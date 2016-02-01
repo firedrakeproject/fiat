@@ -137,10 +137,22 @@ class FiniteElement:
         "Return the dimension of the finite element space."
         return self.poly_set.get_num_members()
 
-    def tabulate(self, order, points):
+    def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to given order of
-        basis functions at given points."""
-        return self.poly_set.tabulate(points, order)
+        basis functions at given points.
+        
+        Modified for trace element tabulation - passing information
+        about the entity of a particular facet element."""
+        
+        # Check if entity information is given. If not, proceed as usual:
+        if entity == None:
+            return self.poly_set.tabulate(points, order)
+        # Entity information is given - will now pass to poly_set.
+        
+        # Will need to add a check to make sure entity info isn't nonsense
+        # Will need to alter poly_set.tabulate()
+        else:
+            return self.poly_set.tabulate(points, order, entity)
 
     def value_shape(self):
         "Return the value shape of the finite element functions."
