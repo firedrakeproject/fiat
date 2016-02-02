@@ -85,7 +85,6 @@ class PolynomialSet:
     def tabulate(self, pts, entity=None, jet_order=0):
         """Returns the values of the polynomial set."""
         
-        """Modified to interpret entity information about facet elements"""
         result = {}
         base_vals = self.expansion_set.tabulate(self.embedded_degree, pts)
         for i in range(jet_order + 1):

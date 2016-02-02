@@ -147,12 +147,14 @@ class FiniteElement:
         # Check if entity information is given. If not, proceed as usual:
         if entity == None:
             return self.poly_set.tabulate(points, order)
-        # Entity information is given - will now pass to poly_set.
         
-        # Will need to add a check to make sure entity info isn't nonsense
-        # Will need to alter poly_set.tabulate()
+        elif entity[0] == self.ref_el.get_spatial_dimension() - 1:
+            # Facet case
+            transform = self.ref_el.get_facet_transform(entity[1])
+            return self.poly_set.tabulate(map(transform, points), order)
+            
         else:
-            return self.poly_set.tabulate(points, order, entity)
+            raise NotImplementedError
 
     def value_shape(self):
         "Return the value shape of the finite element functions."
