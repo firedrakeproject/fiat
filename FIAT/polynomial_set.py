@@ -82,7 +82,7 @@ class PolynomialSet:
                          self.expansion_set.tabulate(self.embedded_degree,
                                                      pts))
 
-    def tabulate(self, pts, entity=None, jet_order=0):
+    def tabulate(self, pts, jet_order=0):
         """Returns the values of the polynomial set."""
         
         result = {}

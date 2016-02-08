@@ -18,6 +18,7 @@
 import numpy as np
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.reference_element import ufc_simplex
+from . import finite_element
 
 
 class TraceHDiv(object):
@@ -45,7 +46,6 @@ class TraceHDiv(object):
 
         # Construct entity ids (assigning top. dim. and initializing as empty)
         self.entity_ids = {}
-        self.empty_entity_ids = {}
         
         # Looping over dictionary of cell topology to construct the empty 
         # dictionary for entity ids of the trace element
@@ -54,13 +54,8 @@ class TraceHDiv(object):
         for top_dim, entities in topology.items():
             self.entity_ids[top_dim] = {}
             
-#            self.empty_entity_ids[top_dim] = {}
-            
             for entity in entities:
                 self.entity_ids[top_dim][entity] = {}
-                
-#                self.empty_entity_ids[top_dim][entity] = {}
-    
 
         # For each facet, we have nf = dim(facet) number of dofs
         # In this case, the facet is a DCLagrange element
@@ -74,24 +69,38 @@ class TraceHDiv(object):
     def degree(self):
         """Return the degree of the (embedding) polynomial space."""
         return self.polyDegree
-        
-#    def empty_entity_ids(self):
-#        """Return the empty entity dictionary (to check it's properly set up)."""
-#        return self.empty_entity_ids()
+    
+    def space_dimension(self):
+        "Return the dimension of the trace finite element space."
+        return self.DCLagrange.space_dimension()*self.num_facets
         
     def entity_ids(self):
         """Return the entity dictionary."""
         return self.entity_ids()
 
-    def get_nodal_basis(self):
-        """Return the nodal basis, encoded as a PolynomialSet object,
-        for the finite element."""
-        raise NotImplementedError
-
-    def get_coeffs(self):
-        """Return the expansion coefficients for the basis of the
-        finite element."""
-        raise NotImplementedError
-
     def tabulate(self, order, points):
-        raise NotImplementedError
+        """Return tabulated values basis functions at given points."""
+        
+        # Derivatives on facets don't make sense, so we raise error:
+        if (order > 0):
+            raise ValueError("Only function evals, no derivatives!")
+        
+        # Initialize basis function values at nodes to be 0 since
+        # all basis functions are 0 except for specific phi on a facet
+        space_dim = self.space_dimension()
+        phiVals = np.zeros((space_dim, len(points)))
+        
+        entity = self.entity_ids
+        
+        # Call modified tabulate and pass entity information along.
+        # Return type is a dictionary!
+        facet_dim = self.DCLagrange.space_dimension()
+        nf = facet_dim
+        
+        for facet_id in range(self.num_facets):
+            nonzeroVals = list(self.DCLagrange.tabulate(order, points, \
+                               entity[facet_dim][facet_id]))[0]
+            
+            phiVals[:,nf*facet_id:nf*(facet_id+1),] = nonzeroVals
+        
+        return {phiVals}
