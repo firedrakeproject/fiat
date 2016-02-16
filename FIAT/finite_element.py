@@ -150,7 +150,7 @@ class FiniteElement:
         
         # Reference element in this case is the DCLagrange element
         # which has the same dimensionality as the facet!
-        elif entity[0] == self.ref_el.get_spatial_dimension():
+        elif entity[0] == self.ref_el.get_spatial_dimension()-1:
             # Facet case
             transform = self.ref_el.get_facet_transform(entity[1])
             return self.poly_set.tabulate(map(transform, points), order)

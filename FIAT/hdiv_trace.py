@@ -91,16 +91,16 @@ class TraceHDiv(object):
         
         # Initialize basis function values at nodes to be 0 since
         # all basis functions are 0 except for specific phi on a facet
-        phiVals = np.zeros((facet_dim+1, len(points)))
+        phiVals = np.zeros((self.space_dimension(), len(points)))
         
         # Call modified tabulate and pass entity information along.
         nf = self.DCLagrange.space_dimension()
         
-	nonzeroVals = self.DCLagrange.tabulate(order, points, entity).values()[0]
+	nonzeroVals = self.DCLagrange.tabulate(order, points).values()[0]
         
         facet_id = entity[1]
             
-        phiVals[:,nf*facet_id:nf*(facet_id+1)] = nonzeroVals
+        phiVals[nf*facet_id:nf*(facet_id+1), :] = nonzeroVals
         
         key = tuple(0 for i in range(facet_dim+1))
         
