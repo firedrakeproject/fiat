@@ -144,19 +144,20 @@ class FiniteElement:
         Modified for trace element tabulation - passing information
         about the entity of a particular facet element."""
         
+        ##TODO: Add a check if element is tensor product element
+        
+        # Something like: if isinstance(self.element, TensorFiniteElement): (?)
+        
         # Check if entity information is given. If not, proceed as usual:
-        if entity == None:
+        if entity == None: # cell base
             return self.poly_set.tabulate(points, order)
         
-        # Reference element in this case is the DCLagrange element
-        # which has the same dimensionality as the facet!
-        elif entity[0] == self.ref_el.get_spatial_dimension()-1:
-            # Facet case
+        elif entity[0] == self.ref_el.get_spatial_dimension()-1: # Facet case
             transform = self.ref_el.get_facet_transform(entity[1])
             return self.poly_set.tabulate(map(transform, points), order)
             
         else:
-            raise NotImplementedError
+            raise NotImplementedError("Not implemented for tensor product elements yet.")
 
     def value_shape(self):
         "Return the value shape of the finite element functions."
