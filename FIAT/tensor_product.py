@@ -227,16 +227,32 @@ class TensorProductElement(FiniteElement):
         # number of dofs just multiplies
         return self.A.space_dimension() * self.B.space_dimension()
 
-    def tabulate(self, order, points):
+    def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to given order of
         basis functions at given points."""
 
-        Asdim = self.A.get_reference_element().get_spatial_dimension()
-        Bsdim = self.B.get_reference_element().get_spatial_dimension()
-        pointsA = [point[0:Asdim] for point in points]
-        pointsB = [point[Asdim:Asdim+Bsdim] for point in points]
-        Atab = self.A.tabulate(order, pointsA)
-        Btab = self.B.tabulate(order, pointsB)
+        if not entity:
+            entity = ((self.A.get_reference_element().get_spatial_dimension(),
+                       self.B.get_reference_element().get_spatial_dimension()),
+                      (0, 0))
+        entity_dim, entity_id = entity
+
+        def s_sum(a):
+            try:
+                return sum(a)
+            except TypeError:
+                return a
+
+        # Sum dimensions in case the sub-elements are themselves tensor products.
+        Aslice = slice(s_sum(entity_dim[0]))
+        Bslice = slice(s_sum(entity_dim[0]), s_sum(entity_dim[0]) + s_sum(entity_dim[1]))
+        pointsA = [point[Aslice] for point in points]
+        pointsB = [point[Bslice] for point in points]
+        # Note that for entities other than cells, the following
+        # tabulations are already appropriately zero-padded so no
+        # additional zero padding is required.
+        Atab = self.A.tabulate(order, pointsA, (entity_dim[0], entity_id[0]))
+        Btab = self.B.tabulate(order, pointsB, (entity_dim[1], entity_id[1]))
         npoints = len(points)
 
         # allow 2 scalar-valued FE spaces, or 1 scalar-valued,
@@ -253,7 +269,7 @@ class TensorProductElement(FiniteElement):
             raise NotImplementedError("tabulate does not support two vector-valued inputs")
         result = {}
         for i in range(order + 1):
-            alphas = mis(Asdim+Bsdim, i)  # thanks, Rob!
+            alphas = mis(entity_dim[0]+entity_dim[1], i)  # thanks, Rob!
             for alpha in alphas:
                 if A_valuedim == 0 and B_valuedim == 0:
                     # for each point, get outer product of (A's basis
@@ -267,8 +283,8 @@ class TensorProductElement(FiniteElement):
                     # Transpose this to get temp[bf][point],
                     # and we are done.
                     temp = numpy.array([numpy.outer(
-                                       Atab[alpha[0:Asdim]][..., j],
-                                       Btab[alpha[Asdim:Asdim+Bsdim]][..., j])
+                                       Atab[alpha[Aslice]][..., j],
+                                       Btab[alpha[Bslice]][..., j])
                         .ravel() for j in range(npoints)])
                     result[alpha] = temp.transpose()
                 elif A_valuedim == 1 and B_valuedim == 0:
@@ -285,8 +301,8 @@ class TensorProductElement(FiniteElement):
                     # finally, transpose the first and last indices
                     # to get temp[bf_i][x/y][point], and we are done.
                     temp = numpy.array([numpy.outer(
-                                       Atab[alpha[0:Asdim]][..., j],
-                                       Btab[alpha[Asdim:Asdim+Bsdim]][..., j])
+                                       Atab[alpha[Aslice]][..., j],
+                                       Btab[alpha[Bslice]][..., j])
                         for j in range(npoints)])
                     temp2 = temp.reshape((temp.shape[0],
                                           temp.shape[1]/2,
@@ -304,9 +320,9 @@ class TensorProductElement(FiniteElement):
                     # flatten middle: temp[point][full bf_i][x/y]
                     # transpose to temp[bf_i][x/y][point]
                     temp = numpy.array([numpy.outer(
-                        Atab[alpha[0:Asdim]][..., j],
-                        Btab[alpha[Asdim:Asdim+Bsdim]][..., j])
-                        for j in range(len(Atab[alpha[0:Asdim]][0]))])
+                        Atab[alpha[Aslice]][..., j],
+                        Btab[alpha[Bslice]][..., j])
+                        for j in range(len(Atab[alpha[Aslice]][0]))])
 
                     temp2 = temp.reshape((temp.shape[0], temp.shape[1],
                                           temp.shape[2]/2, 2))\
