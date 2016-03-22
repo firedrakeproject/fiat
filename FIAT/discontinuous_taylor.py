@@ -26,10 +26,9 @@ class DiscontinuousTaylorDualSet(dual_set.DualSet):
     intervals.  Nodes are function and derivative evaluation
     at the midpoint. This is the discontinuous version where
     all nodes are topologically associated with the cell itself"""
-
     def __init__(self, ref_el, degree):
 
-        assert ref_el.get_spatial_dimension() == 1
+        assert(ref_el.get_spatial_dimension() == 1)
 
         entity_ids = {}
         nodes = []
@@ -41,7 +40,7 @@ class DiscontinuousTaylorDualSet(dual_set.DualSet):
 
         vertices = ref_el.get_vertices()
         midpoint = (vertices[1][0] + vertices[0][0]) / 2.0
-        for k in range(1, degree + 1):
+        for k in range(1, degree+1):
             nodes.append(functional.PointDerivative(ref_el, (midpoint,), [k]))
 
         entity_ids[0] = {}
@@ -55,12 +54,11 @@ class DiscontinuousTaylorDualSet(dual_set.DualSet):
 
 class HigherOrderDiscontinuousTaylor(finite_element.FiniteElement):
     """The discontinuous Taylor finite element. Use a Taylor basis for DG."""
-
     def __init__(self, ref_el, degree):
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = DiscontinuousTaylorDualSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
-        super(HigherOrderDiscontinuousTaylor, self).__init__(poly_set, dual, degree, formdegree)
+        finite_element.FiniteElement.__init__(self, poly_set, dual, degree, formdegree)
 
 
 def DiscontinuousTaylor(ref_el, degree):
