@@ -69,39 +69,18 @@ class Functional(object):
         return
 
     def evaluate(self, f):
-        """Evaluates the functional on some callable object f."""
-        result = 0
+        """Obsolete and broken functional evaluation.
 
-        # non-derivative part
-        # TODO pt_dict? comp?
-        for pt in self. pt_dict:
-            wc_list = self.pt_dict[pt]
-            for (w, c) in wc_list:
-                if comp == tuple:
-                    result += w * f(pt)
-                else:
-                    result += w * f(pt)[comp]
+        To evaluate the functional, call it on the target function:
 
-        # Import AD modules from ScientificPython
-        # import Scientific.Functions.Derivatives as Derivatives
-        for pt in self.deriv_dict:
-            dpt = tuple([Derivatives.DerivVar(pt[i], i, self.max_deriv_order)
-                         for i in range(len(pt))
-                         ])
-            for (w, a, c) in self.deriv_dict[pt]:
-                fpt = f(dpt)
-                order = sum(a)
-                if c == tuple():
-                    val_cur = fpt[order]
-                else:
-                    val_cur = fpt[c][order]
-                for i in range(len[a]):
-                    for j in range(a[j]):
-                        val_cur = val_cur[i]
+          functional(function)
+        """
 
-                result += val_cur
+        raise AttributeError("To evaluate the functional just call it on a function.")
 
-        return result
+    def __call__(self, fn):
+
+        raise NotImplementedError("Evaluation is not yet implemented for %s" % self.__class__)
 
     def get_point_dict(self):
         """Returns the functional information, which is a dictionary
@@ -146,29 +125,8 @@ class Functional(object):
                 for (w, c) in wc_list:
                     result[c][i] += w * bfs[i, j]
 
-        def pt_to_dpt(pt, dorder):
-            assert len(pt) == 0  # code was broken anyway othewise
-            return ()
-
-        # loop over deriv points
-        dpt_dict = self.deriv_dict
-        mdo = self.max_deriv_order
-
-        dpts = list(dpt_dict.keys())
-        dpts_dv = [pt_to_dpt(pt, mdo) for pt in dpts]
-
-        dbfs = es.tabulate(ed, dpts_dv)
-
-        for j in range(len(dpts)):
-            dpt_cur = dpts[j]
-            for i in range(dbfs.shape[0]):
-                for (w, a, c) in dpt_dict[dpt_cur]:
-                    dval_cur = dbfs[i, j][sum(a)]
-                    for k in range(len(a)):
-                        for l in range(a[k]):
-                            dval_cur = dval_cur[k]
-
-                    result[c][i] += w * dval_cur
+        if self.deriv_dict:
+            raise NotImplementedError("Generic to_riesz implementation does not support derivatives")
 
         return result
 
@@ -453,11 +411,13 @@ class PointwiseInnerProductEvaluation(Functional):
 
         wvT = numpy.outer(w, v)
 
-        pt_dict = {p: [(wvT[i][j], (i, j))
-                       for i, j in index_iterator((sd, sd))]}
+        pt_dict = {p: [(wvT[i][j], (i, j, )) for [i, j] in
+                       index_iterator((sd, sd))]}
 
-        shp = (sd, sd)
-        Functional.__init__(self, ref_el, shp, pt_dict, {}, "PointwiseInnerProductEval")
+        shp = (sd, sd, )
+        Functional.__init__(self, ref_el, shp,
+                            pt_dict, {}, "PointwiseInnerProductEval"
+                            )
 
 
 if __name__ == "__main__":
