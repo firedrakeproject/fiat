@@ -17,12 +17,12 @@
 
 from __future__ import absolute_import, print_function, division
 
-from FIAT.finite_element import FiniteElement
+from FIAT.finite_element import CiarletElement
 from FIAT import Lagrange, dual_set
 from six import iteritems
 
 
-class Bubble(FiniteElement):
+class Bubble(CiarletElement):
     """The Bubble finite element: the interior dofs of the Lagrange FE"""
 
     def __init__(self, ref_el, degree):

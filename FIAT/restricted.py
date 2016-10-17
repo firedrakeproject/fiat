@@ -24,10 +24,10 @@ import six
 from six import string_types
 from six import iteritems
 from FIAT.dual_set import DualSet
-from FIAT.finite_element import FiniteElement
+from FIAT.finite_element import CiarletElement
 
 
-class RestrictedElement(FiniteElement):
+class RestrictedElement(CiarletElement):
     """Restrict given element to specified list of dofs."""
 
     def __init__(self, element, indices=None, restriction_domain=None):
