@@ -36,7 +36,7 @@ from FIAT.discontinuous import DiscontinuousElement
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.mixed import MixedElement                       # noqa: F401
 from FIAT.restricted import RestrictedElement             # noqa: F401
-from FIAT.serendipity import S2                           # noqa: F401
+from FIAT.serendipity import Serendipity                  # noqa: F401
 from FIAT.quadrature_element import QuadratureElement     # noqa: F401
 
 # Important functionality

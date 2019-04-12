@@ -107,3 +107,108 @@ class S2(FiniteElement):
                 result[(x_order, y_order)] = result_cur
 
         return result
+
+
+class SerendipityDualSet(DualSet):
+    """The dual basis for quadratic serendipity."""
+
+    def __init__(self, ref_el, degree):
+        # Initialise data structures
+
+        if degree == 1:
+            num_dofs = 4
+        else:
+            num_dofs = (degree+1)*(degree+2)//2+2
+
+        # 1 dof per vertex
+        # degree - 1 dof per edge
+
+        entity_ids = {
+            0: {0: [0],
+                1: [1],
+                2: [2],
+                3: [3]},
+            1: {}, 2: {}}
+
+        cur = 4
+        for e in range(4):
+            entity_ids[1][e] = list(range(cur, cur+degree-1))
+            cur += degree-1
+
+        entity_ids[2][0] = list(range(cur, num_dofs))
+
+        nodes = [None for i in range(num_dofs)]
+
+        super(SerendipityDualSet, self).__init__(nodes, ref_el, entity_ids)
+
+
+class Serendipity(FiniteElement):
+    """Serendipity elements."""
+
+    def __init__(self, ref_el, degree):
+        assert ref_el == UFCQuadrilateral()
+        self.order = degree
+        dual = SerendipityDualSet(ref_el, degree)
+        k = 0  # 0-form
+        super(Serendipity, self).__init__(ref_el, dual, degree, k)
+
+    def degree(self):
+        """The degree of the polynomial space."""
+        return self.order+1
+
+    def value_shape(self):
+        """The value shape of the finite element functions."""
+        return ()
+
+    def tabulate(self, order, points, entity=None):
+        """Return tabulated values of derivatives up to given order of
+        basis functions at given points.
+
+        :arg order: The maximum order of derivative.
+        :arg points: An iterable of points.
+        :arg entity: Optional (dimension, entity number) pair
+                     indicating which topological entity of the
+                     reference element to tabulate on.  If ``None``,
+                     default cell-wise tabulation is performed.
+        """
+        # Transform points to reference cell coordinates
+        ref_el = self.get_reference_element()
+        if entity is None:
+            entity = (ref_el.get_spatial_dimension(), 0)
+
+        num_dofs = len(self.dual.nodes)
+
+        entity_dim, entity_id = entity
+        entity_transform = ref_el.get_entity_transform(entity_dim, entity_id)
+        cell_points = list(map(entity_transform, points))
+
+        degree = self.order
+
+        import sympy
+        leg = sympy.legendre
+        x, y = sympy.var("x,y")
+        bfs = ([(1-x)*(1-y), (1-x)*y, x*(1-y), x*y] +
+               [leg(i, 2*y-1) * (1-x) * y*(y-1) for i in range(degree-1)] +
+               [leg(i, 2*y-1) * x * y*(y-1) for i in range(degree-1)] +
+               [leg(i, 2*x-1) * (1-y) * x*(x-1) for i in range(degree-1)] +
+               [leg(i, 2*x-1) * y * x*(x-1) for i in range(degree-1)])
+
+        for i in range(4, degree+1):
+            bfs += [leg(j, 2*x-1) * leg(i-4-j, 2*y-1) * x*(x-1)*y*(y-1)
+                    for j in range(i-3)]
+
+        assert len(bfs) == num_dofs
+
+        result = {}
+
+        for diff_order in range(order+1):
+            for y_order in range(diff_order+1):
+                x_order = diff_order - y_order
+                result_cur = numpy.zeros((num_dofs, len(cell_points)))
+                dbfs = [bf.diff((x, x_order), (y, y_order)) for bf in bfs]
+                for i, bf in enumerate(dbfs):
+                    for j, pt in enumerate(cell_points):
+                        result_cur[i, j] = bf.subs([(x, pt[0]), (y, pt[1])])
+                result[(x_order, y_order)] = result_cur
+
+        return result
