@@ -17,7 +17,6 @@
 # You should have received a copy of the GNU Lesser General Public
 # License along with FIAT.  If not, see <https://www.gnu.org/licenses/>.
 
-import math
 import numpy
 
 from FIAT.finite_element import FiniteElement
@@ -42,7 +41,7 @@ class S2DualSet(DualSet):
                 3: [7]},
             2: {0: []}}
 
-        nodes = []
+        nodes = [None for i in range(8)]
 
         super(S2DualSet, self).__init__(nodes, ref_el, entity_ids)
 
@@ -94,21 +93,17 @@ class S2(FiniteElement):
                x*(1-y)*y,
                (1-x)*x*(1-y),
                (1-x)*x*y]
-        
+
         result = {}
 
         for diff_order in range(order+1):
             for y_order in range(diff_order+1):
                 x_order = diff_order - y_order
                 result_cur = numpy.zeros((8, len(cell_points)))
-                dbfs = [bf.diff((x,x_order), (y, y_order)) for bf in bfs]
+                dbfs = [bf.diff((x, x_order), (y, y_order)) for bf in bfs]
                 for i, bf in enumerate(dbfs):
                     for j, pt in enumerate(cell_points):
                         result_cur[i, j] = bf.subs([(x, pt[0]), (y, pt[1])])
                 result[(x_order, y_order)] = result_cur
 
         return result
-
-        
-
-
