@@ -50,16 +50,42 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         y_mid = 2*y-(verts[-1][1] + verts[0][1])
 
         EL = e_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
-        ETL = e_tilda_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
+        FL = f_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
+        bdmce_list = ET + FL
+
+        entity_ids = {}
+        cur = 0
+
+        for top_dim, entities in flat_topology.items():
+            entity_ids[top_dim] = {}
+            for entity in entities:
+                entity_ids[top_dim][entity] = []
+
+        for j in sorted(flat_topology[1]):
+            entity_ids[1][j] = list(range(cur, cur + degree + 1))
+            cur = cur + degree + 1
+
+        entity_ids[2][0] = list(range(cur, cur + len(FL)))
+        cur += len(FL)
+
+        assert len(bdmce_list) == cur
 
 
-def e_lambda_1_2d(i, dx, dy, x_mid, y_mid):
-    EL = tuple([(0, y_mid**j*a) for a in dx for j in range(i)] + [(x_mid**j*a, 0) for a in dy for j in range(i)])
+def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
+    EL = tuple([(0, y_mid**j*dx[0]) for j in range(deg)] +
+               [(y_mid**(r-1)*dy[0]*dy[1], (r+1)*y_mid**r*dx[0])] +
+               [(0, y_mid**j*dx[1]) for j in range(deg)] +
+               [(y_mid**(r-1)*dy[0]*dy[1], (r+1)*y_mid**r*dx[1])] +
+               [(x_mid**j*dy[0], 0) for j in range(deg)] +
+               [((r+1)*x_mid**r*dy[0], x_mid**(r-1)*dx[0]*dx[1])] +
+               [(x_mid**j*dy[1], 0) for j in range(deg)] +
+               [((r+1)*x_mid**r*dy[1], x_mid**(r-1)*dx[0]*dx[1])])
 
     return EL
 
-def e_tilda_lambda_1_2d(r, dx, dy, x_mid, y_mid):
-    ETL = tuple([(y_mid**(r-1)*dy[0]*dy[1], (r+1)*y_mid**r*a) for a in dx] +
-                [((r+1)*x_mid**r*a, x_mid**(r-1)*dx[0]*dx[1]) for a in dy])
 
-    return ETL
+def f_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
+    FL = tuple([(x_mid**j*y_mid**(deg-2-j)*dy[0]*dy[1], 0) for j in range(2, deg+1)] +
+               [(0, x_mid**j*y_mid**(deg-2-j)*dx[0]*dx[1]) for j in range(2, deg+1)])
+
+    return FL
