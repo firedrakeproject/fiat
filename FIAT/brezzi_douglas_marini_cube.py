@@ -69,6 +69,68 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         cur += len(FL)
 
         assert len(bdmce_list) == cur
+        formdegree = 1
+
+        super(BrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
+
+        self.basis = {(0, 0): Array(bdmce_list)}
+
+        topology = ref_el.get_topology()
+        unflattening_map = compute_unflattening_map(topology)
+        unflattened_entity_ids = {}
+        unflattened_entity_closure_ids = {}
+
+        entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
+
+        for dim, entities in sorted(topology.items()):
+            unflattened_entity_ids[dim] = {}
+            unflattened_entity_closure_ids[dim] = {}
+        for dim, entities in sorted(flat_topology.items()):
+            for entity in entities:
+                unflat_dim, unflat_entity = unflattening_map[(dim, entity)]
+                unflattened_entity_ids[unflat_dim][unflat_entity] = entity_ids[dim][entity]
+                unflattened_entity_closure_ids[unflat_dim][unflat_entity] = entity_closure_ids[dim][entity]
+        self.entity_ids = unflattened_entity_ids
+        self.entity_closure_ids = unflattened_entity_closure_ids
+        self._degree = degree
+        self.flat_el = flat_el
+
+    def degree(self):
+        return self._degree + 1
+
+    def get_nodal_basis(self):
+        raise NotImplementedError("get_nodal_basis not implemented for serendipity")
+
+    def get_dual_set(self):
+        raise NotImplementedError("get_dual_set is not implemented for serendipity")
+
+    def get_coeffs(self):
+        raise NotImplementedError("get_coeffs not implemented for serendipity")
+
+    def tabulate(self, order, points, entity=None):
+        raise NotImplementedError
+
+    def entity_dofs(self):
+        """Return the map of topological entities to degrees of
+        freedom for the finite element."""
+        return self.entity_ids
+
+    def entity_closure_dofs(self):
+        """Return the map of topological entities to degrees of
+        freedom on the closure of those entities for the finite element."""
+        return self.entity_closure_ids
+
+    def value_shape(self):
+        return (2,)
+
+    def dmats(self):
+        raise NotImplementedError
+
+    def get_num_members(self, arg):
+        raise NotImplementedError
+
+    def space_dimension(self):
+        return len(self.basis[(0,)*self.flat_el.get_spatial_dimension()])
 
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
