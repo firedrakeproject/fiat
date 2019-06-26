@@ -22,7 +22,7 @@ import numpy as np
 from FIAT.finite_element import FiniteElement
 from FIAT.lagrange import Lagrange
 from FIAT.dual_set import make_entity_closure_ids
-from FIAT.polynomial_set import mis
+from FIAT.polynomialsnomial_set import mis
 from FIAT.reference_element import (compute_unflattening_map,
                                     flatten_reference_cube)
 
@@ -165,14 +165,14 @@ class Serendipity(FiniteElement):
             alphas = mis(dim, o)
             for alpha in alphas:
                 try:
-                    poly = self.basis[alpha]
+                    polynomials = self.basis[alpha]
                 except KeyError:
-                    poly = diff(self.basis[(0,)*dim], *zip(variables, alpha))
-                    self.basis[alpha] = poly
-                T = np.zeros((len(poly), len(points)))
+                    polynomials = diff(self.basis[(0,)*dim], *zip(variables, alpha))
+                    self.basis[alpha] = polynomials
+                T = np.zeros((len(polynomials), len(points)))
                 for i in range(len(points)):
                     subs = {v: points[i][k] for k, v in enumerate(variables[:dim])}
-                    for j, f in enumerate(poly):
+                    for j, f in enumerate(polynomials):
                         T[j, i] = f.evalf(subs=subs)
                 phivals[alpha] = T
 
