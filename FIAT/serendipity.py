@@ -22,7 +22,7 @@ import numpy as np
 from FIAT.finite_element import FiniteElement
 from FIAT.lagrange import Lagrange
 from FIAT.dual_set import make_entity_closure_ids
-from FIAT.polynomialsnomial_set import mis
+from FIAT.polynomial_set import mis
 from FIAT.reference_element import (compute_unflattening_map,
                                     flatten_reference_cube)
 

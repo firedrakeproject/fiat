@@ -72,6 +72,8 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         assert len(bdmce_list) == cur
         formdegree = 1
 
+        entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
+
         super(BrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
 
         self.basis = {(0, 0): Array(bdmce_list)}
@@ -80,8 +82,6 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         unflattening_map = compute_unflattening_map(topology)
         unflattened_entity_ids = {}
         unflattened_entity_closure_ids = {}
-
-        entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
         for dim, entities in sorted(topology.items()):
             unflattened_entity_ids[dim] = {}
@@ -109,7 +109,33 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         raise NotImplementedError("get_coeffs not implemented for bdmce")
 
     def tabulate(self, order, points, entity=None):
-        raise NotImplementedError
+
+        if entity is None:
+            entity = (self.ref_el.get_spatial_dimension(), 0)
+
+        entity_dim, entity_id = entity
+        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
+        points = list(map(transform, points))
+
+        phivals = {}
+
+        for o in range(order+1):
+            alphas = mis(2, o)
+            for alpha in alphas:
+                try:
+                    polynomials = self.basis[alpha]
+                except KeyError:
+                    polynomials = diff(self.basis[(0,)*dim], *zip(variables, alpha))
+                    self.basis[alpha] = polynomials
+                T = np.zeros((len(polynomials), 2, len(points)))
+                for i in range(len(points)):
+                    subs = {v: points[i][k] for k, v in enumerate(variables[:2])}
+                    for k in range(2):
+                        for j, f in enumerate(polynomials[:, k]):
+                            T[j, :, i] = f.evalf(subs=subs)
+                phivals[alpha] = T
+
+        return phivals
 
     def entity_dofs(self):
         """Return the map of topological entities to degrees of
@@ -131,7 +157,7 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         raise NotImplementedError
 
     def space_dimension(self):
-        return len(self.basis[(0,)*self.flat_el.get_spatial_dimension()])
+        return 2
 
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
