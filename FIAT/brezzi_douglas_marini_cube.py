@@ -24,6 +24,7 @@ from FIAT.lagrange import Lagrange
 from FIAT.dual_set import make_entity_closure_ids
 from FIAT.polynomial_set import mis
 from FIAT.serendipity import tr
+from FIAT.reference_element import compute_unflattening_map, flatten_reference_cube
 
 x, y, z = symbols('x y z')
 variables = (x, y, z)
@@ -51,7 +52,7 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
 
         EL = e_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
         FL = f_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
-        bdmce_list = ET + FL
+        bdmce_list = EL + FL
 
         entity_ids = {}
         cur = 0
@@ -99,13 +100,13 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         return self._degree + 1
 
     def get_nodal_basis(self):
-        raise NotImplementedError("get_nodal_basis not implemented for serendipity")
+        raise NotImplementedError("get_nodal_basis not implemented for bdmce")
 
     def get_dual_set(self):
-        raise NotImplementedError("get_dual_set is not implemented for serendipity")
+        raise NotImplementedError("get_dual_set is not implemented for bdmce")
 
     def get_coeffs(self):
-        raise NotImplementedError("get_coeffs not implemented for serendipity")
+        raise NotImplementedError("get_coeffs not implemented for bdmce")
 
     def tabulate(self, order, points, entity=None):
         raise NotImplementedError
@@ -135,13 +136,13 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
     EL = tuple([(0, y_mid**j*dx[0]) for j in range(deg)] +
-               [(y_mid**(r-1)*dy[0]*dy[1], (r+1)*y_mid**r*dx[0])] +
+               [(y_mid**(deg-1)*dy[0]*dy[1], (deg+1)*y_mid**deg*dx[0])] +
                [(0, y_mid**j*dx[1]) for j in range(deg)] +
-               [(y_mid**(r-1)*dy[0]*dy[1], (r+1)*y_mid**r*dx[1])] +
+               [(y_mid**(deg-1)*dy[0]*dy[1], (deg+1)*y_mid**deg*dx[1])] +
                [(x_mid**j*dy[0], 0) for j in range(deg)] +
-               [((r+1)*x_mid**r*dy[0], x_mid**(r-1)*dx[0]*dx[1])] +
+               [((deg+1)*x_mid**deg*dy[0], x_mid**(deg-1)*dx[0]*dx[1])] +
                [(x_mid**j*dy[1], 0) for j in range(deg)] +
-               [((r+1)*x_mid**r*dy[1], x_mid**(r-1)*dx[0]*dx[1])])
+               [((deg+1)*x_mid**deg*dy[1], x_mid**(deg-1)*dx[0]*dx[1])])
 
     return EL
 
