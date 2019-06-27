@@ -16,6 +16,7 @@ from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.discontinuous_taylor import DiscontinuousTaylor
 from FIAT.discontinuous_raviart_thomas import DiscontinuousRaviartThomas
 from FIAT.serendipity import Serendipity
+from FIAT.brezzi_douglas_marini_cube import BrezziDouglasMariniCubeEdge, BrezziDouglasMariniCubeFace
 from FIAT.discontinuous_pc import DPC
 from FIAT.brezzi_douglas_marini_cube import BrezziDouglasMariniCube
 from FIAT.hermite import CubicHermite
