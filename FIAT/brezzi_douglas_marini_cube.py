@@ -31,7 +31,7 @@ variables = (x, y, z)
 leg = legendre
 
 
-class BrezziDouglasMariniCubeEdge(FiniteElement):
+class BrezziDouglasMariniCube(FiniteElement):
     def __init__(self, ref_el, degree):
         if degree < 1:
             raise Exception("BDMce_k elements only valid for k >= 1")
@@ -51,7 +51,10 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         y_mid = 2*y-(verts[-1][1] + verts[0][1])
 
         EL = e_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
-        FL = f_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
+        if degree >= 2:
+            FL = f_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
+        else:
+            FL = ()
         bdmce_list = EL + FL
 
         entity_ids = {}
@@ -74,7 +77,8 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
-        super(BrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
+        super(BrezziDouglasMariniCube, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
+                                                      mapping="contravariant piola")
 
         self.basis = {(0, 0): Array(bdmce_list)}
 
@@ -97,7 +101,7 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         self.flat_el = flat_el
 
     def degree(self):
-        return self._degree + 1
+        return self._degree
 
     def get_nodal_basis(self):
         raise NotImplementedError("get_nodal_basis not implemented for bdmce")
@@ -111,7 +115,7 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
     def tabulate(self, order, points, entity=None):
 
         if entity is None:
-            entity = (self.ref_el.get_spatial_dimension(), 0)
+            entity = (self.ref_el.get_dimension(), 0)
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
@@ -125,14 +129,15 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
                 try:
                     polynomials = self.basis[alpha]
                 except KeyError:
-                    polynomials = diff(self.basis[(0,)*dim], *zip(variables, alpha))
+                    polynomials = diff(self.basis[(0, 0)], *zip(variables, alpha))
                     self.basis[alpha] = polynomials
-                T = np.zeros((len(polynomials), 2, len(points)))
+                T = np.zeros((len(polynomials[:, 0]), 2, len(points)))
                 for i in range(len(points)):
                     subs = {v: points[i][k] for k, v in enumerate(variables[:2])}
-                    for k in range(2):
-                        for j, f in enumerate(polynomials[:, k]):
-                            T[j, :, i] = f.evalf(subs=subs)
+                    for j, f in enumerate(polynomials[:, 0]):
+                        T[j, 0, i] = f.evalf(subs=subs)
+                    for j, f in enumerate(polynomials[:, 1]):
+                        T[j, 1, i] = f.evalf(subs=subs)
                 phivals[alpha] = T
 
         return phivals
@@ -157,7 +162,7 @@ class BrezziDouglasMariniCubeEdge(FiniteElement):
         raise NotImplementedError
 
     def space_dimension(self):
-        return 2
+        return int(len(self.basis[(0, 0)])/2)
 
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
@@ -174,7 +179,7 @@ def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
 
 
 def f_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
-    FL = tuple([(x_mid**j*y_mid**(deg-2-j)*dy[0]*dy[1], 0) for j in range(2, deg+1)] +
-               [(0, x_mid**j*y_mid**(deg-2-j)*dx[0]*dx[1]) for j in range(2, deg+1)])
+    FL = tuple([(x_mid**j*y_mid**(deg-2-j)*dy[0]*dy[1], 0) for j in range(deg-1)] +
+               [(0, x_mid**j*y_mid**(deg-2-j)*dx[0]*dx[1]) for j in range(deg-1)])
 
     return FL
