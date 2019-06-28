@@ -166,14 +166,14 @@ class BrezziDouglasMariniCube(FiniteElement):
 
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
-    EL = tuple([(0, y_mid**j*dx[0]) for j in range(deg)] +
-               [(y_mid**(deg-1)*dy[0]*dy[1], (deg+1)*y_mid**deg*dx[0])] +
-               [(0, y_mid**j*dx[1]) for j in range(deg)] +
-               [(y_mid**(deg-1)*dy[0]*dy[1], (deg+1)*y_mid**deg*dx[1])] +
-               [(x_mid**j*dy[0], 0) for j in range(deg)] +
-               [((deg+1)*x_mid**deg*dy[0], x_mid**(deg-1)*dx[0]*dx[1])] +
-               [(x_mid**j*dy[1], 0) for j in range(deg)] +
-               [((deg+1)*x_mid**deg*dy[1], x_mid**(deg-1)*dx[0]*dx[1])])
+    EL = tuple([(0, -y_mid**j*dx[0]) for j in range(deg)] +
+               [(-y_mid**(deg-1)*dy[0]*dy[1], -(deg+1)*y_mid**deg*dx[0])] +
+               [(0, -y_mid**j*dx[1]) for j in range(deg)] +
+               [(-y_mid**(deg-1)*dy[0]*dy[1], -(deg+1)*y_mid**deg*dx[1])] +
+               [(-x_mid**j*dy[0], 0) for j in range(deg)] +
+               [(-(deg+1)*x_mid**deg*dy[0], -x_mid**(deg-1)*dx[0]*dx[1])] +
+               [(-x_mid**j*dy[1], 0) for j in range(deg)] +
+               [(-(deg+1)*x_mid**deg*dy[1], -x_mid**(deg-1)*dx[0]*dx[1])])
 
     return EL
 
@@ -217,5 +217,5 @@ class BrezziDouglasMariniCubeFace(BrezziDouglasMariniCube):
         bdmcf_list = EL + FL
         bdmcf_list = [[a[1], -a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
-        
+
         super(BrezziDouglasMariniCubeFace, self).__init__(ref_el=ref_el, degree=degree)
