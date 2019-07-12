@@ -1035,7 +1035,7 @@ def is_hypercube(cell):
 
 
 def flatten_reference_cube(ref_el):
-    """ ... """
+    """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
     flattened_cube = {2: UFCQuadrilateral(), 3: UFCHexahedron()}
     if numpy.sum(ref_el.get_dimension()) <= 1:
         # Just return point/interval cell arguments
