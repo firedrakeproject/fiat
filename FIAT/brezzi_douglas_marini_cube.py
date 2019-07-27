@@ -31,6 +31,10 @@ variables = (x, y, z)
 leg = legendre
 
 
+def triangular_number(n):
+    return int((n+1)*n/2)
+
+
 class BrezziDouglasMariniCube(FiniteElement):
     def __init__(self, ref_el, degree):
         if degree < 1:
@@ -42,20 +46,6 @@ class BrezziDouglasMariniCube(FiniteElement):
             raise Exception("BDMce_k elements only valid for dimension 2")
 
         flat_topology = flat_el.get_topology()
-
-        verts = flat_el.get_vertices()
-
-        dx = ((verts[-1][0] - x)/(verts[-1][0] - verts[0][0]), (x - verts[0][0])/(verts[-1][0] - verts[0][0]))
-        dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
-        x_mid = 2*x-(verts[-1][0] + verts[0][0])
-        y_mid = 2*y-(verts[-1][1] + verts[0][1])
-
-        EL = e_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
-        if degree >= 2:
-            FL = f_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
-        else:
-            FL = ()
-        bdmce_list = EL + FL
 
         entity_ids = {}
         cur = 0
@@ -69,18 +59,15 @@ class BrezziDouglasMariniCube(FiniteElement):
             entity_ids[1][j] = list(range(cur, cur + degree + 1))
             cur = cur + degree + 1
 
-        entity_ids[2][0] = list(range(cur, cur + len(FL)))
-        cur += len(FL)
+        entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 1)))
+        cur += 2*triangular_number(degree - 1)
 
-        assert len(bdmce_list) == cur
         formdegree = 1
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
         super(BrezziDouglasMariniCube, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
                                                       mapping="contravariant piola")
-
-        self.basis = {(0, 0): Array(bdmce_list)}
 
         topology = ref_el.get_topology()
         unflattening_map = compute_unflattening_map(topology)
@@ -166,27 +153,51 @@ class BrezziDouglasMariniCube(FiniteElement):
 
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
-    EL = tuple([(0, -y_mid**j*dx[0]) for j in range(deg)] +
-               [(-y_mid**(deg-1)*dy[0]*dy[1], -(deg+1)*y_mid**deg*dx[0])] +
-               [(0, -y_mid**j*dx[1]) for j in range(deg)] +
-               [(-y_mid**(deg-1)*dy[0]*dy[1], -(deg+1)*y_mid**deg*dx[1])] +
-               [(-x_mid**j*dy[0], 0) for j in range(deg)] +
-               [(-(deg+1)*x_mid**deg*dy[0], -x_mid**(deg-1)*dx[0]*dx[1])] +
-               [(-x_mid**j*dy[1], 0) for j in range(deg)] +
-               [(-(deg+1)*x_mid**deg*dy[1], -x_mid**(deg-1)*dx[0]*dx[1])])
+    EL = tuple([(0, -leg(j, y_mid)*dx[0]) for j in range(deg)] +
+               [(-leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[0])] +
+               [(0, -leg(j, y_mid)*dx[1]) for j in range(deg)] +
+               [(leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[1])] +
+               [(-leg(j, x_mid)*dy[0], 0) for j in range(deg)] +
+               [(-leg(deg, x_mid)*dy[0], -leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))] +
+               [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)] +
+               [(-leg(deg, x_mid)*dy[1], leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))])
 
     return EL
 
 
 def f_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
-    FL = tuple([(x_mid**j*y_mid**(deg-2-j)*dy[0]*dy[1], 0) for j in range(deg-1)] +
-               [(0, x_mid**j*y_mid**(deg-2-j)*dx[0]*dx[1]) for j in range(deg-1)])
+    FL = tuple([(x_mid**j*y_mid**(k-2-j)*dy[0]*dy[1], 0) for k in range(2, deg+1) for j in range(k-1)] +
+               [(0, x_mid**j*y_mid**(k-2-j)*dx[0]*dx[1]) for k in range(2, deg+1) for j in range(k-1)])
 
     return FL
 
 
 class BrezziDouglasMariniCubeEdge(BrezziDouglasMariniCube):
     def __init__(self, ref_el, degree):
+        if degree < 1:
+            raise Exception("BDMcf_k elements only valid for k >= 1")
+
+        flat_el = flatten_reference_cube(ref_el)
+        dim = flat_el.get_spatial_dimension()
+        if dim != 2:
+            raise Exception("BDMcf_k elements only valid for dimension 2")
+
+        flat_topology = flat_el.get_topology()
+
+        verts = flat_el.get_vertices()
+
+        dx = ((verts[-1][0] - x)/(verts[-1][0] - verts[0][0]), (x - verts[0][0])/(verts[-1][0] - verts[0][0]))
+        dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
+        x_mid = 2*x-(verts[-1][0] + verts[0][0])
+        y_mid = 2*y-(verts[-1][1] + verts[0][1])
+
+        EL = e_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
+        if degree >= 2:
+            FL = f_lambda_1_2d(degree, dx, dy, x_mid, y_mid)
+        else:
+            FL = ()
+        bdmce_list = EL + FL
+        self.basis = {(0, 0): Array(bdmce_list)}
         super(BrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, degree=degree)
 
 
@@ -215,7 +226,7 @@ class BrezziDouglasMariniCubeFace(BrezziDouglasMariniCube):
         else:
             FL = ()
         bdmcf_list = EL + FL
-        bdmcf_list = [[a[1], -a[0]] for a in bdmcf_list]
+        bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
 
         super(BrezziDouglasMariniCubeFace, self).__init__(ref_el=ref_el, degree=degree)
