@@ -20,10 +20,8 @@
 from sympy import symbols, legendre, Array, diff
 import numpy as np
 from FIAT.finite_element import FiniteElement
-from FIAT.lagrange import Lagrange
 from FIAT.dual_set import make_entity_closure_ids
 from FIAT.polynomial_set import mis
-from FIAT.serendipity import tr
 from FIAT.reference_element import compute_unflattening_map, flatten_reference_cube
 
 x, y, z = symbols('x y z')
@@ -182,8 +180,6 @@ class BrezziDouglasMariniCubeEdge(BrezziDouglasMariniCube):
         if dim != 2:
             raise Exception("BDMcf_k elements only valid for dimension 2")
 
-        flat_topology = flat_el.get_topology()
-
         verts = flat_el.get_vertices()
 
         dx = ((verts[-1][0] - x)/(verts[-1][0] - verts[0][0]), (x - verts[0][0])/(verts[-1][0] - verts[0][0]))
@@ -210,8 +206,6 @@ class BrezziDouglasMariniCubeFace(BrezziDouglasMariniCube):
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
             raise Exception("BDMcf_k elements only valid for dimension 2")
-
-        flat_topology = flat_el.get_topology()
 
         verts = flat_el.get_vertices()
 
