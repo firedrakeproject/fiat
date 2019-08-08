@@ -154,20 +154,20 @@ class BrezziDouglasMariniCube(FiniteElement):
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
     EL = tuple([(0, -leg(j, y_mid)*dx[0]) for j in range(deg)] +
-               [(-leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[0])] +
+               [(-leg(deg-1, y_mid)*dy[0]*dy[1]/deg, -leg(deg, y_mid)*dx[0])] +
                [(0, -leg(j, y_mid)*dx[1]) for j in range(deg)] +
-               [(leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[1])] +
+               [(leg(deg-1, y_mid)*dy[0]*dy[1]/deg, -leg(deg, y_mid)*dx[1])] +
                [(-leg(j, x_mid)*dy[0], 0) for j in range(deg)] +
-               [(-leg(deg, x_mid)*dy[0], -leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))] +
+               [(-leg(deg, x_mid)*dy[0], -leg(deg-1, x_mid)*dx[0]*dx[1]/deg)] +
                [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)] +
-               [(-leg(deg, x_mid)*dy[1], leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))])
+               [(-leg(deg, x_mid)*dy[1], leg(deg-1, x_mid)*dx[0]*dx[1]/deg)])
 
     return EL
 
 
 def f_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
-    FL = tuple([(x_mid**j*y_mid**(k-2-j)*dy[0]*dy[1], 0) for k in range(2, deg+1) for j in range(k-1)] +
-               [(0, x_mid**j*y_mid**(k-2-j)*dx[0]*dx[1]) for k in range(2, deg+1) for j in range(k-1)])
+    FL = tuple([(leg(j, x_mid)*leg(k-2-j, y_mid)*dy[0]*dy[1], 0) for k in range(2, deg+1) for j in range(k-1)] +
+               [(0, -leg(k-2-j, x_mid)*leg(j, y_mid)*dx[0]*dx[1]) for k in range(2, deg+1) for j in range(k-1)])
 
     return FL
 
