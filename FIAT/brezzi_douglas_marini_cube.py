@@ -164,10 +164,13 @@ def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
 
 
 def f_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
-    FL = tuple([(leg(j, x_mid)*leg(k-2-j, y_mid)*dy[0]*dy[1], 0) for k in range(2, deg+1) for j in range(k-1)] +
-               [(0, -leg(k-2-j, x_mid)*leg(j, y_mid)*dx[0]*dx[1]) for k in range(2, deg+1) for j in range(k-1)])
+    FL = []
+    for k in range(2, deg+1):
+        for j in range(k-1):
+            FL += [(0, leg(j, x_mid)*leg(k-2-j, y_mid)*dx[0]*dx[1])]
+            FL += [(leg(k-2-j, x_mid)*leg(j, y_mid)*dy[0]*dy[1], 0)]
 
-    return FL
+    return tuple(FL)
 
 
 class BrezziDouglasMariniCubeEdge(BrezziDouglasMariniCube):
