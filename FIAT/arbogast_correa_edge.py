@@ -37,4 +37,41 @@ class ArbogastCorreaEdge(FiniteElement):
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 3:
-            raise Exception("AAce_k elements only valid for dimension 3")
+            raise Exception("AAe_k elements only valid for dimension 3")
+
+        dx = ((verts[-1][0] - x)/(verts[-1][0] - verts[0][0]), (x - verts[0][0])/(verts[-1][0] - verts[0][0]))
+        dy = ((verts[-1][1] - y)/(verts[-1][1] - verts[0][1]), (y - verts[0][1])/(verts[-1][1] - verts[0][1]))
+        dz = ((verts[-1][2] - z)/(verts[-1][2] - verts[0][2]), (z - verts[0][2])/(verts[-1][2] - verts[0][2]))
+        x_mid = 2*x-(verts[-1][0] + verts[0][0])
+        y_mid = 2*y-(verts[-1][1] + verts[0][1])
+        z_mid = 2*z-(verts[-1][2] + verts[0][2])
+
+    super(ArbogastCorreaEdge, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
+                                                  mapping="covariant piola")
+
+
+def e_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
+    EL = tuple([(0, 0, leg(j, z_mid)*dx[0]*dy[0]) for j in range(deg)] +
+               [(leg(deg-1, z_mid)*dy[0]*dz[0]*dz[1], leg(deg-1, z_mid)*dx[0]*dz[0]*dz[1], (deg+1)*leg(deg, z_mid)*dx[0]*dy[0])] +
+               [(0, 0, leg(j, z_mid)*dx[0]*dy[1]) for j in range(deg)] +
+               [(leg(deg-1, z_mid)*dy[1]*dz[0]*dz[1], leg(deg-1, z_mid)*dx[0]*dz[0]*dz[1], (deg+1)*leg(deg, z_mid)*dx[0]*dy[1])] +
+               [(0, 0, leg(j, z_mid)*dx[1]*dy[0]) for j in range(deg)] +
+               [(leg(deg-1, z_mid)*dy[0]*dz[0]*dz[1], leg(deg-1, z_mid)*dx[1]*dz[0]*dz[1], (deg+1)*leg(deg, z_mid)*dx[1]*dy[0])] +
+               [(0, 0, leg(j, z_mid)*dx[1]*dy[1]) for j in range(deg)] +
+               [(leg(deg-1, z_mid)*dy[1]*dz[0]*dz[1], leg(deg-1, z_mid)*dx[1]*dz[0]*dz[1], (deg+1)*leg(deg, z_mid)*dx[1]*dy[1])] +
+               [(0, leg(j, y_mid)*dx[0]*dz[0], 0) for j in range(deg)] +
+               [(leg(deg-1, y_mid)*dz[0]*dy[0]*dy[1], (deg+1)*leg(deg, y_mid)*dx[0]*dz[0], leg(deg-1, y_mid)*dx[0]*dy[0]*dy[1])] +
+               [(0, leg(j, y_mid)*dx[0]*dz[1], 0) for j in range(deg)] +
+               [(leg(deg-1, y_mid)*dz[1]*dy[0]*dy[1], (deg+1)*leg(deg, y_mid)*dx[0]*dz[1], leg(deg-1, y_mid)*dx[0]*dy[0]*dy[1])] +
+               [(0, leg(j, y_mid)*dx[1]*dz[0], 0) for j in range(deg)] +
+               [(leg(deg-1, y_mid)*dz[0]*dy[0]*dy[1], (deg+1)*leg(deg, y_mid)*dx[1]*dz[0], leg(deg-1, y_mid)*dx[1]*dy[0]*dy[1])] +
+               [(0, leg(j, y_mid)*dx[1]*dz[1], 0) for j in range(deg)] +
+               [(leg(deg-1, y_mid)*dz[1]*dy[0]*dy[1], (deg+1)*leg(deg, y_mid)*dx[1]*dz[1], leg(deg-1, y_mid)*dx[1]*dy[0]*dy[1])] +
+               [(leg(j, x_mid)*dy[0]*dz[0], 0, 0) for j in range(deg)] +
+               [((deg+1)*leg(deg, x_mid)*dy[0]*dz[0], leg(deg-1, x_mid)*dz[0]*dx[0]*dx[1], leg(deg-1, x_mid)*dy[0]*dx[0]*dx[1])] +
+               [(leg(j, x_mid)*dy[0]*dz[1], 0, 0) for j in range(deg)] +
+               [((deg+1)*leg(deg, x_mid)*dy[0]*dz[1], leg(deg-1, x_mid)*dz[1]*dx[0]*dx[1], leg(deg-1, x_mid)*dy[0]*dx[0]*dx[1])] +
+               [(leg(j, x_mid)*dy[1]*dz[0], 0, 0) for j in range(deg)] +
+               [((deg+1)*leg(deg, x_mid)*dy[1]*dz[0], leg(deg-1, x_mid)*dz[0]*dx[0]*dx[1], leg(deg-1, x_mid)*dy[1]*dx[0]*dx[1])] +
+               [(leg(j, x_mid)*dy[1]*dz[1], 0, 0) for j in range(deg)] +
+               [((deg+1)*leg(deg, x_mid)*dy[1]*dz[1], leg(deg-1, x_mid)*dz[1]*dx[0]*dx[1], leg(deg-1, x_mid)*dy[1]*dx[0]*dx[1])])
