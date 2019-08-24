@@ -34,7 +34,7 @@ def triangular_number(n):
 
 
 class BrezziDouglasMariniCube(FiniteElement):
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, mapping):
         if degree < 1:
             raise Exception("BDMce_k elements only valid for k >= 1")
 
@@ -65,7 +65,7 @@ class BrezziDouglasMariniCube(FiniteElement):
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
         super(BrezziDouglasMariniCube, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree,
-                                                      mapping="contravariant piola")
+                                                      mapping=mapping)
 
         topology = ref_el.get_topology()
         unflattening_map = compute_unflattening_map(topology)
@@ -197,7 +197,7 @@ class BrezziDouglasMariniCubeEdge(BrezziDouglasMariniCube):
             FL = ()
         bdmce_list = EL + FL
         self.basis = {(0, 0): Array(bdmce_list)}
-        super(BrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, degree=degree)
+        super(BrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
 class BrezziDouglasMariniCubeFace(BrezziDouglasMariniCube):
@@ -226,4 +226,4 @@ class BrezziDouglasMariniCubeFace(BrezziDouglasMariniCube):
         bdmcf_list = [[-a[1], a[0]] for a in bdmcf_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
 
-        super(BrezziDouglasMariniCubeFace, self).__init__(ref_el=ref_el, degree=degree)
+        super(BrezziDouglasMariniCubeFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
