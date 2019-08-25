@@ -75,3 +75,16 @@ def e_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
                [((deg+1)*leg(deg, x_mid)*dy[1]*dz[0], leg(deg-1, x_mid)*dz[0]*dx[0]*dx[1], leg(deg-1, x_mid)*dy[1]*dx[0]*dx[1])] +
                [(leg(j, x_mid)*dy[1]*dz[1], 0, 0) for j in range(deg)] +
                [((deg+1)*leg(deg, x_mid)*dy[1]*dz[1], leg(deg-1, x_mid)*dz[1]*dx[0]*dx[1], leg(deg-1, x_mid)*dy[1]*dx[0]*dx[1])])
+
+    return EL
+
+
+def f_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
+    FL = tuple([(0, leg(j, y_mid)*leg(deg-2-j, z_mid)*dx[0]*dz[0]*dz[1], 0) for j in range(deg-1)] +
+               [(0, 0, leg(j, z_mid)*leg(deg-2-j, y_mid)*dx[0]*dy[0]*dy[1]) for j in range(deg-1)] +
+               [(leg(j-1, y_mid)*leg(deg-2-j, z_mid)*dy[0]*dy[1]*dz[0]*dz[1], (deg+1)*leg(j, y_mid)*leg(deg-2-j, z_mid)*dx[0]*dz[0]*dz[1], 0) for j in range(1, deg-1)] +
+               [(leg(j-1, z_mid)*leg(deg-2-j, y_mid)*dy[0]*dy[1]*dz[0]*dz[1], 0, (deg+1)*leg(j, z_mid)*leg(deg-2-j, y_mid)*dx[0]*dy[0]*dy[1]) for j in range(1, deg-1)] +
+               [(0, leg(j, y_mid)*leg(deg-2-j, z_mid)*dx[1]*dz[0]*dz[1], 0) for j in range(deg-1)] +
+               [(0, 0, leg(j, z_mid)*leg(deg-2-j, y_mid)*dx[1]*dy[0]*dy[1]) for j in range(deg-1)] +)
+
+    return FL
