@@ -968,6 +968,8 @@ def ufc_cell(cell):
         return UFCQuadrilateral()
     elif celltype == "hexahedron":
         return UFCHexahedron()
+    elif celltype == "vertex":
+        return ufc_simplex(0)
     elif celltype == "interval":
         return ufc_simplex(1)
     elif celltype == "triangle":
