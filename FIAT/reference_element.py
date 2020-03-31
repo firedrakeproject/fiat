@@ -478,7 +478,7 @@ class Point(Simplex):
     """This is the reference point."""
 
     def __init__(self):
-        verts = ((),)
+        verts = ((0.0,),)
         topology = {0: {0: (0,)}}
         super(Point, self).__init__(POINT, verts, topology)
 
