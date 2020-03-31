@@ -109,7 +109,7 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 class PointExpansionSet(object):
-    """Evaluates the Legendre basis on a point reference element."""
+    """Evaluates the point basis on a point reference element."""
 
     def __init__(self, ref_el):
         if ref_el.get_spatial_dimension() != 0:
@@ -121,9 +121,9 @@ class PointExpansionSet(object):
         return 1
 
     def tabulate(self, n, pts):
-        """Returns a numpy array A[i,j] = phi_i(pts[j])"""
+        """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0 """
         if len(pts) > 0:
-            results = numpy.ones((n + 1, len(pts)), type(pts[0]))
+            results = numpy.ones((1, len(pts)), type(pts[0]))
             return results
         else:
             return []
