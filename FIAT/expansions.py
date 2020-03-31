@@ -129,23 +129,15 @@ class PointExpansionSet(object):
             return []
 
     def tabulate_derivatives(self, n, pts):
-        """Returns a tuple of length one (A,) such that
-        A[i,j] = D phi_i(pts[j]) = 0.0.  The tuple is returned for
+        """Returns a numpy array of size A where A[i,j] = phi_i(pts[j])
+        but where each element is an empty tuple (). This maintains
         compatibility with the interfaces of the interval, triangle and
         tetrahedron expansions."""
 
-        results = numpy.zeros((1, len(pts)), "d")
-        vals = self.tabulate(n, pts)
-        deriv_vals = (results,)
+        deriv_vals = empty_like(self.tabulate(n, pts), dtype=tuple)
+        deriv_vals.fill(())
 
-        # Create the ordinary data structure.
-        dv = []
-        for i in range(vals.shape[0]):
-            dv.append([])
-            for j in range(vals.shape[1]):
-                dv[-1].append((vals[i][j], [deriv_vals[0][i][j]]))
-
-        return dv
+        return deriv_vals
 
 class LineExpansionSet(object):
     """Evaluates the Legendre basis on a line reference element."""
