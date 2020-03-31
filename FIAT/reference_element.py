@@ -475,18 +475,12 @@ class UFCSimplex(Simplex):
 
 
 class Point(Simplex):
-    """This is the reference point with a vertex at (0.0)."""
+    """This is the reference point."""
 
     def __init__(self):
-        verts = ((0.0),)
+        verts = ((),)
         topology = {0: {0: (0,)}}
         super(Point, self).__init__(POINT, verts, topology)
-
-    def get_dimension(self):
-        return 0
-
-    def get_spatial_dimension(self):
-        return 0
 
 
 class DefaultLine(Simplex):
