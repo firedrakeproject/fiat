@@ -475,10 +475,10 @@ class UFCSimplex(Simplex):
 
 
 class Point(Simplex):
-    """This is the reference point with a vertex at (0.0,)."""
+    """This is the reference point with a vertex at (0.0)."""
 
     def __init__(self):
-        verts = ((0.0,),)
+        verts = ((0.0),)
         topology = {0: {0: (0,)}}
         super(Point, self).__init__(POINT, verts, topology)
 
