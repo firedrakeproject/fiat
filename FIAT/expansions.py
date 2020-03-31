@@ -108,6 +108,65 @@ def xi_tetrahedron(eta):
     xi3 = eta3
     return xi1, xi2, xi3
 
+class PointExpansionSet(object):
+    """Evaluates the Legendre basis on a point reference element."""
+
+    def __init__(self, ref_el):
+        if ref_el.get_spatial_dimension() != 0:
+            raise Exception("Must have a point")
+        self.ref_el = ref_el
+        self.base_ref_el = reference_element.Point()
+        v1 = ref_el.get_vertices()
+        v2 = self.base_ref_el.get_vertices()
+        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
+        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
+        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+
+    def get_num_members(self, n):
+        return 1
+
+    def tabulate(self, n, pts):
+        """Returns a numpy array A[i,j] = phi_i(pts[j])"""
+        if len(pts) > 0:
+            raise Exception("Can't tabulate on point reference elements")
+            # ref_pts = numpy.array([self.mapping(pt) for pt in pts])
+            # psitilde_as = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
+
+            # results = numpy.zeros((n + 1, len(pts)), type(pts[0][0]))
+            # for k in range(n + 1):
+            #     results[k, :] = psitilde_as[k, :] * math.sqrt(k + 0.5)
+
+            # return results
+        else:
+            return []
+
+    def tabulate_derivatives(self, n, pts):
+        """Returns a tuple of length one (A,) such that
+        A[i,j] = D phi_i(pts[j]).  The tuple is returned for
+        compatibility with the interfaces of the triangle and
+        tetrahedron expansions."""
+        raise Exception("Can't tabulate derivatives on point reference elements")
+        # ref_pts = numpy.array([self.mapping(pt) for pt in pts])
+        # psitilde_as_derivs = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
+
+        # # Jacobi polynomials defined on [-1, 1], first derivatives need scaling
+        # psitilde_as_derivs *= 2.0 / self.ref_el.volume()
+
+        # results = numpy.zeros((n + 1, len(pts)), "d")
+        # for k in range(0, n + 1):
+        #     results[k, :] = psitilde_as_derivs[k, :] * numpy.sqrt(k + 0.5)
+
+        # vals = self.tabulate(n, pts)
+        # deriv_vals = (results,)
+
+        # # Create the ordinary data structure.
+        # dv = []
+        # for i in range(vals.shape[0]):
+        #     dv.append([])
+        #     for j in range(vals.shape[1]):
+        #         dv[-1].append((vals[i][j], [deriv_vals[0][i][j]]))
+
+        # return dv
 
 class LineExpansionSet(object):
     """Evaluates the Legendre basis on a line reference element."""
