@@ -423,7 +423,9 @@ def polynomial_dimension(ref_el, degree):
     """Returns the dimension of the space of polynomials of degree no
     greater than degree on the reference element."""
     if ref_el.get_shape() == reference_element.POINT:
-        return 0
+        if degree > 0:
+            raise Exception("Only degree zero polynomials supported on point elements.")
+        return 1
     elif ref_el.get_shape() == reference_element.LINE:
         return max(0, degree + 1)
     elif ref_el.get_shape() == reference_element.TRIANGLE:
