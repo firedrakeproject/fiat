@@ -72,34 +72,35 @@ class RTDualSet(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         t = ref_el.get_topology()
 
-        # codimension 1 facets
-        for i in range(len(t[sd - 1])):
-            pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
-            for j in range(len(pts_cur)):
-                pt_cur = pts_cur[j]
-                f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
-                nodes.append(f)
+        facet = ref_el.get_facet_element()
+        # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
+        # degree is q - 1
+        Q = quadrature.make_quadrature(facet, degree+1)
+        Pq = polynomial_set.ONPolynomialSet(facet, degree)
+        Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(sd - 1))]
+        for f in range(len(t[sd - 1])):
+            # FIXME: If we have (degree + 1) point exact quadrature
+            # rules on the facet, this can be replaced by
+            # PointScaledNormalEvaluation at those points.
+            # But I don't know what that looks like on triangles for
+            # arbitrary degree.
+            for i in range(Pq_at_qpts.shape[0]):
+                phi = Pq_at_qpts[i, :]
+                nodes.append(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f))
 
-        # internal nodes.  Let's just use points at a lattice
+        # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^d
         if degree > 0:
-            cpe = functional.ComponentPointEvaluation
-            pts = ref_el.make_points(sd, 0, degree + sd)
+            Q = quadrature.make_quadrature(ref_el, degree + 1)
+            qpts = Q.get_points()
+            Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 1)
+            zero_index = tuple([0 for i in range(sd)])
+            Pkm1_at_qpts = Pkm1.tabulate(qpts)[zero_index]
+
             for d in range(sd):
-                for i in range(len(pts)):
-                    l_cur = cpe(ref_el, d, (sd,), pts[i])
+                for i in range(Pkm1_at_qpts.shape[0]):
+                    phi_cur = Pkm1_at_qpts[i, :]
+                    l_cur = functional.IntegralMoment(ref_el, Q, phi_cur, (d,), (sd,))
                     nodes.append(l_cur)
-
-            # Q = quadrature.make_quadrature(ref_el, 2 * ( degree + 1 ))
-            # qpts = Q.get_points()
-            # Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 1)
-            # zero_index = tuple([0 for i in range(sd)])
-            # Pkm1_at_qpts = Pkm1.tabulate(qpts)[zero_index]
-
-            # for d in range(sd):
-            #     for i in range(Pkm1_at_qpts.shape[0]):
-            #         phi_cur = Pkm1_at_qpts[i, :]
-            #         l_cur = functional.IntegralMoment(ref_el, Q, phi_cur, (d,), (sd,))
-            #         nodes.append(l_cur)
 
         # sets vertices (and in 3d, edges) to have no nodes
         for i in range(sd - 1):
