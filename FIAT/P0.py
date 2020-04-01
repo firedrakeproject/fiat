@@ -19,7 +19,14 @@ class P0Dual(dual_set.DualSet):
         entity_ids = {}
         nodes = []
         vs = numpy.array(ref_el.get_vertices())
-        bary = tuple(numpy.average(vs, 0))
+        if vs[0].size > 0:
+            bary = tuple(numpy.average(vs, 0))
+        else:
+            # should only happen for a reference point for which P0 is
+            # the only allowed function space.
+            assert ref_el.get_dimension() is 0
+            # treat a reference point as though it is at the origin
+            bary = 0.0
 
         nodes = [functional.PointEvaluation(ref_el, bary)]
         entity_ids = {}
