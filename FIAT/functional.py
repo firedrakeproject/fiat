@@ -402,6 +402,28 @@ class PointEdgeTangentEvaluation(Functional):
         phis = poly_set.get_expansion_set().tabulate(poly_set.get_embedded_degree(), xs)
         return numpy.outer(self.t, phis)
 
+class IntegralMomentOfEdgeTangentEvaluation(Functional):
+
+    r"""
+    \int_F v\cdot n p ds
+
+    p \in Polynomials
+
+    :arg ref_el: reference element for which F is a codim-1 entity
+    :arg Q: quadrature rule on the face
+    :arg P_at_qpts: polynomials evaluated at quad points
+    :arg facet: which facet.
+    """
+    def __init__(self, ref_el, Q, P_at_qpts, edge):
+        t = ref_el.compute_edge_tangent(edge)
+        sd = ref_el.get_spatial_dimension()
+        transform = ref_el.get_entity_transform(1, edge)
+        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        weights = Q.get_weights()
+        pt_dict = OrderedDict()
+        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
+            pt_dict[pt] = [(wgt*phi*t[i], (i, )) for i in range(sd)]
+        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfEdgeTangentEvaluation")
 
 class PointFaceTangentEvaluation(Functional):
     """Implements the evaluation of a tangential component of a
@@ -425,6 +447,28 @@ class PointFaceTangentEvaluation(Functional):
         phis = poly_set.get_expansion_set().tabulate(poly_set.get_embedded_degree(), xs)
         return numpy.outer(self.t, phis)
 
+class IntegralMomentOfFaceTangentEvaluation(Functional):
+
+    r"""
+    \int_F v \times n \cdot p ds
+
+    p \in Polynomials
+
+    :arg ref_el: reference element for which F is a codim-1 entity
+    :arg Q: quadrature rule on the face
+    :arg P_at_qpts: polynomials evaluated at quad points
+    :arg facet: which facet.
+    """
+    def __init__(self, ref_el, Q, P_at_qpts, facet, k):
+        t = ref_el.compute_face_tangents(facet)[k]
+        sd = ref_el.get_spatial_dimension()
+        transform = ref_el.get_entity_transform(1, facet)
+        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        weights = Q.get_weights()
+        pt_dict = OrderedDict()
+        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
+            pt_dict[pt] = [(wgt*phi*t[i], (i, )) for i in range(sd)]
+        super().__init__(ref_el, shp, pt_dict, {}, "IntegralMomentOfFaceTangentEvaluation")
 
 class PointScaledNormalEvaluation(Functional):
     """Implements the evaluation of the normal component of a vector at a
