@@ -134,7 +134,7 @@ class PointExpansionSet(object):
         compatibility with the interfaces of the interval, triangle and
         tetrahedron expansions."""
 
-        deriv_vals = empty_like(self.tabulate(n, pts), dtype=tuple)
+        deriv_vals = numpy.empty_like(self.tabulate(n, pts), dtype=tuple)
         deriv_vals.fill(())
 
         return deriv_vals
