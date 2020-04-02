@@ -3,6 +3,7 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
+# Modified by Reuben W. Hill (Imperial College London), 2020
 """Principal orthogonal expansion functions as defined by Karniadakis
 and Sherwin.  These are parametrized over a reference element so as
 to allow users to get coordinates that they want."""
@@ -108,6 +109,7 @@ def xi_tetrahedron(eta):
     xi3 = eta3
     return xi1, xi2, xi3
 
+
 class PointExpansionSet(object):
     """Evaluates the point basis on a point reference element."""
 
@@ -133,11 +135,11 @@ class PointExpansionSet(object):
         but where each element is an empty tuple (). This maintains
         compatibility with the interfaces of the interval, triangle and
         tetrahedron expansions."""
-
         deriv_vals = numpy.empty_like(self.tabulate(n, pts), dtype=tuple)
         deriv_vals.fill(())
 
         return deriv_vals
+
 
 class LineExpansionSet(object):
     """Evaluates the Legendre basis on a line reference element."""

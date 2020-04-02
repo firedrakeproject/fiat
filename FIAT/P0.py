@@ -6,6 +6,7 @@
 #
 # Written by Robert C. Kirby
 # Modified by Andrew T. T. McRae (Imperial College London)
+# Modified by Reuben W. Hill (Imperial College London), 2020
 #
 # This work is partially supported by the US Department of Energy
 # under award number DE-FG02-04ER25650
@@ -24,7 +25,7 @@ class P0Dual(dual_set.DualSet):
         else:
             # should only happen for a reference point for which P0 is
             # the only allowed function space.
-            assert ref_el.get_dimension() is 0
+            assert ref_el.get_dimension() == 0
             # treat a reference point as though it is at the origin
             bary = 0.0
 

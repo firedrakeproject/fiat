@@ -14,6 +14,8 @@
 #
 # You should have received a copy of the GNU Lesser General Public License
 # along with FIAT. If not, see <http://www.gnu.org/licenses/>.
+#
+# Modified by Reuben W. Hill (Imperial College London), 2020
 
 import random
 import numpy as np

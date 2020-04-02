@@ -6,6 +6,8 @@
 #
 # Modified by David A. Ham (david.ham@imperial.ac.uk), 2014
 # Modified by Lizao Li (lzlarryli@gmail.com), 2016
+# Modified by Reuben W. Hill (Imperial College London), 2020
+
 """
 Abstract class and particular implementations of finite element
 reference simplex geometry/topology.
