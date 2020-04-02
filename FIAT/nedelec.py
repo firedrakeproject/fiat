@@ -244,7 +244,7 @@ class NedelecDual3D(dual_set.DualSet):
         #                nodes.append(f)
             facet = ref_el.get_facet_element()
             Q = quadrature.make_quadrature(facet, degree+1)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree-1)
+            Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd-1,))
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
             for e in range(len(t[2])):
                 for i in range(Pq_at_qpts.shape[0]):
