@@ -230,29 +230,18 @@ class NedelecDual3D(dual_set.DualSet):
                 phi = Pq_at_qpts[i, :]
                 nodes.append(functional.IntegralMomentOfEdgeTangentEvaluation(ref_el, Q, phi, e))
 
-
         # face nodes are \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
-        # degree is q - 2
         if degree > 0:  # face tangents
-        #    num_faces = len(t[2])
-        #    for i in range(num_faces):  # loop over faces
-        #        pts_cur = ref_el.make_points(2, i, degree + 2)
-        #        for j in range(len(pts_cur)):  # loop over points
-        #            pt_cur = pts_cur[j]
-        #            for k in range(2):  # loop over tangents
-        #                f = functional.PointFaceTangentEvaluation(ref_el, i, k, pt_cur)
-        #                nodes.append(f)
             facet = ref_el.get_facet_element()
             Q = quadrature.make_quadrature(facet, degree+1)
             Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd-1,))
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
-            for e in range(len(t[2])):
+            for f in range(len(t[2])):
                 for i in range(Pq_at_qpts.shape[0]):
                     phi = Pq_at_qpts[i, :]
-                    for k in range(2):
-                        nodes.append(functional.IntegralMomentOfFaceTangentEvaluation(ref_el, Q, phi, e, k))
+                    nodes.append(functional.IntegralMomentOfFaceTangentEvaluation(ref_el, Q, phi, f))
 
-        #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3
+        #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
         if degree > 1:
             Q = quadrature.make_quadrature(ref_el, degree + 1)
             qpts = Q.get_points()

@@ -442,18 +442,21 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
     :arg P_at_qpts: polynomials evaluated at quad points
     :arg facet: which facet.
     """
-    def __init__(self, ref_el, Q, P_at_qpts, facet, k):
-        t = ref_el.compute_face_tangents(facet)[k]
+    def __init__(self, ref_el, Q, P_at_qpts, facet):
+        P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i]]
+                     for i in range(P_at_qpts.shape[1])]
+        n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
         transform = ref_el.get_entity_transform(sd-1, facet)
         pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        #transform 2D polynomials to 3D polynomials
+        P_at_qpts = tuple(map(lambda p: tuple(transform(p)), P_at_qpts))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
-        index = [i for i in range(len(pts))]
-        for pt, wgt, i in zip(pts, weights, index):
-            phi1 = P_at_qpts[0][i]
-            phi2 = P_at_qpts[1][i]
-            pt_dict[pt] = [(wgt*(phi1*t[1] + phi2*t[2]), (j, )) for j in range(sd)]
+        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
+             pt_dict[pt] = [(wgt*(-n[2]*phi[1]+n[1]*phi[2]), (0, )),
+                            (wgt*(n[2]*phi[0]-n[0]*phi[2]), (1, )),
+                            (wgt*(-n[1]*phi[0]+n[0]*phi[1]), (2, ))]
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfFaceTangentEvaluation")
 
 class PointScaledNormalEvaluation(Functional):
