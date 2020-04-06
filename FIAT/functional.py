@@ -460,14 +460,12 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i]]
+        P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i], P_at_qpts[2][i]]
                      for i in range(P_at_qpts.shape[1])]
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
         transform = ref_el.get_entity_transform(sd-1, facet)
         pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
-        #transform 2D polynomials to 3D polynomials
-        P_at_qpts = tuple(map(lambda p: tuple(transform(p)), P_at_qpts))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):

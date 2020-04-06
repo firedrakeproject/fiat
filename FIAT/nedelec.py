@@ -236,9 +236,17 @@ class NedelecDual3D(dual_set.DualSet):
             Q = quadrature.make_quadrature(facet, degree+1)
             Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd-1,))
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
+            reshaped = Pq_at_qpts.swapaxes(1, 2)
             for f in range(len(t[2])):
+                #transform 2D polynomials to 3D polynomials
+                transform = ref_el.get_entity_transform(sd-1, f)
+                new_points = numpy.empty(reshaped.shape[:-1] + (3, ), dtype=reshaped.dtype)
+                for i, j in numpy.ndindex(*reshaped.shape[:-1]):
+                        new_points[i, j, :] = transform(reshaped[i, j, :])
+                new_points = new_points.swapaxes(1, 2)
+
                 for i in range(Pq_at_qpts.shape[0]):
-                    phi = Pq_at_qpts[i, :]
+                    phi = new_points[i, :]
                     nodes.append(functional.IntegralMomentOfFaceTangentEvaluation(ref_el, Q, phi, f))
 
         #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
