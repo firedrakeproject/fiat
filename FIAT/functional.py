@@ -477,7 +477,7 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
                       phi[2]*n[0] - phi[0]*n[2],
                       phi[0]*n[1] - phi[1]*n[0]]
              pt_dict[pt] = [(wgt*(-n[2]*phixn[1]+n[1]*phixn[2]), (0, )),
-                            (wgt*(n[2]*phixn[0]-n[0]*phi[2]), (1, )),
+                            (wgt*(n[2]*phixn[0]-n[0]*phixn[2]), (1, )),
                             (wgt*(-n[1]*phixn[0]+n[0]*phixn[1]), (2, ))]
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfFaceTangentEvaluation")
 
