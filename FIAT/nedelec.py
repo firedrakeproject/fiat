@@ -219,8 +219,8 @@ class NedelecDual3D(dual_set.DualSet):
         # how many edges
         num_edges = len(t[1])
 
-        # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
-        # degree is q - 1
+        #edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
+        #degree is q - 1
         edge = ref_el.get_facet_element().get_facet_element()
         Q = quadrature.make_quadrature(edge, degree+1)
         Pq = polynomial_set.ONPolynomialSet(edge, degree)
@@ -229,24 +229,39 @@ class NedelecDual3D(dual_set.DualSet):
             for i in range(Pq_at_qpts.shape[0]):
                 phi = Pq_at_qpts[i, :]
                 nodes.append(functional.IntegralMomentOfEdgeTangentEvaluation(ref_el, Q, phi, e))
+        #for i in range(num_edges):
+            # points to specify P_k on each edge
+        #    pts_cur = ref_el.make_points(1, i, degree + 2)
+        #    for j in range(len(pts_cur)):
+        #        pt_cur = pts_cur[j]
+        #        f = functional.PointEdgeTangentEvaluation(ref_el, i, pt_cur)
+        #        nodes.append(f)
 
         # face nodes are \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
         if degree > 0:  # face tangents
+            #num_faces = len(t[2])
+            #for i in range(num_faces):  # loop over faces
+            #    pts_cur = ref_el.make_points(2, i, degree + 2)
+            #    for j in range(len(pts_cur)):  # loop over points
+            #        pt_cur = pts_cur[j]
+            #        for k in range(2):  # loop over tangents
+            #            f = functional.PointFaceTangentEvaluation(ref_el, i, k, pt_cur)
+            #            nodes.append(f)
             facet = ref_el.get_facet_element()
             Q = quadrature.make_quadrature(facet, degree+1)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd-1,))
+            Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd,))
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
             reshaped = Pq_at_qpts.swapaxes(1, 2)
             for f in range(len(t[2])):
                 #transform 2D polynomials to 3D polynomials
-                transform = ref_el.get_entity_transform(sd-1, f)
-                new_points = numpy.empty(reshaped.shape[:-1] + (3, ), dtype=reshaped.dtype)
-                for i, j in numpy.ndindex(*reshaped.shape[:-1]):
-                        new_points[i, j, :] = transform(reshaped[i, j, :])
-                new_points = new_points.swapaxes(1, 2)
-
+                #transform = ref_el.get_entity_transform(sd-1, f)
+                #new_points = numpy.empty(reshaped.shape[:-1] + (3, ), dtype=reshaped.dtype)
+                #for i, j in numpy.ndindex(*reshaped.shape[:-1]):
+                #        new_points[i, j, :] = transform(reshaped[i, j, :])
+                #new_points = new_points.swapaxes(1, 2)
                 for i in range(Pq_at_qpts.shape[0]):
-                    phi = new_points[i, :]
+                    phi = Pq_at_qpts[i, :]
+                    #phi = new_points[i, :]
                     nodes.append(functional.IntegralMomentOfFaceTangentEvaluation(ref_el, Q, phi, f))
 
         #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)

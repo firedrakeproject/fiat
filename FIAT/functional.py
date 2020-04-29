@@ -460,6 +460,7 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
+        #import ipdb; ipdb.set_trace()
         P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i], P_at_qpts[2][i]]
                      for i in range(P_at_qpts.shape[1])]
         n = ref_el.compute_scaled_normal(facet)
@@ -469,9 +470,15 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-             pt_dict[pt] = [(wgt*(-n[2]*phi[1]+n[1]*phi[2]), (0, )),
-                            (wgt*(n[2]*phi[0]-n[0]*phi[2]), (1, )),
-                            (wgt*(-n[1]*phi[0]+n[0]*phi[1]), (2, ))]
+#             pt_dict[pt] = [(wgt*(-n[2]*phi[1]+n[1]*phi[2]), (0, )),
+#                            (wgt*(n[2]*phi[0]-n[0]*phi[2]), (1, )),
+#                            (wgt*(-n[1]*phi[0]+n[0]*phi[1]), (2, ))]
+             phixn = [phi[1]*n[2] - phi[2]*n[1],
+                      phi[2]*n[0] - phi[0]*n[2],
+                      phi[0]*n[1] - phi[1]*n[0]]
+             pt_dict[pt] = [(wgt*(-n[2]*phixn[1]+n[1]*phixn[2]), (0, )),
+                            (wgt*(n[2]*phixn[0]-n[0]*phi[2]), (1, )),
+                            (wgt*(-n[1]*phixn[0]+n[0]*phixn[1]), (2, ))]
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfFaceTangentEvaluation")
 
 class PointScaledNormalEvaluation(Functional):
