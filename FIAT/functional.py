@@ -430,6 +430,28 @@ class PointFaceTangentEvaluation(Functional):
         return "(u.t%d)(%s)" % (self.tno, ','.join(x),)
 
 
+
+class MonkIntegralMoment(Functional):
+    def __init__(self, ref_el, Q, P_at_qpts, facet):
+        sd = ref_el.get_spatial_dimension()
+        area = ref_el.get_volume_of_subcomplex(sd - 1, facet)
+        """
+        1/area \int_F u \cdot q ds
+
+        where u \in R^3 and q in P_{k-2]^3 with q \cdot n = 0
+        """
+        weights = Q.get_weights()
+        pt_dict = OrderedDict()
+        transform = ref_el.get_entity_transform(sd-1, facet)
+        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
+            wgt = wgt / area
+            pt_dict[pt] = [(wgt*phi[0], (0, )),
+                           (wgt*phi[1], (1, )),
+                           (wgt*phi[2], (2, ))]
+        super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
+
+
 class IntegralMomentOfFaceTangentEvaluation(Functional):
 
     r"""

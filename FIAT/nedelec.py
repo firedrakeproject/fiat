@@ -249,18 +249,23 @@ class NedelecDual3D(dual_set.DualSet):
             #            nodes.append(f)
             facet = ref_el.get_facet_element()
             Q = quadrature.make_quadrature(facet, degree+1)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd-1,))
+            Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd,))
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
-            reshaped = Pq_at_qpts.swapaxes(1, 2)
             for f in range(len(t[2])):
-                #transform 2D polynomials to 3D polynomials
-                transform = ref_el.get_entity_transform(sd-1, f)
-                new_points = numpy.empty(reshaped.shape[:-1] + (3, ), dtype=reshaped.dtype)
-                for i, j in numpy.ndindex(*reshaped.shape[:-1]):
-                    new_points[i, j, :] = transform(reshaped[i, j, :])
-                for i in range(new_points.shape[0]):
-                    phi = new_points[i, ...]
-                    nodes.append(functional.IntegralMomentOfFaceTangentEvaluation(ref_el, Q, phi, f))
+                n = ref_el.compute_scaled_normal(f)
+                # from IPython import embed; embed()
+                # To implement the Monk dofs:
+
+                # \int_F phi \cdot q ds for q \in P_{k-2}(f)^3 and q \cdot n == 0
+                # Need to determine that q \cdot n == 0
+                # something like push quad points into 3 space, these
+                # give us values of x, y, z at the quad point. Pq_at_qpts
+                # are coefficients of some polynomial, so should not
+                # be transformed with a geometric transformation.
+                # UGH.
+                for i in range(Pq_at_qpts.shape[0]):
+                    phi = Pq_at_qpts[i, ...]
+                    nodes.append(functional.MonkIntegralMoment(ref_el, Q, phi, f))
 
         #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
         if degree > 1:
