@@ -450,8 +450,10 @@ class PointFaceTangentEvaluation(Functional):
 
 class MonkIntegralMoment(Functional):
     def __init__(self, ref_el, Q, P_at_qpts, facet):
+        import numpy as np
+        P_at_qpts = np.array(np.transpose(P_at_qpts))
         sd = ref_el.get_spatial_dimension()
-        area = ref_el.get_volume_of_subcomplex(sd - 1, facet)
+        area = ref_el.volume_of_subcomplex(sd - 1, facet)
         """
         1/area \int_F u \cdot q ds
 
@@ -466,6 +468,7 @@ class MonkIntegralMoment(Functional):
             pt_dict[pt] = [(wgt*phi[0], (0, )),
                            (wgt*phi[1], (1, )),
                            (wgt*phi[2], (2, ))]
+        #print(pt_dict, flush=True)
         super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
 
 

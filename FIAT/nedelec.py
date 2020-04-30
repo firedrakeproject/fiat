@@ -253,7 +253,10 @@ class NedelecDual3D(dual_set.DualSet):
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
             for f in range(len(t[2])):
                 n = ref_el.compute_scaled_normal(f)
-                # from IPython import embed; embed()
+                tt = ref_el.compute_face_tangents(f)
+                R = [tt[0], tt[1], n]
+                R = np.transpose(np.matrix(R))
+
                 # To implement the Monk dofs:
 
                 # \int_F phi \cdot q ds for q \in P_{k-2}(f)^3 and q \cdot n == 0
@@ -263,8 +266,9 @@ class NedelecDual3D(dual_set.DualSet):
                 # are coefficients of some polynomial, so should not
                 # be transformed with a geometric transformation.
                 # UGH.
-                for i in range(Pq_at_qpts.shape[0]):
+                for i in range(int(Pq_at_qpts.shape[0]/3)*2):
                     phi = Pq_at_qpts[i, ...]
+                    phi = np.matmul(R, phi)
                     nodes.append(functional.MonkIntegralMoment(ref_el, Q, phi, f))
 
         #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
