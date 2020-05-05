@@ -222,53 +222,32 @@ class NedelecDual3D(dual_set.DualSet):
         #edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
         #degree is q - 1
         edge = ref_el.get_facet_element().get_facet_element()
-        Q = quadrature.make_quadrature(edge, degree+1)
+        Q = quadrature.make_quadrature(edge, degree + 1)
         Pq = polynomial_set.ONPolynomialSet(edge, degree)
         Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(1))]
         for e in range(len(t[1])):
             for i in range(Pq_at_qpts.shape[0]):
                 phi = Pq_at_qpts[i, :]
                 nodes.append(functional.IntegralMomentOfEdgeTangentEvaluation(ref_el, Q, phi, e))
-        #for i in range(num_edges):
-            # points to specify P_k on each edge
-        #    pts_cur = ref_el.make_points(1, i, degree + 2)
-        #    for j in range(len(pts_cur)):
-        #        pt_cur = pts_cur[j]
-        #        f = functional.PointEdgeTangentEvaluation(ref_el, i, pt_cur)
-        #        nodes.append(f)
 
-        # face nodes are \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
-        if degree > 0:  # face tangents
-            #num_faces = len(t[2])
-            #for i in range(num_faces):  # loop over faces
-            #    pts_cur = ref_el.make_points(2, i, degree + 2)
-            #    for j in range(len(pts_cur)):  # loop over points
-            #        pt_cur = pts_cur[j]
-            #        for k in range(2):  # loop over tangents
-            #            f = functional.PointFaceTangentEvaluation(ref_el, i, k, pt_cur)
-            #            nodes.append(f)
+        # face nodes are \int_F v\cdot p dA where p \in P_{q-2}(f)^3 with p \cdot n = 0 (cmp. Monk)
+        # these are equivalent to dofs from Fenics book defined by
+        # \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
+        if degree > 0:
             facet = ref_el.get_facet_element()
-            Q = quadrature.make_quadrature(facet, degree+1)
+            Q = quadrature.make_quadrature(facet, degree + 1)
             Pq = polynomial_set.ONPolynomialSet(facet, degree-1, (sd,))
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
+
             for f in range(len(t[2])):
                 n = ref_el.compute_scaled_normal(f)
-                tt = ref_el.compute_face_tangents(f)
-                R = [tt[0], tt[1], n]
-                R = np.transpose(np.matrix(R))
+                #R is used to map [1,0,0] to tangent1 and [0,1,0] to tangent2
+                R = ref_el.compute_face_tangents(f)
 
-                # To implement the Monk dofs:
-
-                # \int_F phi \cdot q ds for q \in P_{k-2}(f)^3 and q \cdot n == 0
-                # Need to determine that q \cdot n == 0
-                # something like push quad points into 3 space, these
-                # give us values of x, y, z at the quad point. Pq_at_qpts
-                # are coefficients of some polynomial, so should not
-                # be transformed with a geometric transformation.
-                # UGH.
+                #Skip last functionals because we only want p with p \cdot n = 0
                 for i in range(int(Pq_at_qpts.shape[0]/3)*2):
                     phi = Pq_at_qpts[i, ...]
-                    phi = np.matmul(R, phi)
+                    phi = numpy.matmul(phi[:-1, ...].T, R)
                     nodes.append(functional.MonkIntegralMoment(ref_el, Q, phi, f))
 
         #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
