@@ -65,42 +65,56 @@ class RTDualSet(dual_set.DualSet):
     evaluation of normals on facets of codimension 1 and internal
     moments against polynomials"""
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant, quad_deg):
         entity_ids = {}
         nodes = []
 
         sd = ref_el.get_spatial_dimension()
         t = ref_el.get_topology()
 
-        facet = ref_el.get_facet_element()
-        # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
-        # degree is q - 1
-        Q = quadrature.make_quadrature(facet, degree+1)
-        Pq = polynomial_set.ONPolynomialSet(facet, degree)
-        Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(sd - 1))]
-        for f in range(len(t[sd - 1])):
-            # FIXME: If we have (degree + 1) point exact quadrature
-            # rules on the facet, this can be replaced by
-            # PointScaledNormalEvaluation at those points.
-            # But I don't know what that looks like on triangles for
-            # arbitrary degree.
-            for i in range(Pq_at_qpts.shape[0]):
-                phi = Pq_at_qpts[i, :]
-                nodes.append(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f))
+        if variant == "integral":
+            facet = ref_el.get_facet_element()
+            # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
+            # degree is q - 1
+            Q = quadrature.make_quadrature(facet, quad_deg)
+            Pq = polynomial_set.ONPolynomialSet(facet, degree)
+            Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(sd - 1))]
+            for f in range(len(t[sd - 1])):
+                for i in range(Pq_at_qpts.shape[0]):
+                    phi = Pq_at_qpts[i, :]
+                    nodes.append(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f))
 
-        # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^d
-        if degree > 0:
-            Q = quadrature.make_quadrature(ref_el, degree + 1)
-            qpts = Q.get_points()
-            Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 1)
-            zero_index = tuple([0 for i in range(sd)])
-            Pkm1_at_qpts = Pkm1.tabulate(qpts)[zero_index]
+            # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^d
+            if degree > 0:
+                Q = quadrature.make_quadrature(ref_el, quad_deg)
+                qpts = Q.get_points()
+                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 1)
+                zero_index = tuple([0 for i in range(sd)])
+                Pkm1_at_qpts = Pkm1.tabulate(qpts)[zero_index]
 
-            for d in range(sd):
-                for i in range(Pkm1_at_qpts.shape[0]):
-                    phi_cur = Pkm1_at_qpts[i, :]
-                    l_cur = functional.IntegralMoment(ref_el, Q, phi_cur, (d,), (sd,))
-                    nodes.append(l_cur)
+                for d in range(sd):
+                    for i in range(Pkm1_at_qpts.shape[0]):
+                        phi_cur = Pkm1_at_qpts[i, :]
+                        l_cur = functional.IntegralMoment(ref_el, Q, phi_cur, (d,), (sd,))
+                        nodes.append(l_cur)
+
+        elif variant == "point":
+            # codimension 1 facets
+            for i in range(len(t[sd - 1])):
+                pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
+                for j in range(len(pts_cur)):
+                    pt_cur = pts_cur[j]
+                    f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
+                    nodes.append(f)
+
+            # internal nodes.  Let's just use points at a lattice
+            if degree > 0:
+                cpe = functional.ComponentPointEvaluation
+                pts = ref_el.make_points(sd, 0, degree + sd)
+                for d in range(sd):
+                    for i in range(len(pts)):
+                        l_cur = cpe(ref_el, d, (sd,), pts[i])
+                        nodes.append(l_cur)
 
         # sets vertices (and in 3d, edges) to have no nodes
         for i in range(sd - 1):
@@ -131,11 +145,37 @@ class RTDualSet(dual_set.DualSet):
 class RaviartThomas(finite_element.CiarletElement):
     """The Raviart-Thomas finite element"""
 
-    def __init__(self, ref_el, q):
+    def __init__(self, ref_el, q, variant=None):
 
         degree = q - 1
+
+        if not (variant == "point" or "integral" in variant):
+            raise ValueError('Choose either variant="point" or variant="integral"'
+                             'or variant="integral(Quadrature degree)"')
+
+        if variant is None:
+           variant = "point"
+           print('Warning: Variant of Raviart-Thomas element will change from point evaluation to integral evaluation.'
+                          'You should project into variant="integral"')
+           #Replace by the following in a month time
+           #variant = "integral"
+
+        if variant == "integral":
+            quad_deg = 5 * (degree + 1)
+            variant = "integral"
+        elif "integral" in variant:
+            try:
+                quad_deg = int(''.join(filter(str.isdigit, variant)))
+            except:
+                raise ValueError("Wrong format for variant")
+            if quad_deg < degree + 1:
+                raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))
+            variant = "integral"
+        elif variant == "point":
+            quad_deg = None
+
         poly_set = RTSpace(ref_el, degree)
-        dual = RTDualSet(ref_el, degree)
+        dual = RTDualSet(ref_el, degree, variant, quad_deg)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super(RaviartThomas, self).__init__(poly_set, dual, degree, formdegree,
                                             mapping="contravariant piola")
