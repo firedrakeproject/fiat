@@ -355,16 +355,16 @@ class Nedelec(finite_element.CiarletElement):
 
         degree = q - 1
 
-        if not (variant == "point" or "integral" in variant):
-            raise ValueError('Choose either variant="point" or variant="integral"'
-                             'or variant="integral(Quadrature degree)"')
-
         if variant is None:
            variant = "point"
            print('Warning: Variant of Nedelec element will change from point evaluation to integral evaluation.'
                           'You should project into variant="integral"')
            #Replace by the following in a month time
            #variant = "integral"
+
+        if not (variant == "point" or "integral" in variant):
+            raise ValueError('Choose either variant="point" or variant="integral"'
+                             'or variant="integral(Quadrature degree)"')
 
         if variant == "integral":
             quad_deg = 5 * (degree + 1)
