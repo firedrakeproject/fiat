@@ -11,6 +11,7 @@ from itertools import chain
 import numpy
 from FIAT.check_format_variant import check_format_variant
 
+
 def NedelecSpace2D(ref_el, k):
     """Constructs a basis for the 2d H(curl) space of the first kind
     which is (P_k)^2 + P_k rot( x )"""

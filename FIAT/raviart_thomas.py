@@ -11,6 +11,7 @@ import numpy
 from itertools import chain
 from FIAT.check_format_variant import check_format_variant
 
+
 def RTSpace(ref_el, deg):
     """Constructs a basis for the the Raviart-Thomas space
     (P_k)^d + P_k x"""

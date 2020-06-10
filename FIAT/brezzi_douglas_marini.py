@@ -9,6 +9,7 @@ from FIAT import (finite_element, quadrature, functional, dual_set,
                   polynomial_set, nedelec)
 from FIAT.check_format_variant import check_format_variant
 
+
 class BDMDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, quad_deg):
 
