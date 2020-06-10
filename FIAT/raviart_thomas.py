@@ -150,11 +150,9 @@ class RaviartThomas(finite_element.CiarletElement):
         degree = q - 1
 
         if variant is None:
-           variant = "point"
-           print('Warning: Variant of Raviart-Thomas element will change from point evaluation to integral evaluation.'
-                          'You should project into variant="integral"')
-           #Replace by the following in a month time
-           #variant = "integral"
+            variant = "point"
+            print('Warning: Variant of Raviart-Thomas element will change from point evaluation to integral evaluation.'
+                  'You should project into variant="integral"')
 
         if not (variant == "point" or "integral" in variant):
             raise ValueError('Choose either variant="point" or variant="integral"'
@@ -166,7 +164,7 @@ class RaviartThomas(finite_element.CiarletElement):
         elif "integral" in variant:
             try:
                 quad_deg = int(''.join(filter(str.isdigit, variant)))
-            except:
+            except ValueError:
                 raise ValueError("Wrong format for variant")
             if quad_deg < degree + 1:
                 raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))

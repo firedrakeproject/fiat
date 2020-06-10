@@ -389,7 +389,6 @@ class PointEdgeTangentEvaluation(Functional):
 
 
 class IntegralMomentOfEdgeTangentEvaluation(Functional):
-
     r"""
     \int_e v\cdot t ds
 
@@ -430,11 +429,9 @@ class PointFaceTangentEvaluation(Functional):
         return "(u.t%d)(%s)" % (self.tno, ','.join(x),)
 
 
-
 class MonkIntegralMoment(Functional):
     def __init__(self, ref_el, Q, P_at_qpts, facet):
         sd = ref_el.get_spatial_dimension()
-        area = ref_el.volume_of_subcomplex(sd - 1, facet)
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         transform = ref_el.get_entity_transform(sd-1, facet)
@@ -445,7 +442,6 @@ class MonkIntegralMoment(Functional):
 
 
 class IntegralMomentOfFaceTangentEvaluation(Functional):
-
     r"""
     \int_F v \times n \cdot p ds
 
@@ -457,7 +453,6 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
     :arg facet: which facet.
     """
     def __init__(self, ref_el, Q, P_at_qpts, facet):
-        #import ipdb; ipdb.set_trace()
         P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i], P_at_qpts[2][i]]
                      for i in range(P_at_qpts.shape[1])]
         n = ref_el.compute_scaled_normal(facet)
@@ -467,16 +462,14 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-#             pt_dict[pt] = [(wgt*(-n[2]*phi[1]+n[1]*phi[2]), (0, )),
-#                            (wgt*(n[2]*phi[0]-n[0]*phi[2]), (1, )),
-#                            (wgt*(-n[1]*phi[0]+n[0]*phi[1]), (2, ))]
-             phixn = [phi[1]*n[2] - phi[2]*n[1],
-                      phi[2]*n[0] - phi[0]*n[2],
-                      phi[0]*n[1] - phi[1]*n[0]]
-             pt_dict[pt] = [(wgt*(-n[2]*phixn[1]+n[1]*phixn[2]), (0, )),
-                            (wgt*(n[2]*phixn[0]-n[0]*phixn[2]), (1, )),
-                            (wgt*(-n[1]*phixn[0]+n[0]*phixn[1]), (2, ))]
+            phixn = [phi[1]*n[2] - phi[2]*n[1],
+                     phi[2]*n[0] - phi[0]*n[2],
+                     phi[0]*n[1] - phi[1]*n[0]]
+            pt_dict[pt] = [(wgt*(-n[2]*phixn[1]+n[1]*phixn[2]), (0, )),
+                           (wgt*(n[2]*phixn[0]-n[0]*phixn[2]), (1, )),
+                           (wgt*(-n[1]*phixn[0]+n[0]*phixn[1]), (2, ))]
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfFaceTangentEvaluation")
+
 
 class PointScaledNormalEvaluation(Functional):
     """Implements the evaluation of the normal component of a vector at a
@@ -497,7 +490,6 @@ class PointScaledNormalEvaluation(Functional):
 
 
 class IntegralMomentOfScaledNormalEvaluation(Functional):
-
     r"""
     \int_F v\cdot n p ds
 

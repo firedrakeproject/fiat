@@ -16,8 +16,7 @@ from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature import make_quadrature, UFCTetrahedronFaceQuadratureRule
 from FIAT.reference_element import UFCTetrahedron
 
-from FIAT import (polynomial_set, expansions, quadrature, dual_set,
-                  finite_element, functional)
+from FIAT import polynomial_set, quadrature, functional
 
 
 class NedelecSecondKindDual(DualSet):
@@ -103,11 +102,11 @@ class NedelecSecondKindDual(DualSet):
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(1))]
             for e in range(len(cell.get_topology()[1])):
-                    for i in range(Pq_at_qpts.shape[0]):
-                        phi = Pq_at_qpts[i, :]
-                        dofs.append(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e))
-                    jj = Pq_at_qpts.shape[0] * e
-                    ids[e] = list(range(offset + jj, offset + jj + Pq_at_qpts.shape[0]))
+                for i in range(Pq_at_qpts.shape[0]):
+                    phi = Pq_at_qpts[i, :]
+                    dofs.append(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e))
+                jj = Pq_at_qpts.shape[0] * e
+                ids[e] = list(range(offset + jj, offset + jj + Pq_at_qpts.shape[0]))
 
         elif variant == "point":
             for edge in range(len(cell.get_topology()[1])):
@@ -224,11 +223,9 @@ class NedelecSecondKind(CiarletElement):
     def __init__(self, cell, degree, variant=None):
 
         if variant is None:
-           variant = "point"
-           print('Warning: Variant of Nedelec 2nd kind element will change from point evaluation to integral evaluation.'
-                          'You should project into variant="integral"')
-           #Replace by the following in a month time
-           #variant = "integral"
+            variant = "point"
+            print('Warning: Variant of Nedelec 2nd kind element will change from point evaluation to integral evaluation.'
+                  'You should project into variant="integral"')
 
         if not (variant == "point" or "integral" in variant):
             raise ValueError('Choose either variant="point" or variant="integral"'
@@ -240,7 +237,7 @@ class NedelecSecondKind(CiarletElement):
         elif "integral" in variant:
             try:
                 quad_deg = int(''.join(filter(str.isdigit, variant)))
-            except:
+            except ValueError:
                 raise ValueError("Wrong format for variant")
             if quad_deg < degree + 1:
                 raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))

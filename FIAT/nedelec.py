@@ -10,6 +10,7 @@ from FIAT import (polynomial_set, expansions, quadrature, dual_set,
 from itertools import chain
 import numpy
 
+
 def NedelecSpace2D(ref_el, k):
     """Constructs a basis for the 2d H(curl) space of the first kind
     which is (P_k)^2 + P_k rot( x )"""
@@ -240,8 +241,8 @@ class NedelecDual3D(dual_set.DualSet):
         t = ref_el.get_topology()
 
         if variant == "integral":
-            #edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
-            #degree is q - 1
+            # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
+            # degree is q - 1
             edge = ref_el.get_facet_element().get_facet_element()
             Q = quadrature.make_quadrature(edge, quad_deg)
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
@@ -261,17 +262,16 @@ class NedelecDual3D(dual_set.DualSet):
                 Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(2))]
 
                 for f in range(len(t[2])):
-                    n = ref_el.compute_scaled_normal(f)
-                    #R is used to map [1,0,0] to tangent1 and [0,1,0] to tangent2
+                    # R is used to map [1,0,0] to tangent1 and [0,1,0] to tangent2
                     R = ref_el.compute_face_tangents(f)
 
-                    #Skip last functionals because we only want p with p \cdot n = 0
+                    # Skip last functionals because we only want p with p \cdot n = 0
                     for i in range(int(Pq_at_qpts.shape[0]/3)*2):
                         phi = Pq_at_qpts[i, ...]
                         phi = numpy.matmul(phi[:-1, ...].T, R)
                         nodes.append(functional.MonkIntegralMoment(ref_el, Q, phi, f))
 
-            #internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
+            # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
             if degree > 1:
                 Q = quadrature.make_quadrature(ref_el, quad_deg)
                 qpts = Q.get_points()
@@ -356,11 +356,9 @@ class Nedelec(finite_element.CiarletElement):
         degree = q - 1
 
         if variant is None:
-           variant = "point"
-           print('Warning: Variant of Nedelec element will change from point evaluation to integral evaluation.'
-                          'You should project into variant="integral"')
-           #Replace by the following in a month time
-           #variant = "integral"
+            variant = "point"
+            print('Warning: Variant of Nedelec element will change from point evaluation to integral evaluation.'
+                  'You should project into variant="integral"')
 
         if not (variant == "point" or "integral" in variant):
             raise ValueError('Choose either variant="point" or variant="integral"'
@@ -372,7 +370,7 @@ class Nedelec(finite_element.CiarletElement):
         elif "integral" in variant:
             try:
                 quad_deg = int(''.join(filter(str.isdigit, variant)))
-            except:
+            except ValueError:
                 raise ValueError("Wrong format for variant")
             if quad_deg < degree + 1:
                 raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))
