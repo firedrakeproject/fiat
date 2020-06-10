@@ -19,7 +19,7 @@ def check_format_variant(variant, degree, element):
         # quadrature is so high to ensure that the interpolant of curl/divergence-free functions is still curl/divergence-free
         quad_deg = 5 * (degree + 1)
         variant = "integral"
-    elif re.match('^integral\(\d+\)$', variant):
+    elif re.match(r'^integral\(\d+\)$', variant):
         quad_deg = int(''.join(filter(str.isdigit, variant)))
         if quad_deg < degree + 1:
             raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))

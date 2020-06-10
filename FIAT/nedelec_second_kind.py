@@ -17,9 +17,6 @@ from FIAT.quadrature import make_quadrature, UFCTetrahedronFaceQuadratureRule
 from FIAT.reference_element import UFCTetrahedron
 from FIAT.check_format_variant import check_format_variant
 
-from FIAT import (polynomial_set, expansions, quadrature, dual_set,
-                  finite_element, functional)
-
 from FIAT import polynomial_set, quadrature, functional
 
 

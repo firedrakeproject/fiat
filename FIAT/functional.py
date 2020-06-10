@@ -390,29 +390,6 @@ class PointEdgeTangentEvaluation(Functional):
 
 class IntegralMomentOfEdgeTangentEvaluation(Functional):
     r"""
-    \int_e v\cdot t ds
-
-    p \in Polynomials
-
-    :arg ref_el: reference element for which e is a dim-1 entity
-    :arg Q: quadrature rule on the face
-    :arg P_at_qpts: polynomials evaluated at quad points
-    :arg edge: which edge.
-    """
-    def __init__(self, ref_el, Q, P_at_qpts, edge):
-        t = ref_el.compute_edge_tangent(edge)
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(1, edge)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
-        weights = Q.get_weights()
-        pt_dict = OrderedDict()
-        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-            pt_dict[pt] = [(wgt*phi*t[i], (i, )) for i in range(sd)]
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfEdgeTangentEvaluation")
-
-
-class IntegralMomentOfEdgeTangentEvaluation(Functional):
-    r"""
     \int_e v\cdot t p ds
 
     p \in Polynomials
@@ -450,18 +427,6 @@ class PointFaceTangentEvaluation(Functional):
     def tostr(self):
         x = list(map(str, list(self.pt_dict.keys())[0]))
         return "(u.t%d)(%s)" % (self.tno, ','.join(x),)
-
-
-class MonkIntegralMoment(Functional):
-    def __init__(self, ref_el, Q, P_at_qpts, facet):
-        sd = ref_el.get_spatial_dimension()
-        weights = Q.get_weights()
-        pt_dict = OrderedDict()
-        transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
-        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-            pt_dict[pt] = [(wgt*phi[i], (i, )) for i in range(sd)]
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
 
 
 class IntegralMomentOfFaceTangentEvaluation(Functional):
@@ -506,7 +471,6 @@ class MonkIntegralMoment(Functional):
 
     def __init__(self, ref_el, Q, P_at_qpts, facet):
         sd = ref_el.get_spatial_dimension()
-        area = ref_el.volume_of_subcomplex(sd - 1, facet)
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         transform = ref_el.get_entity_transform(sd-1, facet)
@@ -514,37 +478,6 @@ class MonkIntegralMoment(Functional):
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
             pt_dict[pt] = [(wgt*phi[i], (i, )) for i in range(sd)]
         super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
-
-
-class IntegralMomentOfFaceTangentEvaluation(Functional):
-
-    r"""
-    \int_F v \times n \cdot p ds
-
-    p \in Polynomials
-
-    :arg ref_el: reference element for which F is a codim-1 entity
-    :arg Q: quadrature rule on the face
-    :arg P_at_qpts: polynomials evaluated at quad points
-    :arg facet: which facet.
-    """
-    def __init__(self, ref_el, Q, P_at_qpts, facet):
-        P_at_qpts = [[P_at_qpts[0][i], P_at_qpts[1][i], P_at_qpts[2][i]]
-                     for i in range(P_at_qpts.shape[1])]
-        n = ref_el.compute_scaled_normal(facet)
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
-        weights = Q.get_weights()
-        pt_dict = OrderedDict()
-        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-            phixn = [phi[1]*n[2] - phi[2]*n[1],
-                     phi[2]*n[0] - phi[0]*n[2],
-                     phi[0]*n[1] - phi[1]*n[0]]
-            pt_dict[pt] = [(wgt*(-n[2]*phixn[1]+n[1]*phixn[2]), (0, )),
-                           (wgt*(n[2]*phixn[0]-n[0]*phixn[2]), (1, )),
-                           (wgt*(-n[1]*phixn[0]+n[0]*phixn[1]), (2, ))]
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfFaceTangentEvaluation")
 
 
 class PointScaledNormalEvaluation(Functional):
@@ -566,30 +499,6 @@ class PointScaledNormalEvaluation(Functional):
 
 
 class IntegralMomentOfScaledNormalEvaluation(Functional):
-    r"""
-    \int_F v\cdot n p ds
-
-    p \in Polynomials
-
-    :arg ref_el: reference element for which F is a codim-1 entity
-    :arg Q: quadrature rule on the face
-    :arg P_at_qpts: polynomials evaluated at quad points
-    :arg facet: which facet.
-    """
-    def __init__(self, ref_el, Q, P_at_qpts, facet):
-        n = ref_el.compute_scaled_normal(facet)
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
-        weights = Q.get_weights()
-        pt_dict = OrderedDict()
-        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
-            pt_dict[pt] = [(wgt*phi*n[i], (i, )) for i in range(sd)]
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledNormalEvaluation")
-
-
-class IntegralMomentOfScaledNormalEvaluation(Functional):
-
     r"""
     \int_F v\cdot n p ds
 
