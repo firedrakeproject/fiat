@@ -405,7 +405,7 @@ class PointEdgeTangentEvaluation(Functional):
 class IntegralMomentOfEdgeTangentEvaluation(Functional):
 
     r"""
-    \int_e v\cdot t ds
+    \int_e v\cdot t p ds
 
     p \in Polynomials
 
@@ -449,6 +449,15 @@ class PointFaceTangentEvaluation(Functional):
 
 
 class MonkIntegralMoment(Functional):
+    r"""
+    \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
+
+    :arg ref_el: reference element for which F is a codim-1 entity
+    :arg Q: quadrature rule on the face
+    :arg P_at_qpts: polynomials evaluated at quad points
+    :arg facet: which facet.
+    """
+
     def __init__(self, ref_el, Q, P_at_qpts, facet):
         sd = ref_el.get_spatial_dimension()
         area = ref_el.volume_of_subcomplex(sd - 1, facet)

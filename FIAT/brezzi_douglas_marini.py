@@ -7,7 +7,7 @@
 
 from FIAT import (finite_element, quadrature, functional, dual_set,
                   polynomial_set, nedelec)
-
+from FIAT.check_format_variant import check_format_variant
 
 class BDMDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, quad_deg):
@@ -98,34 +98,19 @@ class BDMDualSet(dual_set.DualSet):
 
 
 class BrezziDouglasMarini(finite_element.CiarletElement):
-    """The BDM element"""
+    """
+    The BDM element
+    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
+    convergence order in the H(div)-norm
+    "integral" -> dofs are evaluated by quadrature rule. The quadrature degree is high enough
+    to ensure that the interpolant of a divergence-free function is still divergence-free
+    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree
+    """
 
     def __init__(self, ref_el, degree, variant=None):
 
-        if variant is None:
-           variant = "point"
-           print('Warning: Variant of BDM element will change from point evaluation to integral evaluation.'
-                          'You should project into variant="integral"')
-           #Replace by the following in a month time
-           #variant = "integral"
-
-        if not (variant == "point" or "integral" in variant):
-            raise ValueError('Choose either variant="point" or variant="integral"'
-                             'or variant="integral(Quadrature degree)"')
-
-        if variant == "integral":
-            quad_deg = 5 * (degree + 1)
-            variant = "integral"
-        elif "integral" in variant:
-            try:
-                quad_deg = int(''.join(filter(str.isdigit, variant)))
-            except:
-                raise ValueError("Wrong format for variant")
-            if quad_deg < degree + 1:
-                raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))
-            variant = "integral"
-        elif variant == "point":
-            quad_deg = None
+        (variant, quad_deg) = check_format_variant(variant, degree, "BDM")
 
         if degree < 1:
             raise Exception("BDM_k elements only valid for k >= 1")

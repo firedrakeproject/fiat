@@ -9,6 +9,7 @@ from FIAT import (polynomial_set, expansions, quadrature, dual_set,
                   finite_element, functional)
 from itertools import chain
 import numpy
+from FIAT.check_format_variant import check_format_variant
 
 def NedelecSpace2D(ref_el, k):
     """Constructs a basis for the 2d H(curl) space of the first kind
@@ -349,36 +350,21 @@ class NedelecDual3D(dual_set.DualSet):
 
 
 class Nedelec(finite_element.CiarletElement):
-    """Nedelec finite element"""
+    """
+    Nedelec finite element
+    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
+    convergence order in the H(curl)-norm
+    "integral" -> dofs are evaluated by quadrature rule. The quadrature degree is high enough
+    to ensure that the interpolant of a curl-free function is still curl-free
+    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree
+    """
 
     def __init__(self, ref_el, q, variant=None):
 
         degree = q - 1
 
-        if variant is None:
-           variant = "point"
-           print('Warning: Variant of Nedelec element will change from point evaluation to integral evaluation.'
-                          'You should project into variant="integral"')
-           #Replace by the following in a month time
-           #variant = "integral"
-
-        if not (variant == "point" or "integral" in variant):
-            raise ValueError('Choose either variant="point" or variant="integral"'
-                             'or variant="integral(Quadrature degree)"')
-
-        if variant == "integral":
-            quad_deg = 5 * (degree + 1)
-            variant = "integral"
-        elif "integral" in variant:
-            try:
-                quad_deg = int(''.join(filter(str.isdigit, variant)))
-            except:
-                raise ValueError("Wrong format for variant")
-            if quad_deg < degree + 1:
-                raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))
-            variant = "integral"
-        elif variant == "point":
-            quad_deg = None
+        (variant, quad_deg) = check_format_variant(variant, degree, "Nedelec")
 
         if ref_el.get_spatial_dimension() == 3:
             poly_set = NedelecSpace3D(ref_el, degree)

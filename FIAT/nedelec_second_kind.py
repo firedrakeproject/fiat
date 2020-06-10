@@ -15,6 +15,7 @@ from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature import make_quadrature, UFCTetrahedronFaceQuadratureRule
 from FIAT.reference_element import UFCTetrahedron
+from FIAT.check_format_variant import check_format_variant
 
 from FIAT import (polynomial_set, expansions, quadrature, dual_set,
                   finite_element, functional)
@@ -219,34 +220,17 @@ class NedelecSecondKind(CiarletElement):
     tetrahedra: the polynomial space described by the full polynomials
     of degree k, with a suitable set of degrees of freedom to ensure
     H(curl) conformity.
+    variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
+    "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
+    convergence order in the H(curl)-norm
+    "integral" -> dofs are evaluated by quadrature rule. The quadrature degree is high enough
+    to ensure that the interpolant of a curl-free function is still curl-free
+    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree
     """
 
     def __init__(self, cell, degree, variant=None):
 
-        if variant is None:
-           variant = "point"
-           print('Warning: Variant of Nedelec 2nd kind element will change from point evaluation to integral evaluation.'
-                          'You should project into variant="integral"')
-           #Replace by the following in a month time
-           #variant = "integral"
-
-        if not (variant == "point" or "integral" in variant):
-            raise ValueError('Choose either variant="point" or variant="integral"'
-                             'or variant="integral(Quadrature degree)"')
-
-        if variant == "integral":
-            quad_deg = 5 * (degree + 1)
-            variant = "integral"
-        elif "integral" in variant:
-            try:
-                quad_deg = int(''.join(filter(str.isdigit, variant)))
-            except:
-                raise ValueError("Wrong format for variant")
-            if quad_deg < degree + 1:
-                raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))
-            variant = "integral"
-        elif variant == "point":
-            quad_deg = None
+        (variant, quad_deg) = check_format_variant(variant, degree, "Nedelec Second Kind")
 
         # Check degree
         assert degree >= 1, "Second kind Nedelecs start at 1!"
