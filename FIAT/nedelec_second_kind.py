@@ -20,6 +20,8 @@ from FIAT.check_format_variant import check_format_variant
 from FIAT import (polynomial_set, expansions, quadrature, dual_set,
                   finite_element, functional)
 
+from FIAT import polynomial_set, quadrature, functional
+
 
 class NedelecSecondKindDual(DualSet):
     r"""
@@ -104,11 +106,11 @@ class NedelecSecondKindDual(DualSet):
             Pq = polynomial_set.ONPolynomialSet(edge, degree)
             Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(1))]
             for e in range(len(cell.get_topology()[1])):
-                    for i in range(Pq_at_qpts.shape[0]):
-                        phi = Pq_at_qpts[i, :]
-                        dofs.append(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e))
-                    jj = Pq_at_qpts.shape[0] * e
-                    ids[e] = list(range(offset + jj, offset + jj + Pq_at_qpts.shape[0]))
+                for i in range(Pq_at_qpts.shape[0]):
+                    phi = Pq_at_qpts[i, :]
+                    dofs.append(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e))
+                jj = Pq_at_qpts.shape[0] * e
+                ids[e] = list(range(offset + jj, offset + jj + Pq_at_qpts.shape[0]))
 
         elif variant == "point":
             for edge in range(len(cell.get_topology()[1])):
