@@ -33,6 +33,8 @@ def compute_pointwise_dual(el, pts):
 
     T = el.ref_el
     sd = T.get_dimension()
+    if type(sd) == tuple:
+        sd = sum(sd)
 
     assert np.asarray(pts).shape == (int(nbf / np.prod(el.value_shape())), sd)
 
