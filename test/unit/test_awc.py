@@ -6,7 +6,7 @@ def test_dofs():
     line = ufc_simplex(1)
     T = ufc_simplex(2)
     T.vertices = np.random.rand(3, 2)
-    AW = ArnoldWinther(T, 3)
+    AW = ArnoldWinther(T, 1)
 
     # check Kronecker property at vertices
 
@@ -92,7 +92,7 @@ def test_projection():
     T = ufc_simplex(2)
     T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.0), (0.5, 2.1)])
 
-    AW = ArnoldWinther(T, 3)
+    AW = ArnoldWinther(T, 1)
 
     Q = make_quadrature(T, 4)
     qpts = np.asarray(Q.pts)

@@ -157,7 +157,7 @@ class ArnoldWinther(CiarletElement):
     """The definition of the conforming Arnold-Winther element.
     """
     def __init__(self, cell, degree):
-        assert degree == 1, "Only defined for degree 3"
+        assert degree == 1, "Only defined for degree 1"
         Ps = ONSymTensorPolynomialSet(cell, 3)
         Ls = ArnoldWintherDual(cell, 1)
         mapping = "double contravariant piola"
