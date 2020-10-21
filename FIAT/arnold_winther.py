@@ -26,9 +26,9 @@ import numpy
 
 class ArnoldWintherNCDual(DualSet):
     def __init__(self, cell, degree):
-        if not degree == 2:
+        if not degree == 1:
             raise ValueError("Nonconforming Arnold-Winther elements are"
-                             "only defined for degree 2.")
+                             "only defined for degree 1.")
         dofs = []
         dof_ids = {}
         dof_ids[0] = {0: [], 1: [], 2: []}
@@ -77,9 +77,9 @@ class ArnoldWintherNC(CiarletElement):
     """The definition of the nonconforming Arnold-Winther element.
     """
     def __init__(self, cell, degree):
-        assert degree == 2, "Only defined for degree 2"
-        Ps = ONSymTensorPolynomialSet(cell, degree)
-        Ls = ArnoldWintherNCDual(cell, degree)
+        assert degree == 1, "Only defined for degree 1"
+        Ps = ONSymTensorPolynomialSet(cell, 2)
+        Ls = ArnoldWintherNCDual(cell, 1)
         mapping = "double contravariant piola"
 
         super(ArnoldWintherNC, self).__init__(Ps, Ls, degree,
@@ -88,9 +88,7 @@ class ArnoldWintherNC(CiarletElement):
 
 class ArnoldWintherDual(DualSet):
     def __init__(self, cell, degree):
-        if not degree == 3:
-            raise ValueError("Arnold-Winther elements are"
-                             "only defined for degree 3.")
+        assert degree == 1, "Only defined for degree 1."
         dofs = []
         dof_ids = {}
         dof_ids[0] = {0: [], 1: [], 2: []}
@@ -159,8 +157,8 @@ class ArnoldWinther(CiarletElement):
     """The definition of the conforming Arnold-Winther element.
     """
     def __init__(self, cell, degree):
-        assert degree == 3, "Only defined for degree 3"
-        Ps = ONSymTensorPolynomialSet(cell, degree)
-        Ls = ArnoldWintherDual(cell, degree)
+        assert degree == 1, "Only defined for degree 3"
+        Ps = ONSymTensorPolynomialSet(cell, 3)
+        Ls = ArnoldWintherDual(cell, 1)
         mapping = "double contravariant piola"
         super(ArnoldWinther, self).__init__(Ps, Ls, degree, mapping=mapping)

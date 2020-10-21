@@ -20,11 +20,14 @@ class FiniteElement(object):
     this class are non-nodal unless they are CiarletElement subclasses.
     """
 
-    def __init__(self, ref_el, dual, order, formdegree=None, mapping="affine"):
+    def __init__(self, ref_el, dual, order,
+                 formdegree=None, mapping="affine",
+                 quaddegree=None):
         # Relevant attributes that do not necessarily depend on a PolynomialSet object:
         # The order (degree) of the polynomial basis
         self.order = order
         self.formdegree = formdegree
+        self.quaddegree = quaddegree if quaddegree else order
 
         # The reference element and the appropriate dual
         self.ref_el = ref_el
@@ -44,6 +47,11 @@ class FiniteElement(object):
     def get_order(self):
         """Return the order of the element (may be different from the degree)."""
         return self.order
+
+    def get_quaddegree(self):
+        """Return the desired degree of accuracy a quadrature rule
+        needs to integrate members of this space."""
+        return self.quaddegree
 
     def dual_basis(self):
         """Return the dual basis (list of functionals) for the finite
@@ -109,9 +117,9 @@ class CiarletElement(FiniteElement):
     basis generated from polynomials encoded in a `PolynomialSet`.
     """
 
-    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_el=None):
+    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_el=None, quaddegree=None):
         ref_el = ref_el or poly_set.get_reference_element()
-        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping)
+        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping, quaddegree)
 
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()

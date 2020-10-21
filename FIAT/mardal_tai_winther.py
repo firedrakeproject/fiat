@@ -37,15 +37,15 @@ def DivergenceDubinerMoments(cell, start_deg, stop_deg, comp_deg):
 
 class MardalTaiWintherDual(DualSet):
     """Degrees of freedom for Mardal-Tai-Winther elements."""
-    def __init__(self, cell, degree):
+    def __init__(self, cell, order):
         dim = cell.get_spatial_dimension()
         if not dim == 2:
             raise ValueError("Mardal-Tai-Winther elements are only"
                              "defined in dimension 2.")
 
-        if not degree == 3:
+        if not order == 1:
             raise ValueError("Mardal-Tai-Winther elements are only defined"
-                             "for degree 3.")
+                             "for order 1.")
 
         # construct the degrees of freedoms
         dofs = []               # list of functionals
@@ -58,7 +58,7 @@ class MardalTaiWintherDual(DualSet):
         dof_ids[0] = {i: [] for i in range(dim + 1)}
 
         # edge dofs
-        (_dofs, _dof_ids) = self._generate_edge_dofs(cell, degree)
+        (_dofs, _dof_ids) = self._generate_edge_dofs(cell, order)
         dofs.extend(_dofs)
         dof_ids[1] = _dof_ids
 
@@ -68,7 +68,7 @@ class MardalTaiWintherDual(DualSet):
 
         # extra dofs for enforcing div(v) constant over the cell and
         # v.n linear on edges
-        (_dofs, _edge_dof_ids, _cell_dof_ids) = self._generate_constraint_dofs(cell, degree, len(dofs))
+        (_dofs, _edge_dof_ids, _cell_dof_ids) = self._generate_constraint_dofs(cell, order, len(dofs))
         dofs.extend(_dofs)
 
         for entity_id in range(3):
@@ -145,11 +145,11 @@ class MardalTaiWintherDual(DualSet):
 class MardalTaiWinther(CiarletElement):
     """The definition of the Mardal-Tai-Winther element.
     """
-    def __init__(self, cell, degree=3):
-        assert degree == 3, "Only defined for degree 3"
+    def __init__(self, cell, degree=1):
+        assert degree == 1, "Only defined for degree 1"
         assert cell.get_spatial_dimension() == 2, "Only defined for dimension 2"
         # polynomial space
-        Ps = ONPolynomialSet(cell, degree, (2,))
+        Ps = ONPolynomialSet(cell, 3, (2,))
 
         # degrees of freedom
         Ls = MardalTaiWintherDual(cell, degree)
@@ -158,4 +158,4 @@ class MardalTaiWinther(CiarletElement):
         mapping = "contravariant piola"
 
         super(MardalTaiWinther, self).__init__(Ps, Ls, degree,
-                                               mapping=mapping)
+                                               mapping=mapping, quaddegree=3)
