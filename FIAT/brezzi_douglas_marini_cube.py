@@ -17,7 +17,7 @@
 #
 # Modified by David A. Ham (david.ham@imperial.ac.uk), 2019
 
-from sympy import symbols, legendre, Array, diff
+from sympy import symbols, legendre, Array, diff, binomial
 import numpy as np
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import make_entity_closure_ids
@@ -151,14 +151,28 @@ class BrezziDouglasMariniCube(FiniteElement):
 
 
 def e_lambda_1_2d(deg, dx, dy, x_mid, y_mid):
+    # Elements introduced by Brezzi, Douglas, Marini (1985)
+    # "Two families of mixed finite elements for Second Order Elliptic Problems"
+
+    # See e.g. Brezzi, Douglas, Fortin, Marini (1987)
+    # "Efficient rectangular mixed finite elements in two and three space variables"
+    # For rectangle K:
+    # BDM_j(K) = [P_k(K)^2 + Span(curl(xy^{j+1}, x^{j+1}y))] x P_{j-1}(K)
+    #
+    # For all basis functions, the div/curl should be of degree (deg-1)
+    # Thus the div/curl component needs weighting by a coefficient
+    # This comes from looking at the coefficient of the highest order polynomial
+    # For leg(deg, 2x-1), this is binomial(2*deg, deg)
+    # The then takes this factor from both components of the vector
+    coeff = binomial(2*deg, deg) / ((deg+1)*binomial(2*deg-2, deg-1))
     EL = tuple([(0, -leg(j, y_mid)*dx[0]) for j in range(deg)] +
-               [(-leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[0])] +
+               [(coeff*-leg(deg-1, y_mid)*dy[0]*dy[1], -leg(deg, y_mid)*dx[0])] +
                [(0, -leg(j, y_mid)*dx[1]) for j in range(deg)] +
-               [(leg(deg-1, y_mid)*dy[0]*dy[1]/(deg+1), -leg(deg, y_mid)*dx[1])] +
+               [(coeff*leg(deg-1, y_mid)*dy[0]*dy[1], -leg(deg, y_mid)*dx[1])] +
                [(-leg(j, x_mid)*dy[0], 0) for j in range(deg)] +
-               [(-leg(deg, x_mid)*dy[0], -leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))] +
+               [(-leg(deg, x_mid)*dy[0], coeff*-leg(deg-1, x_mid)*dx[0]*dx[1])] +
                [(-leg(j, x_mid)*dy[1], 0) for j in range(deg)] +
-               [(-leg(deg, x_mid)*dy[1], leg(deg-1, x_mid)*dx[0]*dx[1]/(deg+1))])
+               [(-leg(deg, x_mid)*dy[1], coeff*leg(deg-1, x_mid)*dx[0]*dx[1])])
 
     return EL
 
