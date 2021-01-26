@@ -14,6 +14,9 @@ from FIAT.dual_set import make_entity_closure_ids
 from FIAT.polynomial_set import mis
 from FIAT.reference_element import (compute_unflattening_map,
                                     flatten_reference_cube)
+from FIAT.reference_element import make_lattice
+
+from FIAT.pointwise_dual import compute_pointwise_dual
 
 x, y, z = symbols('x y z')
 variables = (x, y, z)
@@ -123,6 +126,8 @@ class Serendipity(FiniteElement):
         self._degree = degree
         self.flat_el = flat_el
 
+        self.dual = compute_pointwise_dual(self, unisolvent_pts(ref_el, degree))
+
     def degree(self):
         return self._degree + 1
 
@@ -138,7 +143,7 @@ class Serendipity(FiniteElement):
     def tabulate(self, order, points, entity=None):
 
         if entity is None:
-            entity = (self.ref_el.get_spatial_dimension(), 0)
+            entity = (self.ref_el.get_dimension(), 0)
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
@@ -150,6 +155,8 @@ class Serendipity(FiniteElement):
             raise NotImplementedError('no tabulate method for serendipity elements of dimension 1 or less.')
         if dim >= 4:
             raise NotImplementedError('tabulate does not support higher dimensions than 3.')
+        points = np.asarray(points)
+        npoints, pointdim = points.shape
         for o in range(order + 1):
             alphas = mis(dim, o)
             for alpha in alphas:
@@ -160,8 +167,9 @@ class Serendipity(FiniteElement):
                     callable = lambdify(variables[:dim], polynomials, modules="numpy", dummify=True)
                     self.basis[alpha] = polynomials
                     self.basis_callable[alpha] = callable
-                points = np.asarray(points)
-                T = np.asarray(callable(*(points[:, i] for i in range(points.shape[1]))))
+                tabulation = callable(*(points[:, i] for i in range(pointdim)))
+                T = np.asarray([np.broadcast_to(tab, (npoints, ))
+                                for tab in tabulation])
                 phivals[alpha] = T
         return phivals
 
@@ -234,3 +242,75 @@ def i_lambda_0(i, dx, dy, dz, x_mid, y_mid, z_mid):
                 for l in range(6, i + 1) for j in range(l-5) for k in range(j+1)])
 
     return IL
+
+
+def unisolvent_pts(K, deg):
+    flat_el = flatten_reference_cube(K)
+    dim = flat_el.get_spatial_dimension()
+    if dim == 2:
+        return unisolvent_pts_quad(flat_el, deg)
+    elif dim == 3:
+        return unisolvent_pts_hex(flat_el, deg)
+    else:
+        raise ValueError("Serendipity only defined for quads and hexes")
+
+
+def unisolvent_pts_quad(K, deg):
+    """Gives a set of unisolvent points for the quad serendipity space of order deg.
+    The S element is not dual to these nodes, but a dual basis can be constructed from them."""
+    L = K.construct_subelement(1)
+    vs = np.asarray(K.vertices)
+    pts = [pt for pt in K.vertices]
+    Lpts = make_lattice(L.vertices, deg, 1)
+    for e in K.topology[1]:
+        Fmap = K.get_entity_transform(1, e)
+        epts = [tuple(Fmap(pt)) for pt in Lpts]
+        pts.extend(epts)
+    if deg > 3:
+        dx0 = (vs[1, :] - vs[0, :]) / (deg-2)
+        dx1 = (vs[2, :] - vs[0, :]) / (deg-2)
+
+        internal_nodes = [tuple(vs[0, :] + dx0 * i + dx1 * j)
+                          for i in range(1, deg-2)
+                          for j in range(1, deg-1-i)]
+        pts.extend(internal_nodes)
+
+    return pts
+
+
+def unisolvent_pts_hex(K, deg):
+    """Gives a set of unisolvent points for the hex serendipity space of order deg.
+    The S element is not dual to these nodes, but a dual basis can be constructed from them."""
+    L = K.construct_subelement(1)
+    F = K.construct_subelement(2)
+    vs = np.asarray(K.vertices)
+    pts = [pt for pt in K.vertices]
+    Lpts = make_lattice(L.vertices, deg, 1)
+    for e in K.topology[1]:
+        Fmap = K.get_entity_transform(1, e)
+        epts = [tuple(Fmap(pt)) for pt in Lpts]
+        pts.extend(epts)
+    if deg > 3:
+        fvs = np.asarray(F.vertices)
+        # Planar points to map to each face
+        dx0 = (fvs[1, :] - fvs[0, :]) / (deg-2)
+        dx1 = (fvs[2, :] - fvs[0, :]) / (deg-2)
+
+        Fpts = [tuple(fvs[0, :] + dx0 * i + dx1 * j)
+                for i in range(1, deg-2)
+                for j in range(1, deg-1-i)]
+        for f in K.topology[2]:
+            Fmap = K.get_entity_transform(2, f)
+            pts.extend([tuple(Fmap(pt)) for pt in Fpts])
+    if deg > 5:
+        dx0 = np.asarray([1., 0, 0]) / (deg-4)
+        dx1 = np.asarray([0, 1., 0]) / (deg-4)
+        dx2 = np.asarray([0, 0, 1.]) / (deg-4)
+
+        Ipts = [tuple(vs[0, :] + dx0 * i + dx1 * j + dx2 * k)
+                for i in range(1, deg-4)
+                for j in range(1, deg-3-i)
+                for k in range(1, deg-2-i-j)]
+        pts.extend(Ipts)
+
+    return pts
