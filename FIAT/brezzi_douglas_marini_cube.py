@@ -99,7 +99,6 @@ class BrezziDouglasMariniCube(FiniteElement):
         self._degree = degree
         self.flat_el = flat_el
 
-
     def degree(self):
         """Return the degree of the polynomial space."""
         return self._degree
@@ -129,12 +128,11 @@ class BrezziDouglasMariniCube(FiniteElement):
             entity = (self.ref_el.get_dimension(), 0)
 
         entity_dim, entity_id = entity
-        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
         points = np.asarray(points)
         npoints, pointdim = points.shape
 
         # Turn analytic basis functions into python functions via lambdify
-        basis_callable = {(0, 0): numpy_lambdify(variables, self.basis[(0,0)],
+        basis_callable = {(0, 0): numpy_lambdify(variables, self.basis[(0, 0)],
                                                  modules="numpy")}
 
         # Dictionary of values of functions
@@ -146,15 +144,14 @@ class BrezziDouglasMariniCube(FiniteElement):
                 try:
                     callable = basis_callable[alpha]
                 except KeyError:
-                    diff_basis = diff(self.basis[(0,0)], *zip(variables, alpha))
+                    diff_basis = diff(self.basis[(0, 0)], *zip(variables, alpha))
                     callable = numpy_lambdify(variables, diff_basis, modules="numpy")
                     self.basis[alpha] = diff_basis
 
                 # tabulate by passing points through all lambdified functions
                 # resulting array has shape (len(self.basis), spatial_dim, npoints)
                 T = np.array([[[func_component(point) for point in points]
-                                                      for func_component in func]
-                                                      for func in callable])
+                               for func_component in func] for func in callable])
 
                 phivals[alpha] = T
 
@@ -172,7 +169,7 @@ class BrezziDouglasMariniCube(FiniteElement):
 
     def value_shape(self):
         """Return the value shape of the finite element functions."""
-        return np.shape(self.basis[(0,0)][0])
+        return np.shape(self.basis[(0, 0)][0])
 
     def dmats(self):
         raise NotImplementedError
