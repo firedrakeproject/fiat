@@ -183,7 +183,7 @@ class BrezziDouglasMariniCube(FiniteElement):
 
 
 def bdmce_edge_basis(deg, dx, dy, x_mid, y_mid):
-    """ Returns the basis functions associated with DoFs on the
+    """Returns the basis functions associated with DoFs on the
     edges of elements for the HCurl Brezz-Douglas-Marini element on
     quadrilateral cells.
 
@@ -225,7 +225,7 @@ def bdmce_edge_basis(deg, dx, dy, x_mid, y_mid):
 
 
 def bdmce_face_basis(deg, dx, dy, x_mid, y_mid):
-    """ Returns the basis functions associated with DoFs on the
+    """Returns the basis functions associated with DoFs on the
     faces of elements for the HCurl Brezz-Douglas-Marini element on
     quadrilateral cells.
 
