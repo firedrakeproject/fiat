@@ -128,7 +128,8 @@ class BrezziDouglasMariniCube(FiniteElement):
             entity = (self.ref_el.get_dimension(), 0)
 
         entity_dim, entity_id = entity
-        points = np.asarray(points)
+        transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
+        points = np.asarray(list(map(transform, points)))
         npoints, pointdim = points.shape
 
         # Turn analytic basis functions into python functions via lambdify
