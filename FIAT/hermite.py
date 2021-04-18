@@ -15,6 +15,8 @@ class CubicHermiteDualSet(dual_set.DualSet):
 
     def __init__(self, ref_el):
         entity_ids = {}
+        # 0th-order and 1st-order derivatives exist
+        entity_ids_per_derivative_order = {0: {}, 1: {}}
         nodes = []
         cur = 0
 
@@ -27,6 +29,8 @@ class CubicHermiteDualSet(dual_set.DualSet):
         # get jet at each vertex
 
         entity_ids[0] = {}
+        entity_ids_per_derivative_order[0][0] = {}
+        entity_ids_per_derivative_order[1][0] = {}
         for v in sorted(top[0]):
             nodes.append(functional.PointEvaluation(ref_el, verts[v]))
             pd = functional.PointDerivative
@@ -37,6 +41,8 @@ class CubicHermiteDualSet(dual_set.DualSet):
                 nodes.append(pd(ref_el, verts[v], alpha))
 
             entity_ids[0][v] = list(range(cur, cur + 1 + sd))
+            entity_ids_per_derivative_order[0][0][v] = list(range(cur, cur + 1))
+            entity_ids_per_derivative_order[1][0][v] = list(range(cur + 1, cur + 1 + sd))
             cur += sd + 1
 
         # now only have dofs at the barycenter, which is the
@@ -44,27 +50,40 @@ class CubicHermiteDualSet(dual_set.DualSet):
         # no edge dof
 
         entity_ids[1] = {}
+        entity_ids_per_derivative_order[0][1] = {}
+        entity_ids_per_derivative_order[1][1] = {}
         for i in top[1]:
             entity_ids
             entity_ids[1][i] = []
+            entity_ids_per_derivative_order[0][1][i] = []
+            entity_ids_per_derivative_order[1][1][i] = []
 
         if sd > 1:
             # face dof
             # point evaluation at barycenter
             entity_ids[2] = {}
+            entity_ids_per_derivative_order[0][2] = {}
+            entity_ids_per_derivative_order[1][2] = {}
             for f in sorted(top[2]):
                 pt = ref_el.make_points(2, f, 3)[0]
                 n = functional.PointEvaluation(ref_el, pt)
                 nodes.append(n)
                 entity_ids[2][f] = list(range(cur, cur + 1))
+                entity_ids_per_derivative_order[0][2][f] = list(range(cur, cur + 1))
+                entity_ids_per_derivative_order[1][2][f] = []
                 cur += 1
 
             for dim in range(3, sd + 1):
                 entity_ids[dim] = {}
+                entity_ids_per_derivative_order[0][dim] = {}
+                entity_ids_per_derivative_order[1][dim] = {}
                 for facet in top[dim]:
                     entity_ids[dim][facet] = []
+                    entity_ids_per_derivative_order[0][dim][facet] = []
+                    entity_ids_per_derivative_order[1][dim][facet] = []
 
-        super(CubicHermiteDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super(CubicHermiteDualSet, self).__init__(nodes, ref_el, entity_ids,
+                                                  entity_ids_per_derivative_order=entity_ids_per_derivative_order)
 
 
 class CubicHermite(finite_element.CiarletElement):
