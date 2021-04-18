@@ -55,6 +55,12 @@ class FiniteElement(object):
         freedom for the finite element."""
         return self.dual.get_entity_ids()
 
+    def entity_dofs_per_derivative_order(self):
+        """Return a dictionary of maps obtained by splitting `self.entity_dofs()`
+        according to the derivative order of degrees of freedom.
+        Useful for element with derivative degrees of freedom."""
+        return self.dual.get_entity_ids_per_derivative_order()
+
     def entity_closure_dofs(self):
         """Return the map of topological entities to degrees of
         freedom on the closure of those entities for the finite element."""

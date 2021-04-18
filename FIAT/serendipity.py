@@ -183,6 +183,12 @@ class Serendipity(FiniteElement):
         freedom on the closure of those entities for the finite element."""
         return self.entity_closure_ids
 
+    def entity_dofs_per_derivative_order(self):
+        """Return a dictionary of maps obtained by splitting `self.entity_dofs()`
+        according to the derivative order of degrees of freedom.
+        Useful for element with derivative degrees of freedom."""
+        return None
+
     def value_shape(self):
         return ()
 
