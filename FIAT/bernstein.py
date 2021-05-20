@@ -15,6 +15,7 @@ from FIAT.polynomial_set import mis
 from FIAT.reference_element import make_lattice
 from FIAT.pointwise_dual import compute_pointwise_dual
 
+
 class BernsteinDualSet(DualSet):
     """The dual basis for Bernstein elements."""
 
@@ -59,9 +60,7 @@ class Bernstein(FiniteElement):
 
         # update to use a dual that has implemented nodes.
         self.dual = compute_pointwise_dual(self, pts)
-                                      
 
-        
     def degree(self):
         """The degree of the polynomial space."""
         return self.get_order()
