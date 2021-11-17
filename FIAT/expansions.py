@@ -148,11 +148,13 @@ class LineExpansionSet(object):
         v1 = ref_el.get_vertices()
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
         self.scale = numpy.sqrt(numpy.linalg.det(self.A))
 
     def get_num_members(self, n):
         return n + 1
+
+    def mapping(self, x):
+        return numpy.dot(self.A, x) + self.b
 
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j])"""
@@ -208,11 +210,13 @@ class TriangleExpansionSet(object):
         v1 = ref_el.get_vertices()
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
 #        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
 
     def get_num_members(self, n):
         return (n + 1) * (n + 2) // 2
+
+    def mapping(self, x):
+        return numpy.dot(self.A, x) + self.b
 
     def tabulate(self, n, pts):
         if len(pts) == 0:
@@ -300,11 +304,13 @@ class TetrahedronExpansionSet(object):
         v1 = ref_el.get_vertices()
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
         self.scale = numpy.sqrt(numpy.linalg.det(self.A))
 
     def get_num_members(self, n):
         return (n + 1) * (n + 2) * (n + 3) // 6
+
+    def mapping(self, x):
+        return numpy.dot(self.A, x) + self.b
 
     def tabulate(self, n, pts):
         if len(pts) == 0:
