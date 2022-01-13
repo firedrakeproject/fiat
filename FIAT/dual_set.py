@@ -13,11 +13,12 @@ from FIAT import polynomial_set
 
 
 class DualSet(object):
-    def __init__(self, nodes, ref_el, entity_ids, entity_ids_per_derivative_order=None):
+    def __init__(self, nodes, ref_el, entity_ids, entity_ids_per_derivative_order=None, entity_permutations=None):
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
         self.entity_ids_per_derivative_order = entity_ids_per_derivative_order
+        self.entity_permutations = entity_permutations
 
         # Compute the nodes on the closure of each sub_entity.
         self.entity_closure_ids = {}
@@ -43,6 +44,34 @@ class DualSet(object):
 
     def get_entity_ids_per_derivative_order(self):
         return self.entity_ids_per_derivative_order
+
+    def get_entity_permutations(self):
+        r"""This method returns a nested dictionary that gives, for
+        each dimension, for each entity, and for each possible entity
+        orientation, the DoF permutation array that maps the entity
+        local DoF ordering to the canonical global DoF ordering; see
+        :class:`~.Simplex` and :class:`~.UFCQuadrilateral` for how we
+        define entity orientations for standard cells.
+
+        The entity permutations `dict` for the degree 4 Lagrange finite
+        element on the interval, for instance, is given by:
+
+        .. code-block:: python3
+
+            {0: {0: {0: [0]},
+                 1: {0: [0]}},
+             1: {0: {0: [0, 1, 2],
+                     1: [2, 1, 0]}}}
+
+        Note that there are two entities on dimension ``0`` (vertices),
+        each of which has only one possible orientation, while there is
+        a single entity on dimension ``1`` (interval), which has two
+        possible orientations representing non-reflected and reflected
+        intervals.
+        """
+        if self.entity_permutations is None:
+            raise NotImplementedError("entity_permutations not yet implemented for %s" % type(self))
+        return self.entity_permutations
 
     def get_reference_element(self):
         return self.ref_el
