@@ -13,7 +13,7 @@ from FIAT import polynomial_set
 
 
 class DualSet(object):
-    def __init__(self, nodes, ref_el, entity_ids, entity_ids_per_derivative_order=None, entity_permutations=None):
+    def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None, entity_ids_per_derivative_order=None):
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
