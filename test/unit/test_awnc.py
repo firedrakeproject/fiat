@@ -5,7 +5,7 @@ from FIAT import ufc_simplex, ArnoldWintherNC, make_quadrature, expansions
 def test_dofs():
     line = ufc_simplex(1)
     T = ufc_simplex(2)
-    T.vertices = np.random.rand(3, 2)
+    T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.25), (-0.75, 1.1)])
     AW = ArnoldWintherNC(T, 2)
 
     Qline = make_quadrature(line, 6)
