@@ -151,17 +151,21 @@ class FDMFiniteElement(finite_element.CiarletElement):
         else:
             return super(FDMFiniteElement, self).tabulate(order, points, entity)
 
+
 class FDMLagrange(FDMFiniteElement):
     """1D CG element with interior shape functions that diagonalize the Laplacian."""
     _kind = 1
+
 
 class FDMHermite(FDMFiniteElement):
     """1D CG element with interior shape functions that diagonalize the biharmonic operator."""
     _kind = 2
 
+
 class FDMDiscontinuous(FDMFiniteElement):
     """1D DG element with shape functions that diagonalize the Laplacian."""
     _kind = 0
+
 
 class FDMDerivative(FDMFiniteElement):
     """1D DG element with the derivate of the shape functions that diagonalize the Laplacian."""
