@@ -87,6 +87,7 @@ class FDMDual(dual_set.DualSet):
         if kind < 0:
             # Take the derivative of the eigenbasis and normalize
             idof = lam > 1.0E-12
+            lam[~idof] = 1.0E0
             S = numpy.multiply(S, numpy.sqrt(1.0E0/lam))
             basis = numpy.dot(S.T, Ek)
             self.gll_points = numpy.array(rule.get_points()).flatten()
@@ -131,7 +132,7 @@ class FDMFiniteElement(finite_element.CiarletElement):
             dual = P0Dual(ref_el)
         else:
             dual = FDMDual(ref_el, degree, kind=self._kind)
-        formdegree = 0 if self._kind > 0 else 1
+        formdegree = self._kind < 0
         super(FDMFiniteElement, self).__init__(poly_set, dual, degree, formdegree)
 
     def tabulate(self, order, points, entity=None):
@@ -162,11 +163,11 @@ class FDMHermite(FDMFiniteElement):
     _kind = 2
 
 
-class FDMDiscontinuous(FDMFiniteElement):
+class FDMDiscontinuousH1(FDMFiniteElement):
     """1D DG element with shape functions that diagonalize the Laplacian."""
     _kind = 0
 
 
-class FDMDerivative(FDMFiniteElement):
+class FDMDiscontinuousL2(FDMFiniteElement):
     """1D DG element with the derivate of the shape functions that diagonalize the Laplacian."""
     _kind = -1

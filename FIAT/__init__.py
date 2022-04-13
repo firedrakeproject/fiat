@@ -43,7 +43,7 @@ from FIAT.mixed import MixedElement                       # noqa: F401
 from FIAT.restricted import RestrictedElement             # noqa: F401
 from FIAT.quadrature_element import QuadratureElement     # noqa: F401
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen  # noqa: F401
-from FIAT.fdm_element import FDMLagrange, FDMHermite, FDMDiscontinuous, FDMDerivative  # noqa: F401
+from FIAT.fdm_element import FDMLagrange, FDMHermite, FDMDiscontinuousH1, FDMDiscontinuousL2  # noqa: F401
 
 # Important functionality
 from FIAT.quadrature import make_quadrature               # noqa: F401
