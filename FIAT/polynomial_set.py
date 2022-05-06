@@ -79,7 +79,7 @@ class PolynomialSet(object):
                     D = form_matrix_product(self.dmats, alpha)
                 else:
                     # special for vertex without defined point location
-                    assert pts == [()]
+                    assert set(pts) == {()}
                     D = numpy.eye(1)
                 result[alpha] = numpy.dot(self.coeffs,
                                           numpy.dot(numpy.transpose(D),
