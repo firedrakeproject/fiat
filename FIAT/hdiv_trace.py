@@ -213,8 +213,8 @@ class HDivTrace(FiniteElement):
                 for key in phivals:
                     msg = "The HDivTrace element can only be tabulated on facets."
                     phivals[key] = TraceError(msg)
-                    phivals[key] = np.tile(1E-14, (self.space_dimension(), len(points)))
-
+                    phivals[key] = np.zeros(shape=(self.space_dimension(), len(points)))
+                    phivals[key][:] = 1E-14
                 return phivals
 
             else:
