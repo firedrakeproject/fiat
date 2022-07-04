@@ -35,6 +35,7 @@ class FDMDual(dual_set.DualSet):
         # Define the generalized eigenproblem on a GLL element
         gll_degree = degree + formdegree
         gll = GaussLobattoLegendre(ref_el, gll_degree)
+        xhat = numpy.array([list(x.get_point_dict().keys())[0][0] for x in gll.dual_basis()])
         E = numpy.eye(gll.space_dimension())
 
         bdof = []
@@ -82,7 +83,7 @@ class FDMDual(dual_set.DualSet):
         if formdegree == 0:
             basis = numpy.dot(S.T, E0)
             # Eigenfunctions in the Lagrange basis
-            self._points = numpy.array([list(x.get_point_dict().keys())[0][0] for x in gll.dual_basis()])
+            self._points = xhat
             self._tabulation = numpy.dot(S.T, E.T)
         else:
             # Take the derivative of the eigenbasis and normalize
