@@ -31,7 +31,7 @@ def sym_eig(A, B):
 
 class FDMDual(dual_set.DualSet):
     """The dual basis for 1D elements with FDM shape functions."""
-    def __init__(self, ref_el, degree, bc_order=1, formdegree=0):
+    def __init__(self, ref_el, degree, bc_order=1, formdegree=0, orthogonalize=False):
         # Define the generalized eigenproblem on a GLL element
         gll_degree = degree + formdegree
         gll = GaussLobattoLegendre(ref_el, gll_degree)
@@ -78,6 +78,9 @@ class FDMDual(dual_set.DualSet):
             lam[idof], Sii = sym_eig(A[idof, idof], B[idof, idof])
             S[idof, idof] = Sii
             S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
+            if orthogonalize:
+                Lbb = numpy.linalg.cholesky(S[:, bdof].T @ B @ S[:, bdof])
+                S[:, bdof] = numpy.dot(S[:, bdof], numpy.linalg.inv(Lbb.T))
 
         # Interpolate eigenfunctions onto the quadrature points
         if formdegree == 0:
@@ -85,6 +88,9 @@ class FDMDual(dual_set.DualSet):
             # Eigenfunctions in the Lagrange basis
             self._points = xhat
             self._tabulation = numpy.dot(S.T, E.T)
+            if orthogonalize:
+                idof = slice(0, degree+1)
+                bc_nodes = [[], []]
         else:
             # Take the derivative of the eigenbasis and normalize
             if bc_order == 0:
@@ -103,7 +109,7 @@ class FDMDual(dual_set.DualSet):
 
         nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]] + bc_nodes[1]
 
-        if bc_order > 0 and formdegree == 0:
+        if len(bc_nodes[0]) and formdegree == 0:
             entity_ids = {0: {0: [0], 1: [degree]},
                           1: {0: list(range(1, degree))}}
             entity_permutations = {}
@@ -120,6 +126,8 @@ class FDMDual(dual_set.DualSet):
 
 class FDMFiniteElement(finite_element.CiarletElement):
     """1D element that diagonalizes certain problems under certain BCs."""
+
+    _orthogonalize = False
 
     @property
     @abc.abstractmethod
@@ -138,7 +146,8 @@ class FDMFiniteElement(finite_element.CiarletElement):
         if degree == 0:
             dual = P0Dual(ref_el)
         else:
-            dual = FDMDual(ref_el, degree, bc_order=self._bc_order, formdegree=self._formdegree)
+            dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
+                           formdegree=self._formdegree, orthogonalize=self._orthogonalize)
         super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
 
     def tabulate(self, order, points, entity=None):
@@ -169,6 +178,13 @@ class FDMDiscontinuousLagrange(FDMFiniteElement):
     """1D DG element with derivatives of shape functions that diagonalize the Laplacian."""
     _bc_order = 1
     _formdegree = 1
+
+
+class FDMQuadrature(FDMFiniteElement):
+    """1D CG element with FDM shape functions and orthogonalized vertex modes."""
+    _bc_order = 1
+    _formdegree = 0
+    _orthogonalize = True
 
 
 class FDMBrokenH1(FDMFiniteElement):
