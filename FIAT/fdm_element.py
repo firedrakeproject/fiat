@@ -79,8 +79,10 @@ class FDMDual(dual_set.DualSet):
             S[idof, idof] = Sii
             S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
             if orthogonalize:
-                Lbb = numpy.linalg.cholesky(S[:, bdof].T @ B @ S[:, bdof])
-                S[:, bdof] = numpy.dot(S[:, bdof], numpy.linalg.inv(Lbb.T))
+                Abb = numpy.dot(S[:, bdof].T, numpy.dot(A, S[:, bdof]))
+                Bbb = numpy.dot(S[:, bdof].T, numpy.dot(B, S[:, bdof]))
+                _, Qbb = sym_eig(Abb, Bbb)
+                S[:, bdof] = numpy.dot(S[:, bdof], Qbb)
 
         # Interpolate eigenfunctions onto the quadrature points
         if formdegree == 0:
@@ -125,7 +127,7 @@ class FDMDual(dual_set.DualSet):
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
-    """1D element that diagonalizes certain problems under certain BCs."""
+    """1D element that diagonalizes bilinear forms with BCs."""
 
     _orthogonalize = False
 
@@ -175,13 +177,13 @@ class FDMLagrange(FDMFiniteElement):
 
 
 class FDMDiscontinuousLagrange(FDMFiniteElement):
-    """1D DG element with derivatives of shape functions that diagonalize the Laplacian."""
+    """1D DG element with derivatives of interior CG FDM shape functions."""
     _bc_order = 1
     _formdegree = 1
 
 
 class FDMQuadrature(FDMFiniteElement):
-    """1D CG element with FDM shape functions and orthogonalized vertex modes."""
+    """1D DG element with interior CG FDM shape functions and orthogonalized vertex modes."""
     _bc_order = 1
     _formdegree = 0
     _orthogonalize = True
@@ -194,7 +196,7 @@ class FDMBrokenH1(FDMFiniteElement):
 
 
 class FDMBrokenL2(FDMFiniteElement):
-    """1D DG element with the derivate of the shape functions that diagonalize the Laplacian."""
+    """1D DG element with the derivates of DG FDM shape functions."""
     _bc_order = 0
     _formdegree = 1
 
