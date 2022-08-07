@@ -110,7 +110,7 @@ class GaussLegendreQuadratureLineRule(QuadratureRule):
 
         xs_ref, ws_ref = numpy.polynomial.legendre.leggauss(m)
 
-        A, b = reference_element.make_affine_mapping(((-1.,), (1.)),
+        A, b = reference_element.make_affine_mapping(((-1.,), (1.,)),
                                                      ref_el.get_vertices())
 
         mapping = lambda x: numpy.dot(A, x) + b
