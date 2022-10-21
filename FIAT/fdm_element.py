@@ -87,8 +87,6 @@ class FDMDual(dual_set.DualSet):
         if formdegree == 0:
             basis = numpy.dot(S.T, E0)
             # Eigenfunctions in the Lagrange basis
-            self._points = xhat
-            self._tabulation = numpy.dot(S.T, E.T)
             if orthogonalize:
                 idof = slice(0, degree+1)
                 bc_nodes = [[], []]
@@ -104,9 +102,6 @@ class FDMDual(dual_set.DualSet):
                 idof = slice(0, -bc_order)
                 basis[0][:] = 1.0E0/numpy.sqrt(B.sum())
                 bc_nodes = [[], []]
-
-            self._points = numpy.array(rule.get_points()).flatten()
-            self._tabulation = basis[idof]
 
         nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]] + bc_nodes[1]
 
