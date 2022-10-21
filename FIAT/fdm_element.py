@@ -11,7 +11,6 @@ import numpy
 
 from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
-from FIAT.barycentric_interpolation import barycentric_interpolation
 from FIAT.lagrange import make_entity_permutations
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 from FIAT.P0 import P0Dual
@@ -151,23 +150,6 @@ class FDMFiniteElement(finite_element.CiarletElement):
             dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
                            formdegree=self._formdegree, orthogonalize=self._orthogonalize)
         super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
-
-    def tabulate(self, order, points, entity=None):
-        # This overrides the default with a more numerically stable algorithm
-        if hasattr(self.dual, "_points"):
-            if entity is None:
-                entity = (self.ref_el.get_dimension(), 0)
-
-            entity_dim, entity_id = entity
-            transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-            xsrc = self.dual._points
-            xdst = numpy.array(list(map(transform, points))).flatten()
-            tabulation = barycentric_interpolation(xsrc, xdst, order=order)
-            for key in tabulation:
-                tabulation[key] = numpy.dot(self.dual._tabulation, tabulation[key])
-            return tabulation
-        else:
-            return super(FDMFiniteElement, self).tabulate(order, points, entity)
 
 
 class FDMLagrange(FDMFiniteElement):
