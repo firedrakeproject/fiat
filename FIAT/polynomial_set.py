@@ -82,9 +82,8 @@ class PolynomialSet(object):
                     # special for vertex without defined point location
                     assert set(pts) == {()}
                     D = numpy.eye(1)
-                result[alpha] = numpy.dot(self.coeffs,
-                                          numpy.dot(numpy.transpose(D),
-                                                    base_vals))
+                dcoefs = numpy.dot(self.coeffs, numpy.transpose(D))
+                result[alpha] = numpy.dot(dcoefs, base_vals)
         return result
 
     def get_expansion_set(self):
@@ -163,24 +162,29 @@ class ONPolynomialSet(PolynomialSet):
 
 
 def make_dmats(U, degree):
+    """Computes the expansion coefficients of grad(U[j])
+    in terms of the members of a orthogonal polynomial set U.
+    Exploits orthogonality to avoid the inversion of a Vandermonde
+    matrix.
+
+    """
     sd = U.ref_el.get_spatial_dimension()
     if degree == 0:
         return [numpy.array([[0.0]], "d") for i in range(sd)]
 
-    quadrature = make_quadrature(U.ref_el, degree+1)
-    wts = quadrature.get_weights()
-    pts = quadrature.get_points()
+    Q = make_quadrature(U.ref_el, degree+1)
+    pts = Q.get_points()
+    wts = Q.get_weights()
 
     v = numpy.transpose(U.tabulate(degree, pts))
-    vTw = numpy.multiply(v.T, wts)
-    M = vTw.dot(v)
+    Minv = numpy.reciprocal(wts.dot(numpy.square(v)))
+    vdual = numpy.multiply(Minv[:, numpy.newaxis], numpy.multiply(v.T, wts))
 
     dv = U.tabulate_derivatives(degree, pts)
     dtildes = [[[a[1][i] for a in dvrow] for dvrow in dv]
                for i in range(sd)]
 
-    dmats = [numpy.linalg.solve(M, vTw.dot(numpy.transpose(dtilde)))
-             for dtilde in dtildes]
+    dmats = [vdual.dot(numpy.transpose(dtilde)) for dtilde in dtildes]
     return dmats
 
 

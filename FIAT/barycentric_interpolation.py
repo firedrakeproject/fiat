@@ -9,6 +9,15 @@
 import numpy
 
 
+def make_dmat(xsrc):
+    D = numpy.add.outer(-xsrc, xsrc)
+    numpy.fill_diagonal(D, 1.0E0)
+    w = 1.0E0 / numpy.prod(D, axis=0)
+    D = numpy.divide.outer(w, w) / D
+    numpy.fill_diagonal(D, numpy.diag(D) - numpy.sum(D, axis=0))
+    return D, w
+
+
 def barycentric_interpolation(xsrc, xdst, order=0):
     """Return tabulations of a 1D Lagrange nodal basis via the second barycentric interpolation formula
 
@@ -23,12 +32,7 @@ def barycentric_interpolation(xsrc, xdst, order=0):
     # w = barycentric weights
     # D = spectral differentiation matrix (D.T : u(xsrc) -> u'(xsrc))
     # I = barycentric interpolation matrix (I.T : u(xsrc) -> u(xdst))
-
-    D = numpy.add.outer(-xsrc, xsrc)
-    numpy.fill_diagonal(D, 1.0E0)
-    w = 1.0E0 / numpy.prod(D, axis=0)
-    D = numpy.divide.outer(w, w) / D
-    numpy.fill_diagonal(D, numpy.diag(D) - numpy.sum(D, axis=0))
+    D, w = make_dmat(xsrc)
 
     I = numpy.add.outer(-xsrc, xdst)
     idx = numpy.argwhere(numpy.isclose(I, 0.0E0, 0.0E0))

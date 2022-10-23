@@ -34,7 +34,6 @@ class FDMDual(dual_set.DualSet):
         # Define the generalized eigenproblem on a GLL element
         gll_degree = degree + formdegree
         gll = GaussLobattoLegendre(ref_el, gll_degree)
-        xhat = numpy.array([list(x.get_point_dict().keys())[0][0] for x in gll.dual_basis()])
         E = numpy.eye(gll.space_dimension())
 
         bdof = []
@@ -100,7 +99,7 @@ class FDMDual(dual_set.DualSet):
             basis = numpy.dot(S.T, Ek)
             if bc_order > 0:
                 idof = slice(0, -bc_order)
-                basis[0][:] = 1.0E0/numpy.sqrt(B.sum())
+                basis[0][:] = numpy.sqrt(1.0E0/B.sum())
                 bc_nodes = [[], []]
 
         nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]] + bc_nodes[1]
