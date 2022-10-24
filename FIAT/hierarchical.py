@@ -22,9 +22,7 @@ class LegendreDual(dual_set.DualSet):
         x1 = verts[1][0]
 
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
-        scale = 2.0 / (x1 - x0)
-        xhat = scale * (numpy.array(rule.pts) - x0) - 1.0
-
+        xhat = 2.0 * (numpy.array(rule.pts) - x0) / (x1 - x0) - 1.0
         basis = jacobi.eval_jacobi_batch(0, 0, degree, xhat)
         nodes = [functional.IntegralMoment(ref_el, rule, f) for f in basis]
 
@@ -44,7 +42,7 @@ class Legendre(finite_element.CiarletElement):
             raise ValueError("%s is only defined in one dimension." % type(self))
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = LegendreDual(ref_el, degree)
-        formdegree = ref_el.get_spatial_dimension()
+        formdegree = ref_el.get_spatial_dimension()  # n-form
         super(Legendre, self).__init__(poly_set, dual, degree, formdegree)
 
 
@@ -62,11 +60,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
         W = rule.get_weights()
         duals = numpy.dot(numpy.multiply(P, W), numpy.multiply(D.T, 1.0/W))
 
-        nodes = [functional.PointEvaluation(ref_el, x) for x in verts]
-        nodes.extend([functional.IntegralMoment(ref_el, rule, f) for f in duals[1:]])
+        pt_eval = [functional.PointEvaluation(ref_el, x) for x in verts]
+        even = [functional.IntegralMoment(ref_el, rule, f) for f in duals[1::2]]
+        odd = [functional.IntegralMoment(ref_el, rule, f) for f in duals[2::2]]
+        nodes = pt_eval[:1] + odd + even + pt_eval[1:]
 
-        entity_ids = {0: {0: [0], 1: [1]},
-                      1: {0: list(range(2, degree+1))}}
+        entity_ids = {0: {0: [0], 1: [degree]},
+                      1: {0: list(range(1, degree))}}
         entity_permutations = {}
         entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
         entity_permutations[1] = {0: make_entity_permutations(1, degree-1)}
@@ -81,5 +81,5 @@ class IntegratedLegendre(finite_element.CiarletElement):
             raise ValueError("%s is only defined in one dimension." % type(self))
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = IntegratedLegendreDual(ref_el, degree)
-        formdegree = 0
+        formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)

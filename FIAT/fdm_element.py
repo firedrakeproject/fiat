@@ -13,6 +13,7 @@ from FIAT import finite_element, polynomial_set, dual_set, functional, quadratur
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
+from FIAT.hierarchical import IntegratedLegendre
 from FIAT.P0 import P0Dual
 
 
@@ -20,11 +21,22 @@ def sym_eig(A, B):
     """
     A numpy-only implementation of `scipy.linalg.eigh`
     """
-    L = numpy.linalg.cholesky(B)
-    Linv = numpy.linalg.inv(L)
+    Linv = numpy.linalg.inv(numpy.linalg.cholesky(B))
     C = numpy.dot(Linv, numpy.dot(A, Linv.T))
-    Z, W = numpy.linalg.eigh(C)
-    V = numpy.dot(Linv.T, W)
+    Z, V = numpy.linalg.eigh(C, "U")
+    V = numpy.dot(Linv.T, V)
+    return Z, V
+
+
+def tridiag_eig(A, B):
+    """
+    Same as sym_eig, but assumes that A is already diagonal and B tri-diagonal
+    """
+    from scipy.linalg import eigh_tridiagonal
+    Z, V = eigh_tridiagonal(B.diagonal(), B.diagonal(1))
+    numpy.reciprocal(Z, out=Z)
+    numpy.multiply(numpy.sqrt(Z), V, out=V)
+    numpy.multiply(A.diagonal(), Z, out=Z)
     return Z, V
 
 
@@ -34,7 +46,11 @@ class FDMDual(dual_set.DualSet):
         # Define the generalized eigenproblem on a GLL element
         gll_degree = degree + formdegree
         gll = GaussLobattoLegendre(ref_el, gll_degree)
+        # gll = IntegratedLegendre(ref_el, gll_degree)
         E = numpy.eye(gll.space_dimension())
+        solve_eig = sym_eig
+        #if bc_order == 1:
+        #    solve_eig = tridiag_eig
 
         bdof = []
         idof = slice(0, E.shape[0]+1)
@@ -73,7 +89,7 @@ class FDMDual(dual_set.DualSet):
         S = numpy.eye(A.shape[0])
         lam = numpy.ones((A.shape[0],))
         if S.shape[0] > len(bdof):
-            lam[idof], Sii = sym_eig(A[idof, idof], B[idof, idof])
+            lam[idof], Sii = solve_eig(A[idof, idof], B[idof, idof])
             S[idof, idof] = Sii
             S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
             if orthogonalize:
