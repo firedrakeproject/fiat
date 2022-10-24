@@ -11,6 +11,7 @@
 from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
+from FIAT.barycentric_interpolation import LagrangePolynomialSet
 
 
 class GaussLegendreDualSet(dual_set.DualSet):
@@ -33,7 +34,13 @@ class GaussLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("Gauss-Legendre elements are only defined in one dimension.")
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        # poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = GaussLegendreDualSet(ref_el, degree)
+        points = []
+        for node in dual.nodes:
+            # Assert singleton point for each node.
+            pt, = node.get_point_dict().keys()
+            points.append(pt)
+        poly_set = LagrangePolynomialSet(ref_el, points)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(GaussLegendre, self).__init__(poly_set, dual, degree, formdegree)

@@ -12,8 +12,8 @@ import numpy
 from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
-from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 from FIAT.hierarchical import IntegratedLegendre
+from FIAT.barycentric_interpolation import LagrangePolynomialSet
 from FIAT.P0 import P0Dual
 
 
@@ -32,25 +32,30 @@ def tridiag_eig(A, B):
     """
     Same as sym_eig, but assumes that A is already diagonal and B tri-diagonal
     """
-    from scipy.linalg import eigh_tridiagonal
-    Z, V = eigh_tridiagonal(B.diagonal(), B.diagonal(1))
+    a = numpy.reciprocal(A.diagonal())
+    numpy.sqrt(a, out=a)
+    C = numpy.multiply(a, B)
+    numpy.multiply(C, a[:, None], out=C)
+
+    Z, V = numpy.linalg.eigh(C, "U")
     numpy.reciprocal(Z, out=Z)
     numpy.multiply(numpy.sqrt(Z), V, out=V)
-    numpy.multiply(A.diagonal(), Z, out=Z)
+    numpy.multiply(V, a[:, None], out=V)
     return Z, V
 
 
 class FDMDual(dual_set.DualSet):
     """The dual basis for 1D elements with FDM shape functions."""
     def __init__(self, ref_el, degree, bc_order=1, formdegree=0, orthogonalize=False):
-        # Define the generalized eigenproblem on a GLL element
-        gll_degree = degree + formdegree
-        gll = GaussLobattoLegendre(ref_el, gll_degree)
-        # gll = IntegratedLegendre(ref_el, gll_degree)
-        E = numpy.eye(gll.space_dimension())
+        # Define the generalized eigenproblem on a reference element
+        embedded_degree = degree + formdegree
+        embedded = IntegratedLegendre(ref_el, embedded_degree)
+        self.embedded = embedded
+
+        E = numpy.eye(embedded.space_dimension())
         solve_eig = sym_eig
-        #if bc_order == 1:
-        #    solve_eig = tridiag_eig
+        if bc_order == 1:
+            solve_eig = tridiag_eig
 
         bdof = []
         idof = slice(0, E.shape[0]+1)
@@ -66,7 +71,7 @@ class FDMDual(dual_set.DualSet):
             bdof = list(range(-k, k))
             bdof = bdof[k:] + bdof[:k]
             # Tabulate the BC nodes
-            constraints = gll.tabulate(bc_order-1, ref_el.get_vertices())
+            constraints = embedded.tabulate(bc_order-1, ref_el.get_vertices())
             C = numpy.column_stack(list(constraints.values()))
             perm = list(range(len(bdof)))
             perm = perm[::2] + perm[-1::-2]
@@ -78,8 +83,8 @@ class FDMDual(dual_set.DualSet):
             bc_nodes = [[], []]
 
         # Assemble the constrained Galerkin matrices on the reference cell
-        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, gll.space_dimension())
-        phi = gll.tabulate(max(1, bc_order), rule.get_points())
+        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, embedded.space_dimension())
+        phi = embedded.tabulate(max(1, bc_order), rule.get_points())
         E0 = numpy.dot(E.T, phi[(0, )])
         Ek = numpy.dot(E.T, phi[(max(1, bc_order), )])
         B = numpy.dot(numpy.multiply(E0, rule.get_weights()), E0.T)
@@ -101,7 +106,7 @@ class FDMDual(dual_set.DualSet):
         # Interpolate eigenfunctions onto the quadrature points
         if formdegree == 0:
             basis = numpy.dot(S.T, E0)
-            # Eigenfunctions in the Lagrange basis
+            # Eigenfunctions in the embedded basis
             if orthogonalize:
                 idof = slice(0, degree+1)
                 bc_nodes = [[], []]
@@ -115,7 +120,7 @@ class FDMDual(dual_set.DualSet):
             basis = numpy.dot(S.T, Ek)
             if bc_order > 0:
                 idof = slice(0, -bc_order)
-                basis[0][:] = numpy.sqrt(1.0E0/B.sum())
+                basis[0][:] = numpy.sqrt(1.0E0/ref_el.volume())
                 bc_nodes = [[], []]
 
         nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]] + bc_nodes[1]
@@ -153,12 +158,17 @@ class FDMFiniteElement(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("%s is only defined in one dimension." % type(self))
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         if degree == 0:
             dual = P0Dual(ref_el)
         else:
             dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
                            formdegree=self._formdegree, orthogonalize=self._orthogonalize)
+
+        if self._formdegree == 0:
+            poly_set = dual.embedded.poly_set
+        else:
+            lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
+            poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
         super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
 
 
