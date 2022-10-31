@@ -7,52 +7,55 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
 import numpy
-from FIAT import expansions, polynomial_set
+from FIAT.expansions import LineExpansionSet, polynomial_dimension
+from FIAT.polynomial_set import PolynomialSet
 
 
-def make_dmat(xhat):
-    D = numpy.add.outer(-xhat, xhat)
-    numpy.fill_diagonal(D, 1.0E0)
-    w = numpy.prod(D, axis=0)
-    numpy.reciprocal(w, out=w)
-    numpy.divide(numpy.divide.outer(w, w), D, out=D)
-    numpy.fill_diagonal(D, D.diagonal() - numpy.sum(D, axis=0))
-    return D, w
+def make_dmat(x):
+    """returns Lagrange differentiation matrix and barycentric weights 
+    associated with x[j]."""
+    dmat = numpy.add.outer(-x, x)
+    numpy.fill_diagonal(dmat, 1.0)
+    wts = numpy.prod(dmat, axis=0)
+    numpy.reciprocal(wts, out=wts)
+    numpy.divide(numpy.divide.outer(wts, wts), dmat, out=dmat)
+    numpy.fill_diagonal(dmat, dmat.diagonal() - numpy.sum(dmat, axis=0))
+    return dmat, wts
 
 
-class LagrangeLineExpansionSet(expansions.LineExpansionSet):
-    """1D Lagrange nodal basis via the second barycentric interpolation formula
-
-    See Berrut and Trefethen (2004) https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
+class LagrangeLineExpansionSet(LineExpansionSet):
+    """Evaluates a 1D Lagrange nodal basis on a line reference element
+    via the second barycentric interpolation formula. See Berrut and Trefethen (2004) 
+    https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
 
     def __init__(self, ref_el, pts):
         self.nodes = numpy.array(pts).flatten()
         self.dmat, self.weights = make_dmat(self.nodes)
-        expansions.LineExpansionSet.__init__(self, ref_el)
+        LineExpansionSet.__init__(self, ref_el)
 
     def get_num_members(self, n):
         return len(self.nodes)
 
     def tabulate(self, n, pts):
         assert n == len(self.nodes)-1
-        xdst = numpy.array(pts).flatten()
-        results = numpy.add.outer(-self.nodes, xdst)
-        idx = numpy.argwhere(numpy.isclose(results, 0.0E0, 0.0E0))
-        results[idx[:, 0], idx[:, 1]] = 1.0E0
-        numpy.reciprocal(results, out=results)
+        results = numpy.add.outer(-self.nodes, numpy.array(pts).flatten())
+        with numpy.errstate(divide='ignore', invalid='ignore'):
+            numpy.reciprocal(results, out=results)
+            numpy.multiply(results, self.weights[:, None], out=results)
+            numpy.multiply(1.0 / numpy.sum(results, axis=0), results, out=results)
 
-        results *= self.weights[:, None]
-        results[:, idx[:, 1]] = 0.0E0
-        results[idx[:, 0], idx[:, 1]] = 1.0E0
-        numpy.multiply(1.0E0 / numpy.sum(results, axis=0), results, out=results)
+        results[results != results] = 1.0
+        if results.dtype == object:
+            from sympy import simplify
+            results = numpy.array(list(map(simplify, results)))
         return results
 
     def tabulate_derivative(self, n, pts):
         return numpy.dot(sefl.dmat, self.tabulate(n, pts))
 
 
-class LagrangePolynomialSet(polynomial_set.PolynomialSet):
+class LagrangePolynomialSet(PolynomialSet):
 
     def __init__(self, ref_el, pts, shape=tuple()):
         degree = len(pts) - 1
@@ -61,7 +64,7 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
         expansion_set = LagrangeLineExpansionSet(ref_el, pts)
@@ -75,12 +78,12 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
-                n = expansions.polynomial_dimension(ref_el, embedded_degree)
+                n = polynomial_dimension(ref_el, embedded_degree)
                 for exp_bf in range(n):
                     cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
         dmats = [numpy.transpose(expansion_set.dmat)]
-        polynomial_set.PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
-                                              expansion_set, coeffs, dmats)
+        PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
+                               expansion_set, coeffs, dmats)

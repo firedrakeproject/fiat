@@ -18,10 +18,8 @@ from FIAT.barycentric_interpolation import LagrangePolynomialSet
 class LegendreDual(dual_set.DualSet):
     """The dual basis for Legendre elements."""
     def __init__(self, ref_el, degree, rule):
-        base_ref_el = reference_element.DefaultLine()
         v1 = ref_el.get_vertices()
-        v2 = base_ref_el.get_vertices()
-        A, b = reference_element.make_affine_mapping(v1, v2)
+        A, b = reference_element.make_affine_mapping(v1, [(-1.0,), (1.0,)])
         mapping = lambda x: numpy.dot(A, x) + b
         xhat = numpy.array([mapping(pt) for pt in rule.pts])
 
@@ -53,21 +51,19 @@ class Legendre(finite_element.CiarletElement):
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for Legendre elements."""
     def __init__(self, ref_el, degree, rule):
-        base_ref_el = reference_element.DefaultLine()
         v1 = ref_el.get_vertices()
-        v2 = base_ref_el.get_vertices()
-        A, b = reference_element.make_affine_mapping(v1, v2)
+        A, b = reference_element.make_affine_mapping(v1, [(-1.0,), (1.0,)])
         mapping = lambda x: numpy.dot(A, x) + b
         xhat = numpy.array([mapping(pt) for pt in rule.pts])
 
-        P = jacobi.eval_jacobi_batch(0, 0, degree-1, xhat)
-        D, _ = barycentric_interpolation.make_dmat(numpy.array(rule.pts).flatten())
         W = rule.get_weights()
-        duals = numpy.dot(numpy.multiply(P, W), numpy.multiply(D.T, 1.0/W))
+        D, _ = barycentric_interpolation.make_dmat(numpy.array(rule.pts).flatten())
+        P = jacobi.eval_jacobi_batch(0, 0, degree-1, xhat)
+        basis = numpy.dot(numpy.multiply(P, W), numpy.multiply(D.T, 1.0/W))
 
         pt_eval = [functional.PointEvaluation(ref_el, x) for x in v1]
-        even = [functional.IntegralMoment(ref_el, rule, f) for f in duals[1::2]]
-        odd = [functional.IntegralMoment(ref_el, rule, f) for f in duals[2::2]]
+        even = [functional.IntegralMoment(ref_el, rule, f) for f in basis[1::2]]
+        odd = [functional.IntegralMoment(ref_el, rule, f) for f in basis[2::2]]
         nodes = pt_eval[:1] + odd + even + pt_eval[1:]
 
         entity_ids = {0: {0: [0], 1: [degree]},
