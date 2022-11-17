@@ -38,20 +38,30 @@ class RestrictedElement(CiarletElement):
         # Restrict dual set
         dof_counter = 0
         entity_ids = {}
+        entity_permutations = {} if element.entity_permutations() is not None else None
         nodes = []
         nodes_old = element.dual_basis()
         for d, entities in element.entity_dofs().items():
             entity_ids[d] = {}
+            if element.entity_permutations() is not None:
+                entity_permutations[d] = {}
             for entity, dofs in entities.items():
                 entity_ids[d][entity] = []
-                for dof in dofs:
+                _old_new_map = {}  # ordered
+                dof_counter_local = 0
+                for i, dof in enumerate(dofs):
                     if dof not in indices:
                         continue
                     entity_ids[d][entity].append(dof_counter)
+                    _old_new_map[i] = dof_counter_local
                     dof_counter += 1
+                    dof_counter_local += 1
                     nodes.append(nodes_old[dof])
+                if element.entity_permutations is not None:
+                    entity_permutations[d][entity] = {o: [_old_new_map[perm[i]] for i in _old_new_map]
+                                                      for o, perm in element.entity_permutations()[d][entity].items()}
         assert dof_counter == len(indices)
-        dual = DualSet(nodes, ref_el, entity_ids)
+        dual = DualSet(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
         # Restrict mapping
         mapping_old = element.mapping()
