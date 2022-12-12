@@ -9,7 +9,7 @@
 import abc
 import numpy
 
-from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature
+from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature, barycentric_interpolation
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
 from FIAT.hierarchical import IntegratedLegendre
@@ -84,9 +84,10 @@ class FDMDual(dual_set.DualSet):
 
         # Assemble the constrained Galerkin matrices on the reference cell
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, embedded.space_dimension())
-        phi = embedded.tabulate(max(1, bc_order), rule.get_points())
+        k = max(1, bc_order)
+        phi = embedded.tabulate(k, rule.get_points())
         E0 = numpy.dot(E.T, phi[(0, )])
-        Ek = numpy.dot(E.T, phi[(max(1, bc_order), )])
+        Ek = numpy.dot(E.T, phi[(k, )])
         B = numpy.dot(numpy.multiply(E0, rule.get_weights()), E0.T)
         A = numpy.dot(numpy.multiply(Ek, rule.get_weights()), Ek.T)
 
@@ -103,25 +104,33 @@ class FDMDual(dual_set.DualSet):
                 _, Qbb = sym_eig(Abb, Bbb)
                 S[:, bdof] = numpy.dot(S[:, bdof], Qbb)
 
-        # Interpolate eigenfunctions onto the quadrature points
-        if formdegree == 0:
-            basis = numpy.dot(S.T, E0)
-            # Eigenfunctions in the embedded basis
-            if orthogonalize:
-                idof = slice(0, degree+1)
-                bc_nodes = [[], []]
-        else:
+        if formdegree:
             # Take the derivative of the eigenbasis and normalize
             if bc_order == 0:
                 idof = lam > 1.0E-12
                 lam[~idof] = 1.0E0
-
-            S = numpy.multiply(S, numpy.sqrt(1.0E0/lam))
+            numpy.reciprocal(lam, out=lam)
+            numpy.sqrt(lam, out=lam)
+            numpy.multiply(S, lam, out=S)
             basis = numpy.dot(S.T, Ek)
-            if bc_order > 0:
-                idof = slice(0, -bc_order)
-                basis[0][:] = numpy.sqrt(1.0E0/ref_el.volume())
+        else:
+            basis = numpy.dot(S.T, E0)
+            if False:
+                # moments in H1 seminorm
+                W = rule.get_weights()
+                D, _ = barycentric_interpolation.make_dmat(numpy.array(rule.pts).flatten())
+                H1 = numpy.dot(numpy.multiply(D, W), D.T)
+                basis[idof] = numpy.multiply(numpy.dot(basis[idof], H1), 1/W)
+
+        if formdegree == 0:
+            if orthogonalize:
+                idof = slice(0, degree+1)
                 bc_nodes = [[], []]
+
+        elif bc_order > 0:
+            basis[0][:] = numpy.sqrt(1.0E0/ref_el.volume())
+            idof = slice(0, -bc_order)
+            bc_nodes = [[], []]
 
         nodes = bc_nodes[0] + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]] + bc_nodes[1]
 

@@ -49,7 +49,7 @@ class Legendre(finite_element.CiarletElement):
 
 
 class IntegratedLegendreDual(dual_set.DualSet):
-    """The dual basis for Legendre elements."""
+    """The dual basis for integrated Legendre elements."""
     def __init__(self, ref_el, degree, rule):
         v1 = ref_el.get_vertices()
         A, b = reference_element.make_affine_mapping(v1, [(-1.0,), (1.0,)])
