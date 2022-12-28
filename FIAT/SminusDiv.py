@@ -70,7 +70,7 @@ class TrimmedSerendipity(FiniteElement):
                 entity_ids[1][j] = list(range(cur, cur + degree))
                 cur = cur + degree
 
-            if(degree >= 2):
+            if (degree >= 2):
                 entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
 
             cur += 2*triangular_number(degree - 2) + degree

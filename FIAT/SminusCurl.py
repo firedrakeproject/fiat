@@ -80,7 +80,7 @@ class TrimmedSerendipity(FiniteElement):
                 entity_ids[1][j] = list(range(cur, cur + degree))
                 cur = cur + degree
 
-            if(degree >= 2):
+            if (degree >= 2):
                 entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
 
             cur += 2*triangular_number(degree - 2) + degree
@@ -359,11 +359,11 @@ def I_lambda_1_3d_pieces(deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 def I_lambda_tilde_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
     ITilde = ()
-    if(deg == 4):
+    if (deg == 4):
         ITilde += tuple([(dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                         [(0, dx[0] * dx[1] * dz[0] * dz[1], 0)] +
                         [(0, 0, dx[0] * dx[1] * dy[0] * dy[1])])
-    if(deg > 4):
+    if (deg > 4):
         ITilde += tuple([(leg(deg - 4, y_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                         [(leg(deg - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0, 0)] +
                         [(0, leg(deg - 4, x_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)] +
