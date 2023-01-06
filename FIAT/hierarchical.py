@@ -8,7 +8,7 @@
 
 import numpy
 
-from FIAT import (finite_element, reference_element, polynomial_set, 
+from FIAT import (finite_element, reference_element, polynomial_set,
                   dual_set, functional, quadrature,
                   jacobi, barycentric_interpolation)
 from FIAT.lagrange import make_entity_permutations

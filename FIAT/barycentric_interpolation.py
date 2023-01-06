@@ -12,7 +12,7 @@ from FIAT.polynomial_set import PolynomialSet
 
 
 def make_dmat(x):
-    """returns Lagrange differentiation matrix and barycentric weights 
+    """returns Lagrange differentiation matrix and barycentric weights
     associated with x[j]."""
     dmat = numpy.add.outer(-x, x)
     numpy.fill_diagonal(dmat, 1.0)
@@ -25,7 +25,7 @@ def make_dmat(x):
 
 class LagrangeLineExpansionSet(LineExpansionSet):
     """Evaluates a 1D Lagrange nodal basis on a line reference element
-    via the second barycentric interpolation formula. See Berrut and Trefethen (2004) 
+    via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
 
