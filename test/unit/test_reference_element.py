@@ -18,6 +18,7 @@
 import pytest
 import numpy as np
 import sys
+from math import isclose
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT.reference_element import Point, TensorProductCell, UFCQuadrilateral, UFCHexahedron
@@ -264,6 +265,95 @@ def test_reference_normal_vert(cell, normals):
                           (quadrilateral_x_interval, [0.0, 0.0, 1+1e-12], 1e-13, False)])
 def test_contains_point(cell, point, epsilon, expected):
     assert cell.contains_point(point, epsilon) == expected
+
+
+@pytest.mark.parametrize(('cell', 'point', 'expected'),
+                         [(interval, [0.5], -0.5),
+                          (interval, [0.0], 0.0),
+                          (interval, [1.0], 0.0),
+                          (interval, [-1e-12], 1e-12),
+                          (interval, [1+1e-12], 1e-12),
+                          (triangle, [0.25, 0.25], -0.25),
+                          (triangle, [0.0, 0.0], 0.0),
+                          (triangle, [1.0, 0.0], 0.0),
+                          (triangle, [0.0, 1.0], 0.0),
+                          (triangle, [0.5, 0.5], 0.0),
+                          (triangle, [-1e-12, 0.0], 1e-12),
+                          (triangle, [1+1e-12, 0.0], 1e-12),
+                          (triangle, [0.0, -1e-12], 1e-12),
+                          (triangle, [0.0, 1+1e-12], 1e-12),
+                          (triangle, [0.5+1e-12, 0.5], 1e-12),
+                          (triangle, [0.5, 0.5+1e-12], 1e-12),
+                          (quadrilateral, [0.5, 0.5], -0.5),
+                          (quadrilateral, [0.0, 0.0], 0.0),
+                          (quadrilateral, [1.0, 0.0], 0.0),
+                          (quadrilateral, [0.0, 1.0], 0.0),
+                          (quadrilateral, [1.0, 1.0], 0.0),
+                          (quadrilateral, [-1e-12, 0.5], 1e-12),
+                          (quadrilateral, [1+1e-12, 0.5], 1e-12),
+                          (quadrilateral, [0.5, -1e-12], 1e-12),
+                          (quadrilateral, [0.5, 1+1e-12], 1e-12),
+                          (quadrilateral, [-1e-12, 0.5], 1e-12),
+                          (quadrilateral, [1+1e-12, 0.5], 1e-12),
+                          (quadrilateral, [1+1e-12, 1+1e-12], 1e-12),
+                          (tetrahedron, [0.25, 0.25, 0.25], -0.25),
+                          (tetrahedron, [1/3, 1/3, 1/3], 0.0),
+                          (tetrahedron, [0.0, 0.0, 0.0], 0.0),
+                          (tetrahedron, [1.0, 0.0, 0.0], 0.0),
+                          (tetrahedron, [0.0, 1.0, 0.0], 0.0),
+                          (tetrahedron, [0.0, 0.0, 1.0], 0.0),
+                          (tetrahedron, [0.0, 0.5, 0.5], 0.0),
+                          (tetrahedron, [0.5, 0.0, 0.5], 0.0),
+                          (tetrahedron, [0.5, 0.5, 0.0], 0.0),
+                          (tetrahedron, [-1e-12, 0.0, 0.0], 1e-12),
+                          (tetrahedron, [1+1e-12, 0.0, 0.0], 1e-12),
+                          (tetrahedron, [0.0, -1e-12, 0.0], 1e-12),
+                          (tetrahedron, [0.0, 1+1e-12, 0.0], 1e-12),
+                          (tetrahedron, [0.0, 0.0, -1e-12], 1e-12),
+                          (tetrahedron, [0.0, 0.0, 1+1e-12], 1e-12),
+                          (tetrahedron, [1/3+1e-12, 1/3, 1/3], 1e-12),
+                          (tetrahedron, [1/3, 1/3+1e-12, 1/3], 1e-12),
+                          (tetrahedron, [1/3, 1/3, 1/3+1e-12], 1e-12),
+                          (interval_x_interval, [0.5, 0.5], -0.5),
+                          (interval_x_interval, [0.0, 0.0], 0.0),
+                          (interval_x_interval, [1.0, 0.0], 0.0),
+                          (interval_x_interval, [0.0, 1.0], 0.0),
+                          (interval_x_interval, [1.0, 1.0], 0.0),
+                          (interval_x_interval, [-1e-12, 0.5], 1e-12),
+                          (interval_x_interval, [1+1e-12, 0.5], 1e-12),
+                          (interval_x_interval, [0.5, -1e-12], 1e-12),
+                          (interval_x_interval, [0.5, 1+1e-12], 1e-12),
+                          (interval_x_interval, [-1e-12, 0.5], 1e-12),
+                          (interval_x_interval, [1+1e-12, 0.5], 1e-12),
+                          (interval_x_interval, [1+1e-12, 1+1e-12], 1e-12),
+                          (triangle_x_interval, [0.25, 0.25, 0.5], 0.0),
+                          (triangle_x_interval, [0.0, 0.0, 0.0], 0.0),
+                          (triangle_x_interval, [1.0, 0.0, 0.0], 0.0),
+                          (triangle_x_interval, [0.0, 1.0, 0.0], 0.0),
+                          (triangle_x_interval, [0.0, 0.0, 1.0], 0.0),
+                          (triangle_x_interval, [0.5, 0.5, 0.5], 0.0),
+                          (triangle_x_interval, [-1e-12, 0.0, 0.5], 1e-12),
+                          (triangle_x_interval, [1+1e-12, 0.0, 0.5], 1e-12),
+                          (triangle_x_interval, [0.0, -1e-12, 0.5], 1e-12),
+                          (triangle_x_interval, [0.0, 1+1e-12, 0.5], 1e-12),
+                          (triangle_x_interval, [0.0, 0.0, -1e-12], 1e-12),
+                          (triangle_x_interval, [0.0, 0.0, 1+1e-12], 1e-12),
+                          (quadrilateral_x_interval, [0.5, 0.5, 0.5], -0.5),
+                          (quadrilateral_x_interval, [0.0, 0.0, 0.0], 0.0),
+                          (quadrilateral_x_interval, [1.0, 0.0, 0.0], 0.0),
+                          (quadrilateral_x_interval, [0.0, 1.0, 0.0], 0.0),
+                          (quadrilateral_x_interval, [0.0, 0.0, 1.0], 0.0),
+                          (quadrilateral_x_interval, [-1e-12, 0.0, 0.0], 1e-12),
+                          (quadrilateral_x_interval, [1+1e-12, 0.0, 0.0], 1e-12),
+                          (quadrilateral_x_interval, [0.0, -1e-12, 0.0], 1e-12),
+                          (quadrilateral_x_interval, [0.0, 1+1e-12, 0.0], 1e-12),
+                          (quadrilateral_x_interval, [0.0, 0.0, -1e-12], 1e-12),
+                          (quadrilateral_x_interval, [0.0, 0.0, 1+1e-12], 1e-12)])
+def test_distance_to_point(cell, point, expected):
+    if expected < 0:  # Only promise to give negative value
+        assert cell.distance_to_point(point) < 0
+    else:
+        assert isclose(cell.distance_to_point(point), expected, rel_tol=1e-3)
 
 
 if __name__ == '__main__':
