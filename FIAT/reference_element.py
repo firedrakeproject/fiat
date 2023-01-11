@@ -621,7 +621,7 @@ class UFCSimplex(Simplex):
         """
         # bary = [alpha, beta, gamma, delta, ...] - see docstring
         bary = [1.0 - sum(point)] + list(point)
-        neg_bary = [b for b in bary if b < 0]
+        neg_bary = [b for b in bary if b <= 0]
         if len(neg_bary) == 0:
             # Point is inside the cell, give a negative distance to it
             return -bary[0]
