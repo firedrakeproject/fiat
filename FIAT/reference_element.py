@@ -1031,6 +1031,13 @@ class UFCQuadrilateral(Cell):
         (with numerical tolerance)."""
         return self.product.contains_point(point, epsilon=epsilon)
 
+    def distance_to_point(self, point):
+        """Get an aproximate distance to a point with a negative result if the
+        point is inside the cell.
+
+        For more information see the docstring for the UFCSimplex method."""
+        return self.product.distance_to_point(point)
+
     def symmetry_group_size(self, dim):
         return [1, 2, 8][dim]
 
