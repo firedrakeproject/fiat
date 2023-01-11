@@ -925,6 +925,13 @@ class TensorProductCell(Cell):
                        for c, s in zip(self.cells, slices)),
                       True)
 
+    def distance_to_point(self, point):
+        """Get an aproximate distance to a point with a negative result if the
+        point is inside the cell.
+
+        For more information see the docstring for the UFCSimplex method."""
+        raise NotImplementedError("Not implemented for TensorProductCell")
+
     def symmetry_group_size(self, dim):
         return tuple(c.symmetry_group_size(d) for d, c in zip(dim, self.cells))
 
