@@ -508,10 +508,126 @@ class UFCSimplex(Simplex):
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
         (with numerical tolerance)."""
-        result = (sum(point) - epsilon <= 1)
-        for c in point:
-            result &= (c + epsilon >= 0)
-        return result
+        return self.distance_to_point(point) <= epsilon
+
+    def distance_to_point(self, point):
+        """Get an aproximate distance to a point with a negative result if the
+        point is inside the cell.
+
+        In 1D the result is exact.
+
+        Parameters
+        ----------
+        point : numpy.ndarray or list
+            The coordinates of the point.
+
+        Returns
+        -------
+        float
+            The approximate distance to the point. If negative the point is
+            inside the cell.
+
+        Notes
+        -----
+
+        This is done with the help of barycentric coordinates where yhe general
+        algorithm is to compute the smallest negative barycentric coordinate
+        then return its negative. In each of the below examples the point
+        coordinate is `X` with appropriate dimensions.
+
+        Consider, for example, a UFCInterval. We have two vertices which make
+        the interval,
+            `P0 = [0]` and
+            `P1 = [1]`.
+        Our point is
+            `X = [x]`.
+        Barycentric coordinates are defined as
+            `X = alpha * P0 + beta * P1` where
+            `alpha + beta = 1.0`.
+        The solution is
+            `alpha = 1 - X[0] = 1 - x` and
+            `beta = X[0] = x`.
+        If both `alpha` and `beta` are positive, the point is inside the
+        reference interval.
+
+        `---regionA---P0=0------P1=1---regionB---`
+
+        If we are in `regionA`, `alpha` is negative and
+        `-alpha = X[0] - 1.0` is the (positive) distance from `P0`.
+        If we are in `regionB`, `beta` is negative and `-beta = -X[0]` is
+        the (positive) distance from `P1`.
+        If we are in the interval we can just return `-X[0]` since we don't
+        care about how close to either vertex we are.
+
+        Things get more complicated when we consider higher dimensions.
+        Consider a UFCTriangle. We have three vertices which make the a
+        reference triangle,
+            `P0 = (0, 0)`,
+            `P1 = (1, 0)` and
+            `P2 = (0, 1)`.
+        Our point is
+            `X = [x, y]`.
+        Below is a diagram of the cell (which may not render correctly in
+        sphinx):
+
+        .. code-block:: text
+        ```
+                y-axis
+                |
+                |
+          (0,1) P2
+                | \\
+                |  \\
+                |   \\
+                |    \\
+                |  T  \\
+                |      \\
+                |       \\
+                |        \\
+            ---P0--------P1--- x-axis
+          (0,0) |         (1,0)
+        ```
+
+        Barycentric coordinates are defined as
+            `X = alpha * P0 + beta * P1 + gamma * P2` where
+            `alpha + beta + gamma = 1.0`.
+        The solution is
+            `alpha = 1 - X[0] - X[1] = 1 - x - y`,
+            `beta = X[0] = x` and
+            `gamma = X[1] = y`.
+        If all three are positive, the point is inside the reference cell.
+        If any are negative, we are outside it. The negative barycentric
+        coordinate which is closest to 0.0 is a reasonable approximation of the
+        closest point to the triangle.
+
+        For a UFCTetrahedron we have four vertices
+            `P0 = (0,0,0)`,
+            `P1 = (1,0,0)`,
+            `P2 = (0,1,0)` and
+            `P3 = (0,0,1)`.
+        Our point is
+            `X = [x, y, z]`.
+        The barycentric coordinates are defined as
+            `X = alpha * P0 + beta * P1 + gamma * P2 + delta * P3`
+            where
+            `alpha + beta + gamma + delta = 1.0`.
+        The solution is
+            `alpha = 1 - X[0] - X[1] - X[2] = 1 - x - y - z`,
+            `beta = X[0] = x`,
+            `gamma = X[1] = y` and
+            `delta = X[2] = z`.
+        The rules are the same as for the triangle but with one extra
+        barycentric coordinate.
+        """
+        # bary = [alpha, beta, gamma, delta, ...] - see docstring
+        bary = [1.0 - sum(point)] + list(point)
+        neg_bary = [b for b in bary if b < 0]
+        if len(neg_bary) == 0:
+            # Point is inside the cell, give a negative distance to it
+            return -bary[0]
+        else:
+            # Point is outside the cell, give approximate distance to it
+            return -min(neg_bary)
 
 
 class Point(Simplex):
