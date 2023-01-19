@@ -507,8 +507,30 @@ class UFCSimplex(Simplex):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
-        return self.distance_to_point(point) <= epsilon
+        (with numerical tolerance).
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+
+        Notes
+        -----
+        Whilst this coudl use `distance_to_point` in this function,
+        `distance_to_point` cannot be used to return a symbolic expression so
+        we have to reimplement the logic here. If this function is changed, be
+        sure to update `distance_to_point` as well.
+        """
+        result = (sum(point) - epsilon <= 1)
+        for c in point:
+            result &= (c + epsilon >= 0)
+        return result
 
     def distance_to_point(self, point):
         """Get an aproximate distance to a point with a negative result if the
@@ -529,6 +551,9 @@ class UFCSimplex(Simplex):
 
         Notes
         -----
+
+        Important: If this function's logic is changed, be sure to update
+        `contains_point` as well.
 
         This is done with the help of barycentric coordinates where yhe general
         algorithm is to compute the smallest negative barycentric coordinate
