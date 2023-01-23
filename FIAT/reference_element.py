@@ -519,24 +519,12 @@ class UFCSimplex(Simplex):
         Returns
         -------
         bool : True if the point is inside the cell, False otherwise.
-
-        Notes
-        -----
-        This is logically equivalent to
-        `return self.distance_to_point(point) <= epsilon`.
-        Whilst this could use `distance_to_point` in this function,
-        `distance_to_point` cannot be used to return a symbolic expression so
-        we have to reimplement the logic here. If this function is changed, be
-        sure to update `distance_to_point` as well.
         """
-        result = (sum(point) - epsilon <= 1)
-        for c in point:
-            result &= (c + epsilon >= 0)
-        return result
+        return self.distance_to_point(point) <= epsilon
 
     def distance_to_point(self, point):
-        """Get an aproximate distance to a point with a negative result if the
-        point is inside the cell.
+        """Get an aproximate distance to a point with 0.0 if the point is
+        inside the cell.
 
         In 1D the result is exact.
 
@@ -548,19 +536,18 @@ class UFCSimplex(Simplex):
         Returns
         -------
         float
-            The approximate distance to the point. If negative the point is
+            The approximate distance to the point. If 0.0 the point is
             inside the cell.
 
         Notes
         -----
 
-        Important: If this function's logic is changed, be sure to update
-        `contains_point` as well.
-
         This is done with the help of barycentric coordinates where the general
         algorithm is to compute the most negative (i.e. minimum) barycentric
-        coordinate then return its negative. In each of the below examples the
-        point coordinate is `X` with appropriate dimensions.
+        coordinate then return its negative. For implementation reasons we
+        return the sum of all the negative barycentric coordinates. In each of
+        the below examples the point coordinate is `X` with appropriate
+        dimensions.
 
         Consider, for example, a UFCInterval. We have two vertices which make
         the interval,
@@ -582,9 +569,8 @@ class UFCSimplex(Simplex):
         If we are in `regionA`, `alpha` is negative and
         `-alpha = X[0] - 1.0` is the (positive) distance from `P0`.
         If we are in `regionB`, `beta` is negative and `-beta = -X[0]` is
-        the (positive) distance from `P1`.
-        If we are in the interval we can just return `-X[0]` since we don't
-        care about how close to either vertex we are.
+        the exact (positive) distance from `P1`.
+        If we are in the interval we can just return 0.0.
 
         Things get more complicated when we consider higher dimensions.
         Consider a UFCTriangle. We have three vertices which make the
@@ -623,9 +609,11 @@ class UFCSimplex(Simplex):
             `beta = X[0] = x` and
             `gamma = X[1] = y`.
         If all three are positive, the point is inside the reference cell.
-        If any are negative, we are outside it. The most negative barycentric
-        coordinate which is a reasonable approximation of the closest point to
-        the triangle.
+        If any are negative, we are outside it. The absolute sum of the
+        negative barycentric coordinates gives a reasonable (the correct order
+        of magnitude - if all three are negative it's at worse about 3 times
+        the actual distance) approximation of the closest point to the
+        triangle.
 
         For a UFCTetrahedron we have four vertices
             `P0 = (0,0,0)`,
@@ -644,12 +632,22 @@ class UFCSimplex(Simplex):
             `gamma = X[1] = y` and
             `delta = X[2] = z`.
         The rules are the same as for the triangle but with one extra
-        barycentric coordinate.
+        barycentric coordinate. Our approximate distance, the absolute sum of
+        the negative barycentric coordinates, is at worse around 4 times the
+        actual distance to the tetrahedron.
         """
-        # alpha is 1-sum(point), beta is point[0], gamma is point[1], delta is
-        # point[2] etc. The minimum of these is our most negative barycentric
-        # coordinate (see docstring).
-        return -min(1-sum(point), min(point))
+        # bary = [alpha, beta, gamma, delta, ...] - see docstring
+        bary = [1.0 - sum(point)] + list(point)
+        # We output the most negative of these in a way the sympy can cope
+        # with. bary-abs(bary) gets rid of the positive barycentric coordinates
+        # and doubles the rest. Halving this then summing the result gives a
+        # reasonable (negative) aproximation to the distance. When there are
+        # multiple negative barycentric coordinates it will be an overestimate.
+        # Ideally we would just output the absoliute value of the minimum
+        # barycentric coordinate which would be a better aproximation (e.g.
+        # -min(1-sum(point), min(point)) but sympy can't outputa symbolic
+        # minimum.
+        return - 0.5 * sum([b - abs(b) for b in bary])
 
 
 class Point(Simplex):
