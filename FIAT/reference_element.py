@@ -522,7 +522,9 @@ class UFCSimplex(Simplex):
 
         Notes
         -----
-        Whilst this coudl use `distance_to_point` in this function,
+        This is logically equivalent to
+        `return self.distance_to_point(point) <= epsilon`.
+        Whilst this could use `distance_to_point` in this function,
         `distance_to_point` cannot be used to return a symbolic expression so
         we have to reimplement the logic here. If this function is changed, be
         sure to update `distance_to_point` as well.
@@ -555,10 +557,10 @@ class UFCSimplex(Simplex):
         Important: If this function's logic is changed, be sure to update
         `contains_point` as well.
 
-        This is done with the help of barycentric coordinates where yhe general
-        algorithm is to compute the smallest negative barycentric coordinate
-        then return its negative. In each of the below examples the point
-        coordinate is `X` with appropriate dimensions.
+        This is done with the help of barycentric coordinates where the general
+        algorithm is to compute the most negative (i.e. minimum) barycentric
+        coordinate then return its negative. In each of the below examples the
+        point coordinate is `X` with appropriate dimensions.
 
         Consider, for example, a UFCInterval. We have two vertices which make
         the interval,
@@ -585,7 +587,7 @@ class UFCSimplex(Simplex):
         care about how close to either vertex we are.
 
         Things get more complicated when we consider higher dimensions.
-        Consider a UFCTriangle. We have three vertices which make the a
+        Consider a UFCTriangle. We have three vertices which make the
         reference triangle,
             `P0 = (0, 0)`,
             `P1 = (1, 0)` and
@@ -621,9 +623,9 @@ class UFCSimplex(Simplex):
             `beta = X[0] = x` and
             `gamma = X[1] = y`.
         If all three are positive, the point is inside the reference cell.
-        If any are negative, we are outside it. The negative barycentric
-        coordinate which is closest to 0.0 is a reasonable approximation of the
-        closest point to the triangle.
+        If any are negative, we are outside it. The most negative barycentric
+        coordinate which is a reasonable approximation of the closest point to
+        the triangle.
 
         For a UFCTetrahedron we have four vertices
             `P0 = (0,0,0)`,
@@ -644,15 +646,10 @@ class UFCSimplex(Simplex):
         The rules are the same as for the triangle but with one extra
         barycentric coordinate.
         """
-        # bary = [alpha, beta, gamma, delta, ...] - see docstring
-        bary = [1.0 - sum(point)] + list(point)
-        neg_bary = [b for b in bary if b <= 0]
-        if len(neg_bary) == 0:
-            # Point is inside the cell, give a negative distance to it
-            return -bary[0]
-        else:
-            # Point is outside the cell, give approximate distance to it
-            return -min(neg_bary)
+        # alpha is 1-sum(point), beta is point[0], gamma is point[1], delta is
+        # point[2] etc. The minimum of these is our most negative barycentric
+        # coordinate (see docstring).
+        return -min(1-sum(point), min(point))
 
 
 class Point(Simplex):
