@@ -52,7 +52,7 @@ class LagrangeLineExpansionSet(LineExpansionSet):
         return results
 
     def tabulate_derivative(self, n, pts):
-        return numpy.dot(sefl.dmat, self.tabulate(n, pts))
+        return numpy.dot(self.dmat, self.tabulate(n, pts))
 
 
 class LagrangePolynomialSet(PolynomialSet):
