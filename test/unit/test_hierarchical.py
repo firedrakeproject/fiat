@@ -25,21 +25,21 @@ import numpy as np
 
 @pytest.mark.parametrize("degree", range(1, 7))
 @pytest.mark.parametrize("family", ["CG", "DG"])
-def test_fdm_basis_values(family, degree):
+def test_hierarchical_basis_values(family, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
-    from FIAT import ufc_simplex, FDMLagrange, FDMDiscontinuousLagrange, make_quadrature
+    from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
 
     s = ufc_simplex(1)
     q = make_quadrature(s, degree + 1)
 
     if family == "CG":
-        fe = FDMLagrange(s, degree)
+        fe = IntegratedLegendre(s, degree)
     else:
-        fe = FDMDiscontinuousLagrange(s, degree-1)
+        fe = Legendre(s, degree)
     tab = fe.tabulate(0, q.pts)[(0,)]
 
     for test_degree in range(degree + 1):
-        coefs = [float(n(lambda x: x[0]**test_degree)) for n in fe.dual.nodes]
+        coefs = [n(lambda x: x[0]**test_degree) for n in fe.dual.nodes]
         integral = np.dot(coefs, np.dot(tab, q.wts))
         reference = np.dot([x[0]**test_degree
                             for x in q.pts], q.wts)
@@ -48,9 +48,9 @@ def test_fdm_basis_values(family, degree):
 
 @pytest.mark.parametrize("degree", range(1, 7))
 def test_sparsity(degree):
-    from FIAT import ufc_simplex, FDMLagrange, make_quadrature
+    from FIAT import ufc_simplex, IntegratedLegendre, make_quadrature
     cell = ufc_simplex(1)
-    fe = FDMLagrange(cell, degree)
+    fe = IntegratedLegendre(cell, degree)
 
     rule = make_quadrature(cell, degree+1)
     basis = fe.tabulate(1, rule.get_points())
@@ -61,8 +61,8 @@ def test_sparsity(degree):
     Bhat = np.dot(np.multiply(Jhat, what), Jhat.T)
     nnz = lambda A: A.size - np.sum(np.isclose(A, 0.0E0, rtol=1E-14))
     ndof = fe.space_dimension()
-    assert nnz(Ahat) == 5*ndof-6
-    assert nnz(Bhat) == ndof+2
+    assert nnz(Ahat) == ndof+2
+    assert nnz(Bhat) == 3*max(ndof-4, 0) + 5*min(ndof-1, 3) - 1
 
 
 if __name__ == '__main__':
