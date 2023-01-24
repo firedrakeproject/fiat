@@ -20,6 +20,7 @@ from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.discontinuous_taylor import DiscontinuousTaylor
 from FIAT.discontinuous_raviart_thomas import DiscontinuousRaviartThomas
 from FIAT.serendipity import Serendipity
+from FIAT.provide_basis import Provide_Basis
 from FIAT.discontinuous_pc import DPC
 from FIAT.hermite import CubicHermite
 from FIAT.lagrange import Lagrange
