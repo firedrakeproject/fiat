@@ -349,11 +349,11 @@ def test_contains_point(cell, point, epsilon, expected):
                           (quadrilateral_x_interval, [0.0, 1+1e-12, 0.0], 1e-12),
                           (quadrilateral_x_interval, [0.0, 0.0, -1e-12], 1e-12),
                           (quadrilateral_x_interval, [0.0, 0.0, 1+1e-12], 1e-12)])
-def test_distance_to_point(cell, point, expected):
+def test_distance_to_point_l1(cell, point, expected):
     if expected < 0:  # Only promise to give negative value
-        assert cell.distance_to_point(point) < 0
+        assert cell.distance_to_point_l1(point) < 0
     else:
-        assert isclose(cell.distance_to_point(point), expected, rel_tol=1e-3)
+        assert isclose(cell.distance_to_point_l1(point), expected, rel_tol=1e-3)
 
 
 if __name__ == '__main__':

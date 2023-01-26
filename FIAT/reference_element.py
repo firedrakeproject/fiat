@@ -507,7 +507,8 @@ class UFCSimplex(Simplex):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance).
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
 
         Parameters
         ----------
@@ -520,13 +521,11 @@ class UFCSimplex(Simplex):
         -------
         bool : True if the point is inside the cell, False otherwise.
         """
-        return self.distance_to_point(point) <= epsilon
+        return self.distance_to_point_l1(point) <= epsilon
 
-    def distance_to_point(self, point):
-        """Get an aproximate distance to a point with 0.0 if the point is
-        inside the cell.
-
-        In 1D the result is exact.
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
 
         Parameters
         ----------
@@ -536,8 +535,9 @@ class UFCSimplex(Simplex):
         Returns
         -------
         float
-            The approximate distance to the point. If 0.0 the point is
-            inside the cell.
+            The L1 distance, also known as taxicab, manhatten or rectilinear
+            distance, of the cell to the point. If 0.0 the point is inside the
+            cell.
 
         Notes
         -----
@@ -569,8 +569,9 @@ class UFCSimplex(Simplex):
         If we are in `regionA`, `alpha` is negative and
         `-alpha = X[0] - 1.0` is the (positive) distance from `P0`.
         If we are in `regionB`, `beta` is negative and `-beta = -X[0]` is
-        the exact (positive) distance from `P1`.
-        If we are in the interval we can just return 0.0.
+        the exact (positive) distance from `P1`. Since we are in 1D the L1
+        distance is the same as the L2 distance. If we are in the interval we
+        can just return 0.0.
 
         Things get more complicated when we consider higher dimensions.
         Consider a UFCTriangle. We have three vertices which make the
@@ -609,11 +610,16 @@ class UFCSimplex(Simplex):
             `beta = X[0] = x` and
             `gamma = X[1] = y`.
         If all three are positive, the point is inside the reference cell.
-        If any are negative, we are outside it. The absolute sum of the
-        negative barycentric coordinates gives a reasonable (the correct order
-        of magnitude - if all three are negative it's at worse about 3 times
-        the actual distance) approximation of the closest point to the
-        triangle.
+        If any are negative, we are outside it. The absolute sum of any
+        negative barycentric coordinates usefully gives the L1 distance from
+        the cell to the point. For example the point (1,1) has L1 distance
+        1 from the cell: on this case alpha = -1, beta = 1 and gamma = 1.
+        -alpha = 1 is the L1 distance. For comparison the L2 distance (the
+        length of the vector from the nearest point on the cell to the point)
+        is sqrt(0.5^2 + 0.5^2) = 0.707. Similarly the point (-1.0, -1.0) has
+        alpha = 3, beta = -1 and gamma = -1. The absolute sum of beta and gamma
+        2 which is again the L1 distance. The L2 distance in this case is
+        sqrt(1^2 + 1^2) = 1.414.
 
         For a UFCTetrahedron we have four vertices
             `P0 = (0,0,0)`,
@@ -640,13 +646,14 @@ class UFCSimplex(Simplex):
         bary = [1.0 - sum(point)] + list(point)
         # We output the most negative of these in a way the sympy can cope
         # with. bary-abs(bary) gets rid of the positive barycentric coordinates
-        # and doubles the rest. Halving this then summing the result gives a
-        # reasonable (negative) aproximation to the distance. When there are
-        # multiple negative barycentric coordinates it will be an overestimate.
-        # Ideally we would just output the absoliute value of the minimum
-        # barycentric coordinate which would be a better aproximation (e.g.
-        # -min(1-sum(point), min(point)) but sympy can't outputa symbolic
-        # minimum.
+        # and doubles the negative distances. Summing, halving and taking the
+        # negative of these gives the L1 distance. So for example
+        # point = [-1, -1]
+        # bary = [3, -1, -1],
+        # bary-abs(bary) = [0, -2, -2],
+        # sum(bary-abs(bary)) = -4.
+        # - 0.5 * sum(bary-abs(bary)) = 2.0
+        # which is the correct L1 distance from the cell to the point.
         return - 0.5 * sum([b - abs(b) for b in bary])
 
 
@@ -945,9 +952,9 @@ class TensorProductCell(Cell):
                        for c, s in zip(self.cells, slices)),
                       True)
 
-    def distance_to_point(self, point):
-        """Get an aproximate distance to a point with a negative result if the
-        point is inside the cell.
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
 
         For more information see the docstring for the UFCSimplex method."""
         raise NotImplementedError("Not implemented for TensorProductCell")
@@ -1058,12 +1065,12 @@ class UFCQuadrilateral(Cell):
         (with numerical tolerance)."""
         return self.product.contains_point(point, epsilon=epsilon)
 
-    def distance_to_point(self, point):
-        """Get an aproximate distance to a point with a negative result if the
-        point is inside the cell.
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
 
         For more information see the docstring for the UFCSimplex method."""
-        return self.product.distance_to_point(point)
+        return self.product.distance_to_point_l1(point)
 
     def symmetry_group_size(self, dim):
         return [1, 2, 8][dim]
