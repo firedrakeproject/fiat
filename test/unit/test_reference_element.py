@@ -268,12 +268,12 @@ def test_contains_point(cell, point, epsilon, expected):
 
 
 @pytest.mark.parametrize(('cell', 'point', 'expected'),
-                         [(interval, [0.5], -0.5),
+                         [(interval, [0.5], 0.0),
                           (interval, [0.0], 0.0),
                           (interval, [1.0], 0.0),
                           (interval, [-1e-12], 1e-12),
                           (interval, [1+1e-12], 1e-12),
-                          (triangle, [0.25, 0.25], -0.25),
+                          (triangle, [0.25, 0.25], 0.0),
                           (triangle, [0.0, 0.0], 0.0),
                           (triangle, [1.0, 0.0], 0.0),
                           (triangle, [0.0, 1.0], 0.0),
@@ -284,7 +284,7 @@ def test_contains_point(cell, point, epsilon, expected):
                           (triangle, [0.0, 1+1e-12], 1e-12),
                           (triangle, [0.5+1e-12, 0.5], 1e-12),
                           (triangle, [0.5, 0.5+1e-12], 1e-12),
-                          (quadrilateral, [0.5, 0.5], -0.5),
+                          (quadrilateral, [0.5, 0.5], 0.0),
                           (quadrilateral, [0.0, 0.0], 0.0),
                           (quadrilateral, [1.0, 0.0], 0.0),
                           (quadrilateral, [0.0, 1.0], 0.0),
@@ -296,7 +296,7 @@ def test_contains_point(cell, point, epsilon, expected):
                           (quadrilateral, [-1e-12, 0.5], 1e-12),
                           (quadrilateral, [1+1e-12, 0.5], 1e-12),
                           (quadrilateral, [1+1e-12, 1+1e-12], 1e-12),
-                          (tetrahedron, [0.25, 0.25, 0.25], -0.25),
+                          (tetrahedron, [0.25, 0.25, 0.25], 0.0),
                           (tetrahedron, [1/3, 1/3, 1/3], 0.0),
                           (tetrahedron, [0.0, 0.0, 0.0], 0.0),
                           (tetrahedron, [1.0, 0.0, 0.0], 0.0),
@@ -314,7 +314,7 @@ def test_contains_point(cell, point, epsilon, expected):
                           (tetrahedron, [1/3+1e-12, 1/3, 1/3], 1e-12),
                           (tetrahedron, [1/3, 1/3+1e-12, 1/3], 1e-12),
                           (tetrahedron, [1/3, 1/3, 1/3+1e-12], 1e-12),
-                          (interval_x_interval, [0.5, 0.5], -0.5),
+                          (interval_x_interval, [0.5, 0.5], 0.0),
                           (interval_x_interval, [0.0, 0.0], 0.0),
                           (interval_x_interval, [1.0, 0.0], 0.0),
                           (interval_x_interval, [0.0, 1.0], 0.0),
@@ -338,7 +338,7 @@ def test_contains_point(cell, point, epsilon, expected):
                           (triangle_x_interval, [0.0, 1+1e-12, 0.5], 1e-12),
                           (triangle_x_interval, [0.0, 0.0, -1e-12], 1e-12),
                           (triangle_x_interval, [0.0, 0.0, 1+1e-12], 1e-12),
-                          (quadrilateral_x_interval, [0.5, 0.5, 0.5], -0.5),
+                          (quadrilateral_x_interval, [0.5, 0.5, 0.5], 0.0),
                           (quadrilateral_x_interval, [0.0, 0.0, 0.0], 0.0),
                           (quadrilateral_x_interval, [1.0, 0.0, 0.0], 0.0),
                           (quadrilateral_x_interval, [0.0, 1.0, 0.0], 0.0),
@@ -350,10 +350,7 @@ def test_contains_point(cell, point, epsilon, expected):
                           (quadrilateral_x_interval, [0.0, 0.0, -1e-12], 1e-12),
                           (quadrilateral_x_interval, [0.0, 0.0, 1+1e-12], 1e-12)])
 def test_distance_to_point_l1(cell, point, expected):
-    if expected < 0:  # Only promise to give negative value
-        assert cell.distance_to_point_l1(point) < 0
-    else:
-        assert isclose(cell.distance_to_point_l1(point), expected, rel_tol=1e-3)
+    assert isclose(cell.distance_to_point_l1(point), expected, rel_tol=1e-3)
 
 
 if __name__ == '__main__':
