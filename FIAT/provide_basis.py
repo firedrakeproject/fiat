@@ -15,7 +15,7 @@ from FIAT.lagrange import Lagrange
 from FIAT.dual_set import make_entity_closure_ids
 from FIAT.polynomial_set import mis
 from FIAT.reference_element import (compute_unflattening_map,
-                                    flatten_reference_cube)
+                                    flatten_reference_cube, is_hypercube)
 from FIAT.reference_element import make_lattice
 
 from FIAT.pointwise_dual import compute_pointwise_dual
@@ -30,13 +30,15 @@ class Provide_Basis(FiniteElement):
 
     # basis is a dictionary from entity to basis functions, with a set of unisolvent points provided under the key pts
     def __init__(self, ref_el, degree, basis):
-
-        flat_el = flatten_reference_cube(ref_el) #something needed here
+        if is_hypercube(ref_el):
+            flat_el = flatten_reference_cube(ref_el)
+        else:
+            flat_el = ref_el
         dim = flat_el.get_spatial_dimension()
         flat_topology = flat_el.get_topology()
 
         verts = flat_el.get_vertices()
-
+        print(basis)
         for i in range(4):
             try:
                 x = basis[i]
@@ -60,13 +62,16 @@ class Provide_Basis(FiniteElement):
             entity_ids[0][j] = [cur]
             cur = cur + 1
 
+        per_entity = int(len(EL) / len(flat_topology[1]))
         for j in sorted(flat_topology[1]):
-            entity_ids[1][j] = list(range(cur, cur + degree - 1))
-            cur = cur + degree - 1
+            entity_ids[1][j] = list(range(cur, cur + per_entity))
+            cur = cur + per_entity
+
+        per_entity = int(len(FL) / len(flat_topology[2]))
 
         for j in sorted(flat_topology[2]):
-            entity_ids[2][j] = list(range(cur, cur + tr(degree)))
-            cur = cur + tr(degree)
+            entity_ids[2][j] = list(range(cur, cur + per_entity))
+            cur = cur + per_entity
 
         if dim == 3:
             entity_ids[3] = {}
@@ -110,16 +115,16 @@ class Provide_Basis(FiniteElement):
         return self._degree + 1
 
     def get_nodal_basis(self):
-        raise NotImplementedError("get_nodal_basis not implemented for serendipity")
+        raise NotImplementedError("get_nodal_basis not implemented for explicit basis elements")
 
     def get_dual_set(self):
-        raise NotImplementedError("get_dual_set is not implemented for serendipity")
+        raise NotImplementedError("get_dual_set is not implemented for explicit basis elements")
 
     def get_coeffs(self):
-        raise NotImplementedError("get_coeffs not implemented for serendipity")
+        raise NotImplementedError("get_coeffs not implemented for explicit basis elements")
 
     def tabulate(self, order, points, entity=None):
-
+        print("in tabulate")
         if entity is None:
             entity = (self.ref_el.get_dimension(), 0)
 
