@@ -943,7 +943,20 @@ class TensorProductCell(Cell):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+        """
         lengths = [c.get_spatial_dimension() for c in self.cells]
         assert len(point) == sum(lengths)
         slices = TensorProductCell._split_slices(lengths)
@@ -1068,7 +1081,20 @@ class UFCQuadrilateral(Cell):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+        """
         return self.product.contains_point(point, epsilon=epsilon)
 
     def distance_to_point_l1(self, point):
@@ -1143,7 +1169,20 @@ class UFCHexahedron(Cell):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+        """
         return self.product.contains_point(point, epsilon=epsilon)
 
     def symmetry_group_size(self, dim):
