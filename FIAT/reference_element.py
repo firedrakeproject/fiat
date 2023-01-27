@@ -957,12 +957,13 @@ class TensorProductCell(Cell):
         -------
         bool : True if the point is inside the cell, False otherwise.
         """
-        lengths = [c.get_spatial_dimension() for c in self.cells]
-        assert len(point) == sum(lengths)
-        slices = TensorProductCell._split_slices(lengths)
+        subcell_dimensions = [c.get_spatial_dimension() for c in self.cells]
+        assert len(point) == sum(subcell_dimensions)
+        point_slices = TensorProductCell._split_slices(subcell_dimensions)
+        subcell_points = [point[s] for s in point_slices]
         return reduce(operator.and_,
-                      (c.contains_point(point[s], epsilon=epsilon)
-                       for c, s in zip(self.cells, slices)),
+                      (c.contains_point(p, epsilon=epsilon)
+                       for c, p in zip(self.cells, subcell_points)),
                       True)
 
     def distance_to_point_l1(self, point):
