@@ -957,7 +957,13 @@ class TensorProductCell(Cell):
         distance) to a point with 0.0 if the point is inside the cell.
 
         For more information see the docstring for the UFCSimplex method."""
-        raise NotImplementedError("Not implemented for TensorProductCell")
+        subcell_dimensions = [c.get_spatial_dimension() for c in self.cells]
+        assert len(point) == sum(subcell_dimensions)
+        point_slices = TensorProductCell._split_slices(subcell_dimensions)
+        subcell_points = [point[s] for s in point_slices]
+        subcell_distances = [c.distance_to_point_l1(p)
+                             for c, p in zip(self.cells, subcell_points)]
+        return sum(subcell_distances)
 
     def symmetry_group_size(self, dim):
         return tuple(c.symmetry_group_size(d) for d, c in zip(dim, self.cells))
