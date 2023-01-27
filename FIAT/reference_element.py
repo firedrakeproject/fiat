@@ -520,10 +520,12 @@ class UFCSimplex(Simplex):
         Returns
         -------
         bool : True if the point is inside the cell, False otherwise.
+
         """
         return self.distance_to_point_l1(point) <= epsilon
 
     def distance_to_point_l1(self, point):
+        # noqa: D301
         """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
         distance) to a point with 0.0 if the point is inside the cell.
 
@@ -641,6 +643,7 @@ class UFCSimplex(Simplex):
         barycentric coordinate. Our approximate distance, the absolute sum of
         the negative barycentric coordinates, is at worse around 4 times the
         actual distance to the tetrahedron.
+
         """
         # bary = [alpha, beta, gamma, delta, ...] - see docstring
         bary = [1.0 - sum(point)] + list(point)
@@ -956,6 +959,7 @@ class TensorProductCell(Cell):
         Returns
         -------
         bool : True if the point is inside the cell, False otherwise.
+
         """
         subcell_dimensions = [c.get_spatial_dimension() for c in self.cells]
         assert len(point) == sum(subcell_dimensions)
@@ -1095,6 +1099,7 @@ class UFCQuadrilateral(Cell):
         Returns
         -------
         bool : True if the point is inside the cell, False otherwise.
+
         """
         return self.product.contains_point(point, epsilon=epsilon)
 
@@ -1183,7 +1188,9 @@ class UFCHexahedron(Cell):
         Returns
         -------
         bool : True if the point is inside the cell, False otherwise.
+
         """
+
         return self.product.contains_point(point, epsilon=epsilon)
 
     def symmetry_group_size(self, dim):
