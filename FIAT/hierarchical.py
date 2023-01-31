@@ -61,16 +61,15 @@ class IntegratedLegendreDual(dual_set.DualSet):
         P = jacobi.eval_jacobi_batch(0, 0, degree-1, xhat)
         basis = numpy.dot(numpy.multiply(P, W), numpy.multiply(D.T, 1.0/W))
 
-        pt_eval = [functional.PointEvaluation(ref_el, x) for x in v1]
-        even = [functional.IntegralMoment(ref_el, rule, f) for f in basis[1::2]]
-        odd = [functional.IntegralMoment(ref_el, rule, f) for f in basis[2::2]]
-        nodes = pt_eval[:1] + odd + even + pt_eval[1:]
+        nodes = [functional.PointEvaluation(ref_el, x) for x in v1]
+        nodes += [functional.IntegralMoment(ref_el, rule, f) for f in basis[2::2]]
+        nodes += [functional.IntegralMoment(ref_el, rule, f) for f in basis[1::2]]
 
-        entity_ids = {0: {0: [0], 1: [degree]},
-                      1: {0: list(range(1, degree))}}
+        entity_ids = {0: {0: [0], 1: [1]},
+                      1: {0: list(range(2, degree+1))}}
         entity_permutations = {}
         entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
-        entity_permutations[1] = {0: make_entity_permutations(1, degree-1)}
+        entity_permutations[1] = {0: make_entity_permutations(1, degree - 1)}
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 

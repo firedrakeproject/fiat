@@ -35,7 +35,7 @@ def test_fdm_basis_values(family, degree):
     if family == "CG":
         fe = FDMLagrange(s, degree)
     else:
-        fe = FDMDiscontinuousLagrange(s, degree-1)
+        fe = FDMDiscontinuousLagrange(s, degree)
     tab = fe.tabulate(0, q.pts)[(0,)]
 
     for test_degree in range(degree + 1):
@@ -51,8 +51,8 @@ def test_sparsity(degree):
     from FIAT import ufc_simplex, FDMLagrange, make_quadrature
     cell = ufc_simplex(1)
     fe = FDMLagrange(cell, degree)
+    rule = fe.dual.rule
 
-    rule = make_quadrature(cell, degree+1)
     basis = fe.tabulate(1, rule.get_points())
     Jhat = basis[(0,)]
     Dhat = basis[(1,)]
