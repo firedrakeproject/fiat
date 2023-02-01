@@ -26,7 +26,7 @@ variables = (x, y, z)
 leg = legendre
 
 
-class Provide_Basis(FiniteElement):
+class DirectDefinition(FiniteElement):
 
     # basis is a dictionary from entity to basis functions, with a set of unisolvent points provided under the key pts
     def __init__(self, ref_el, degree, basis):
@@ -82,7 +82,7 @@ class Provide_Basis(FiniteElement):
         assert len(s_list) == cur
         formdegree = 0
         print(Array(s_list))
-        super(Provide_Basis, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
+        super(DirectDefinition, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
 
         self.basis = {(0,)*dim: Array(s_list)}
         polynomials, extra_vars = _replace_numbers_with_symbols(Array(s_list))
