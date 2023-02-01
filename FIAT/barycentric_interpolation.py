@@ -7,8 +7,7 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
 import numpy
-from FIAT.expansions import LineExpansionSet, polynomial_dimension
-from FIAT.polynomial_set import PolynomialSet
+from FIAT import reference_element, expansions, polynomial_set
 
 
 def make_dmat(x):
@@ -23,8 +22,8 @@ def make_dmat(x):
     return dmat, wts
 
 
-class LagrangeLineExpansionSet(LineExpansionSet):
-    """Evaluates a 1D Lagrange nodal basis on a line reference element
+class LagrangeLineExpansionSet(expansions.LineExpansionSet):
+    """Evaluates a Lagrange basis on a line reference element
     via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
@@ -32,7 +31,7 @@ class LagrangeLineExpansionSet(LineExpansionSet):
     def __init__(self, ref_el, pts):
         self.nodes = numpy.array(pts).flatten()
         self.dmat, self.weights = make_dmat(self.nodes)
-        LineExpansionSet.__init__(self, ref_el)
+        super(LagrangeLineExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
         return len(self.nodes)
@@ -51,11 +50,11 @@ class LagrangeLineExpansionSet(LineExpansionSet):
             results = numpy.array(list(map(simplify, results)))
         return results
 
-    def tabulate_derivative(self, n, pts):
+    def tabulate_derivatives(self, n, pts):
         return numpy.dot(self.dmat, self.tabulate(n, pts))
 
 
-class LagrangePolynomialSet(PolynomialSet):
+class LagrangePolynomialSet(polynomial_set.PolynomialSet):
 
     def __init__(self, ref_el, pts, shape=tuple()):
         degree = len(pts) - 1
@@ -64,10 +63,10 @@ class LagrangePolynomialSet(PolynomialSet):
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        num_exp_functions = polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = LagrangeLineExpansionSet(ref_el, pts)
+        expansion_set = get_expansion_set(ref_el, pts)
 
         # set up coefficients
         if shape == tuple():
@@ -78,12 +77,23 @@ class LagrangePolynomialSet(PolynomialSet):
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
-                n = polynomial_dimension(ref_el, embedded_degree)
+                n = expansions.polynomial_dimension(ref_el, embedded_degree)
                 for exp_bf in range(n):
                     cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
         dmats = [numpy.transpose(expansion_set.dmat)]
-        PolynomialSet.__init__(self, ref_el, degree, embedded_degree,
-                               expansion_set, coeffs, dmats)
+        super(LagrangePolynomialSet, self).__init__(ref_el, degree, embedded_degree,
+                                                    expansion_set, coeffs, dmats)
+
+
+def get_expansion_set(ref_el, pts):
+    """Returns an ExpansionSet instance appopriate for the given
+    reference element."""
+    if ref_el.get_shape() == reference_element.POINT:
+        return expansions.PointExpansionSet(ref_el)
+    elif ref_el.get_shape() == reference_element.LINE:
+        return LagrangeLineExpansionSet(ref_el, pts)
+    else:
+        raise Exception("Unknown reference element type.")

@@ -176,9 +176,11 @@ def make_dmats(U, degree):
     pts = Q.get_points()
     wts = Q.get_weights()
 
-    v = numpy.transpose(U.tabulate(degree, pts))
-    Minv = numpy.reciprocal(wts.dot(numpy.square(v)))
-    vdual = numpy.multiply(Minv[:, numpy.newaxis], numpy.multiply(v.T, wts))
+    vdual = U.tabulate(degree, pts)
+    Minv = numpy.dot(numpy.square(vdual), wts)
+    numpy.reciprocal(Minv, out=Minv)
+    numpy.multiply(Minv[:, numpy.newaxis], vdual, out=vdual)
+    numpy.multiply(vdual, wts, out=vdual)
 
     dv = U.tabulate_derivatives(degree, pts)
     dtildes = [[[a[1][i] for a in dvrow] for dvrow in dv]

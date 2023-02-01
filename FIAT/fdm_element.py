@@ -50,29 +50,18 @@ class FDMDual(dual_set.DualSet):
         # Define the generalized eigenproblem on a reference element
         embedded_degree = degree + formdegree
         embedded = IntegratedLegendre(ref_el, embedded_degree)
-        self.embedded = embedded
-
         edim = embedded.space_dimension()
-        entity_dofs = embedded.entity_dofs()
-        _bdof = entity_dofs[0][0] + entity_dofs[0][1]
-        _idof = entity_dofs[1][0]
+        self.embedded = embedded
 
         solve_eig = sym_eig
         if bc_order == 1:
             solve_eig = tridiag_eig
 
-        bc_nodes = []
-        if bc_order > 0:
-            bc_nodes += [functional.PointEvaluation(ref_el, x) for x in ref_el.get_vertices()]
-        for alpha in range(1, bc_order):
-            bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in ref_el.get_vertices()]
-
-        bdof = slice(0, len(bc_nodes))
-        idof = slice(len(bc_nodes), edim)
-
         # Tabulate the BC nodes
         constraints = embedded.tabulate(bc_order-1, ref_el.get_vertices())
         C = numpy.transpose(numpy.column_stack(list(constraints.values())))
+        bdof = slice(0, C.shape[0])
+        idof = slice(C.shape[0], edim)
 
         # Tabulate the basis that splits the DOFs into interior and bcs
         E = numpy.eye(edim)
@@ -94,7 +83,7 @@ class FDMDual(dual_set.DualSet):
         # Eigenfunctions in the constrained basis
         S = numpy.eye(A.shape[0])
         lam = numpy.ones((A.shape[0],))
-        if S.shape[0] > len(bc_nodes):
+        if S.shape[0] > C.shape[0]:
             lam[idof], Sii = solve_eig(A[idof, idof], B[idof, idof])
             S[idof, idof] = Sii
             S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
@@ -121,15 +110,18 @@ class FDMDual(dual_set.DualSet):
                 K = numpy.dot(numpy.multiply(D, W), D.T)
                 basis[idof] = numpy.multiply(numpy.dot(basis[idof], K), 1/W)
 
+        bc_nodes = []
         if formdegree == 0:
             if orthogonalize:
-                idof = slice(0, degree+1)
-                bc_nodes = []
+                idof = slice(0, edim)
+            elif bc_order > 0:
+                bc_nodes += [functional.PointEvaluation(ref_el, x) for x in ref_el.get_vertices()]
+                for alpha in range(1, bc_order):
+                    bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in ref_el.get_vertices()]
 
         elif bc_order > 0:
             basis[bdof, :] = numpy.sqrt(1.0E0/ref_el.volume())
-            idof = slice(len(bc_nodes)-1, edim)
-            bc_nodes = []
+            idof = slice(formdegree, edim)
 
         nodes = bc_nodes + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]]
 
