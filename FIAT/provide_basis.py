@@ -58,9 +58,10 @@ class Provide_Basis(FiniteElement):
             for entity in entities:
                 entity_ids[top_dim][entity] = []
 
+        per_entity = int(len(VL) / len(flat_topology[0]))
         for j in sorted(flat_topology[0]):
             entity_ids[0][j] = [cur]
-            cur = cur + 1
+            cur = cur + per_entity
 
         per_entity = int(len(EL) / len(flat_topology[1]))
         for j in sorted(flat_topology[1]):
@@ -68,7 +69,6 @@ class Provide_Basis(FiniteElement):
             cur = cur + per_entity
 
         per_entity = int(len(FL) / len(flat_topology[2]))
-
         for j in sorted(flat_topology[2]):
             entity_ids[2][j] = list(range(cur, cur + per_entity))
             cur = cur + per_entity
@@ -81,7 +81,7 @@ class Provide_Basis(FiniteElement):
         s_list = VL + EL + FL + IL
         assert len(s_list) == cur
         formdegree = 0
-
+        print(Array(s_list))
         super(Provide_Basis, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
 
         self.basis = {(0,)*dim: Array(s_list)}
@@ -124,7 +124,6 @@ class Provide_Basis(FiniteElement):
         raise NotImplementedError("get_coeffs not implemented for explicit basis elements")
 
     def tabulate(self, order, points, entity=None):
-        print("in tabulate")
         if entity is None:
             entity = (self.ref_el.get_dimension(), 0)
 
