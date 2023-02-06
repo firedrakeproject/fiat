@@ -1190,8 +1190,14 @@ class UFCHexahedron(Cell):
         bool : True if the point is inside the cell, False otherwise.
 
         """
-
         return self.product.contains_point(point, epsilon=epsilon)
+
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
+
+        For more information see the docstring for the UFCSimplex method."""
+        return self.product.distance_to_point_l1(point)
 
     def symmetry_group_size(self, dim):
         return [1, 2, 8, 48][dim]
