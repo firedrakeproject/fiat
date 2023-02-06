@@ -8,11 +8,10 @@
 
 import numpy
 from FIAT import reference_element, expansions, polynomial_set
-from FIAT.functional import index_iterator
 
 
 def make_dmat(x):
-    """returns Lagrange differentiation matrix and barycentric weights
+    """Returns Lagrange differentiation matrix and barycentric weights
     associated with x[j]."""
     dmat = numpy.add.outer(-x, x)
     numpy.fill_diagonal(dmat, 1.0)
@@ -92,9 +91,7 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
 def get_expansion_set(ref_el, pts):
     """Returns an ExpansionSet instance appopriate for the given
     reference element."""
-    if ref_el.get_shape() == reference_element.POINT:
-        return expansions.PointExpansionSet(ref_el)
-    elif ref_el.get_shape() == reference_element.LINE:
+    if ref_el.get_shape() == reference_element.LINE:
         return LagrangeLineExpansionSet(ref_el, pts)
     else:
         raise Exception("Unknown reference element type.")
