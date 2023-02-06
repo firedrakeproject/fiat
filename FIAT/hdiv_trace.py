@@ -49,7 +49,7 @@ class HDivTrace(FiniteElement):
                      varying degrees.
         """
         sd = ref_el.get_spatial_dimension()
-        if sd in (0,):
+        if sd in (0, 1):
             raise ValueError("Cannot take the trace of a %d-dim cell." % sd)
 
         # Store the degrees if on a tensor product cell
@@ -63,7 +63,7 @@ class HDivTrace(FiniteElement):
                 "Number of specified degrees must be equal to the number of cells."
             )
         else:
-            if ref_el.get_shape() not in [LINE, TRIANGLE, TETRAHEDRON, QUADRILATERAL]:
+            if ref_el.get_shape() not in [TRIANGLE, TETRAHEDRON, QUADRILATERAL]:
                 raise NotImplementedError(
                     "Trace element on a %s not implemented" % type(ref_el)
                 )
@@ -213,8 +213,7 @@ class HDivTrace(FiniteElement):
                 for key in phivals:
                     msg = "The HDivTrace element can only be tabulated on facets."
                     phivals[key] = TraceError(msg)
-                    phivals[key] = np.zeros(shape=(self.space_dimension(), len(points)))
-                    phivals[key][:] = 1E-14
+
                 return phivals
 
             else:
@@ -270,8 +269,7 @@ def construct_dg_element(ref_el, degree):
     """Constructs a discontinuous galerkin element of a given degree
     on a particular reference cell.
     """
-
-    if ref_el.get_shape() in [POINT, LINE, TRIANGLE]:
+    if ref_el.get_shape() in [LINE, TRIANGLE]:
         dg_element = DiscontinuousLagrange(ref_el, degree)
 
     # Quadrilateral facets could be on a FiredrakeQuadrilateral.
