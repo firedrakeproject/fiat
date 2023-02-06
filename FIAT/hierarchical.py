@@ -8,7 +8,7 @@
 
 import numpy
 
-from FIAT import (finite_element, reference_element, polynomial_set,
+from FIAT import (finite_element, reference_element,
                   dual_set, functional, quadrature,
                   jacobi, barycentric_interpolation)
 from FIAT.lagrange import make_entity_permutations
@@ -40,7 +40,6 @@ class Legendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape != reference_element.LINE:
             raise ValueError("%s is only defined in one dimension." % type(self))
-        # poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
         poly_set = LagrangePolynomialSet(ref_el, rule.get_points())
         dual = LegendreDual(ref_el, degree, rule)
@@ -79,7 +78,6 @@ class IntegratedLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape != reference_element.LINE:
             raise ValueError("%s is only defined in one dimension." % type(self))
-        # poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
         poly_set = LagrangePolynomialSet(ref_el, rule.get_points())
         dual = IntegratedLegendreDual(ref_el, degree, rule)

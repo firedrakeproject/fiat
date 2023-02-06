@@ -51,7 +51,7 @@ def test_sparsity(degree):
     from FIAT import ufc_simplex, FDMLagrange, make_quadrature
     cell = ufc_simplex(1)
     fe = FDMLagrange(cell, degree)
-    rule = fe.dual.rule
+    rule = make_quadrature(cell, degree+1)
 
     basis = fe.tabulate(1, rule.get_points())
     Jhat = basis[(0,)]

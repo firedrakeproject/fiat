@@ -9,7 +9,7 @@
 import abc
 import numpy
 
-from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature, barycentric_interpolation
+from FIAT import finite_element, dual_set, functional, quadrature, barycentric_interpolation
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
 from FIAT.hierarchical import IntegratedLegendre
@@ -38,6 +38,7 @@ def tridiag_eig(A, B):
     numpy.multiply(C, a[:, None], out=C)
 
     Z, V = numpy.linalg.eigh(C, "U")
+
     numpy.reciprocal(Z, out=Z)
     numpy.multiply(numpy.sqrt(Z), V, out=V)
     numpy.multiply(V, a[:, None], out=V)
@@ -52,6 +53,9 @@ class FDMDual(dual_set.DualSet):
         embedded = IntegratedLegendre(ref_el, embedded_degree)
         edim = embedded.space_dimension()
         self.embedded = embedded
+
+        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
+        self.rule = rule
 
         solve_eig = sym_eig
         if bc_order == 1:
@@ -69,9 +73,6 @@ class FDMDual(dual_set.DualSet):
         E[bdof, :] = numpy.linalg.solve(C[:, bdof], E[bdof, :])
 
         # Assemble the constrained Galerkin matrices on the reference cell
-        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
-        self.rule = rule
-
         k = max(1, bc_order)
         phi = embedded.tabulate(k, rule.get_points())
         W = rule.get_weights()

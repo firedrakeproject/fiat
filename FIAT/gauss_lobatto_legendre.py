@@ -8,7 +8,7 @@
 #
 # Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
-from FIAT import finite_element, polynomial_set, dual_set, functional, quadrature
+from FIAT import finite_element, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
@@ -34,7 +34,6 @@ class GaussLobattoLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("Gauss-Lobatto-Legendre elements are only defined in one dimension.")
-        # poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = GaussLobattoLegendreDualSet(ref_el, degree)
         points = []
         for node in dual.nodes:

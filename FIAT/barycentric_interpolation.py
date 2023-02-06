@@ -8,6 +8,7 @@
 
 import numpy
 from FIAT import reference_element, expansions, polynomial_set
+from FIAT.functional import index_iterator
 
 
 def make_dmat(x):
