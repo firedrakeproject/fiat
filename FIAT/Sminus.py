@@ -69,7 +69,7 @@ class TrimmedSerendipity(FiniteElement):
                 entity_ids[1][j] = list(range(cur, cur + degree))
                 cur = cur + degree
 
-            if(degree >= 2):
+            if (degree >= 2):
                 entity_ids[2][0] = list(range(cur, cur + 2*triangular_number(degree - 2) + degree))
 
             cur += 2*triangular_number(degree - 2) + degree
@@ -408,7 +408,7 @@ def determine_I_lambda_1_portions_3d(deg):
                 for z in range(0, deg - 3 - x - y):
                     Degs += tuple([(x, y, z)])
         for degs in Degs:
-            if(degs[0] + degs[1] + degs[2] == deg - 4):
+            if (degs[0] + degs[1] + degs[2] == deg - 4):
                 DegsOfIteration += tuple([degs])
     return DegsOfIteration
 
@@ -439,7 +439,7 @@ def I_lambda_1_tilde_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
                            -leg(j - 1, x_mid) * leg(deg - j - 3, y_mid) * dx[0] * dx[1] * dz[0] * dz[1], 0)])
         ILtilde += tuple([(leg(j, x_mid) * leg(deg - j - 4, z_mid) * dy[0] * dy[1] * dz[0] * dz[1], 0,
                            -leg(j - 1, x_mid) * leg(deg - j - 3, z_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
-        if(deg > 5):
+        if (deg > 5):
             ILtilde += tuple([(0, leg(j, y_mid) * leg(deg - j - 4, z_mid) * dx[0] * dx[1] * dz[0] * dz[1],
                                -leg(j - 1, y_mid) * leg(deg - j - 3, z_mid) * dx[0] * dx[1] * dy[0] * dy[1])])
     return ILtilde

@@ -31,6 +31,12 @@ class DPC0(finite_element.CiarletElement):
         flat_el = flatten_reference_cube(ref_el)
         poly_set = polynomial_set.ONPolynomialSet(hypercube_simplex_map[flat_el], 0)
         dual = P0Dual(ref_el)
+        # Implement entity_permutations when we handle that for HigherOrderDPC.
+        # Currently, orientation_tuples in P0Dual(ref_el).entity_permutations
+        # are missing the extrinsic orientation entry (which should always be 0).
+        # We should probably just change o_tuple -> (0, ) + o_tuple for non-
+        # tensorproduct elements for consistency.
+        dual.entity_permutations = None
         degree = 0
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(DPC0, self).__init__(poly_set=poly_set,
