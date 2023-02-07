@@ -94,8 +94,11 @@ class FDMDual(dual_set.DualSet):
                 _, Qbb = sym_eig(Abb, Bbb)
                 S[:, bdof] = numpy.dot(S[:, bdof], Qbb)
 
-        if formdegree:
-            # Take the derivative of the eigenbasis and normalize
+        if formdegree == 0:
+            # Tabulate eigenbasis
+            basis = numpy.dot(S.T, E0)
+        else:
+            # Tabulate the derivative of the eigenbasis and normalize
             if bc_order == 0:
                 idof = lam > 1.0E-12
                 lam[~idof] = 1.0E0
@@ -103,25 +106,19 @@ class FDMDual(dual_set.DualSet):
             numpy.sqrt(lam, out=lam)
             numpy.multiply(S, lam, out=S)
             basis = numpy.dot(S.T, Ek)
-        else:
-            basis = numpy.dot(S.T, E0)
-            if False:
-                # moments in H1 seminorm
-                D, _ = barycentric_interpolation.make_dmat(numpy.array(rule.pts).flatten())
-                K = numpy.dot(numpy.multiply(D, W), D.T)
-                basis[idof] = numpy.multiply(numpy.dot(basis[idof], K), 1/W)
 
         bc_nodes = []
         if formdegree == 0:
             if orthogonalize:
                 idof = slice(0, edim)
             elif bc_order > 0:
-                bc_nodes += [functional.PointEvaluation(ref_el, x) for x in ref_el.get_vertices()]
+                vertices = ref_el.get_vertices()
+                bc_nodes += [functional.PointEvaluation(ref_el, x) for x in vertices]
                 for alpha in range(1, bc_order):
-                    bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in ref_el.get_vertices()]
+                    bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in vertices]
 
         elif bc_order > 0:
-            basis[bdof, :] = numpy.sqrt(1.0E0/ref_el.volume())
+            basis[bdof, :] = numpy.sqrt(1.0E0 / ref_el.volume())
             idof = slice(formdegree, edim)
 
         nodes = bc_nodes + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]]
