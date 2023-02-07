@@ -157,9 +157,13 @@ class LineExpansionSet(object):
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j])"""
         if len(pts) > 0:
-            ref_pts = numpy.array([self.mapping(pt) for pt in pts], type(pts[0][0]))
-            results = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
-            results = numpy.sqrt(numpy.arange(n + 1) + 0.5)[:, numpy.newaxis] * results
+            ref_pts = numpy.array([self.mapping(pt) for pt in pts])
+            psitilde_as = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
+
+            results = numpy.zeros((n + 1, len(pts)), type(pts[0][0]))
+            for k in range(n + 1):
+                results[k, :] = psitilde_as[k, :] * math.sqrt(k + 0.5)
+
             return results
         else:
             return []
@@ -169,12 +173,15 @@ class LineExpansionSet(object):
         A[i,j] = D phi_i(pts[j]).  The tuple is returned for
         compatibility with the interfaces of the triangle and
         tetrahedron expansions."""
-        ref_pts = numpy.array([self.mapping(pt) for pt in pts], type(pts[0][0]))
-        results = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
+        ref_pts = numpy.array([self.mapping(pt) for pt in pts])
+        psitilde_as_derivs = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
 
         # Jacobi polynomials defined on [-1, 1], first derivatives need scaling
-        results *= 2.0 / self.ref_el.volume()
-        results = numpy.sqrt(numpy.arange(n + 1) + 0.5)[:, numpy.newaxis] * results
+        psitilde_as_derivs *= 2.0 / self.ref_el.volume()
+
+        results = numpy.zeros((n + 1, len(pts)), "d")
+        for k in range(0, n + 1):
+            results[k, :] = psitilde_as_derivs[k, :] * numpy.sqrt(k + 0.5)
 
         vals = self.tabulate(n, pts)
         deriv_vals = (results,)
