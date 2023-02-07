@@ -136,7 +136,9 @@ class CiarletElement(FiniteElement):
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
 
-        new_coeffs_flat = numpy.linalg.solve(numpy.transpose(V), B)
+        Vinv = numpy.linalg.inv(V)
+
+        new_coeffs_flat = numpy.dot(numpy.transpose(Vinv), B)
 
         new_shp = tuple([new_coeffs_flat.shape[0]] + list(shp[1:]))
         new_coeffs = numpy.reshape(new_coeffs_flat, new_shp)
