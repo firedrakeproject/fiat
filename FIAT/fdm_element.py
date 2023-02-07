@@ -9,7 +9,7 @@
 import abc
 import numpy
 
-from FIAT import finite_element, dual_set, functional, quadrature, barycentric_interpolation
+from FIAT import finite_element, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
 from FIAT.hierarchical import IntegratedLegendre
