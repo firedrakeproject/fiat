@@ -23,19 +23,31 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.parametrize("degree", range(1, 7))
-@pytest.mark.parametrize("family", ["CG", "DG"])
+def make_fdm_element(ref_el, family, degree):
+    from FIAT import FDMLagrange, FDMDiscontinuousLagrange, FDMBrokenH1, FDMBrokenL2, FDMQuadrature
+    if family == "CG":
+        return FDMLagrange(ref_el, degree)
+    elif family == "DG":
+        return FDMDiscontinuousLagrange(ref_el, degree)
+    elif family == "BrokenH1":
+        return FDMBrokenH1(ref_el, degree)
+    elif family == "BrokenL2":
+        return FDMBrokenL2(ref_el, degree)
+    elif family == "Quadrature":
+        return FDMQuadrature(ref_el, degree)
+
+
+@pytest.mark.parametrize("family, degree", [(f, degree - 1 if f in {"DG", "BrokenL2"} else degree)
+                                            for f in ("CG", "DG", "BrokenH1", "BrokenL2", "Quadrature")
+                                            for degree in range(1, 7)])
 def test_fdm_basis_values(family, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
-    from FIAT import ufc_simplex, FDMLagrange, FDMDiscontinuousLagrange, make_quadrature
+    from FIAT import ufc_simplex, make_quadrature
 
     s = ufc_simplex(1)
     q = make_quadrature(s, degree + 1)
+    fe = make_fdm_element(s, family, degree)
 
-    if family == "CG":
-        fe = FDMLagrange(s, degree)
-    else:
-        fe = FDMDiscontinuousLagrange(s, degree)
     tab = fe.tabulate(0, q.pts)[(0,)]
 
     for test_degree in range(degree + 1):
@@ -46,23 +58,32 @@ def test_fdm_basis_values(family, degree):
         assert np.allclose(integral, reference, rtol=1e-14)
 
 
-@pytest.mark.parametrize("degree", range(1, 7))
-def test_sparsity(degree):
-    from FIAT import ufc_simplex, FDMLagrange, make_quadrature
-    cell = ufc_simplex(1)
-    fe = FDMLagrange(cell, degree)
-    rule = make_quadrature(cell, degree+1)
+@pytest.mark.parametrize("family, degree", [(f, degree - 1 if f in {"DG", "BrokenL2"} else degree)
+                                            for f in ("CG", "DG", "BrokenH1", "BrokenL2", "Quadrature")
+                                            for degree in range(1, 7)])
+def test_fdm_sparsity(family, degree):
+    from FIAT import ufc_simplex, make_quadrature
 
-    basis = fe.tabulate(1, rule.get_points())
-    Jhat = basis[(0,)]
-    Dhat = basis[(1,)]
-    what = rule.get_weights()
-    Ahat = np.dot(np.multiply(Dhat, what), Dhat.T)
-    Bhat = np.dot(np.multiply(Jhat, what), Jhat.T)
+    s = ufc_simplex(1)
+    q = make_quadrature(s, degree+1)
+    fe = make_fdm_element(s, family, degree)
+
+    if family == "CG":
+        expected = [degree + 3, 5 * degree - 1]
+    elif family == "DG":
+        expected = [degree + 1]
+    elif family == "BrokenH1":
+        expected = [degree + 1, degree]
+    elif family == "BrokenL2":
+        expected = [degree + 1]
+    elif family == "Quadrature":
+        expected = [degree + 1, 3 * degree - 1 - (degree == 1)]
+
     nnz = lambda A: A.size - np.sum(np.isclose(A, 0.0E0, rtol=1E-14))
-    ndof = fe.space_dimension()
-    assert nnz(Ahat) == 5*ndof-6
-    assert nnz(Bhat) == ndof+2
+    moments = lambda v, u: np.dot(np.multiply(v, q.get_weights()), u.T)
+    tab = fe.tabulate(len(expected)-1, q.get_points())
+    for k, ennz in enumerate(expected):
+        assert nnz(moments(tab[(k, )], tab[(k, )])) == ennz
 
 
 if __name__ == '__main__':

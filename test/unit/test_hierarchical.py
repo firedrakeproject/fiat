@@ -23,15 +23,15 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.parametrize("degree", range(1, 7))
-@pytest.mark.parametrize("family", ["CG", "DG"])
+@pytest.mark.parametrize("family, degree", [(f, degree - 1 if f == "DG" else degree)
+                                            for f in ("CG", "DG")
+                                            for degree in range(1, 7)])
 def test_hierarchical_basis_values(family, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
     from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
 
     s = ufc_simplex(1)
     q = make_quadrature(s, degree + 1)
-
     if family == "CG":
         fe = IntegratedLegendre(s, degree)
     else:
@@ -46,23 +46,26 @@ def test_hierarchical_basis_values(family, degree):
         assert np.allclose(integral, reference, rtol=1e-14)
 
 
-@pytest.mark.parametrize("degree", range(1, 7))
-def test_sparsity(degree):
-    from FIAT import ufc_simplex, IntegratedLegendre, make_quadrature
-    cell = ufc_simplex(1)
-    fe = IntegratedLegendre(cell, degree)
+@pytest.mark.parametrize("family, degree", [(f, degree - 1 if f == "DG" else degree)
+                                            for f in ("CG", "DG")
+                                            for degree in range(1, 7)])
+def test_hierarchical_sparsity(family, degree):
+    from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
 
-    rule = make_quadrature(cell, degree+1)
-    basis = fe.tabulate(1, rule.get_points())
-    Jhat = basis[(0,)]
-    Dhat = basis[(1,)]
-    what = rule.get_weights()
-    Ahat = np.dot(np.multiply(Dhat, what), Dhat.T)
-    Bhat = np.dot(np.multiply(Jhat, what), Jhat.T)
+    s = ufc_simplex(1)
+    q = make_quadrature(s, degree+1)
+    if family == "CG":
+        fe = IntegratedLegendre(s, degree)
+        expected = [5 * min(degree, 3) + 3 * max(0, degree-3) - 1, degree + 3]
+    else:
+        fe = Legendre(s, degree)
+        expected = [degree + 1]
+
     nnz = lambda A: A.size - np.sum(np.isclose(A, 0.0E0, rtol=1E-14))
-    ndof = fe.space_dimension()
-    assert nnz(Ahat) == ndof+2
-    assert nnz(Bhat) == 3*max(ndof-4, 0) + 5*min(ndof-1, 3) - 1
+    moments = lambda v, u: np.dot(np.multiply(v, q.get_weights()), u.T)
+    tab = fe.tabulate(len(expected)-1, q.get_points())
+    for k, ennz in enumerate(expected):
+        assert nnz(moments(tab[(k, )], tab[(k, )])) == ennz
 
 
 if __name__ == '__main__':

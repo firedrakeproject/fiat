@@ -36,9 +36,7 @@ def tridiag_eig(A, B):
     numpy.sqrt(a, out=a)
     C = numpy.multiply(a, B)
     numpy.multiply(C, a[:, None], out=C)
-
     Z, V = numpy.linalg.eigh(C, "U")
-
     numpy.reciprocal(Z, out=Z)
     numpy.multiply(numpy.sqrt(Z), V, out=V)
     numpy.multiply(V, a[:, None], out=V)
@@ -54,6 +52,7 @@ class FDMDual(dual_set.DualSet):
         edim = embedded.space_dimension()
         self.embedded = embedded
 
+        vertices = ref_el.get_vertices()
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
         self.rule = rule
 
@@ -62,10 +61,13 @@ class FDMDual(dual_set.DualSet):
             solve_eig = tridiag_eig
 
         # Tabulate the BC nodes
-        constraints = embedded.tabulate(bc_order-1, ref_el.get_vertices())
-        C = numpy.transpose(numpy.column_stack(list(constraints.values())))
-        bdof = slice(0, C.shape[0])
-        idof = slice(C.shape[0], edim)
+        if bc_order == 0:
+            C = numpy.empty((0, edim), "d")
+        else:
+            constraints = embedded.tabulate(bc_order-1, vertices)
+            C = numpy.transpose(numpy.column_stack(list(constraints.values())))
+        bdof = slice(None, C.shape[0])
+        idof = slice(C.shape[0], None)
 
         # Tabulate the basis that splits the DOFs into interior and bcs
         E = numpy.eye(edim)
@@ -75,11 +77,11 @@ class FDMDual(dual_set.DualSet):
         # Assemble the constrained Galerkin matrices on the reference cell
         k = max(1, bc_order)
         phi = embedded.tabulate(k, rule.get_points())
-        W = rule.get_weights()
+        wts = rule.get_weights()
         E0 = numpy.dot(E.T, phi[(0, )])
         Ek = numpy.dot(E.T, phi[(k, )])
-        B = numpy.dot(numpy.multiply(E0, W), E0.T)
-        A = numpy.dot(numpy.multiply(Ek, W), Ek.T)
+        B = numpy.dot(numpy.multiply(E0, wts), E0.T)
+        A = numpy.dot(numpy.multiply(Ek, wts), Ek.T)
 
         # Eigenfunctions in the constrained basis
         S = numpy.eye(A.shape[0])
@@ -88,11 +90,12 @@ class FDMDual(dual_set.DualSet):
             lam[idof], Sii = solve_eig(A[idof, idof], B[idof, idof])
             S[idof, idof] = Sii
             S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
-            if orthogonalize:
-                Abb = numpy.dot(S[:, bdof].T, numpy.dot(A, S[:, bdof]))
-                Bbb = numpy.dot(S[:, bdof].T, numpy.dot(B, S[:, bdof]))
-                _, Qbb = sym_eig(Abb, Bbb)
-                S[:, bdof] = numpy.dot(S[:, bdof], Qbb)
+
+        if orthogonalize:
+            Abb = numpy.dot(S[:, bdof].T, numpy.dot(A, S[:, bdof]))
+            Bbb = numpy.dot(S[:, bdof].T, numpy.dot(B, S[:, bdof]))
+            _, Qbb = sym_eig(Abb, Bbb)
+            S[:, bdof] = numpy.dot(S[:, bdof], Qbb)
 
         if formdegree == 0:
             # Tabulate eigenbasis
@@ -110,20 +113,19 @@ class FDMDual(dual_set.DualSet):
         bc_nodes = []
         if formdegree == 0:
             if orthogonalize:
-                idof = slice(0, edim)
+                idof = slice(None)
             elif bc_order > 0:
-                vertices = ref_el.get_vertices()
                 bc_nodes += [functional.PointEvaluation(ref_el, x) for x in vertices]
                 for alpha in range(1, bc_order):
                     bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in vertices]
 
         elif bc_order > 0:
             basis[bdof, :] = numpy.sqrt(1.0E0 / ref_el.volume())
-            idof = slice(formdegree, edim)
+            idof = slice(formdegree, None)
 
         nodes = bc_nodes + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]]
 
-        if len(bc_nodes) and formdegree == 0:
+        if len(bc_nodes) > 0:
             entity_ids = {0: {0: [0], 1: [1]},
                           1: {0: list(range(2, degree+1))}}
             entity_permutations = {}
