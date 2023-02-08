@@ -647,10 +647,10 @@ class UFCSimplex(Simplex):
         """
         # bary = [alpha, beta, gamma, delta, ...] - see docstring
         bary = [1.0 - sum(point)] + list(point)
-        # We output the most negative of these in a way the sympy can cope
-        # with. bary-abs(bary) gets rid of the positive barycentric coordinates
-        # and doubles the negative distances. Summing, halving and taking the
-        # negative of these gives the L1 distance. So for example
+        # We avoid branching so that code can be generated from this (e.g. with
+        # sympy). bary-abs(bary) gets rid of the positive barycentric
+        # coordinates and doubles the negative distances. Summing, halving and
+        # taking the negative of these gives the L1 distance. So for example
         # point = [-1, -1]
         # bary = [3, -1, -1],
         # bary-abs(bary) = [0, -2, -2],
