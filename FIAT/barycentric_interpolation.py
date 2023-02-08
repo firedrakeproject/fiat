@@ -7,39 +7,92 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
 import numpy
+from FIAT import reference_element, expansions, polynomial_set
+from FIAT.functional import index_iterator
 
 
-def barycentric_interpolation(xsrc, xdst, order=0):
-    """Return tabulations of a 1D Lagrange nodal basis via the second barycentric interpolation formula
+def make_dmat(x):
+    """Returns Lagrange differentiation matrix and barycentric weights
+    associated with x[j]."""
+    dmat = numpy.add.outer(-x, x)
+    numpy.fill_diagonal(dmat, 1.0)
+    wts = numpy.prod(dmat, axis=0)
+    numpy.reciprocal(wts, out=wts)
+    numpy.divide(numpy.divide.outer(wts, wts), dmat, out=dmat)
+    numpy.fill_diagonal(dmat, dmat.diagonal() - numpy.sum(dmat, axis=0))
+    return dmat, wts
 
-    See Berrut and Trefethen (2004) https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
 
-    :arg xsrc: a :class:`numpy.array` with the nodes defining the Lagrange polynomial basis
-    :arg xdst: a :class:`numpy.array` with the interpolation points
-    :arg order: the integer order of differentiation
-    :returns: dict of tabulations up to the given order (in the same format as :meth:`~.CiarletElement.tabulate`)
+class LagrangeLineExpansionSet(expansions.LineExpansionSet):
+    """Evaluates a Lagrange basis on a line reference element
+    via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
+    https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
 
-    # w = barycentric weights
-    # D = spectral differentiation matrix (D.T : u(xsrc) -> u'(xsrc))
-    # I = barycentric interpolation matrix (I.T : u(xsrc) -> u(xdst))
+    def __init__(self, ref_el, pts):
+        self.nodes = numpy.array(pts).flatten()
+        self.dmat, self.weights = make_dmat(self.nodes)
+        super(LagrangeLineExpansionSet, self).__init__(ref_el)
 
-    D = numpy.add.outer(-xsrc, xsrc)
-    numpy.fill_diagonal(D, 1.0E0)
-    w = 1.0E0 / numpy.prod(D, axis=0)
-    D = numpy.divide.outer(w, w) / D
-    numpy.fill_diagonal(D, numpy.diag(D) - numpy.sum(D, axis=0))
+    def get_num_members(self, n):
+        return len(self.nodes)
 
-    I = numpy.add.outer(-xsrc, xdst)
-    idx = numpy.argwhere(numpy.isclose(I, 0.0E0, 0.0E0))
-    I[idx[:, 0], idx[:, 1]] = 1.0E0
-    I = 1.0E0 / I
-    I *= w[:, None]
-    I[:, idx[:, 1]] = 0.0E0
-    I[idx[:, 0], idx[:, 1]] = 1.0E0
-    I = (1.0E0 / numpy.sum(I, axis=0)) * I
+    def tabulate(self, n, pts):
+        assert n == len(self.nodes)-1
+        results = numpy.add.outer(-self.nodes, numpy.array(pts).flatten())
+        with numpy.errstate(divide='ignore', invalid='ignore'):
+            numpy.reciprocal(results, out=results)
+            numpy.multiply(results, self.weights[:, None], out=results)
+            numpy.multiply(1.0 / numpy.sum(results, axis=0), results, out=results)
 
-    tabulation = {(0,): I}
-    for k in range(order):
-        tabulation[(k+1,)] = numpy.dot(D, tabulation[(k,)])
-    return tabulation
+        results[results != results] = 1.0
+        if results.dtype == object:
+            from sympy import simplify
+            results = numpy.array(list(map(simplify, results)))
+        return results
+
+    def tabulate_derivatives(self, n, pts):
+        return numpy.dot(self.dmat, self.tabulate(n, pts))
+
+
+class LagrangePolynomialSet(polynomial_set.PolynomialSet):
+
+    def __init__(self, ref_el, pts, shape=tuple()):
+        degree = len(pts) - 1
+        if shape == tuple():
+            num_components = 1
+        else:
+            flat_shape = numpy.ravel(shape)
+            num_components = numpy.prod(flat_shape)
+        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_members = num_components * num_exp_functions
+        embedded_degree = degree
+        expansion_set = get_expansion_set(ref_el, pts)
+
+        # set up coefficients
+        if shape == tuple():
+            coeffs = numpy.eye(num_members)
+        else:
+            coeffs_shape = tuple([num_members] + list(shape) + [num_exp_functions])
+            coeffs = numpy.zeros(coeffs_shape, "d")
+            # use functional's index_iterator function
+            cur_bf = 0
+            for idx in index_iterator(shape):
+                n = expansions.polynomial_dimension(ref_el, embedded_degree)
+                for exp_bf in range(n):
+                    cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
+                    coeffs[cur_idx] = 1.0
+                    cur_bf += 1
+
+        dmats = [numpy.transpose(expansion_set.dmat)]
+        super(LagrangePolynomialSet, self).__init__(ref_el, degree, embedded_degree,
+                                                    expansion_set, coeffs, dmats)
+
+
+def get_expansion_set(ref_el, pts):
+    """Returns an ExpansionSet instance appopriate for the given
+    reference element."""
+    if ref_el.get_shape() == reference_element.LINE:
+        return LagrangeLineExpansionSet(ref_el, pts)
+    else:
+        raise Exception("Unknown reference element type.")
