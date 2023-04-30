@@ -54,15 +54,15 @@ class IntegratedLegendreDual(dual_set.DualSet):
         A, b = reference_element.make_affine_mapping(v1, [(-1.0,), (1.0,)])
         mapping = lambda x: numpy.dot(A, x) + b
         xhat = numpy.array([mapping(pt) for pt in rule.pts])
+        P = jacobi.eval_jacobi_batch(0, 0, degree-1, xhat)
 
         W = rule.get_weights()
         D, _ = barycentric_interpolation.make_dmat(numpy.array(rule.pts).flatten())
-        P = jacobi.eval_jacobi_batch(0, 0, degree-1, xhat)
         basis = numpy.dot(numpy.multiply(P, W), numpy.multiply(D.T, 1.0/W))
 
         nodes = [functional.PointEvaluation(ref_el, x) for x in v1]
-        nodes += [functional.IntegralMoment(ref_el, rule, f) for f in basis[2::2]]
-        nodes += [functional.IntegralMoment(ref_el, rule, f) for f in basis[1::2]]
+        nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[2::2])
+        nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[1::2])
 
         entity_ids = {0: {0: [0], 1: [1]},
                       1: {0: list(range(2, degree+1))}}

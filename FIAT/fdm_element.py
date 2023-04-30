@@ -9,7 +9,7 @@
 import abc
 import numpy
 
-from FIAT import finite_element, dual_set, functional, quadrature
+from FIAT import finite_element, dual_set, functional, quadrature, barycentric_interpolation
 from FIAT.reference_element import LINE
 from FIAT.lagrange import make_entity_permutations
 from FIAT.hierarchical import IntegratedLegendre
@@ -54,7 +54,9 @@ class FDMDual(dual_set.DualSet):
 
         vertices = ref_el.get_vertices()
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
-        self.rule = rule
+        pts = rule.get_points()
+        wts = rule.get_weights()
+        dtype = wts.dtype
 
         solve_eig = sym_eig
         if bc_order == 1:
@@ -62,7 +64,7 @@ class FDMDual(dual_set.DualSet):
 
         # Tabulate the BC nodes
         if bc_order == 0:
-            C = numpy.empty((0, edim), "d")
+            C = numpy.empty((0, edim), dtype=dtype)
         else:
             constraints = embedded.tabulate(bc_order-1, vertices)
             C = numpy.transpose(numpy.column_stack(list(constraints.values())))
@@ -70,28 +72,28 @@ class FDMDual(dual_set.DualSet):
         idof = slice(C.shape[0], None)
 
         # Tabulate the basis that splits the DOFs into interior and bcs
-        E = numpy.eye(edim)
+        E = numpy.eye(edim, dtype=dtype)
         E[bdof, idof] = -C[:, idof]
         E[bdof, :] = numpy.linalg.solve(C[:, bdof], E[bdof, :])
 
         # Assemble the constrained Galerkin matrices on the reference cell
         k = max(1, bc_order)
-        phi = embedded.tabulate(k, rule.get_points())
-        wts = rule.get_weights()
+        phi = embedded.tabulate(k, pts)
         E0 = numpy.dot(E.T, phi[(0, )])
-        Ek = numpy.dot(E.T, phi[(k, )])
+        E1 = numpy.dot(E.T, phi[(k, )])
         B = numpy.dot(numpy.multiply(E0, wts), E0.T)
-        A = numpy.dot(numpy.multiply(Ek, wts), Ek.T)
+        A = numpy.dot(numpy.multiply(E1, wts), E1.T)
 
         # Eigenfunctions in the constrained basis
-        S = numpy.eye(A.shape[0])
-        lam = numpy.ones((A.shape[0],))
+        S = numpy.eye(A.shape[0], dtype=dtype)
+        lam = numpy.ones((A.shape[0],), dtype=dtype)
         if S.shape[0] > C.shape[0]:
             lam[idof], Sii = solve_eig(A[idof, idof], B[idof, idof])
             S[idof, idof] = Sii
-            S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
+            if orthogonalize:
+                S[idof, bdof] = numpy.dot(Sii, numpy.dot(Sii.T, -B[idof, bdof]))
 
-        if orthogonalize:
+        if orthogonalize or (bc_order == 0 and formdegree == 0):
             Abb = numpy.dot(S[:, bdof].T, numpy.dot(A, S[:, bdof]))
             Bbb = numpy.dot(S[:, bdof].T, numpy.dot(B, S[:, bdof]))
             _, Qbb = sym_eig(Abb, Bbb)
@@ -102,30 +104,37 @@ class FDMDual(dual_set.DualSet):
             basis = numpy.dot(S.T, E0)
         else:
             # Tabulate the derivative of the eigenbasis and normalize
-            if bc_order == 0:
+            if formdegree > 0 and bc_order == 0:
                 idof = lam > 1.0E-12
                 lam[~idof] = 1.0E0
+
             numpy.reciprocal(lam, out=lam)
             numpy.sqrt(lam, out=lam)
             numpy.multiply(S, lam, out=S)
-            basis = numpy.dot(S.T, Ek)
+            basis = numpy.dot(S.T, E1)
+            if formdegree == 0:
+                D, _ = barycentric_interpolation.make_dmat(numpy.array(pts).flatten())
+                numpy.multiply(basis[idof], wts, out=basis[idof])
+                basis[idof] = numpy.dot(basis[idof], D.T)
+                numpy.multiply(basis[idof], 1/wts, out=basis[idof])
 
-        bc_nodes = []
+        nodes = []
         if formdegree == 0:
             if orthogonalize:
                 idof = slice(None)
             elif bc_order > 0:
-                bc_nodes += [functional.PointEvaluation(ref_el, x) for x in vertices]
+                nodes.extend(functional.PointEvaluation(ref_el, x) for x in vertices)
                 for alpha in range(1, bc_order):
-                    bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in vertices]
+                    nodes.extend(functional.PointDerivative(ref_el, x, [alpha]) for x in vertices)
 
         elif bc_order > 0:
             basis[bdof, :] = numpy.sqrt(1.0E0 / ref_el.volume())
             idof = slice(formdegree, None)
 
-        nodes = bc_nodes + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]]
+        bc_nodes = len(nodes)
+        nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[idof])
 
-        if len(bc_nodes) > 0:
+        if bc_nodes > 0:
             entity_ids = {0: {0: [0], 1: [1]},
                           1: {0: list(range(2, degree+1))}}
             entity_permutations = {}
