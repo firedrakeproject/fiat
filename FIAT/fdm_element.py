@@ -104,7 +104,7 @@ class FDMDual(dual_set.DualSet):
             basis = numpy.dot(S.T, E0)
         else:
             # Tabulate the derivative of the eigenbasis and normalize
-            if formdegree > 0 and bc_order == 0:
+            if bc_order == 0:
                 idof = lam > 1.0E-12
                 lam[~idof] = 1.0E0
 
