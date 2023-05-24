@@ -3,7 +3,7 @@ import pytest
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT import create_quadrature, make_quadrature, polynomial_set
-from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
+from FIAT.mass_lumped_triangular import KongMulderVeldhuizen as KMV
 
 I = UFCInterval()
 T = UFCTriangle()
