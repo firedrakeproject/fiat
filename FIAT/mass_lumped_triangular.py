@@ -102,7 +102,7 @@ def bump(T, deg):
             raise ValueError("Dimension of element is not supported")
 
 
-def KongMulderVeldhuizenSpace(T, deg):
+def MassLumpedTriangularSpace(T, deg):
     sd = T.get_spatial_dimension()
     if deg == 1:
         return Lagrange(T, 1).poly_set
@@ -133,19 +133,19 @@ def KongMulderVeldhuizenSpace(T, deg):
             return NodalEnrichedElement(RL, bubs, fbubs).poly_set
 
 
-class KongMulderVeldhuizenDualSet(dual_set.DualSet):
-    """The dual basis for KMV simplical elements."""
+class MassLumpedTriangularDualSet(dual_set.DualSet):
+    """The dual basis for MLT simplical elements."""
 
     def __init__(self, ref_el, degree):
         entity_ids = {}
         entity_ids = _get_entity_ids(ref_el, degree)
-        lr = create_quadrature(ref_el, degree, scheme="KMV")
+        lr = create_quadrature(ref_el, degree, scheme="MLT")
         nodes = [functional.PointEvaluation(ref_el, x) for x in lr.pts]
-        super(KongMulderVeldhuizenDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super(MassLumpedTriangularDualSet, self).__init__(nodes, ref_el, entity_ids)
 
 
-class KongMulderVeldhuizen(finite_element.CiarletElement):
-    """The "lumped" simplical finite element (NB: requires custom quad. "KMV" points to achieve a diagonal mass matrix).
+class MassLumpedTriangular(finite_element.CiarletElement):
+    """The "lumped" simplical finite element (NB: requires custom quad. "MLT" points to achieve a diagonal mass matrix).
 
     References
     ----------
@@ -164,15 +164,15 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree):
         if ref_el != TRIANGLE and ref_el != TETRAHEDRON:
-            raise ValueError("KMV is only valid for triangles and tetrahedrals")
+            raise ValueError("MLT is only valid for triangles and tetrahedrals")
         if degree > 5 and ref_el == TRIANGLE:
             raise NotImplementedError("Only P < 6 for triangles are implemented.")
         if degree > 3 and ref_el == TETRAHEDRON:
             raise NotImplementedError("Only P < 4 for tetrahedrals are implemented.")
-        S = KongMulderVeldhuizenSpace(ref_el, degree)
+        S = MassLumpedTriangularSpace(ref_el, degree)
 
-        dual = KongMulderVeldhuizenDualSet(ref_el, degree)
+        dual = MassLumpedTriangularDualSet(ref_el, degree)
         formdegree = 0  # 0-form
-        super(KongMulderVeldhuizen, self).__init__(
+        super(MassLumpedTriangular, self).__init__(
             S, dual, degree + max(bump(ref_el, degree)), formdegree
         )

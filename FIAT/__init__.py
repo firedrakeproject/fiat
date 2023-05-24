@@ -46,7 +46,7 @@ from FIAT.hdiv_trace import HDivTrace
 from FIAT.mixed import MixedElement                       # noqa: F401
 from FIAT.restricted import RestrictedElement             # noqa: F401
 from FIAT.quadrature_element import QuadratureElement     # noqa: F401
-from FIAT.mass_lumped_triangular import KongMulderVeldhuizen  # noqa: F401
+from FIAT.mass_lumped_triangular import MassLumpedTriangular  # noqa: F401
 from FIAT.hierarchical import Legendre, IntegratedLegendre  # noqa: F401
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 
@@ -74,7 +74,7 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
                       "Lagrange": Lagrange,
-                      "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
+                      "Mass lumped triangles and tetrahedra": MassLumpedTriangular,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
                       "Gauss-Legendre": GaussLegendre,
                       "Gauss-Radau": GaussRadau,

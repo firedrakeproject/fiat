@@ -77,8 +77,8 @@ def create_quadrature(ref_el, degree, scheme="default"):
             return _fiat_scheme(ref_el, degree)
     elif scheme == "canonical":
         return _fiat_scheme(ref_el, degree)
-    elif scheme == "KMV":  # Kong-Mulder-Veldhuizen scheme
-        return _kmv_lump_scheme(ref_el, degree)
+    elif scheme == "MLT": # mass lumped triangular scheme
+        return _mlt_lump_scheme(ref_el, degree)
     else:
         raise ValueError("Unknown quadrature scheme: %s." % scheme)
 
@@ -93,8 +93,8 @@ def _fiat_scheme(ref_el, degree):
     return make_quadrature(ref_el, num_points_per_axis)
 
 
-def _kmv_lump_scheme(ref_el, degree):
-    """Specialized quadrature schemes for P < 6 for KMV simplical elements."""
+def _mlt_lump_scheme(ref_el, degree):
+    """Specialized quadrature schemes for P < 6 for MLT simplical elements."""
 
     sd = ref_el.get_spatial_dimension()
     # set the unit element
