@@ -11,7 +11,7 @@ import numpy
 from FIAT import (finite_element, reference_element,
                   dual_set, functional, quadrature,
                   jacobi, barycentric_interpolation)
-from FIAT.lagrange import make_entity_permutations
+from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
 
 
@@ -30,7 +30,7 @@ class LegendreDual(dual_set.DualSet):
                       1: {0: list(range(0, degree+1))}}
         entity_permutations = {}
         entity_permutations[0] = {0: {0: []}, 1: {0: []}}
-        entity_permutations[1] = {0: make_entity_permutations(1, degree + 1)}
+        entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree + 1)}
         super(LegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
@@ -68,7 +68,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
                       1: {0: list(range(2, degree+1))}}
         entity_permutations = {}
         entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
-        entity_permutations[1] = {0: make_entity_permutations(1, degree - 1)}
+        entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree - 1)}
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 

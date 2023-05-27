@@ -10,7 +10,7 @@
 
 from FIAT import finite_element, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
-from FIAT.lagrange import make_entity_permutations
+from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
 
 
@@ -24,7 +24,7 @@ class GaussLobattoLegendreDualSet(dual_set.DualSet):
         nodes = [functional.PointEvaluation(ref_el, x) for x in lr.pts]
         entity_permutations = {}
         entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
-        entity_permutations[1] = {0: make_entity_permutations(1, degree - 1)}
+        entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree - 1)}
 
         super(GaussLobattoLegendreDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 

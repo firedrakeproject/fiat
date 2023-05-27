@@ -24,6 +24,8 @@ from functools import reduce
 from collections import defaultdict
 import operator
 from math import factorial
+from FIAT.orientation_utils import make_cell_orientation_reflection_map_simplex, make_cell_orientation_reflection_map_tensorproduct
+
 
 import numpy
 
@@ -226,6 +228,10 @@ class Cell(object):
     def symmetry_group_size(self, dim):
         """Returns the size of the symmetry group of an entity of
         dimension `dim`."""
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
 
@@ -485,6 +491,10 @@ class Simplex(Cell):
 
     def symmetry_group_size(self, dim):
         return numpy.math.factorial(dim + 1)
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return make_cell_orientation_reflection_map_simplex(self.get_dimension())
 
 
 # Backwards compatible name
@@ -986,6 +996,10 @@ class TensorProductCell(Cell):
     def symmetry_group_size(self, dim):
         return tuple(c.symmetry_group_size(d) for d, c in zip(dim, self.cells))
 
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return make_cell_orientation_reflection_map_tensorproduct(self.cells)
+
 
 class UFCQuadrilateral(Cell):
     r"""This is the reference quadrilateral with vertices
@@ -1113,6 +1127,10 @@ class UFCQuadrilateral(Cell):
     def symmetry_group_size(self, dim):
         return [1, 2, 8][dim]
 
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return self.product.cell_orientation_reflection_map()
+
 
 class UFCHexahedron(Cell):
     """This is the reference hexahedron with vertices
@@ -1201,6 +1219,10 @@ class UFCHexahedron(Cell):
 
     def symmetry_group_size(self, dim):
         return [1, 2, 8, 48][dim]
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return self.product.cell_orientation_reflection_map()
 
 
 def make_affine_mapping(xs, ys):
