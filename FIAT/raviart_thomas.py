@@ -154,17 +154,17 @@ class RaviartThomas(finite_element.CiarletElement):
     variant can be chosen from ["point", "integral", "integral(quadrature_degree)"]
     "point" -> dofs are evaluated by point evaluation. Note that this variant has suboptimal
     convergence order in the H(div)-norm
-    "integral" -> dofs are evaluated by quadrature rule. The quadrature degree is chosen to integrate
-    polynomials of degree 5*k so that most expressions will be interpolated exactly. This is important
-    when you want to have (nearly) divergence-preserving interpolation.
-    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree
+    "integral" -> dofs are evaluated by quadrature rule of degree k.
+    "integral(quadrature_degree)" -> dofs are evaluated by quadrature rule of degree quadrature_degree. You might
+    want to choose a high quadrature degree to make sure that expressions will be interpolated exactly. This is important
+    when you want to have (nearly) div-preserving interpolation.
     """
 
     def __init__(self, ref_el, k, variant=None):
 
         degree = k - 1
 
-        (variant, quad_deg) = check_format_variant(variant, degree, "Raviart Thomas")
+        (variant, quad_deg) = check_format_variant(variant, degree)
 
         poly_set = RTSpace(ref_el, degree)
         dual = RTDualSet(ref_el, degree, variant, quad_deg)

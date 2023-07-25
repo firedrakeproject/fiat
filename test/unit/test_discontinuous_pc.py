@@ -40,7 +40,7 @@ def test_basis_values(dim, degree):
 
     for test_degree in range(degree + 1):
         coefs = [n(lambda x: x[0]**test_degree) for n in fe.dual.nodes]
-        integral = np.float(np.dot(coefs, np.dot(tab, q.wts)))
+        integral = float(np.dot(coefs, np.dot(tab, q.wts)))
         reference = np.dot([x[0]**test_degree
                             for x in q.pts], q.wts)
         assert np.isclose(integral, reference, rtol=1e-14)

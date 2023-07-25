@@ -6,6 +6,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
+from FIAT.orientation_utils import make_entity_permutations_simplex
 
 
 class LagrangeDualSet(dual_set.DualSet):
@@ -16,6 +17,7 @@ class LagrangeDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree):
         entity_ids = {}
         nodes = []
+        entity_permutations = {}
 
         # make nodes by getting points
         # need to do this dimension-by-dimension, facet-by-facet
@@ -24,6 +26,8 @@ class LagrangeDualSet(dual_set.DualSet):
         cur = 0
         for dim in sorted(top):
             entity_ids[dim] = {}
+            entity_permutations[dim] = {}
+            perms = {0: [0]} if dim == 0 else make_entity_permutations_simplex(dim, degree - dim)
             for entity in sorted(top[dim]):
                 pts_cur = ref_el.make_points(dim, entity, degree)
                 nodes_cur = [functional.PointEvaluation(ref_el, x)
@@ -32,8 +36,9 @@ class LagrangeDualSet(dual_set.DualSet):
                 nodes += nodes_cur
                 entity_ids[dim][entity] = list(range(cur, cur + nnodes_cur))
                 cur += nnodes_cur
+                entity_permutations[dim][entity] = perms
 
-        super(LagrangeDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super(LagrangeDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class Lagrange(finite_element.CiarletElement):

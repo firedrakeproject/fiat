@@ -13,10 +13,11 @@ from FIAT import polynomial_set
 
 
 class DualSet(object):
-    def __init__(self, nodes, ref_el, entity_ids):
+    def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
+        self.entity_permutations = entity_permutations
 
         # Compute the nodes on the closure of each sub_entity.
         self.entity_closure_ids = {}
@@ -39,6 +40,34 @@ class DualSet(object):
 
     def get_entity_ids(self):
         return self.entity_ids
+
+    def get_entity_permutations(self):
+        r"""This method returns a nested dictionary that gives, for
+        each dimension, for each entity, and for each possible entity
+        orientation, the DoF permutation array that maps the entity
+        local DoF ordering to the canonical global DoF ordering; see
+        :class:`~.Simplex` and :class:`~.UFCQuadrilateral` for how we
+        define entity orientations for standard cells.
+
+        The entity permutations `dict` for the degree 4 Lagrange finite
+        element on the interval, for instance, is given by:
+
+        .. code-block:: python3
+
+            {0: {0: {0: [0]},
+                 1: {0: [0]}},
+             1: {0: {0: [0, 1, 2],
+                     1: [2, 1, 0]}}}
+
+        Note that there are two entities on dimension ``0`` (vertices),
+        each of which has only one possible orientation, while there is
+        a single entity on dimension ``1`` (interval), which has two
+        possible orientations representing non-reflected and reflected
+        intervals.
+        """
+        if self.entity_permutations is None:
+            raise NotImplementedError("entity_permutations not yet implemented for %s" % type(self))
+        return self.entity_permutations
 
     def get_reference_element(self):
         return self.ref_el
@@ -78,7 +107,7 @@ class DualSet(object):
 
         riesz_shape = tuple([num_nodes] + list(tshape) + [num_exp])
 
-        self.mat = numpy.zeros(riesz_shape, "d")
+        mat = numpy.zeros(riesz_shape, "d")
 
         # Dictionaries mapping pts to which functionals they come from
         pts_to_ells = collections.OrderedDict()
@@ -110,7 +139,7 @@ class DualSet(object):
 
                 for i in range(num_exp):
                     for (w, c) in wc_list:
-                        self.mat[k][c][i] += w*expansion_values[i, j]
+                        mat[k][c][i] += w*expansion_values[i, j]
 
         # Tabulate the derivative values that are needed
         max_deriv_order = max([ell.max_deriv_order for ell in self.nodes])
@@ -131,9 +160,9 @@ class DualSet(object):
 
                     for i in range(num_exp):
                         for (w, alpha, c) in wac_list:
-                            self.mat[k][c][i] += w*dexpansion_values[alpha][i, j]
+                            mat[k][c][i] += w*dexpansion_values[alpha][i, j]
 
-        return self.mat
+        return mat
 
 
 def make_entity_closure_ids(ref_el, entity_ids):

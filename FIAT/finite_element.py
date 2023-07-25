@@ -12,6 +12,7 @@ import numpy
 
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.dual_set import DualSet
 
 
 class FiniteElement(object):
@@ -59,6 +60,11 @@ class FiniteElement(object):
         """Return the map of topological entities to degrees of
         freedom on the closure of those entities for the finite element."""
         return self.dual.get_entity_closure_ids()
+
+    def entity_permutations(self):
+        return self.dual.get_entity_permutations()
+
+    entity_permutations.__doc__ = DualSet.get_entity_permutations.__doc__
 
     def get_formdegree(self):
         """Return the degree of the associated form (FEEC)"""

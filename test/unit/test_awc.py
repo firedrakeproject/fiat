@@ -5,7 +5,7 @@ from FIAT import ufc_simplex, ArnoldWinther, make_quadrature, expansions
 def test_dofs():
     line = ufc_simplex(1)
     T = ufc_simplex(2)
-    T.vertices = np.random.rand(3, 2)
+    T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.25), (-0.75, 1.1)])
     AW = ArnoldWinther(T, 3)
 
     # check Kronecker property at vertices
