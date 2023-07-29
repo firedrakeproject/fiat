@@ -17,7 +17,20 @@ from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 
 
 class HistopolationDualSet(dual_set.DualSet):
-    """The dual basis for 1D histopolation elements"""
+    """The dual basis for 1D histopolation elements.
+
+    We define window functions w_j that satisfy
+
+    \int_{K} w_j v dx = \phi_j(v)   for all v \in P_{k}
+
+    where
+
+    \phi_j(v) = 1/h_j \int_{x_j}^{x_{j+1}} v dx
+
+    is the usual histopolation dual basis.
+
+    The DOFs are defined as integral moments against the window functions.
+    """
     def __init__(self, ref_el, degree):
         entity_ids = {0: {0: [], 1: []},
                       1: {0: list(range(0, degree+1))}}
@@ -52,7 +65,7 @@ class HistopolationDualSet(dual_set.DualSet):
 
 
 class Histopolation(finite_element.CiarletElement):
-    """1D discontinuous element with average between consecutive Gauss-Lobatto-Legendre points."""
+    """1D discontinuous element with integral DOFs on GLL subgrid."""
     def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("Histopolation elements are only defined in one dimension.")
