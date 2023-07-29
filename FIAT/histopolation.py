@@ -21,11 +21,11 @@ class HistopolationDualSet(dual_set.DualSet):
 
     We define window functions w_j that satisfy
 
-    \int_{K} w_j v dx = \phi_j(v)   for all v \in P_{k}
+    int_{K} w_j v dx = phi_j(v)   for all v in P_{k}
 
     where
 
-    \phi_j(v) = 1/h_j \int_{x_j}^{x_{j+1}} v dx
+    phi_j(v) = 1/h_j int_{x_j}^{x_{j+1}} v dx
 
     is the usual histopolation dual basis.
 
