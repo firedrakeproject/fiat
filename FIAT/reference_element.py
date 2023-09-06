@@ -160,7 +160,7 @@ class Cell(object):
         return None
 
     def __eq__(self, other):
-        return type(self) == type(other) and self._key() == other._key()
+        return type(self) is type(other) and self._key() == other._key()
 
     def __ne__(self, other):
         return not self.__eq__(other)
