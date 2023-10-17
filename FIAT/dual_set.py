@@ -107,7 +107,7 @@ class DualSet(object):
 
         riesz_shape = tuple([num_nodes] + list(tshape) + [num_exp])
 
-        self.mat = numpy.zeros(riesz_shape, "d")
+        mat = numpy.zeros(riesz_shape, "d")
 
         # Dictionaries mapping pts to which functionals they come from
         pts_to_ells = collections.OrderedDict()
@@ -139,7 +139,7 @@ class DualSet(object):
 
                 for i in range(num_exp):
                     for (w, c) in wc_list:
-                        self.mat[k][c][i] += w*expansion_values[i, j]
+                        mat[k][c][i] += w*expansion_values[i, j]
 
         # Tabulate the derivative values that are needed
         max_deriv_order = max([ell.max_deriv_order for ell in self.nodes])
@@ -160,9 +160,9 @@ class DualSet(object):
 
                     for i in range(num_exp):
                         for (w, alpha, c) in wac_list:
-                            self.mat[k][c][i] += w*dexpansion_values[alpha][i, j]
+                            mat[k][c][i] += w*dexpansion_values[alpha][i, j]
 
-        return self.mat
+        return mat
 
 
 def make_entity_closure_ids(ref_el, entity_ids):

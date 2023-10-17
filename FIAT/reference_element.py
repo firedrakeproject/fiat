@@ -24,6 +24,8 @@ from functools import reduce
 from collections import defaultdict
 import operator
 from math import factorial
+from FIAT.orientation_utils import make_cell_orientation_reflection_map_simplex, make_cell_orientation_reflection_map_tensorproduct
+
 
 import numpy
 
@@ -158,7 +160,7 @@ class Cell(object):
         return None
 
     def __eq__(self, other):
-        return type(self) == type(other) and self._key() == other._key()
+        return type(self) is type(other) and self._key() == other._key()
 
     def __ne__(self, other):
         return not self.__eq__(other)
@@ -226,6 +228,10 @@ class Cell(object):
     def symmetry_group_size(self, dim):
         """Returns the size of the symmetry group of an entity of
         dimension `dim`."""
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
 
@@ -486,6 +492,10 @@ class Simplex(Cell):
     def symmetry_group_size(self, dim):
         return numpy.math.factorial(dim + 1)
 
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return make_cell_orientation_reflection_map_simplex(self.get_dimension())
+
 
 # Backwards compatible name
 ReferenceElement = Simplex
@@ -507,11 +517,159 @@ class UFCSimplex(Simplex):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
-        result = (sum(point) - epsilon <= 1)
-        for c in point:
-            result &= (c + epsilon >= 0)
-        return result
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+
+        """
+        return self.distance_to_point_l1(point) <= epsilon
+
+    def distance_to_point_l1(self, point):
+        # noqa: D301
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray or list
+            The coordinates of the point.
+
+        Returns
+        -------
+        float
+            The L1 distance, also known as taxicab, manhatten or rectilinear
+            distance, of the cell to the point. If 0.0 the point is inside the
+            cell.
+
+        Notes
+        -----
+
+        This is done with the help of barycentric coordinates where the general
+        algorithm is to compute the most negative (i.e. minimum) barycentric
+        coordinate then return its negative. For implementation reasons we
+        return the sum of all the negative barycentric coordinates. In each of
+        the below examples the point coordinate is `X` with appropriate
+        dimensions.
+
+        Consider, for example, a UFCInterval. We have two vertices which make
+        the interval,
+            `P0 = [0]` and
+            `P1 = [1]`.
+        Our point is
+            `X = [x]`.
+        Barycentric coordinates are defined as
+            `X = alpha * P0 + beta * P1` where
+            `alpha + beta = 1.0`.
+        The solution is
+            `alpha = 1 - X[0] = 1 - x` and
+            `beta = X[0] = x`.
+        If both `alpha` and `beta` are positive, the point is inside the
+        reference interval.
+
+        `---regionA---P0=0------P1=1---regionB---`
+
+        If we are in `regionA`, `alpha` is negative and
+        `-alpha = X[0] - 1.0` is the (positive) distance from `P0`.
+        If we are in `regionB`, `beta` is negative and `-beta = -X[0]` is
+        the exact (positive) distance from `P1`. Since we are in 1D the L1
+        distance is the same as the L2 distance. If we are in the interval we
+        can just return 0.0.
+
+        Things get more complicated when we consider higher dimensions.
+        Consider a UFCTriangle. We have three vertices which make the
+        reference triangle,
+            `P0 = (0, 0)`,
+            `P1 = (1, 0)` and
+            `P2 = (0, 1)`.
+        Our point is
+            `X = [x, y]`.
+        Below is a diagram of the cell (which may not render correctly in
+        sphinx):
+
+        .. code-block:: text
+        ```
+                y-axis
+                |
+                |
+          (0,1) P2
+                | \\
+                |  \\
+                |   \\
+                |    \\
+                |  T  \\
+                |      \\
+                |       \\
+                |        \\
+            ---P0--------P1--- x-axis
+          (0,0) |         (1,0)
+        ```
+
+        Barycentric coordinates are defined as
+            `X = alpha * P0 + beta * P1 + gamma * P2` where
+            `alpha + beta + gamma = 1.0`.
+        The solution is
+            `alpha = 1 - X[0] - X[1] = 1 - x - y`,
+            `beta = X[0] = x` and
+            `gamma = X[1] = y`.
+        If all three are positive, the point is inside the reference cell.
+        If any are negative, we are outside it. The absolute sum of any
+        negative barycentric coordinates usefully gives the L1 distance from
+        the cell to the point. For example the point (1,1) has L1 distance
+        1 from the cell: on this case alpha = -1, beta = 1 and gamma = 1.
+        -alpha = 1 is the L1 distance. For comparison the L2 distance (the
+        length of the vector from the nearest point on the cell to the point)
+        is sqrt(0.5^2 + 0.5^2) = 0.707. Similarly the point (-1.0, -1.0) has
+        alpha = 3, beta = -1 and gamma = -1. The absolute sum of beta and gamma
+        2 which is again the L1 distance. The L2 distance in this case is
+        sqrt(1^2 + 1^2) = 1.414.
+
+        For a UFCTetrahedron we have four vertices
+            `P0 = (0,0,0)`,
+            `P1 = (1,0,0)`,
+            `P2 = (0,1,0)` and
+            `P3 = (0,0,1)`.
+        Our point is
+            `X = [x, y, z]`.
+        The barycentric coordinates are defined as
+            `X = alpha * P0 + beta * P1 + gamma * P2 + delta * P3`
+            where
+            `alpha + beta + gamma + delta = 1.0`.
+        The solution is
+            `alpha = 1 - X[0] - X[1] - X[2] = 1 - x - y - z`,
+            `beta = X[0] = x`,
+            `gamma = X[1] = y` and
+            `delta = X[2] = z`.
+        The rules are the same as for the triangle but with one extra
+        barycentric coordinate. Our approximate distance, the absolute sum of
+        the negative barycentric coordinates, is at worse around 4 times the
+        actual distance to the tetrahedron.
+
+        """
+        # bary = [alpha, beta, gamma, delta, ...] - see docstring
+        bary = [1.0 - sum(point)] + list(point)
+        # We avoid branching so that code can be generated from this (e.g. with
+        # sympy). bary-abs(bary) gets rid of the positive barycentric
+        # coordinates and doubles the negative distances. Summing, halving and
+        # taking the negative of these gives the L1 distance. So for example
+        # point = [-1, -1]
+        # bary = [3, -1, -1],
+        # bary-abs(bary) = [0, -2, -2],
+        # sum(bary-abs(bary)) = -4.
+        # - 0.5 * sum(bary-abs(bary)) = 2.0
+        # which is the correct L1 distance from the cell to the point.
+        l1_dist = - 0.5 * sum([b - abs(b) for b in bary])
+        # Take abs at the end to avoid negative zero.
+        return abs(l1_dist)
 
 
 class Point(Simplex):
@@ -800,17 +958,49 @@ class TensorProductCell(Cell):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
-        lengths = [c.get_spatial_dimension() for c in self.cells]
-        assert len(point) == sum(lengths)
-        slices = TensorProductCell._split_slices(lengths)
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+
+        """
+        subcell_dimensions = [c.get_spatial_dimension() for c in self.cells]
+        assert len(point) == sum(subcell_dimensions)
+        point_slices = TensorProductCell._split_slices(subcell_dimensions)
+        subcell_points = [point[s] for s in point_slices]
         return reduce(operator.and_,
-                      (c.contains_point(point[s], epsilon=epsilon)
-                       for c, s in zip(self.cells, slices)),
+                      (c.contains_point(p, epsilon=epsilon)
+                       for c, p in zip(self.cells, subcell_points)),
                       True)
+
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
+
+        For more information see the docstring for the UFCSimplex method."""
+        subcell_dimensions = [c.get_spatial_dimension() for c in self.cells]
+        assert len(point) == sum(subcell_dimensions)
+        point_slices = TensorProductCell._split_slices(subcell_dimensions)
+        subcell_points = [point[s] for s in point_slices]
+        subcell_distances = [c.distance_to_point_l1(p)
+                             for c, p in zip(self.cells, subcell_points)]
+        return sum(subcell_distances)
 
     def symmetry_group_size(self, dim):
         return tuple(c.symmetry_group_size(d) for d, c in zip(dim, self.cells))
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return make_cell_orientation_reflection_map_tensorproduct(self.cells)
 
 
 class UFCQuadrilateral(Cell):
@@ -912,11 +1102,36 @@ class UFCQuadrilateral(Cell):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+
+        """
         return self.product.contains_point(point, epsilon=epsilon)
+
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
+
+        For more information see the docstring for the UFCSimplex method."""
+        return self.product.distance_to_point_l1(point)
 
     def symmetry_group_size(self, dim):
         return [1, 2, 8][dim]
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return self.product.cell_orientation_reflection_map()
 
 
 class UFCHexahedron(Cell):
@@ -980,11 +1195,36 @@ class UFCHexahedron(Cell):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance)."""
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+
+        """
         return self.product.contains_point(point, epsilon=epsilon)
+
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
+
+        For more information see the docstring for the UFCSimplex method."""
+        return self.product.distance_to_point_l1(point)
 
     def symmetry_group_size(self, dim):
         return [1, 2, 8, 48][dim]
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return self.product.cell_orientation_reflection_map()
 
 
 def make_affine_mapping(xs, ys):
