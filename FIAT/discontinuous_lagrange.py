@@ -7,8 +7,11 @@
 
 import itertools
 import numpy as np
-from FIAT import finite_element, polynomial_set, dual_set, functional, P0
 from FIAT.polynomial_set import mis
+from FIAT import finite_element, polynomial_set, dual_set, functional, P0
+from FIAT.orientation_utils import make_entity_permutations_simplex
+from FIAT.barycentric_interpolation import LagrangePolynomialSet
+from FIAT.reference_element import LINE, make_lattice
 
 
 def make_entity_permutations(dim, npoints):
@@ -140,45 +143,46 @@ def make_entity_permutations(dim, npoints):
 
 
 class DiscontinuousLagrangeDualSet(dual_set.DualSet):
-    """The dual basis for Lagrange elements.  This class works for
+    """The dual basis for discontinuous Lagrange elements.  This class works for
     simplices of any dimension.  Nodes are point evaluation at
-    equispaced points.  This is the discontinuous version where
+    lattice points. This is the discontinuous version where
     all nodes are topologically associated with the cell itself"""
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant="equispaced"):
         entity_ids = {}
-        nodes = []
         entity_permutations = {}
-
-        # make nodes by getting points
-        # need to do this dimension-by-dimension, facet-by-facet
         top = ref_el.get_topology()
-
-        cur = 0
         for dim in sorted(top):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
-            perms = make_entity_permutations(dim, degree + 1 if dim == len(top) - 1 else -1)
+            perms = make_entity_permutations_simplex(dim, degree + 1 if dim == len(top)-1 else -1)
             for entity in sorted(top[dim]):
-                pts_cur = ref_el.make_points(dim, entity, degree)
-                nodes_cur = [functional.PointEvaluation(ref_el, x)
-                             for x in pts_cur]
-                nnodes_cur = len(nodes_cur)
-                nodes += nodes_cur
                 entity_ids[dim][entity] = []
-                cur += nnodes_cur
                 entity_permutations[dim][entity] = perms
-        entity_ids[dim][0] = list(range(len(nodes)))
 
+        # make nodes by getting points
+        pts = make_lattice(ref_el.get_vertices(), degree, variant=variant)
+        nodes = [functional.PointEvaluation(ref_el, x) for x in pts]
+        entity_ids[dim][0] = list(range(len(nodes)))
         super(DiscontinuousLagrangeDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class HigherOrderDiscontinuousLagrange(finite_element.CiarletElement):
     """The discontinuous Lagrange finite element.  It is what it is."""
 
-    def __init__(self, ref_el, degree):
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
-        dual = DiscontinuousLagrangeDualSet(ref_el, degree)
+    def __init__(self, ref_el, degree, variant="equispaced"):
+        dual = DiscontinuousLagrangeDualSet(ref_el, degree, variant=variant)
+        if ref_el.shape == LINE:
+            # In 1D we can use the primal basis as the expansion set,
+            # avoiding any round-off coming from a basis transformation
+            points = []
+            for node in dual.nodes:
+                # Assert singleton point for each node.
+                pt, = node.get_point_dict().keys()
+                points.append(pt)
+            poly_set = LagrangePolynomialSet(ref_el, points)
+        else:
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(HigherOrderDiscontinuousLagrange, self).__init__(poly_set, dual, degree, formdegree)
 

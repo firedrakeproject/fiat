@@ -14,7 +14,7 @@ from FIAT.reference_element import LINE
 class LagrangeDualSet(dual_set.DualSet):
     """The dual basis for Lagrange elements.  This class works for
     simplices of any dimension.  Nodes are point evaluation at
-    equispaced points."""
+    lattice points."""
 
     def __init__(self, ref_el, degree, variant="equispaced"):
         entity_ids = {}
@@ -47,6 +47,8 @@ class Lagrange(finite_element.CiarletElement):
     """The Lagrange finite element.  It is what it is."""
 
     def __init__(self, ref_el, degree, variant="equispaced"):
+        if variant not in ["equispaced", "gll"]:
+            raise ValueError
         dual = LagrangeDualSet(ref_el, degree, variant=variant)
         if ref_el.shape == LINE:
             # In 1D we can use the primal basis as the expansion set,
