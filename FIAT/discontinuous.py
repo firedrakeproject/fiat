@@ -24,8 +24,10 @@ class DiscontinuousElement(CiarletElement):
         # re-initialise the dual, so entity_closure_dofs is recalculated
         self.dual = DualSet(element.dual_basis(), element.get_reference_element(), new_entity_ids)
 
+        ref_el = element.get_reference_element()
+        self.ref_el = ref_el
         # fully discontinuous
-        self.formdegree = element.get_reference_element().get_spatial_dimension()
+        self.formdegree = ref_el.get_spatial_dimension()
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."
