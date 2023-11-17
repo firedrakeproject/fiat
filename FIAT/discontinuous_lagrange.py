@@ -12,6 +12,8 @@ from FIAT import finite_element, polynomial_set, dual_set, functional, P0
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
 from FIAT.reference_element import LINE, make_lattice
+from FIAT.discontinuous import DiscontinuousElement
+from FIAT.lagrange import Lagrange
 
 
 def make_entity_permutations(dim, npoints):
@@ -191,4 +193,4 @@ def DiscontinuousLagrange(ref_el, degree):
     if degree == 0:
         return P0.P0(ref_el)
     else:
-        return HigherOrderDiscontinuousLagrange(ref_el, degree)
+        return DiscontinuousElement(Lagrange(ref_el, degree))
