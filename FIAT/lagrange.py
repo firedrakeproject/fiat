@@ -48,7 +48,7 @@ class Lagrange(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant="equispaced"):
         dual = LagrangeDualSet(ref_el, degree, variant=variant)
-        if ref_el.shape == LINE:
+        if ref_el.shape == LINE and variant != "equispaced":
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
             points = []
