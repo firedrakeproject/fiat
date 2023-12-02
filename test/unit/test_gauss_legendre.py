@@ -52,7 +52,7 @@ def test_gl_basis_values(dim, degree):
         v = lambda x: sum(x)**test_degree
         coefs = [n(v) for n in fe.dual.nodes]
         integral = np.dot(coefs, np.dot(tab, q.wts))
-        reference = np.dot([v(x) for x in q.pts], q.wts)
+        reference = q.integrate(v)
         assert np.allclose(integral, reference, rtol=1e-14)
 
 
