@@ -69,7 +69,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         for dim in range(1, len(top)):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
-            perms = {0: [0]} if dim == 0 else make_entity_permutations_simplex(dim, degree - dim)
+            perms = make_entity_permutations_simplex(dim, degree - dim)
 
             ref_facet = ufc_simplex(dim)
             Q_ref = create_quadrature(ref_facet, quad_degree)
