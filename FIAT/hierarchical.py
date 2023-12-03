@@ -8,13 +8,14 @@
 
 import numpy
 
-from FIAT import finite_element, dual_set, functional, polynomial_set
-from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
+from FIAT import finite_element, dual_set, functional
+from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON, ufc_simplex
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import make_dmat
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.expansions import polynomial_dimension
+from FIAT.polynomial_set import ONPolynomialSet
 
 
 class LegendreDual(dual_set.DualSet):
@@ -45,7 +46,7 @@ class Legendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("%s is only defined on simplices." % type(self))
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        poly_set = ONPolynomialSet(ref_el, degree)
         dual = LegendreDual(ref_el, degree, poly_set)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(Legendre, self).__init__(poly_set, dual, degree, formdegree)
@@ -65,55 +66,42 @@ class IntegratedLegendreDual(dual_set.DualSet):
         entity_ids[0] = {k: [k] for k in range(nvertices)}
         entity_permutations[0] = {k: {0: [0]} for k in range(nvertices)}
 
-        # facet dofs
-        for dim in range(1, len(top)-1):
+        for dim in range(1, len(top)):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
             perms = {0: [0]} if dim == 0 else make_entity_permutations_simplex(dim, degree - dim)
 
-            ref_facet = ref_el.construct_subelement(dim)
+            ref_facet = ufc_simplex(dim)
             Q_ref = create_quadrature(ref_facet, quad_degree)
+            phis = self._tabulate_bubbles(ref_facet, degree, Q_ref)
 
-            # get a basis for P_k int H^1_0 on the reference facet
-            P = IntegratedLegendre(ref_facet, degree)
-            idofs = P.entity_dofs()[dim][0]
-            P0 = P.get_nodal_basis().take(idofs)
-
-            phis = P0.tabulate(Q_ref.get_points())[(0,) * dim]
             for entity in range(len(top[dim])):
-                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-
                 cur = len(nodes)
+                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                 nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis)
                 entity_ids[dim][entity] = list(range(cur, cur + len(phis)))
                 entity_permutations[dim][entity] = perms
 
-        # cell dofs
-        cur = len(nodes)
+        super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+
+    def _tabulate_bubbles(self, ref_el, degree, Q):
+        P = ONPolynomialSet(ref_el, degree)
         dim = ref_el.get_spatial_dimension()
-        Q = create_quadrature(ref_el, quad_degree)
-        pts = Q.get_points()
-        P = poly_set.tabulate(pts)[(0,) * dim]
+        qpts = Q.get_points()
+        P_at_qpts = P.tabulate(qpts)[(0,) * dim]
 
         if dim == 1:
-            P = P[1:polynomial_dimension(ref_el, degree-1)]
+            Ps = P_at_qpts[1:polynomial_dimension(ref_el, degree-1)]
             wts = Q.get_weights()
-            dmat, _ = make_dmat(pts.flatten())
-            phis = numpy.dot(numpy.multiply(P, wts), numpy.multiply(dmat.T, 1.0/wts))
-            nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis[1::2])
-            nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis[0::2])
+            dmat, _ = make_dmat(qpts.flatten())
+            phis = numpy.dot(numpy.multiply(Ps, wts), numpy.multiply(dmat.T, 1.0/wts))
+            phis = numpy.concatenate([phis[1::2], phis[0::2]])
         else:
             # TODO use the L2-duals of the H1-orthonormal bubbles
-            # TODO get barycentric coordinates
-            x = pts.T
-            bubble = (1 - numpy.sum(x, axis=0)) * numpy.prod(x, axis=0)
-            phis = P[:polynomial_dimension(ref_el, degree - dim - 1)] * bubble
-            nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis)
-
-        entity_ids[dim] = {0: list(range(cur, cur + len(phis)))}
-        entity_permutations[dim] = {0: make_entity_permutations_simplex(dim, degree - dim)}
-
-        super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+            x = qpts.T
+            bubble = (1.0 - numpy.sum(x, axis=0)) * numpy.prod(x, axis=0)
+            phis = P_at_qpts[:polynomial_dimension(ref_el, degree - dim - 1)] * bubble
+        return phis
 
 
 class IntegratedLegendre(finite_element.CiarletElement):
@@ -122,7 +110,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("%s is only defined on simplices." % type(self))
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        poly_set = ONPolynomialSet(ref_el, degree)
         dual = IntegratedLegendreDual(ref_el, degree, poly_set)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)
