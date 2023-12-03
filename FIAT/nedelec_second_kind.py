@@ -65,7 +65,7 @@ class NedelecSecondKindDual(DualSet):
         assert (d in (2, 3)), "Second kind Nedelecs only implemented in 2/3D."
 
         # Zero vertex-based degrees of freedom (d+1 of these)
-        ids[0] = dict(list(zip(list(range(d + 1)), ([] for i in range(d + 1)))))
+        ids[0] = {i: [] for i in range(d + 1)}
 
         # (degree+1) degrees of freedom per entity of codimension 1 (edges)
         (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
@@ -115,7 +115,7 @@ class NedelecSecondKindDual(DualSet):
         # Initialize empty dofs and identifiers (ids)
         num_facets = len(cell.get_topology()[codim])
         dofs = []
-        ids = dict(list(zip(list(range(num_facets)), ([] for i in range(num_facets)))))
+        ids = {i: [] for i in range(num_facets)}
 
         # Return empty info if not applicable
         rt_degree = degree - codim + 1
@@ -144,6 +144,7 @@ class NedelecSecondKindDual(DualSet):
         # num_basis_functions x num_quad_points x num_components
 
         # Iterate over the facets
+        cur = offset
         for facet in range(num_facets):
             # Get the quadrature and Jacobian on this facet
             Q_facet = FacetQuadratureRule(cell, codim, facet, Q_ref)
@@ -160,7 +161,8 @@ class NedelecSecondKindDual(DualSet):
             dofs.extend(IntegralMoment(cell, Q_facet, phi) for phi in phis)
 
             # Assign identifiers (num RTs per face + previous edge dofs)
-            ids[facet] = list(range(offset + len(phis)*facet, offset + len(phis)*(facet + 1)))
+            ids[facet].extend(range(cur, cur + len(phis)))
+            cur += len(phis)
 
         return (dofs, ids)
 

@@ -25,7 +25,7 @@ import numpy as np
 
 @pytest.mark.parametrize("dim, family, degree", [(dim, f, degree - 1 if f == "DG" else degree)
                                                  for f in ("CG", "DG")
-                                                 for dim in range(1, 4 if f == "DG" else 2)
+                                                 for dim in range(1, 4)
                                                  for degree in range(1, 7)])
 def test_hierarchical_basis_values(dim, family, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
