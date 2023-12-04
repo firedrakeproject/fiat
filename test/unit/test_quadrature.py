@@ -107,19 +107,19 @@ def test_invalid_quadrature_rule():
         QuadratureRule(UFCInterval(), [[0.5, 0.5]], [0.5, 0.5, 0.5])
 
 
-@pytest.mark.parametrize("degree", range(8))
+@pytest.mark.parametrize("degree", range(51))
 def test_create_quadrature_interval(interval, degree, scheme):
     q = FIAT.create_quadrature(interval, degree, scheme)
     assert numpy.allclose(q.integrate(lambda x: x[0]**degree), 1/(degree + 1))
 
 
-@pytest.mark.parametrize("degree", range(8))
+@pytest.mark.parametrize("degree", range(51))
 def test_create_quadrature_triangle(triangle, degree, scheme):
     q = FIAT.create_quadrature(triangle, degree, scheme)
     assert numpy.allclose(q.integrate(lambda x: sum(x)**degree), 1/(degree + 2))
 
 
-@pytest.mark.parametrize("degree", range(8))
+@pytest.mark.parametrize("degree", range(16))
 def test_create_quadrature_tetrahedron(tetrahedron, degree, scheme):
     q = FIAT.create_quadrature(tetrahedron, degree, scheme)
     assert numpy.allclose(q.integrate(lambda x: sum(x)**degree), 1/(2*degree + 6))

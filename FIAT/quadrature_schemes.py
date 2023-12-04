@@ -379,8 +379,8 @@ def _triangle_scheme(ref_el, degree):
         x = numpy.array([[1.0/6.0, 1.0/6.0],
                          [1.0/6.0, 2.0/3.0],
                          [2.0/3.0, 1.0/6.0]])
-        w = numpy.arange(3, dtype=numpy.float64)
-        w[:] = 1.0/6.0
+        w = numpy.zeros((3,), dtype=numpy.float64)
+        w.fill(1.0/6.0)
     elif degree == 3:
         # Scheme from Strang and Fix, 6 points, degree of precision 3
         x = numpy.array([[0.659027622374092, 0.231933368553031],
@@ -389,8 +389,8 @@ def _triangle_scheme(ref_el, degree):
                          [0.231933368553031, 0.109039009072877],
                          [0.109039009072877, 0.659027622374092],
                          [0.109039009072877, 0.231933368553031]])
-        w = numpy.arange(6, dtype=numpy.float64)
-        w[:] = 1.0/12.0
+        w = numpy.zeros((6,), dtype=numpy.float64)
+        w.fill(1.0/12.0)
     else:
         try:
             # Get Xiao-Gambutas scheme
@@ -418,20 +418,8 @@ def _tetrahedron_scheme(ref_el, degree):
                          [b, a, b],
                          [b, b, a],
                          [b, b, b]])
-        w = numpy.arange(4, dtype=numpy.float64)
-        w[:] = 1.0/24.0
-    elif degree == 3:
-        # Scheme from Zienkiewicz and Taylor, 5 points, degree of precision 3
-        # Note: this scheme has a negative weight
-        x = numpy.array([[0.2500000000000000, 0.2500000000000000, 0.2500000000000000],
-                         [0.5000000000000000, 0.1666666666666666, 0.1666666666666666],
-                         [0.1666666666666666, 0.5000000000000000, 0.1666666666666666],
-                         [0.1666666666666666, 0.1666666666666666, 0.5000000000000000],
-                         [0.1666666666666666, 0.1666666666666666, 0.1666666666666666]])
-        w = numpy.arange(5, dtype=numpy.float64)
-        w[0] = -0.8
-        w[1:5] = 0.45
-        w = w/6.0
+        w = numpy.zeros((4,), dtype=numpy.float64)
+        w.fill(1.0/24.0)
     else:
         try:
             # Get Xiao-Gambutas scheme
