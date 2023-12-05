@@ -132,13 +132,13 @@ class CiarletElement(FiniteElement):
         self.V = V
 
         # new_coeffs_flat = numpy.linalg.solve(V.T, B)
-        warnings.filterwarnings("error")
-        try:
-            LU, piv = scipy.linalg.lu_factor(V)
-            new_coeffs_flat = scipy.linalg.lu_solve((LU, piv), B, trans=1)
-        except scipy.linalg.LinAlgWarning:
-            raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
-        warnings.resetwarnings()
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error")
+            try:
+                LU, piv = scipy.linalg.lu_factor(V)
+                new_coeffs_flat = scipy.linalg.lu_solve((LU, piv), B, trans=1)
+            except scipy.linalg.LinAlgWarning:
+                raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
         new_coeffs = new_coeffs_flat.reshape(new_shp)
