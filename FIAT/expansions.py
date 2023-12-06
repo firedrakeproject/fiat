@@ -145,19 +145,20 @@ def xi_tetrahedron(eta):
 
 
 class ExpansionSet(object):
-    def __new__(cls, ref_el, *args, **kwargs):
+    def __new__(cls, *args, **kwargs):
         """Returns an ExpansionSet instance appopriate for the given
         reference element."""
         if cls is not ExpansionSet:
             return super(ExpansionSet, cls).__new__(cls)
+        ref_el = args[0]
         if ref_el.get_shape() == reference_element.POINT:
-            return PointExpansionSet(ref_el)
+            return PointExpansionSet(*args, **kwargs)
         elif ref_el.get_shape() == reference_element.LINE:
-            return LineExpansionSet(ref_el)
+            return LineExpansionSet(*args, **kwargs)
         elif ref_el.get_shape() == reference_element.TRIANGLE:
-            return TriangleExpansionSet(ref_el)
+            return TriangleExpansionSet(*args, **kwargs)
         elif ref_el.get_shape() == reference_element.TETRAHEDRON:
-            return TetrahedronExpansionSet(ref_el)
+            return TetrahedronExpansionSet(*args, **kwargs)
         else:
             raise ValueError("Invalid reference element type.")
 
