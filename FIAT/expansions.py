@@ -52,7 +52,7 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
+def dubiner_recurrence(dim, n, order, ref_pts, jacobian, alpha=0, beta=0):
     """Dubiner recurrence from (Kirby 2010)"""
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
@@ -78,18 +78,22 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
 
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
-
+    base_alpha = alpha
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
         fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
         ddfc = 2 * outer(dfb, dfb)
         for sub_index in reference_element.lattice_iter(0, n, codim):
+            alpha = base_alpha + 2 * sum(sub_index) + len(sub_index)
             # handle i = 1
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
-            alpha = 2 * sum(sub_index) + len(sub_index)
-            b = 0.5 * alpha
-            a = b + 1.0
+            apb = alpha + beta
+            if apb == 0 or apb == -1:
+                a = 0.5 * (alpha + beta) + 1.0
+                b = 0.5 * (alpha - beta)
+            else:
+                a, b, c = jrc(alpha, beta, 0)
             factor = a * fa - b * fb
             phi[inext] = factor * phi[icur]
             if dphi is not None:
@@ -101,7 +105,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
                 iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
-                a, b, c = jrc(alpha, 0, i)
+                a, b, c = jrc(alpha, beta, i)
                 factor = a * fa - b * fb
                 phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
                 if dphi is None:
@@ -115,9 +119,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
                                 c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
 
         # normalize
-        for alpha in reference_element.lattice_iter(0, n+1, codim+1):
-            icur = idx(*alpha)
-            scale = math.sqrt(sum(alpha) + 0.5 * len(alpha))
+        for index in reference_element.lattice_iter(0, n+1, codim+1):
+            icur = idx(*index)
+            scale = math.sqrt(sum(index) + 0.5 * len(index))
             for result in results:
                 result[icur] *= scale
     return results
@@ -157,8 +161,10 @@ class ExpansionSet(object):
         else:
             raise ValueError("Invalid reference element type.")
 
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, alpha=0, beta=0):
         self.ref_el = ref_el
+        self.alpha = alpha
+        self.beta = beta
         dim = ref_el.get_spatial_dimension()
         self.base_ref_el = reference_element.default_simplex(dim)
         v1 = ref_el.get_vertices()
@@ -184,7 +190,7 @@ class ExpansionSet(object):
         """A version of tabulate() that also works for a single point.
         """
         D = self.ref_el.get_spatial_dimension()
-        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A)
+        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, alpha=self.alpha, beta=self.beta)
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -266,10 +272,10 @@ class ExpansionSet(object):
 
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 0:
             raise ValueError("Must have a point")
-        super(PointExpansionSet, self).__init__(ref_el)
+        super(PointExpansionSet, self).__init__(ref_el, **kwargs)
 
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
@@ -279,10 +285,10 @@ class PointExpansionSet(ExpansionSet):
 
 class LineExpansionSet(ExpansionSet):
     """Evaluates the Legendre basis on a line reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
-        super(LineExpansionSet, self).__init__(ref_el)
+        super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
     def _tabulate(self, n, pts, order=0):
         """Returns a tuple of (vals, derivs) such that
@@ -293,7 +299,7 @@ class LineExpansionSet(ExpansionSet):
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
-                v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
+                v[k:] = jacobi.eval_jacobi_batch(self.alpha+k, self.beta+k, n-k, xs)
             for p in range(n + 1):
                 v[p] *= scale[p]
                 scale[p] *= 0.5 * (p + k + 1) * self.A[0, 0]
@@ -306,18 +312,18 @@ class LineExpansionSet(ExpansionSet):
 class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
-        super(TriangleExpansionSet, self).__init__(ref_el)
+        super(TriangleExpansionSet, self).__init__(ref_el, **kwargs)
 
 
 class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expansion on a tetrahedron."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
-        super(TetrahedronExpansionSet, self).__init__(ref_el)
+        super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
 
 
 def polynomial_dimension(ref_el, degree):

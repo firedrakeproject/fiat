@@ -120,7 +120,7 @@ class ONPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, shape=tuple()):
+    def __init__(self, ref_el, degree, shape=tuple(), alpha=0, beta=0):
 
         if shape == tuple():
             num_components = 1
@@ -130,7 +130,7 @@ class ONPolynomialSet(PolynomialSet):
         num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
+        expansion_set = expansions.ExpansionSet(ref_el, alpha=alpha, beta=beta)
 
         # set up coefficients
         if shape == tuple():

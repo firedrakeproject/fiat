@@ -29,10 +29,10 @@ import numpy as np
                                                  for degree in range(1, 7)])
 def test_hierarchical_basis_values(dim, family, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
-    from FIAT import ufc_simplex, Legendre, IntegratedLegendre, create_quadrature
+    from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
 
     s = ufc_simplex(dim)
-    q = create_quadrature(s, degree + 1)
+    q = make_quadrature(s, degree+1)
     if family == "CG":
         fe = IntegratedLegendre(s, degree)
     else:
@@ -49,7 +49,7 @@ def test_hierarchical_basis_values(dim, family, degree):
 
 @pytest.mark.parametrize("family, degree", [(f, degree - 1 if f == "DG" else degree)
                                             for f in ("CG", "DG")
-                                            for degree in range(1, 7)])
+                                            for degree in range(1, 10, 2)])
 def test_hierarchical_sparsity(family, degree):
     from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
 
@@ -66,7 +66,8 @@ def test_hierarchical_sparsity(family, degree):
     moments = lambda v, u: np.dot(np.multiply(v, q.get_weights()), u.T)
     tab = fe.tabulate(len(expected)-1, q.get_points())
     for k, ennz in enumerate(expected):
-        assert nnz(moments(tab[(k, )], tab[(k, )])) == ennz
+        A = sum(moments(tab[alpha], tab[alpha]) for alpha in tab if sum(alpha) == k)
+        assert nnz(A) == ennz
 
 
 if __name__ == '__main__':
