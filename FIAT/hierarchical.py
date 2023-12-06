@@ -101,13 +101,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
             dmat, _ = make_dmat(qpts.flatten())
             K = numpy.dot(numpy.multiply(dmat, W), dmat.T)
         else:
-            # Get an ON basis
+            # Get ON basis
             P = ONPolynomialSet(ref_el, degree)
             tab = P.tabulate(qpts, 1)
             # Assemble a stiffness matrix in the ON basis
             moments = lambda dv: numpy.dot(numpy.multiply(dv, W), dv.T)
             K = sum(moments(tab[alpha]) for alpha in tab if sum(alpha) == 1)
-            # Change of basis to Lagrange polynomials in the quadrauture nodes
+            # Change of basis to Lagrange polynomials at the quadrature nodes
             v = numpy.multiply(tab[(0, ) * dim], W)
             K = numpy.dot(numpy.dot(v.T, K), v)
 

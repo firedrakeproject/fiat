@@ -49,7 +49,7 @@ def test_hierarchical_basis_values(dim, family, degree):
 
 @pytest.mark.parametrize("family, degree", [(f, degree - 1 if f == "DG" else degree)
                                             for f in ("CG", "DG")
-                                            for degree in range(1, 10, 2)])
+                                            for degree in range(1, 7)])
 def test_hierarchical_sparsity(family, degree):
     from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
 
