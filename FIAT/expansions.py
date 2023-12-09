@@ -29,6 +29,20 @@ def jrc(a, b, n):
     return an, bn, cn
 
 
+def bubble_jrc(a, b, n):
+    """Integrated Jacobi recurrence coefficients"""
+    if n == 1:
+        an = (a + b + 2) / 4
+        bn = (a - 3*b - 2) / 4
+        cn = 0.0
+    else:
+        # TODO check dependence on b
+        an = (2*n-1+a+b) * (2*n+a+b) / (2*(n+1)*(n+a+b))
+        bn = (a+b)*(a-b-2) * (2*n-1+a+b) / (2*(n+1)*(2*n-2+a+b)*(n+a+b))
+        cn = (n+a-2)*(n+b-1)*(2*n+a+b) / ((n+1)*(n+a+b)*(2*n-2+a+b))
+    return an, bn, cn
+
+
 def pad_coordinates(ref_pts, embedded_dim):
     """Pad reference coordinates by appending -1.0."""
     return tuple(ref_pts) + (-1.0, )*(embedded_dim - len(ref_pts))
@@ -52,7 +66,7 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, order, ref_pts, jacobian, alpha=0, beta=0):
+def dubiner_recurrence(dim, n, order, ref_pts, jacobian, bubble=False):
     """Dubiner recurrence from (Kirby 2010)"""
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
@@ -76,24 +90,23 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, alpha=0, beta=0):
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
 
+    coefficients = bubble_jrc if bubble else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
-    base_alpha = alpha
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
         fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
         ddfc = 2 * outer(dfb, dfb)
         for sub_index in reference_element.lattice_iter(0, n, codim):
-            alpha = base_alpha + 2 * sum(sub_index) + len(sub_index)
+            alpha = 2 * sum(sub_index) + len(sub_index)
             # handle i = 1
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
-            apb = alpha + beta
-            if apb == 0 or apb == -1:
-                a = 0.5 * (alpha + beta) + 1.0
-                b = 0.5 * (alpha - beta)
+            if bubble:
+                a = b = 1.0
             else:
-                a, b, c = jrc(alpha, beta, 0)
+                a = 0.5 * alpha + 1.0
+                b = 0.5 * alpha
             factor = a * fa - b * fb
             phi[inext] = factor * phi[icur]
             if dphi is not None:
@@ -105,7 +118,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, alpha=0, beta=0):
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
                 iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
-                a, b, c = jrc(alpha, beta, i)
+                a, b, c = coefficients(alpha, 0, i)
                 factor = a * fa - b * fb
                 phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
                 if dphi is None:
@@ -162,17 +175,17 @@ class ExpansionSet(object):
         else:
             raise ValueError("Invalid reference element type.")
 
-    def __init__(self, ref_el, alpha=0, beta=0):
+    def __init__(self, ref_el, bubble=False):
         self.ref_el = ref_el
-        self.alpha = alpha
-        self.beta = beta
+        self.bubble = bubble
         dim = ref_el.get_spatial_dimension()
         self.base_ref_el = reference_element.default_simplex(dim)
         v1 = ref_el.get_vertices()
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+        detA = numpy.sqrt(numpy.linalg.det(numpy.dot(self.A.T, self.A)))
+        self.scale = numpy.sqrt(detA)
         self._dmats_cache = {}
 
     def get_num_members(self, n):
@@ -191,7 +204,7 @@ class ExpansionSet(object):
         """A version of tabulate() that also works for a single point.
         """
         D = self.ref_el.get_spatial_dimension()
-        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, alpha=self.alpha, beta=self.beta)
+        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, bubble=self.bubble)
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -294,13 +307,17 @@ class LineExpansionSet(ExpansionSet):
     def _tabulate(self, n, pts, order=0):
         """Returns a tuple of (vals, derivs) such that
         vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
+        if self.bubble:
+            return super(LineExpansionSet, self)._tabulate(n, pts, order=order)
+
         xs = self._mapping(pts).T
         results = []
         scale = numpy.sqrt(0.5 + numpy.arange(n+1))
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
-                v[k:] = jacobi.eval_jacobi_batch(self.alpha+k, self.beta+k, n-k, xs)
+                v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
+
             for p in range(n + 1):
                 v[p] *= scale[p]
                 scale[p] *= 0.5 * (p + k + 1) * self.A[0, 0]
