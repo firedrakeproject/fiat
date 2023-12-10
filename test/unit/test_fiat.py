@@ -590,11 +590,7 @@ def test_expansion_values(dim):
         return f
 
     def eval_basis(f, pt):
-        fval = f
-        for coord, pval in zip(eta, duffy_coords(pt)):
-            fval = fval.subs(coord, pval)
-        fval = float(fval)
-        return fval
+        return float(f.subs(dict(zip(eta, duffy_coords(pt)))))
 
     for i in range(n + 1):
         for indices in polynomial_set.mis(dim, i):
@@ -602,6 +598,26 @@ def test_expansion_values(dim):
             exact = np.array([eval_basis(phi, r) for r in rpoints])
             uh = Uvals[idx(*indices)]
             assert np.allclose(uh, exact, atol=1E-14)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_make_bubbles(cell):
+    from FIAT.expansions import polynomial_dimension
+    from FIAT.polynomial_set import make_bubbles, PolynomialSet
+    degree = 10
+
+    top = cell.get_topology()
+    points = []
+    for dim in range(len(top)-1):
+        for entity in range(len(top[dim])):
+            points.extend(cell.make_points(dim, entity, degree, variant="gl"))
+
+    sd = cell.get_spatial_dimension()
+    B = make_bubbles(cell, degree)
+    assert isinstance(B, PolynomialSet)
+    assert B.degree == degree
+    assert B.get_num_members() == polynomial_dimension(cell, degree - sd - 1)
+    assert np.allclose(B.tabulate(points)[(0,)*sd], 0)
 
 
 if __name__ == '__main__':

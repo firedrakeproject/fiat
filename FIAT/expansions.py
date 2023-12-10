@@ -24,7 +24,7 @@ def morton_index3(p, q=0, r=0):
 def jrc(a, b, n):
     """Jacobi recurrence coefficients"""
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
-    bn = (a*a-b*b) * (2*n+1+a+b) / (2*(n+1)*(2*n+a+b)*(n+1+a+b))
+    bn = (a+b)*(a-b)*(2*n+1+a+b) / (2*(n+1)*(n+1+a+b)*(2*n+a+b))
     cn = (n+a)*(n+b)*(2*n+2+a+b) / ((n+1)*(n+1+a+b)*(2*n+a+b))
     return an, bn, cn
 
@@ -36,9 +36,10 @@ def bubble_jrc(a, b, n):
         bn = (a - 3*b - 2) / 4
         cn = 0.0
     else:
+        # an, bn, cn = jrc(a-1, b+1, n-1)
         # TODO check dependence on b
-        an = (2*n-1+a+b) * (2*n+a+b) / (2*(n+1)*(n+a+b))
-        bn = (a+b)*(a-b-2) * (2*n-1+a+b) / (2*(n+1)*(2*n-2+a+b)*(n+a+b))
+        an = (2*n-1+a+b)*(2*n+a+b) / (2*(n+1)*(n+a+b))
+        bn = (a+b)*(a-b-2)*(2*n-1+a+b) / (2*(n+1)*(n+a+b)*(2*n-2+a+b))
         cn = (n+a-2)*(n+b-1)*(2*n+a+b) / ((n+1)*(n+a+b)*(2*n-2+a+b))
     return an, bn, cn
 
@@ -98,13 +99,14 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, bubble=False):
         fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
         ddfc = 2 * outer(dfb, dfb)
         for sub_index in reference_element.lattice_iter(0, n, codim):
-            alpha = 2 * sum(sub_index) + len(sub_index)
             # handle i = 1
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
             if bubble:
+                alpha = 2 * sum(sub_index)
                 a = b = 1.0
             else:
+                alpha = 2 * sum(sub_index) + len(sub_index)
                 a = 0.5 * alpha + 1.0
                 b = 0.5 * alpha
             factor = a * fa - b * fb
@@ -317,7 +319,6 @@ class LineExpansionSet(ExpansionSet):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
                 v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
-
             for p in range(n + 1):
                 v[p] *= scale[p]
                 scale[p] *= 0.5 * (p + k + 1) * self.A[0, 0]

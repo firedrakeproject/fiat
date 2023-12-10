@@ -241,3 +241,28 @@ class ONSymTensorPolynomialSet(PolynomialSet):
 
         super(ONSymTensorPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
                                                        expansion_set, coeffs)
+
+
+def make_bubbles(ref_el, degree, shape=(), poly_set=None):
+    """Construct a polynomial set with bubbles up to the given degree.
+
+    """
+    from itertools import chain
+
+    dim = ref_el.get_spatial_dimension()
+    degrees = chain(range(3, degree+1, 2), range(2, degree+1, 2))
+    if dim == 1:
+        indices = list(degrees)
+    else:
+        idx = (expansions.morton_index2, expansions.morton_index3)[dim-2]
+        indices = []
+        for p in degrees:
+            for alpha in mis(dim, p):
+                if alpha[0] > 1 and min(alpha[1:]) > 0:
+                    indices.append(idx(*alpha))
+
+    assert len(indices) == expansions.polynomial_dimension(ref_el, degree - dim - 1)
+    if poly_set is None:
+        poly_set = ONPolynomialSet(ref_el, degree, shape=shape, bubble=True)
+    bubbles = poly_set.take(indices)
+    return bubbles
