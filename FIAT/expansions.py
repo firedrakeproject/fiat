@@ -32,14 +32,11 @@ def jrc(a, b, n):
 def integrated_jrc(a, b, n):
     """Integrated Jacobi recurrence coefficients"""
     if n == 1:
-        an = (a + b + 2) / 4
-        bn = (a - 3*b - 2) / 4
+        an = (a + b + 2) / 2
+        bn = (a - 3*b - 2) / 2
         cn = 0.0
     else:
         an, bn, cn = jrc(a-1, b+1, n-1)
-        an *= n / (n+1)
-        bn *= n / (n+1)
-        cn *= (n-1) / (n+1)
     return an, bn, cn
 
 
@@ -137,10 +134,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
         # normalize
         for index in reference_element.lattice_iter(0, n+1, codim+1):
             alpha = 2 * sum(index) + len(index)
-
-            if variant == "integral" and index[-1] > 1:
-                n1 = index[-1] - 1
-                alpha = 3*n1 * (n1 * alpha + 1)
+            if variant == "integral" and sum(index) > 1:
+                n1 = sum(index) - 1
+                alpha = 3*n1*(n1*alpha + len(index)) / (n1+1)**2
 
             scale = math.sqrt(0.5 * alpha)
             icur = idx(*index)

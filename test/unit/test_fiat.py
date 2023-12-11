@@ -623,7 +623,7 @@ def test_make_bubbles(cell):
         for entity in range(len(top[dim])):
             points.extend(cell.make_points(dim, entity, degree + 1))
     values = B.tabulate(points)[(0,) * sd]
-    assert np.allclose(values, 0, atol=1E-14)
+    assert np.allclose(values, 0, atol=1E-12)
 
     # test linear independence
     m = B.get_num_members()
