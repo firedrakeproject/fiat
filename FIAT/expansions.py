@@ -137,6 +137,11 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
         # normalize
         for index in reference_element.lattice_iter(0, n+1, codim+1):
             alpha = 2 * sum(index) + len(index)
+
+            if variant == "integral" and index[-1] > 1:
+                n1 = index[-1] - 1
+                alpha = 3*n1 * (n1 * alpha + 1)
+
             scale = math.sqrt(0.5 * alpha)
             icur = idx(*index)
             for result in results:
