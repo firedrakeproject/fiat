@@ -602,22 +602,33 @@ def test_expansion_values(dim):
 
 @pytest.mark.parametrize('cell', [I, T, S])
 def test_make_bubbles(cell):
+    from FIAT.reference_element import make_lattice
     from FIAT.expansions import polynomial_dimension
     from FIAT.polynomial_set import make_bubbles, PolynomialSet
+
     degree = 10
-
-    top = cell.get_topology()
-    points = []
-    for dim in range(len(top)-1):
-        for entity in range(len(top[dim])):
-            points.extend(cell.make_points(dim, entity, degree, variant="gl"))
-
     sd = cell.get_spatial_dimension()
     B = make_bubbles(cell, degree)
     assert isinstance(B, PolynomialSet)
     assert B.degree == degree
     assert B.get_num_members() == polynomial_dimension(cell, degree - sd - 1)
-    assert np.allclose(B.tabulate(points)[(0,)*sd], 0)
+
+    # test values on the boundary
+    top = cell.get_topology()
+    points = []
+    for dim in range(len(top)-1):
+        for entity in range(len(top[dim])):
+            points.extend(cell.make_points(dim, entity, degree + 1))
+    values = B.tabulate(points)[(0,) * sd]
+    assert np.allclose(values, 0, atol=1E-14)
+
+    # test linear independence
+    m = B.get_num_members()
+    points = make_lattice(cell.get_vertices(), degree, interior=1)
+    values = B.tabulate(points)[(0,) * sd]
+    assert values.shape == (m, m)
+    assert np.linalg.matrix_rank(values.T) == m
+
 
 
 if __name__ == '__main__':
