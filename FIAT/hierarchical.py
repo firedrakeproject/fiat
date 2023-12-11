@@ -69,11 +69,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
             entity_permutations[dim] = {}
             perms = make_entity_permutations_simplex(dim, degree - dim)
 
-            quad_degree = 2 * degree
             ref_facet = ufc_simplex(dim)
-            Q_ref = create_quadrature(ref_facet, quad_degree)
-            P = poly_set if dim == len(top)-1 else None
-            phis = self._tabulate_L2_duals(ref_facet, degree, Q_ref, poly_set=P)
+            if dim == 1:
+                Q_ref = create_quadrature(ref_facet, 2 * degree)
+                phis = self._tabulate_H1_duals(ref_facet, degree, Q_ref)
+            else:
+                Q_ref = create_quadrature(ref_facet, max(0, 2 * degree - dim - 1))
+                phis = self._tabulate_L2_duals(ref_facet, degree, Q_ref)
 
             for entity in range(len(top[dim])):
                 cur = len(nodes)
@@ -84,15 +86,16 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
-    def _tabulate_L2_duals(self, ref_el, degree, Q, poly_set=None):
+    def _tabulate_H1_duals(self, ref_el, degree, Q):
         qpts = Q.get_points()
         qwts = Q.get_weights()
-        dim = ref_el.get_spatial_dimension()
         moments = lambda v: numpy.dot(numpy.multiply(v, qwts), v.T)
+
+        dim = ref_el.get_spatial_dimension()
         if dim == 1:
             # Assemble a stiffness matrix in the Lagrange basis
             dmat, _ = make_dmat(qpts.flatten())
-            K = numpy.dot(numpy.multiply(dmat, qwts), dmat.T)
+            K = moments(dmat)
         else:
             # Get ON basis
             P = ONPolynomialSet(ref_el, degree)
@@ -103,9 +106,17 @@ class IntegratedLegendreDual(dual_set.DualSet):
             v = numpy.multiply(P_table[(0, ) * dim], qwts)
             K = numpy.dot(numpy.dot(v.T, K), v)
 
-        B = make_bubbles(ref_el, degree, poly_set=poly_set)
-        B_at_qpts = B.tabulate(qpts)[(0,) * dim]
-        phis = numpy.multiply(numpy.dot(B_at_qpts, K), 1/qwts)
+        B = make_bubbles(ref_el, degree)
+        phis = B.tabulate(qpts)[(0,) * dim]
+        phis = numpy.multiply(numpy.dot(phis, K), 1/qwts)
+        return phis
+
+    def _tabulate_L2_duals(self, ref_el, degree, Q):
+        dim = ref_el.get_spatial_dimension()
+        B = make_bubbles(ref_el, degree)
+        phis = B.tabulate(Q.pts)[(0,) * dim]
+        if len(phis) > 0:
+            phis = phis / phis[0]
         return phis
 
 
@@ -115,7 +126,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("%s is only defined on simplices." % type(self))
-        poly_set = ONPolynomialSet(ref_el, degree, bubble=True)
+        poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
         dual = IntegratedLegendreDual(ref_el, degree, poly_set)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)

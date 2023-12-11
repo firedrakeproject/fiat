@@ -16,6 +16,7 @@
 # an entire set of polynomials)
 
 import numpy
+from itertools import chain
 from FIAT import expansions
 from FIAT.functional import index_iterator
 
@@ -120,7 +121,7 @@ class ONPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, shape=tuple(), bubble=False):
+    def __init__(self, ref_el, degree, shape=tuple(), variant=None):
 
         if shape == tuple():
             num_components = 1
@@ -130,7 +131,7 @@ class ONPolynomialSet(PolynomialSet):
         num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el, bubble=bubble)
+        expansion_set = expansions.ExpansionSet(ref_el, variant=variant)
 
         # set up coefficients
         if shape == tuple():
@@ -243,14 +244,14 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                                                        expansion_set, coeffs)
 
 
-def make_bubbles(ref_el, degree, shape=(), poly_set=None):
+def make_bubbles(ref_el, degree, shape=()):
     """Construct a polynomial set with bubbles up to the given degree.
 
     """
-    from itertools import chain
-
     dim = ref_el.get_spatial_dimension()
-    degrees = chain(range(3, degree+1, 2), range(2, degree+1, 2))
+    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, variant="integral")
+    degrees = chain(range(dim + 1, degree+1, 2), range(dim + 2, degree+1, 2))
+
     if dim == 1:
         indices = list(degrees)
     else:
@@ -260,9 +261,5 @@ def make_bubbles(ref_el, degree, shape=(), poly_set=None):
             for alpha in mis(dim, p):
                 if alpha[0] > 1 and min(alpha[1:]) > 0:
                     indices.append(idx(*alpha))
-
-    assert len(indices) == expansions.polynomial_dimension(ref_el, degree - dim - 1)
-    if poly_set is None:
-        poly_set = ONPolynomialSet(ref_el, degree, shape=shape, bubble=True)
-    bubbles = poly_set.take(indices)
-    return bubbles
+    poly_set = poly_set.take(indices)
+    return poly_set

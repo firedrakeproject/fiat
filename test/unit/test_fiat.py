@@ -603,12 +603,15 @@ def test_expansion_values(dim):
 @pytest.mark.parametrize('cell', [I, T, S])
 def test_make_bubbles(cell):
     from FIAT.reference_element import make_lattice
+    from FIAT.quadrature_schemes import create_quadrature
     from FIAT.expansions import polynomial_dimension
-    from FIAT.polynomial_set import make_bubbles, PolynomialSet
+    from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
 
     degree = 10
-    sd = cell.get_spatial_dimension()
     B = make_bubbles(cell, degree)
+
+    # basic tests
+    sd = cell.get_spatial_dimension()
     assert isinstance(B, PolynomialSet)
     assert B.degree == degree
     assert B.get_num_members() == polynomial_dimension(cell, degree - sd - 1)
@@ -629,6 +632,17 @@ def test_make_bubbles(cell):
     assert values.shape == (m, m)
     assert np.linalg.matrix_rank(values.T) == m
 
+    # test that B intersected with span(P_{degree+2} \ P_{degree}) is empty
+    P = ONPolynomialSet(cell, degree + 2)
+    P = P.take(list(range(polynomial_dimension(cell, degree),
+                          P.get_num_members())))
+
+    Q = create_quadrature(cell, P.degree + B.degree)
+    qpts = Q.get_points()
+    qwts = Q.get_weights()
+    P_at_qpts = P.tabulate(qpts)[(0,) * sd]
+    B_at_qpts = B.tabulate(qpts)[(0,) * sd]
+    assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
 
 
 if __name__ == '__main__':
