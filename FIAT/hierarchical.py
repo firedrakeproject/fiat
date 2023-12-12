@@ -53,7 +53,7 @@ class Legendre(finite_element.CiarletElement):
 
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for integrated Legendre elements."""
-    def __init__(self, ref_el, degree, poly_set):
+    def __init__(self, ref_el, degree):
         entity_ids = {}
         entity_permutations = {}
 
@@ -116,7 +116,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         B = make_bubbles(ref_el, degree)
         phis = B.tabulate(Q.pts)[(0,) * dim]
         if len(phis) > 0:
-            phis = phis / phis[0]
+            phis = phis / abs(phis[0])
         return phis
 
 
@@ -126,7 +126,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("%s is only defined on simplices." % type(self))
-        poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
-        dual = IntegratedLegendreDual(ref_el, degree, poly_set)
+        poly_set = ONPolynomialSet(ref_el, degree)
+        dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)

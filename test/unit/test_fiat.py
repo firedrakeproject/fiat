@@ -532,14 +532,17 @@ def test_error_point_high_order(element):
 
 @pytest.mark.parametrize('cell', [I, T, S])
 def test_expansion_orthonormality(cell):
-    from FIAT import expansions, quadrature
+    from FIAT import expansions
+    from FIAT.quadrature_schemes import create_quadrature
     U = expansions.ExpansionSet(cell)
     degree = 10
-    rule = quadrature.make_quadrature(cell, degree + 1)
+    rule = create_quadrature(cell, 2*degree)
     phi = U.tabulate(degree, rule.pts)
-    w = rule.get_weights()
+    qwts = rule.get_weights()
     scale = 0.5 ** -cell.get_spatial_dimension()
-    results = scale * np.dot(phi, w[:, None] * phi.T)
+    results = scale * np.dot(np.multiply(phi, qwts), phi.T)
+
+    assert np.allclose(np.diag(results), 1.0)
     assert np.allclose(results, np.eye(results.shape[0]))
 
 
@@ -642,6 +645,22 @@ def test_make_bubbles(cell):
     P_at_qpts = P.tabulate(qpts)[(0,) * sd]
     B_at_qpts = B.tabulate(qpts)[(0,) * sd]
     assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_bubble_duality(cell):
+    from FIAT.polynomial_set import make_bubbles
+    from FIAT.quadrature_schemes import create_quadrature
+    degree = 10
+    sd = cell.get_spatial_dimension()
+    B = make_bubbles(cell, degree)
+    rule = create_quadrature(cell, 2*degree)
+    phi = B.tabulate(rule.pts)[(0,) * sd]
+    qwts = rule.get_weights() / abs(phi[0])
+    results = np.dot(np.multiply(phi, qwts), phi.T)
+
+    assert np.allclose(np.diag(results), 1.0)
+    assert np.allclose(results, np.eye(results.shape[0]))
 
 
 if __name__ == '__main__':
