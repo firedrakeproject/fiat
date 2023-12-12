@@ -77,7 +77,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
 
     pad_dim = dim + 2
     dX = pad_jacobian(jacobian, pad_dim)
-    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
+    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), math.sqrt(0.5)**dim)
     if dphi is not None:
         dphi[0] = (phi[0] - phi[0]) * dX[0]
     if ddphi is not None:
@@ -138,7 +138,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
                 n1 = sum(index) - 1
                 alpha = 3*n1*(n1*alpha + len(index)) / (n1+1)**2
 
-            scale = math.sqrt(0.5 * alpha)
+            scale = math.sqrt(alpha)
             icur = idx(*index)
             for result in results:
                 result[icur] *= scale

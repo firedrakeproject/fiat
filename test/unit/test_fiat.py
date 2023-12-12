@@ -602,7 +602,6 @@ def test_expansion_values(dim):
 
 @pytest.mark.parametrize('cell', [I, T, S])
 def test_make_bubbles(cell):
-    from FIAT.reference_element import make_lattice
     from FIAT.quadrature_schemes import create_quadrature
     from FIAT.expansions import polynomial_dimension
     from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
@@ -627,7 +626,7 @@ def test_make_bubbles(cell):
 
     # test linear independence
     m = B.get_num_members()
-    points = make_lattice(cell.get_vertices(), degree, interior=1)
+    points = cell.make_points(sd, 0, degree + 1)
     values = B.tabulate(points)[(0,) * sd]
     assert values.shape == (m, m)
     assert np.linalg.matrix_rank(values.T) == m
