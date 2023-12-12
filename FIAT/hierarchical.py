@@ -7,12 +7,13 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2022
 
 import numpy
+from itertools import chain
 
 from FIAT import finite_element, dual_set, functional
-from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON, ufc_simplex
+from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import make_dmat
-from FIAT.quadrature import FacetQuadratureRule
+from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 
@@ -69,7 +70,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
             entity_permutations[dim] = {}
             perms = make_entity_permutations_simplex(dim, degree - dim)
 
-            ref_facet = ufc_simplex(dim)
+            ref_facet = ref_el.construct_subelement(dim)
             if dim == 1:
                 Q_ref = create_quadrature(ref_facet, 2 * degree)
                 phis = self._tabulate_H1_duals(ref_facet, degree, Q_ref)
@@ -80,7 +81,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
             for entity in range(len(top[dim])):
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis)
+                nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in reversed(phis))
                 entity_ids[dim][entity] = list(range(cur, cur + len(phis)))
                 entity_permutations[dim][entity] = perms
 
@@ -116,6 +117,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         B = make_bubbles(ref_el, degree)
         phis = B.tabulate(Q.pts)[(0,) * dim]
         if len(phis) > 0:
+            phis[:, abs(phis[0]) <= 1E-12] = 1.0
             phis = phis / abs(phis[0])
         return phis
 
@@ -130,3 +132,25 @@ class IntegratedLegendre(finite_element.CiarletElement):
         dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)
+
+
+def super_quadrature(cell, degree):
+    sd = cell.get_spatial_dimension()
+    Q = create_quadrature(cell, degree)
+    qpts = list(Q.pts)
+    qwts = list(Q.wts)
+
+    top = cell.get_topology()
+    for dim in reversed(top):
+        if dim == sd:
+            continue
+        if dim == 0:
+            qpts.extend(cell.vertices)
+            qwts.extend((1, ) * len(cell.vertices))
+        else:
+            facet = cell.construct_subelement(dim)
+            Qfacet = create_quadrature(facet, degree + sd - dim)
+            Qs = [FacetQuadratureRule(cell, dim, entity, Qfacet) for entity in top[dim]]
+            qpts.extend(chain.from_iterable(Q.pts for Q in Qs))
+            qwts.extend(chain.from_iterable(Q.wts for Q in Qs))
+    return QuadratureRule(cell, tuple(qpts), tuple(qwts))
