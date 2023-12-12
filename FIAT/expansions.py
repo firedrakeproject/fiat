@@ -171,16 +171,16 @@ class ExpansionSet(object):
         reference element."""
         if cls is not ExpansionSet:
             return super(ExpansionSet, cls).__new__(cls)
-        ref_el = args[0]
-        if ref_el.get_shape() == reference_element.POINT:
-            return PointExpansionSet(*args, **kwargs)
-        elif ref_el.get_shape() == reference_element.LINE:
-            return LineExpansionSet(*args, **kwargs)
-        elif ref_el.get_shape() == reference_element.TRIANGLE:
-            return TriangleExpansionSet(*args, **kwargs)
-        elif ref_el.get_shape() == reference_element.TETRAHEDRON:
-            return TetrahedronExpansionSet(*args, **kwargs)
-        else:
+        try:
+            ref_el = args[0]
+            expansion_set = {
+                reference_element.POINT: PointExpansionSet,
+                reference_element.LINE: LineExpansionSet,
+                reference_element.TRIANGLE: TriangleExpansionSet,
+                reference_element.TETRAHEDRON: TetrahedronExpansionSet,
+            }[ref_el.get_shape()]
+            return expansion_set(*args, **kwargs)
+        except KeyError:
             raise ValueError("Invalid reference element type.")
 
     def __init__(self, ref_el, variant=None):
