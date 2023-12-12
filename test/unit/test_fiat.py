@@ -542,8 +542,8 @@ def test_expansion_orthonormality(cell):
     scale = 0.5 ** -cell.get_spatial_dimension()
     results = scale * np.dot(np.multiply(phi, qwts), phi.T)
 
+    assert np.allclose(results, np.diag(np.diag(results)))
     assert np.allclose(np.diag(results), 1.0)
-    assert np.allclose(results, np.eye(results.shape[0]))
 
 
 @pytest.mark.parametrize('dim', range(1, 4))
@@ -659,8 +659,8 @@ def test_bubble_duality(cell):
     qwts = rule.get_weights() / abs(phi[0])
     results = np.dot(np.multiply(phi, qwts), phi.T)
 
+    assert np.allclose(results, np.diag(np.diag(results)))
     assert np.allclose(np.diag(results), 1.0)
-    assert np.allclose(results, np.eye(results.shape[0]))
 
 
 if __name__ == '__main__':

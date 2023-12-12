@@ -135,8 +135,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
         for index in reference_element.lattice_iter(0, n+1, codim+1):
             p = index[-1]
             d = len(index)
-            if variant == "integral" and p >= 1 + (d == 1):
-                alpha = 2 * sum(index) - 1
+            alpha = 2 * sum(index) - 1
+            if variant == "integral" and p > (d == 1) and alpha > p:
                 norm2 = (d*(2*d+1)*(alpha - p)*alpha) / p
             else:
                 norm2 = 2 * sum(index) + len(index)

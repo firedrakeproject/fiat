@@ -126,7 +126,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("%s is only defined on simplices." % type(self))
-        poly_set = ONPolynomialSet(ref_el, degree)
+        poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
         dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)
