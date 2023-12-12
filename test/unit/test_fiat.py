@@ -620,18 +620,18 @@ def test_make_bubbles(cell):
     points = []
     for dim in range(len(top)-1):
         for entity in range(len(top[dim])):
-            points.extend(cell.make_points(dim, entity, degree + 1))
+            points.extend(cell.make_points(dim, entity, degree))
     values = B.tabulate(points)[(0,) * sd]
     assert np.allclose(values, 0, atol=1E-12)
 
     # test linear independence
     m = B.get_num_members()
-    points = cell.make_points(sd, 0, degree + 1)
+    points = cell.make_points(sd, 0, degree)
     values = B.tabulate(points)[(0,) * sd]
     assert values.shape == (m, m)
     assert np.linalg.matrix_rank(values.T) == m
 
-    # test that B intersected with span(P_{degree+2} \ P_{degree}) is empty
+    # test that B does not have components in span(P_{degree+2} \ P_{degree})
     P = ONPolynomialSet(cell, degree + 2)
     P = P.take(list(range(polynomial_dimension(cell, degree),
                           P.get_num_members())))
