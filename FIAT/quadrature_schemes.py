@@ -30,9 +30,12 @@ Background on the schemes:
 # NumPy
 import numpy
 
+from FIAT.quadrature import (QuadratureRule, make_quadrature,
+                             make_tensor_product_quadrature, map_quadrature)
 # FIAT
-from FIAT.reference_element import QUADRILATERAL, HEXAHEDRON, TENSORPRODUCT, TRIANGLE, TETRAHEDRON, UFCTriangle, UFCTetrahedron, default_simplex
-from FIAT.quadrature import QuadratureRule, make_quadrature, make_tensor_product_quadrature, map_quadrature
+from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
+                                    TETRAHEDRON, TRIANGLE, UFCTetrahedron,
+                                    UFCTriangle, default_simplex)
 
 
 def create_quadrature(ref_el, degree, scheme="default"):
@@ -337,8 +340,10 @@ def xg_scheme(ref_el, degree):
         http://dx.doi.org/10.1016/j.camwa.2009.10.027
     """
     dim = ref_el.get_spatial_dimension()
-    if dim == 2 or dim == 3:
+    if dim == 2:
         from FIAT.xg_quad_data import triangle_table as table
+    elif dim == 3:
+        from FIAT.xg_quad_data import tetrahedron_table as table
     else:
         raise ValueError(f"Xiao-Gambutas rule not availale for {dim} dimensions.")
     try:
