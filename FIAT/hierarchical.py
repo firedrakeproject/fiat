@@ -71,11 +71,10 @@ class IntegratedLegendreDual(dual_set.DualSet):
             perms = make_entity_permutations_simplex(dim, degree - dim)
 
             ref_facet = ref_el.construct_subelement(dim)
-            if dim == 1:
-                Q_ref = create_quadrature(ref_facet, 2 * degree)
+            Q_ref = create_quadrature(ref_facet, 2 * degree)
+            if dim == 1 and False:
                 phis = self._tabulate_H1_duals(ref_facet, degree, Q_ref)
             else:
-                Q_ref = create_quadrature(ref_facet, max(0, 2 * degree - dim - 1))
                 phis = self._tabulate_L2_duals(ref_facet, degree, Q_ref)
 
             for entity in range(len(top[dim])):
@@ -113,12 +112,27 @@ class IntegratedLegendreDual(dual_set.DualSet):
         return phis
 
     def _tabulate_L2_duals(self, ref_el, degree, Q):
+        qpts = Q.get_points()
+        qwts = Q.get_weights()
+        moments = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
         dim = ref_el.get_spatial_dimension()
+
         B = make_bubbles(ref_el, degree)
-        phis = B.tabulate(Q.pts)[(0,) * dim]
+        B_table = B.tabulate(qpts, 1)
+
+        phis = B_table[(0,) * dim]
         if len(phis) > 0:
             phis[:, abs(phis[0]) <= 1E-12] = 1.0
             phis = phis / abs(phis[0])
+
+        P = ONPolynomialSet(ref_el, degree)
+        P_table = P.tabulate(qpts, 1)
+        phis = P_table[(0,) * dim]
+
+        k = dim == 1
+        K00 = sum(moments(B_table[alpha], B_table[alpha]) for alpha in B_table if sum(alpha) == k)
+        K01 = sum(moments(B_table[alpha], P_table[alpha]) for alpha in B_table if sum(alpha) == k)
+        phis = numpy.linalg.solve(K00, numpy.dot(K01, phis))
         return phis
 
 
@@ -136,21 +150,18 @@ class IntegratedLegendre(finite_element.CiarletElement):
 
 def super_quadrature(cell, degree):
     sd = cell.get_spatial_dimension()
-    Q = create_quadrature(cell, degree)
-    qpts = list(Q.pts)
-    qwts = list(Q.wts)
-
     top = cell.get_topology()
-    for dim in reversed(top):
-        if dim == sd:
-            continue
+    Qs = []
+    for dim in sorted(top, reverse=True):
         if dim == 0:
-            qpts.extend(cell.vertices)
-            qwts.extend((1, ) * len(cell.vertices))
+            Qs.append(QuadratureRule(cell, cell.vertices, (1.,)*len(cell.vertices)))
+        elif dim == sd:
+            Qs.append(create_quadrature(cell, degree))
         else:
             facet = cell.construct_subelement(dim)
             Qfacet = create_quadrature(facet, degree + sd - dim)
-            Qs = [FacetQuadratureRule(cell, dim, entity, Qfacet) for entity in top[dim]]
-            qpts.extend(chain.from_iterable(Q.pts for Q in Qs))
-            qwts.extend(chain.from_iterable(Q.wts for Q in Qs))
-    return QuadratureRule(cell, tuple(qpts), tuple(qwts))
+            Qs.extend(FacetQuadratureRule(cell, dim, entity, Qfacet) for entity in top[dim])
+
+    qpts = tuple(chain.from_iterable(Q.pts for Q in Qs))
+    qwts = tuple(chain.from_iterable(Q.wts for Q in Qs))
+    return QuadratureRule(cell, qpts, qwts)

@@ -107,6 +107,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
                 alpha = 2 * sum(sub_index) + len(sub_index)
                 a = 0.5 * (alpha + beta) + 1.0
                 b = 0.5 * (alpha - beta)
+
             factor = a * fa - b * fb
             phi[inext] = factor * phi[icur]
             if dphi is not None:
