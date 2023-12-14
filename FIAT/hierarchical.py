@@ -63,7 +63,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         duals = {
             "beuchler": self._beuchler_integral_duals,
             "beuchler_point": self._beuchler_point_duals,
-            "demkowitz": self._demkowitz_duals,
+            "demkowicz": self._demkowicz_duals,
             "orthonormal": self._orthonormal_duals,
         }[variant]
 
@@ -137,7 +137,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         phis = numpy.dot(B.get_coeffs(), phis)
         return Q, phis
 
-    def _demkowitz_duals(self, ref_el, degree):
+    def _demkowicz_duals(self, ref_el, degree):
         Q = create_quadrature(ref_el, 2 * degree)
         qpts = Q.get_points()
         qwts = Q.get_weights()
