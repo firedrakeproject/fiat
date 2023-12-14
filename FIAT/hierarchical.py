@@ -58,42 +58,55 @@ class IntegratedLegendreDual(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant=None):
         if variant is None:
             variant = "beuchler"
+            variant = "orthonormal"
+
         duals = {
-            "beuchler": self._beuchler_duals,
+            "beuchler": self._beuchler_integral_duals,
+            "beuchler_point": self._beuchler_point_duals,
             "demkowitz": self._demkowitz_duals,
             "orthonormal": self._orthonormal_duals,
         }[variant]
 
+        nodes = []
         entity_ids = {}
         entity_permutations = {}
 
-        # vertex dofs
-        vertices = ref_el.get_vertices()
-        nodes = [functional.PointEvaluation(ref_el, pt) for pt in vertices]
-        entity_ids[0] = {k: [k] for k in range(len(vertices))}
-        entity_permutations[0] = {k: {0: [0]} for k in range(len(vertices))}
-
         top = ref_el.get_topology()
-        for dim in range(1, len(top)):
+        for dim in sorted(top):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
-            perms = make_entity_permutations_simplex(dim, degree - dim)
+            if dim == 0:
+                perms = {0: [0]}
+                for entity in sorted(top[dim]):
+                    cur = len(nodes)
+                    pt, = ref_el.make_points(0, entity, degree)
+                    nodes.append(functional.PointEvaluation(ref_el, pt))
+                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
+                    entity_permutations[dim][entity] = perms
+                continue
 
             ref_facet = ref_el
             if dim != ref_el.get_spatial_dimension():
                 ref_facet = ref_el.construct_subelement(dim)
-            Q_ref, phis = duals(ref_facet, degree)
 
-            for entity in range(len(top[dim])):
+            Q_ref, phis = duals(ref_facet, degree)
+            perms = make_entity_permutations_simplex(dim, degree - dim)
+            for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in reversed(phis))
-                entity_ids[dim][entity] = list(range(cur, cur + len(phis)))
+
+                # phis must transform like a d-form to undo the measure transformation
+                J = Q.jacobian()
+                scale = 1/numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
+                Jphis = scale * phis
+
+                nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in reversed(Jphis))
+                entity_ids[dim][entity] = list(range(cur, len(nodes)))
                 entity_permutations[dim][entity] = perms
 
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
-    def _beuchler_duals(self, ref_el, degree, variant="gll"):
+    def _beuchler_point_duals(self, ref_el, degree, variant="gll"):
         points = make_lattice(ref_el.vertices, degree)
         weights = (1,) * len(points)
         Q = QuadratureRule(ref_el, points, weights)
@@ -102,6 +115,26 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
         PLU = scipy.linalg.lu_factor(V)
         phis = scipy.linalg.lu_solve(PLU, B.get_coeffs().T, trans=1).T
+        return Q, phis
+
+    def _beuchler_integral_duals(self, ref_el, degree):
+        Q = create_quadrature(ref_el, 2 * degree)
+        qpts = Q.get_points()
+        qwts = Q.get_weights()
+        inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
+        dim = ref_el.get_spatial_dimension()
+
+        B = make_bubbles(ref_el, degree)
+        V = B.expansion_set.tabulate(degree, qpts)
+
+        P = ONPolynomialSet(ref_el, degree)
+        phis = P.tabulate(qpts, 0)[(0,) * dim]
+
+        # TODO sparse LU
+        A = inner(phis, V)
+        PLU = scipy.linalg.lu_factor(A)
+        phis = scipy.linalg.lu_solve(PLU, phis)
+        phis = numpy.dot(B.get_coeffs(), phis)
         return Q, phis
 
     def _demkowitz_duals(self, ref_el, degree):
