@@ -7,10 +7,11 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2022
 
 import numpy
-from itertools import chain
+import scipy
 
 from FIAT import finite_element, dual_set, functional
 from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
+from FIAT.reference_element import make_lattice
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import make_dmat
 from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
@@ -54,7 +55,15 @@ class Legendre(finite_element.CiarletElement):
 
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for integrated Legendre elements."""
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant=None):
+        if variant is None:
+            variant = "beuchler"
+        duals = {
+            "beuchler": self._beuchler_duals,
+            "demkowitz": self._demkowitz_duals,
+            "orthonormal": self._orthonormal_duals,
+        }[variant]
+
         entity_ids = {}
         entity_permutations = {}
 
@@ -70,12 +79,10 @@ class IntegratedLegendreDual(dual_set.DualSet):
             entity_permutations[dim] = {}
             perms = make_entity_permutations_simplex(dim, degree - dim)
 
-            ref_facet = ref_el.construct_subelement(dim)
-            Q_ref = create_quadrature(ref_facet, 2 * degree)
-            if dim == 1 and False:
-                phis = self._tabulate_H1_duals(ref_facet, degree, Q_ref)
-            else:
-                phis = self._tabulate_L2_duals(ref_facet, degree, Q_ref)
+            ref_facet = ref_el
+            if dim != ref_el.get_spatial_dimension():
+                ref_facet = ref_el.construct_subelement(dim)
+            Q_ref, phis = duals(ref_facet, degree)
 
             for entity in range(len(top[dim])):
                 cur = len(nodes)
@@ -86,7 +93,19 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
-    def _tabulate_H1_duals(self, ref_el, degree, Q):
+    def _beuchler_duals(self, ref_el, degree, variant="gll"):
+        points = make_lattice(ref_el.vertices, degree)
+        weights = (1,) * len(points)
+        Q = QuadratureRule(ref_el, points, weights)
+        B = make_bubbles(ref_el, degree)
+        V = numpy.transpose(B.expansion_set.tabulate(degree, points))
+
+        PLU = scipy.linalg.lu_factor(V)
+        phis = scipy.linalg.lu_solve(PLU, B.get_coeffs().T, trans=1).T
+        return Q, phis
+
+    def _demkowitz_duals(self, ref_el, degree):
+        Q = create_quadrature(ref_el, 2 * degree)
         qpts = Q.get_points()
         qwts = Q.get_weights()
         moments = lambda v: numpy.dot(numpy.multiply(v, qwts), v.T)
@@ -109,59 +128,41 @@ class IntegratedLegendreDual(dual_set.DualSet):
         B = make_bubbles(ref_el, degree)
         phis = B.tabulate(qpts)[(0,) * dim]
         phis = numpy.multiply(numpy.dot(phis, K), 1/qwts)
-        return phis
+        return Q, phis
 
-    def _tabulate_L2_duals(self, ref_el, degree, Q):
+    def _orthonormal_duals(self, ref_el, degree):
+        Q = create_quadrature(ref_el, 2 * degree)
         qpts = Q.get_points()
         qwts = Q.get_weights()
-        moments = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
+        inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
+        h1_inner = lambda v, u: sum(inner(v[k], u[k]) for k in v if sum(k) == 1)
+
         dim = ref_el.get_spatial_dimension()
 
         B = make_bubbles(ref_el, degree)
         B_table = B.tabulate(qpts, 1)
 
-        phis = B_table[(0,) * dim]
-        if len(phis) > 0:
-            phis[:, abs(phis[0]) <= 1E-12] = 1.0
-            phis = phis / abs(phis[0])
-
         P = ONPolynomialSet(ref_el, degree)
         P_table = P.tabulate(qpts, 1)
-        phis = P_table[(0,) * dim]
 
-        k = dim == 1
-        K00 = sum(moments(B_table[alpha], B_table[alpha]) for alpha in B_table if sum(alpha) == k)
-        K01 = sum(moments(B_table[alpha], P_table[alpha]) for alpha in B_table if sum(alpha) == k)
-        phis = numpy.linalg.solve(K00, numpy.dot(K01, phis))
-        return phis
+        KBB = h1_inner(B_table, B_table)
+        KBP = h1_inner(B_table, P_table)
+
+        phis = P_table[(0,) * dim]
+        phis = numpy.dot(KBP, phis)
+
+        V = numpy.linalg.cholesky(KBB)
+        phis = numpy.linalg.solve(V, phis)
+        return Q, phis
 
 
 class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant=None):
         if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("%s is only defined on simplices." % type(self))
         poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
-        dual = IntegratedLegendreDual(ref_el, degree)
+        dual = IntegratedLegendreDual(ref_el, degree, variant=variant)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)
-
-
-def super_quadrature(cell, degree):
-    sd = cell.get_spatial_dimension()
-    top = cell.get_topology()
-    Qs = []
-    for dim in sorted(top, reverse=True):
-        if dim == 0:
-            Qs.append(QuadratureRule(cell, cell.vertices, (1.,)*len(cell.vertices)))
-        elif dim == sd:
-            Qs.append(create_quadrature(cell, degree))
-        else:
-            facet = cell.construct_subelement(dim)
-            Qfacet = create_quadrature(facet, degree + sd - dim)
-            Qs.extend(FacetQuadratureRule(cell, dim, entity, Qfacet) for entity in top[dim])
-
-    qpts = tuple(chain.from_iterable(Q.pts for Q in Qs))
-    qwts = tuple(chain.from_iterable(Q.wts for Q in Qs))
-    return QuadratureRule(cell, qpts, qwts)
