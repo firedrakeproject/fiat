@@ -163,14 +163,16 @@ class IntegratedLegendreDual(dual_set.DualSet):
         phis = numpy.multiply(numpy.dot(phis, K), 1/qwts)
         return Q, phis
 
-    def _orthonormal_duals(self, ref_el, degree):
+    def _orthonormal_duals(self, ref_el, degree, solver="cholesky"):
+        dim = ref_el.get_spatial_dimension()
+        if dim > 1:
+            solver = "eig"
+
         Q = create_quadrature(ref_el, 2 * degree)
         qpts = Q.get_points()
         qwts = Q.get_weights()
         inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        h1_inner = lambda v, u: sum(inner(v[k], u[k]) for k in v if sum(k) == 1)
-
-        dim = ref_el.get_spatial_dimension()
+        Hk_inner = lambda order, v, u: sum(inner(v[k], u[k]) for k in v if sum(k) == order)
 
         B = make_bubbles(ref_el, degree)
         B_table = B.tabulate(qpts, 1)
@@ -178,14 +180,19 @@ class IntegratedLegendreDual(dual_set.DualSet):
         P = ONPolynomialSet(ref_el, degree)
         P_table = P.tabulate(qpts, 1)
 
-        KBB = h1_inner(B_table, B_table)
-        KBP = h1_inner(B_table, P_table)
-
+        KBP = Hk_inner(1, B_table, P_table)
         phis = P_table[(0,) * dim]
         phis = numpy.dot(KBP, phis)
 
-        V = numpy.linalg.cholesky(KBB)
-        phis = numpy.linalg.solve(V, phis)
+        if len(phis):
+            KBB = Hk_inner(1, B_table, B_table)
+            if solver == "eig":
+                MBB = Hk_inner(0, B_table, B_table)
+                _, S = scipy.linalg.eigh(MBB, KBB)
+                phis = numpy.dot(S.T, phis)
+            elif solver == "cholesky":
+                V = numpy.linalg.cholesky(KBB)
+                phis = numpy.linalg.solve(V, phis)
         return Q, phis
 
 
