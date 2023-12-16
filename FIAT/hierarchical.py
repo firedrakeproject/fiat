@@ -37,6 +37,7 @@ class LegendreDual(dual_set.DualSet):
         Q = create_quadrature(ref_el, 2 * degree)
         phis = poly_set.tabulate(Q.get_points())[(0,) * dim]
         nodes = [functional.IntegralMoment(ref_el, Q, phi) for phi in phis]
+        entity_ids[dim][0] = list(range(len(nodes)))
 
         super(LegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
@@ -184,7 +185,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         phis = P_table[(0,) * dim]
         phis = numpy.dot(KBP, phis)
 
-        if len(phis):
+        if len(phis) > 0:
             KBB = Hk_inner(1, B_table, B_table)
             if solver == "eig":
                 MBB = Hk_inner(0, B_table, B_table)
