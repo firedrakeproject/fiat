@@ -35,7 +35,7 @@ from FIAT.quadrature import (QuadratureRule, make_quadrature,
 # FIAT
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, UFCTetrahedron,
-                                    UFCTriangle, default_simplex)
+                                    UFCTriangle, symmetric_simplex)
 
 
 def create_quadrature(ref_el, degree, scheme="default"):
@@ -351,23 +351,9 @@ def xg_scheme(ref_el, degree):
     except KeyError:
         raise ValueError(f"Xiao-Gambutas rule not availale for degree {degree}.")
 
-    # Get affine map from the (-1,1)^d triangle to the G-X equilateral triangle
-    if dim == 2:
-        A = numpy.array([[1, 1/2],
-                         [0, numpy.sqrt(3)/2]])
-        b = A.sum(axis=1)/3
-    else:
-        A = numpy.array([[1, 1/2, 1/2],
-                         [0, numpy.sqrt(3)/2, numpy.sqrt(3)/6],
-                         [0, 0, numpy.sqrt(6)/3]])
-        b = A.sum(axis=1)/2
-
-    Ref1 = default_simplex(dim)
-    v = numpy.dot(Ref1.vertices, A.T) + b[None, :]
-    Ref1.vertices = tuple(map(tuple, v))
-
     pts_ref = order_table["points"]
     wts_ref = order_table["weights"]
+    Ref1 = symmetric_simplex(dim)
     pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
     return QuadratureRule(ref_el, pts, wts)
 

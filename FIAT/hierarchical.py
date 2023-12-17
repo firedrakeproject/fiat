@@ -10,8 +10,8 @@ import numpy
 import scipy
 
 from FIAT import finite_element, dual_set, functional
-from FIAT.reference_element import POINT, LINE, TRIANGLE, TETRAHEDRON
-from FIAT.reference_element import make_lattice
+from FIAT.reference_element import (POINT, LINE, TRIANGLE, TETRAHEDRON,
+                                    make_lattice, symmetric_simplex)
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import make_dmat
 from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
@@ -86,9 +86,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
                     entity_permutations[dim][entity] = perms
                 continue
 
-            ref_facet = ref_el
-            if dim != ref_el.get_spatial_dimension():
-                ref_facet = ref_el.construct_subelement(dim)
+            ref_facet = symmetric_simplex(dim)
 
             Q_ref, phis = duals(ref_facet, degree)
             perms = make_entity_permutations_simplex(dim, degree - dim)
@@ -126,15 +124,15 @@ class IntegratedLegendreDual(dual_set.DualSet):
         dim = ref_el.get_spatial_dimension()
 
         B = make_bubbles(ref_el, degree)
-        V = B.expansion_set.tabulate(degree, qpts)
+        B_table = B.expansion_set.tabulate(degree, qpts)
 
         P = ONPolynomialSet(ref_el, degree)
-        phis = P.tabulate(qpts, 0)[(0,) * dim]
+        P_table = P.tabulate(qpts, 0)[(0,) * dim]
 
         # TODO sparse LU
-        A = inner(phis, V)
-        PLU = scipy.linalg.lu_factor(A)
-        phis = scipy.linalg.lu_solve(PLU, phis)
+        V = inner(P_table, B_table)
+        PLU = scipy.linalg.lu_factor(V)
+        phis = scipy.linalg.lu_solve(PLU, P_table)
         phis = numpy.dot(B.get_coeffs(), phis)
         return Q, phis
 
@@ -164,7 +162,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         phis = numpy.multiply(numpy.dot(phis, K), 1/qwts)
         return Q, phis
 
-    def _orthonormal_duals(self, ref_el, degree, solver="cholesky"):
+    def _orthonormal_duals(self, ref_el, degree, solver=None):
         dim = ref_el.get_spatial_dimension()
         if dim > 1:
             solver = "eig"
