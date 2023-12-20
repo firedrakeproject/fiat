@@ -292,6 +292,7 @@ class IntegralMoment(Functional):
 
     def __init__(self, ref_el, Q, f_at_qpts, comp=tuple(), shp=tuple()):
         self.Q = Q
+        self.f_at_qpts = f_at_qpts
         qpts, qwts = Q.get_points(), Q.get_weights()
         pt_dict = OrderedDict()
         self.comp = comp
