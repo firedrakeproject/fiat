@@ -7,7 +7,6 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import numpy
-import collections
 
 from FIAT import polynomial_set, functional
 
@@ -105,7 +104,7 @@ class DualSet(object):
         ed = poly_set.get_embedded_degree()
         num_exp = es.get_num_members(poly_set.get_embedded_degree())
 
-        riesz_shape = tuple([num_nodes] + list(tshape) + [num_exp])
+        riesz_shape = (num_nodes, *tshape, num_exp)
 
         mat = numpy.zeros(riesz_shape, "d")
 
@@ -124,12 +123,16 @@ class DualSet(object):
                     Qs_to_ells[Q] = [i]
 
         for Q in Qs_to_ells:
-            pts_to_ells.update(dict.fromkeys(map(tuple, Q.pts), Qs_to_ells[Q]))
+            pts_to_ells.update(dict.fromkeys(Q.pts, Qs_to_ells[Q]))
+        Qpts = set(pts_to_ells.keys())
 
         for i, ell in enumerate(self.nodes):
             if isinstance(ell, functional.IntegralMoment):
                 continue
             for pt in ell.pt_dict:
+                if pt in Qpts:
+                    pts_to_ells[pt] = list(pts_to_ells[pt])
+                    Qpts.remove(pt)
                 if pt in pts_to_ells:
                     pts_to_ells[pt].append(i)
                 else:

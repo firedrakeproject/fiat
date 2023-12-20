@@ -8,13 +8,15 @@
 
 import abc
 import numpy
+import scipy
 
-from FIAT import finite_element, dual_set, functional, quadrature
-from FIAT.reference_element import LINE
-from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.hierarchical import IntegratedLegendre
+from FIAT import dual_set, finite_element, functional, polynomial_set, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
+from FIAT.hierarchical import IntegratedLegendre
+from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.P0 import P0Dual
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.reference_element import LINE, symmetric_simplex
 
 
 def sym_eig(A, B):
@@ -143,6 +145,52 @@ class FDMDual(dual_set.DualSet):
         super(FDMDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
+class SimplexFDMDualSet(dual_set.DualSet):
+
+    def __init__(self, ref_el, degree):
+        sd = ref_el.get_spatial_dimension()
+        S = symmetric_simplex(sd)
+        CG = IntegratedLegendre(S, degree, variant="demkowicz")
+
+        Q = create_quadrature(S, 2 * degree)
+        X, W = Q.get_points(), Q.get_weights()
+        V = CG.tabulate(1, X)
+        inner = lambda v: numpy.dot(numpy.multiply(v, W), v.T)
+        galerkin = lambda order, dofs: sum(inner(V[k][dofs]) for k in V if sum(k) == order)
+
+        nodes = []
+        dual = CG.dual_basis()
+        entity_dofs = CG.entity_dofs()
+        for dim in sorted(entity_dofs):
+            dofs = entity_dofs[dim][0]
+            if isinstance(dual[dofs[0]], functional.IntegralMoment):
+                B = galerkin(0, dofs)
+                A = galerkin(1, dofs)
+                _, S = scipy.linalg.eigh(B, A)
+                Sinv = numpy.dot(S.T, A)
+                phis = numpy.array([dual[i].f_at_qpts for i in dofs])
+                phis = numpy.dot(Sinv, phis)
+
+                Q = dual[dofs[0]].Q
+                Q_ref = Q.reference_rule()
+                for entity in sorted(entity_dofs[dim]):
+                    dofs = entity_dofs[dim][entity]
+                    if len(dofs) == 0:
+                        continue
+
+                    Q = quadrature.FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+                    J = Q.jacobian()
+                    scale = 1 / numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
+                    Jphis = scale * phis
+                    nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in Jphis)
+            else:
+                for entity in sorted(entity_dofs[dim]):
+                    nodes.extend(dual[i] for i in entity_dofs[dim][entity])
+
+        entity_permutations = CG.entity_permutations()
+        super(SimplexFDMDualSet, self).__init__(nodes, ref_el, entity_dofs, entity_permutations)
+
+
 class FDMFiniteElement(finite_element.CiarletElement):
     """1D element that diagonalizes bilinear forms with BCs."""
 
@@ -159,19 +207,23 @@ class FDMFiniteElement(finite_element.CiarletElement):
         pass
 
     def __init__(self, ref_el, degree):
-        if ref_el.shape != LINE:
-            raise ValueError("%s is only defined in one dimension." % type(self))
-        if degree == 0:
-            dual = P0Dual(ref_el)
+        if ref_el.shape == LINE:
+            if degree == 0:
+                dual = P0Dual(ref_el)
+            else:
+                dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
+                               formdegree=self._formdegree, orthogonalize=self._orthogonalize)
+            if self._formdegree == 0:
+                poly_set = dual.embedded.poly_set
+            else:
+                lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
+                poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
         else:
-            dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
-                           formdegree=self._formdegree, orthogonalize=self._orthogonalize)
+            assert self._formdegree == 0
+            assert self._bc_order == 1
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="integral")
+            dual = SimplexFDMDualSet(ref_el, degree)
 
-        if self._formdegree == 0:
-            poly_set = dual.embedded.poly_set
-        else:
-            lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
-            poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
         super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
 
 
