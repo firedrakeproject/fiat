@@ -9,7 +9,7 @@
 import numpy
 import collections
 
-from FIAT import polynomial_set
+from FIAT import polynomial_set, functional
 
 
 class DualSet(object):
@@ -110,10 +110,25 @@ class DualSet(object):
         mat = numpy.zeros(riesz_shape, "d")
 
         # Dictionaries mapping pts to which functionals they come from
-        pts_to_ells = collections.OrderedDict()
-        dpts_to_ells = collections.OrderedDict()
+        pts_to_ells = dict()
+        dpts_to_ells = dict()
+
+        # Dictionary mapping quadratures to which functionals they come from
+        Qs_to_ells = dict()
+        for i, ell in enumerate(self.nodes):
+            if isinstance(ell, functional.IntegralMoment):
+                Q = ell.Q
+                if Q in Qs_to_ells:
+                    Qs_to_ells[Q].append(i)
+                else:
+                    Qs_to_ells[Q] = [i]
+
+        for Q in Qs_to_ells:
+            pts_to_ells.update(dict.fromkeys(map(tuple, Q.pts), Qs_to_ells[Q]))
 
         for i, ell in enumerate(self.nodes):
+            if isinstance(ell, functional.IntegralMoment):
+                continue
             for pt in ell.pt_dict:
                 if pt in pts_to_ells:
                     pts_to_ells[pt].append(i)

@@ -294,11 +294,8 @@ class IntegralMoment(Functional):
         self.Q = Q
         self.f_at_qpts = f_at_qpts
         qpts, qwts = Q.get_points(), Q.get_weights()
-        pt_dict = OrderedDict()
         self.comp = comp
-        for i in range(len(qpts)):
-            pt_cur = tuple(qpts[i])
-            pt_dict[pt_cur] = [(qwts[i] * f_at_qpts[i], comp)]
+        pt_dict = {tuple(pt): [(wt * f, comp)] for pt, wt, f in zip(qpts, qwts, f_at_qpts)}
         Functional.__init__(self, ref_el, shp, pt_dict, {}, "IntegralMoment")
 
     def __call__(self, fn):
