@@ -161,31 +161,27 @@ class SimplexFDMDualSet(dual_set.DualSet):
         nodes = []
         dual = CG.dual_basis()
         entity_dofs = CG.entity_dofs()
-        for dim in sorted(entity_dofs):
+        for dim in entity_dofs:
             dofs = entity_dofs[dim][0]
-            if isinstance(dual[dofs[0]], functional.IntegralMoment):
+            if len(dofs) > 0 and all(isinstance(dual[i], functional.IntegralMoment) for i in dofs):
                 B = galerkin(0, dofs)
                 A = galerkin(1, dofs)
                 _, S = scipy.linalg.eigh(B, A)
                 Sinv = numpy.dot(S.T, A)
                 phis = numpy.array([dual[i].f_at_qpts for i in dofs])
                 phis = numpy.dot(Sinv, phis)
+                Q_ref = dual[dofs[0]].Q.reference_rule()
 
-                Q = dual[dofs[0]].Q
-                Q_ref = Q.reference_rule()
-                for entity in sorted(entity_dofs[dim]):
-                    dofs = entity_dofs[dim][entity]
-                    if len(dofs) == 0:
-                        continue
-
+                for entity in entity_dofs[dim]:
                     Q = quadrature.FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                     J = Q.jacobian()
                     scale = 1 / numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
                     Jphis = scale * phis
                     nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in Jphis)
             else:
-                for entity in sorted(entity_dofs[dim]):
-                    nodes.extend(dual[i] for i in entity_dofs[dim][entity])
+                for entity in entity_dofs[dim]:
+                    points = ref_el.make_points(dim, entity, degree, variant="gll")
+                    nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in points)
 
         entity_permutations = CG.entity_permutations()
         super(SimplexFDMDualSet, self).__init__(nodes, ref_el, entity_dofs, entity_permutations)

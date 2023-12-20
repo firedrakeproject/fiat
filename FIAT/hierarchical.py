@@ -59,7 +59,6 @@ class IntegratedLegendreDual(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant=None):
         if variant is None:
             variant = "beuchler"
-            variant = "orthonormal"
 
         duals = {
             "beuchler": self._beuchler_integral_duals,

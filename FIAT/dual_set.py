@@ -124,15 +124,16 @@ class DualSet(object):
 
         for Q in Qs_to_ells:
             pts_to_ells.update(dict.fromkeys(Q.pts, Qs_to_ells[Q]))
-        Qpts = set(pts_to_ells.keys())
+        # keep track of keys that map to the same list
+        pts_sharing_ells = set(pts_to_ells.keys())
 
         for i, ell in enumerate(self.nodes):
             if isinstance(ell, functional.IntegralMoment):
                 continue
             for pt in ell.pt_dict:
-                if pt in Qpts:
+                if pt in pts_sharing_ells:
                     pts_to_ells[pt] = list(pts_to_ells[pt])
-                    Qpts.remove(pt)
+                    pts_sharing_ells.remove(pt)
                 if pt in pts_to_ells:
                     pts_to_ells[pt].append(i)
                 else:
