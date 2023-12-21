@@ -105,10 +105,6 @@ class DualSet(object):
         ed = poly_set.get_embedded_degree()
         num_exp = es.get_num_members(poly_set.get_embedded_degree())
 
-        riesz_shape = (num_nodes, *tshape, num_exp)
-
-        mat = numpy.zeros(riesz_shape, "d")
-
         # Dictionaries mapping pts to which functionals they come from
         pts_to_ells = dict()
         dpts_to_ells = dict()
@@ -152,11 +148,14 @@ class DualSet(object):
         pts = list(pts_to_ells.keys())
         expansion_values = es.tabulate(ed, pts)
 
+        wshape = (num_nodes, *tshape, len(pts))
+        wts = numpy.zeros(wshape, "d")
         for j, pt in enumerate(pts):
-            vals = expansion_values[:, j]
             for k in chain(*pts_to_ells[pt]):
                 for (w, c) in self.nodes[k].pt_dict[pt]:
-                    mat[k][c][:] += w * vals
+                    wts[k][c][j] += w
+
+        mat = numpy.dot(wts, expansion_values.T)
 
         # Tabulate the derivative values that are needed
         max_deriv_order = max([ell.max_deriv_order for ell in self.nodes])
@@ -169,11 +168,14 @@ class DualSet(object):
             expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
             dexpansion_values = expansion.tabulate(dpts, max_deriv_order)
 
+            wshape = (num_nodes, *tshape, len(dpts))
+            dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
             for j, pt in enumerate(dpts):
                 for k in dpts_to_ells[pt]:
                     for (w, alpha, c) in self.nodes[k].deriv_dict[pt]:
-                        mat[k][c][:] += w*dexpansion_values[alpha][:, j]
-
+                        dwts[alpha][k][c][j] += w
+            for alpha in dwts:
+                mat += numpy.dot(dwts[alpha], dexpansion_values[alpha].T)
         return mat
 
 
