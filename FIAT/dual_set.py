@@ -165,7 +165,7 @@ class DualSet(object):
             # It's easiest/most efficient to get derivatives of the
             # expansion set through the polynomial set interface.
             # This is creating a short-lived set to do just this.
-            coeffs = numpy.eye(poly_set.get_num_members())
+            coeffs = numpy.eye(num_exp)
             expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
             dexpansion_values = expansion.tabulate(dpts, max_deriv_order)
 
