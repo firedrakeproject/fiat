@@ -7,6 +7,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import numpy
+from itertools import chain
 
 from FIAT import polynomial_set, functional
 
@@ -114,6 +115,7 @@ class DualSet(object):
 
         # Dictionary mapping quadratures to which functionals they come from
         Qs_to_ells = dict()
+
         for i, ell in enumerate(self.nodes):
             if isinstance(ell, functional.IntegralMoment):
                 Q = ell.Q
@@ -121,19 +123,9 @@ class DualSet(object):
                     Qs_to_ells[Q].append(i)
                 else:
                     Qs_to_ells[Q] = [i]
-
-        for Q in Qs_to_ells:
-            pts_to_ells.update(dict.fromkeys(Q.pts, Qs_to_ells[Q]))
-        # keep track of keys that map to the same list
-        pts_sharing_ells = set(pts_to_ells.keys())
-
-        for i, ell in enumerate(self.nodes):
-            if isinstance(ell, functional.IntegralMoment):
                 continue
+
             for pt in ell.pt_dict:
-                if pt in pts_sharing_ells:
-                    pts_to_ells[pt] = list(pts_to_ells[pt])
-                    pts_sharing_ells.remove(pt)
                 if pt in pts_to_ells:
                     pts_to_ells[pt].append(i)
                 else:
@@ -145,20 +137,26 @@ class DualSet(object):
                 else:
                     dpts_to_ells[pt] = [i]
 
+        for pt in pts_to_ells:
+            pts_to_ells[pt] = [pts_to_ells[pt]]
+
+        for Q in Qs_to_ells:
+            ells = Qs_to_ells[Q]
+            for pt in map(tuple, Q.pts):
+                if pt in pts_to_ells:
+                    pts_to_ells[pt].append(ells)
+                else:
+                    pts_to_ells[pt] = [ells]
+
         # Now tabulate the function values
         pts = list(pts_to_ells.keys())
         expansion_values = es.tabulate(ed, pts)
 
         for j, pt in enumerate(pts):
-            which_ells = pts_to_ells[pt]
-
-            for k in which_ells:
-                pt_dict = self.nodes[k].pt_dict
-                wc_list = pt_dict[pt]
-
-                for i in range(num_exp):
-                    for (w, c) in wc_list:
-                        mat[k][c][i] += w*expansion_values[i, j]
+            vals = expansion_values[:, j]
+            for k in chain(*pts_to_ells[pt]):
+                for (w, c) in self.nodes[k].pt_dict[pt]:
+                    mat[k][c][:] += w * vals
 
         # Tabulate the derivative values that are needed
         max_deriv_order = max([ell.max_deriv_order for ell in self.nodes])
@@ -167,19 +165,14 @@ class DualSet(object):
             # It's easiest/most efficient to get derivatives of the
             # expansion set through the polynomial set interface.
             # This is creating a short-lived set to do just this.
-            expansion = polynomial_set.ONPolynomialSet(self.ref_el, ed)
+            coeffs = numpy.eye(poly_set.get_num_members())
+            expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
             dexpansion_values = expansion.tabulate(dpts, max_deriv_order)
 
             for j, pt in enumerate(dpts):
-                which_ells = dpts_to_ells[pt]
-
-                for k in which_ells:
-                    dpt_dict = self.nodes[k].deriv_dict
-                    wac_list = dpt_dict[pt]
-
-                    for i in range(num_exp):
-                        for (w, alpha, c) in wac_list:
-                            mat[k][c][i] += w*dexpansion_values[alpha][i, j]
+                for k in dpts_to_ells[pt]:
+                    for (w, alpha, c) in self.nodes[k].deriv_dict[pt]:
+                        mat[k][c][:] += w*dexpansion_values[alpha][:, j]
 
         return mat
 

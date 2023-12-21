@@ -170,12 +170,17 @@ class SimplexFDMDualSet(dual_set.DualSet):
                 Sinv = numpy.dot(S.T, A)
                 phis = numpy.array([dual[i].f_at_qpts for i in dofs])
                 phis = numpy.dot(Sinv, phis)
-                Q_ref = dual[dofs[0]].Q.reference_rule()
+
+                Q = dual[dofs[0]].Q
+                J = Q.jacobian()
+                Q_ref = Q.reference_rule()
+                rscale = numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
+                phis *= rscale
 
                 for entity in entity_dofs[dim]:
                     Q = quadrature.FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                     J = Q.jacobian()
-                    scale = 1 / numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
+                    scale = 1/numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
                     Jphis = scale * phis
                     nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in Jphis)
             else:

@@ -85,16 +85,15 @@ class IntegratedLegendreDual(dual_set.DualSet):
                     entity_permutations[dim][entity] = perms
                 continue
 
-            ref_facet = symmetric_simplex(dim)
-
-            Q_ref, phis = duals(ref_facet, degree)
             perms = make_entity_permutations_simplex(dim, degree - dim)
+            ref_facet = symmetric_simplex(dim)
+            Q_ref, phis = duals(ref_facet, degree)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+                J = Q.jacobian()
 
                 # phis must transform like a d-form to undo the measure transformation
-                J = Q.jacobian()
                 scale = 1/numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
                 Jphis = scale * phis
 
@@ -105,8 +104,8 @@ class IntegratedLegendreDual(dual_set.DualSet):
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
     def _beuchler_point_duals(self, ref_el, degree, variant="gll"):
-        points = make_lattice(ref_el.vertices, degree)
-        weights = (1,) * len(points)
+        points = make_lattice(ref_el.vertices, degree, variant=variant)
+        weights = (1.0,) * len(points)
         Q = QuadratureRule(ref_el, points, weights)
         B = make_bubbles(ref_el, degree)
         V = numpy.transpose(B.expansion_set.tabulate(degree, points))
@@ -117,8 +116,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
     def _beuchler_integral_duals(self, ref_el, degree):
         Q = create_quadrature(ref_el, 2 * degree)
-        qpts = Q.get_points()
-        qwts = Q.get_weights()
+        qpts, qwts = Q.get_points(), Q.get_weights()
         inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
         dim = ref_el.get_spatial_dimension()
 
@@ -137,8 +135,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
     def _demkowicz_duals(self, ref_el, degree):
         Q = create_quadrature(ref_el, 2 * degree)
-        qpts = Q.get_points()
-        qwts = Q.get_weights()
+        qpts, qwts = Q.get_points(), Q.get_weights()
         moments = lambda v: numpy.dot(numpy.multiply(v, qwts), v.T)
 
         dim = ref_el.get_spatial_dimension()
@@ -163,14 +160,11 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
     def _orthonormal_duals(self, ref_el, degree, solver=None):
         dim = ref_el.get_spatial_dimension()
-        if dim > 1:
-            solver = "eig"
 
         Q = create_quadrature(ref_el, 2 * degree)
-        qpts = Q.get_points()
-        qwts = Q.get_weights()
+        qpts, qwts = Q.get_points(), Q.get_weights()
         inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        Hk_inner = lambda order, v, u: sum(inner(v[k], u[k]) for k in v if sum(k) == order)
+        galerkin = lambda order, v, u: sum(inner(v[k], u[k]) for k in v if sum(k) == order)
 
         B = make_bubbles(ref_el, degree)
         B_table = B.tabulate(qpts, 1)
@@ -178,19 +172,14 @@ class IntegratedLegendreDual(dual_set.DualSet):
         P = ONPolynomialSet(ref_el, degree)
         P_table = P.tabulate(qpts, 1)
 
-        KBP = Hk_inner(1, B_table, P_table)
+        KBP = galerkin(1, B_table, P_table)
         phis = P_table[(0,) * dim]
         phis = numpy.dot(KBP, phis)
 
         if len(phis) > 0:
-            KBB = Hk_inner(1, B_table, B_table)
-            if solver == "eig":
-                MBB = Hk_inner(0, B_table, B_table)
-                _, S = scipy.linalg.eigh(MBB, KBB)
-                phis = numpy.dot(S.T, phis)
-            elif solver == "cholesky":
-                V = numpy.linalg.cholesky(KBB)
-                phis = numpy.linalg.solve(V, phis)
+            KBB = galerkin(1, B_table, B_table)
+            V = numpy.linalg.cholesky(KBB)
+            phis = numpy.linalg.solve(V, phis)
         return Q, phis
 
 
