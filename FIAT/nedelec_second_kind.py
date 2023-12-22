@@ -149,9 +149,10 @@ class NedelecSecondKindDual(DualSet):
             # Get the quadrature and Jacobian on this facet
             Q_facet = FacetQuadratureRule(cell, codim, facet, Q_ref)
             J = Q_facet.jacobian()
+            detJ = Q_facet.jacobian_determinant()
 
             # Map Phis -> phis (reference values to physical values)
-            piola_map = J / numpy.sqrt(numpy.linalg.det(numpy.dot(J.T, J)))
+            piola_map = J / detJ
             phis = numpy.dot(Phis, piola_map.T)
             phis = numpy.transpose(phis, (0, 2, 1))
 

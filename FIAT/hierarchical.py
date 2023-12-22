@@ -90,14 +90,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
             Q_ref, phis = duals(ref_facet, degree)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                J = Q.jacobian()
+                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
 
                 # phis must transform like a d-form to undo the measure transformation
-                scale = 1/numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
+                scale = 1 / Q_facet.jacobian_determinant()
                 Jphis = scale * phis
 
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in reversed(Jphis))
+                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in reversed(Jphis))
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
                 entity_permutations[dim][entity] = perms
 

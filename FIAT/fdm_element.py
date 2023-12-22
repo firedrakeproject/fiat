@@ -8,7 +8,6 @@
 
 import abc
 import numpy
-import scipy
 
 from FIAT import dual_set, finite_element, functional, polynomial_set, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
@@ -154,42 +153,51 @@ class SimplexFDMDualSet(dual_set.DualSet):
 
         Q = create_quadrature(S, 2 * degree)
         X, W = Q.get_points(), Q.get_weights()
+
         V = CG.tabulate(1, X)
         inner = lambda v: numpy.dot(numpy.multiply(v, W), v.T)
         galerkin = lambda order, dofs: sum(inner(V[k][dofs]) for k in V if sum(k) == order)
 
         nodes = []
-        dual = CG.dual_basis()
+        entity_ids = {}
+
+        CG_nodes = CG.dual_basis()
         entity_dofs = CG.entity_dofs()
-        for dim in entity_dofs:
+        for dim in sorted(entity_dofs):
+            entity_ids[dim] = {}
+
             dofs = entity_dofs[dim][0]
-            if len(dofs) > 0 and all(isinstance(dual[i], functional.IntegralMoment) for i in dofs):
+            if len(dofs) > 0 and all(isinstance(CG_nodes[i], functional.IntegralMoment) for i in dofs):
                 B = galerkin(0, dofs)
                 A = galerkin(1, dofs)
-                _, S = scipy.linalg.eigh(B, A)
+                _, S = sym_eig(B, A)
                 Sinv = numpy.dot(S.T, A)
-                phis = numpy.array([dual[i].f_at_qpts for i in dofs])
-                phis = numpy.dot(Sinv, phis)
 
-                Q = dual[dofs[0]].Q
-                J = Q.jacobian()
-                Q_ref = Q.reference_rule()
-                rscale = numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
-                phis *= rscale
+                fs_at_qpts = numpy.array([CG_nodes[i].f_at_qpts for i in dofs])
+                phis = numpy.dot(Sinv, fs_at_qpts)
 
-                for entity in entity_dofs[dim]:
-                    Q = quadrature.FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                    J = Q.jacobian()
-                    scale = 1/numpy.sqrt(abs(numpy.linalg.det(numpy.dot(J.T, J))))
+                Q_dof = CG_nodes[dofs[0]].Q
+                Q_ref = Q_dof.reference_rule()
+                phis *= Q_dof.jacobian_determinant()
+                for entity in sorted(entity_dofs[dim]):
+                    cur = len(nodes)
+                    Q_facet = quadrature.FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+
+                    # phis must transform like a d-form to undo the measure transformation
+                    scale = 1 / Q_facet.jacobian_determinant()
                     Jphis = scale * phis
-                    nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in Jphis)
+
+                    nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in Jphis)
+                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
             else:
-                for entity in entity_dofs[dim]:
+                for entity in sorted(entity_dofs[dim]):
+                    cur = len(nodes)
                     points = ref_el.make_points(dim, entity, degree, variant="gll")
                     nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in points)
+                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         entity_permutations = CG.entity_permutations()
-        super(SimplexFDMDualSet, self).__init__(nodes, ref_el, entity_dofs, entity_permutations)
+        super(SimplexFDMDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
