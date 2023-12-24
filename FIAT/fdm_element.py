@@ -165,36 +165,35 @@ class SimplexFDMDualSet(dual_set.DualSet):
         entity_dofs = CG.entity_dofs()
         for dim in sorted(entity_dofs):
             entity_ids[dim] = {}
-
             dofs = entity_dofs[dim][0]
-            if len(dofs) > 0 and all(isinstance(CG_nodes[i], functional.IntegralMoment) for i in dofs):
-                B = galerkin(0, dofs)
-                A = galerkin(1, dofs)
-                _, S = sym_eig(B, A)
-                Sinv = numpy.dot(S.T, A)
-
-                fs_at_qpts = numpy.array([CG_nodes[i].f_at_qpts for i in dofs])
-                phis = numpy.dot(Sinv, fs_at_qpts)
-
-                Q_dof = CG_nodes[dofs[0]].Q
-                Q_ref = Q_dof.reference_rule()
-                phis *= Q_dof.jacobian_determinant()
+            if len(dofs) == 0 or dim == 0:
                 for entity in sorted(entity_dofs[dim]):
                     cur = len(nodes)
-                    Q_facet = quadrature.FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-
-                    # phis must transform like a d-form to undo the measure transformation
-                    scale = 1 / Q_facet.jacobian_determinant()
-                    Jphis = scale * phis
-
-                    nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in Jphis)
-                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
-            else:
-                for entity in sorted(entity_dofs[dim]):
-                    cur = len(nodes)
-                    points = ref_el.make_points(dim, entity, degree, variant="gll")
+                    points = ref_el.make_points(dim, entity, degree)
                     nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in points)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
+                continue
+
+            B = galerkin(0, dofs)
+            A = galerkin(1, dofs)
+            _, S = sym_eig(B, A)
+            Sinv = numpy.dot(S.T, A)
+            fs_at_qpts = numpy.array([CG_nodes[i].f_at_qpts for i in dofs])
+            phis = numpy.dot(Sinv, fs_at_qpts)
+
+            Q_dof = CG_nodes[dofs[0]].Q
+            Q_ref = Q_dof.reference_rule()
+            phis *= Q_dof.jacobian_determinant()
+            for entity in sorted(entity_dofs[dim]):
+                cur = len(nodes)
+                Q_facet = quadrature.FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+
+                # phis must transform like a d-form to undo the measure transformation
+                scale = 1 / Q_facet.jacobian_determinant()
+                Jphis = scale * phis
+
+                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in Jphis)
+                entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         entity_permutations = CG.entity_permutations()
         super(SimplexFDMDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
@@ -230,8 +229,8 @@ class FDMFiniteElement(finite_element.CiarletElement):
         else:
             assert self._formdegree == 0
             assert self._bc_order == 1
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="integral")
             dual = SimplexFDMDualSet(ref_el, degree)
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="integral")
 
         super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
 
