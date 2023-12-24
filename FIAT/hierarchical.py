@@ -184,7 +184,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
         Q = create_quadrature(ref_el, 2 * degree)
         qpts, qwts = Q.get_points(), Q.get_weights()
         inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in v if sum(k) == order)
+        galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
 
         B = make_bubbles(ref_el, degree)
         B_table = B.tabulate(qpts, 1)
