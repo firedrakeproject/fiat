@@ -106,16 +106,20 @@ class DualSet(object):
 
         pts = set()
         dpts = set()
-        Qs = set()
+        Qs_to_ells = dict()
 
         for i, ell in enumerate(self.nodes):
             if isinstance(ell, functional.IntegralMoment):
-                Qs.add(ell.Q)
+                Q = ell.Q
+                if Q in Qs_to_ells:
+                    Qs_to_ells[Q].append(i)
+                else:
+                    Qs_to_ells[Q] = [i]
             else:
-                pts.update(ell.pt_dict)
-                dpts.update(ell.deriv_dict)
+                pts.update(ell.pt_dict.keys())
+                dpts.update(ell.deriv_dict.keys())
 
-        for Q in Qs:
+        for Q in Qs_to_ells:
             pts.update(map(tuple, Q.pts))
 
         # Now tabulate the function values
@@ -124,11 +128,21 @@ class DualSet(object):
 
         wshape = (num_nodes, *tshape, len(pts))
         wts = numpy.zeros(wshape, "d")
-        for k, node in enumerate(self.nodes):
-            for pt in node.pt_dict:
+        for k, ell in enumerate(self.nodes):
+            if isinstance(ell, functional.IntegralMoment):
+                continue
+            for pt, wc_list in ell.pt_dict.items():
                 j = pts.index(pt)
-                for (w, c) in node.pt_dict[pt]:
+                for (w, c) in wc_list:
                     wts[k][c][j] += w
+
+        for Q in Qs_to_ells:
+            qwts = Q.get_weights()
+            qpts = tuple(map(tuple, Q.pts))
+            indices = list(map(pts.index, qpts))
+            for k in Qs_to_ells[Q]:
+                ell = self.nodes[k]
+                wts[k][ell.comp][indices] += numpy.multiply(ell.f_at_qpts, qwts)
 
         mat = numpy.dot(wts, expansion_values.T)
 
@@ -145,10 +159,10 @@ class DualSet(object):
 
             wshape = (num_nodes, *tshape, len(dpts))
             dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
-            for k, node in enumerate(self.nodes):
-                for pt in node.deriv_dict:
+            for k, ell in enumerate(self.nodes):
+                for pt, wac_list in ell.deriv_dict.items():
                     j = dpts.index(pt)
-                    for (w, alpha, c) in node.deriv_dict[pt]:
+                    for (w, alpha, c) in wac_list:
                         dwts[alpha][k][c][j] += w
 
             for alpha in dwts:
