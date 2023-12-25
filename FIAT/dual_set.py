@@ -104,47 +104,55 @@ class DualSet(object):
         ed = poly_set.get_embedded_degree()
         num_exp = es.get_num_members(poly_set.get_embedded_degree())
 
+        riesz_shape = (num_nodes, *tshape, num_exp)
+        mat = numpy.zeros(riesz_shape, "d")
+
         pts = set()
         dpts = set()
         Qs_to_ells = dict()
-
         for i, ell in enumerate(self.nodes):
             if isinstance(ell, functional.IntegralMoment):
                 Q = ell.Q
-                if Q in Qs_to_ells:
-                    Qs_to_ells[Q].append(i)
-                else:
-                    Qs_to_ells[Q] = [i]
             else:
+                Q = None
                 pts.update(ell.pt_dict.keys())
                 dpts.update(ell.deriv_dict.keys())
+            if Q in Qs_to_ells:
+                Qs_to_ells[Q].append(i)
+            else:
+                Qs_to_ells[Q] = [i]
 
+        Qs_to_pts = {None: tuple(sorted(pts))}
         for Q in Qs_to_ells:
-            pts.update(map(tuple, Q.pts))
+            if Q is not None:
+                cur_pts = tuple(map(tuple, Q.pts))
+                Qs_to_pts[Q] = cur_pts
+                pts.update(cur_pts)
 
         # Now tabulate the function values
         pts = list(sorted(pts))
-        expansion_values = es.tabulate(ed, pts)
-
-        wshape = (num_nodes, *tshape, len(pts))
-        wts = numpy.zeros(wshape, "d")
-        for k, ell in enumerate(self.nodes):
-            if isinstance(ell, functional.IntegralMoment):
-                continue
-            for pt, wc_list in ell.pt_dict.items():
-                j = pts.index(pt)
-                for (w, c) in wc_list:
-                    wts[k][c][j] += w
+        expansion_values = numpy.transpose(es.tabulate(ed, pts))
 
         for Q in Qs_to_ells:
-            qwts = Q.get_weights()
-            qpts = tuple(map(tuple, Q.pts))
-            indices = list(map(pts.index, qpts))
-            for k in Qs_to_ells[Q]:
-                ell = self.nodes[k]
-                wts[k][ell.comp][indices] += numpy.multiply(ell.f_at_qpts, qwts)
-
-        mat = numpy.dot(wts, expansion_values.T)
+            ells = Qs_to_ells[Q]
+            cur_pts = Qs_to_pts[Q]
+            indices = list(map(pts.index, cur_pts))
+            wshape = (len(ells), *tshape, len(indices))
+            wts = numpy.zeros(wshape, "d")
+            if Q is None:
+                for i, k in enumerate(ells):
+                    ell = self.nodes[k]
+                    for pt, wc_list in ell.pt_dict.items():
+                        j = cur_pts.index(pt)
+                        for (w, c) in wc_list:
+                            wts[i][c][j] += w
+            else:
+                for i, k in enumerate(ells):
+                    ell = self.nodes[k]
+                    wts[i][ell.comp][:] = ell.f_at_qpts
+                qwts = Q.get_weights()
+                wts = numpy.multiply(wts, qwts, out=wts)
+            mat[ells] += numpy.dot(wts, expansion_values[indices])
 
         # Tabulate the derivative values that are needed
         max_deriv_order = max([ell.max_deriv_order for ell in self.nodes])
@@ -157,16 +165,16 @@ class DualSet(object):
             expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
             dexpansion_values = expansion.tabulate(dpts, max_deriv_order)
 
-            wshape = (num_nodes, *tshape, len(dpts))
+            ells = [k for k, ell in enumerate(self.nodes) if len(ell.deriv_dict) > 0]
+            wshape = (len(ells), *tshape, len(dpts))
             dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
-            for k, ell in enumerate(self.nodes):
+            for i, k in enumerate(ells):
+                ell = self.nodes[k]
                 for pt, wac_list in ell.deriv_dict.items():
                     j = dpts.index(pt)
                     for (w, alpha, c) in wac_list:
-                        dwts[alpha][k][c][j] += w
-
-            for alpha in dwts:
-                mat += numpy.dot(dwts[alpha], dexpansion_values[alpha].T)
+                        dwts[alpha][i][c][j] += w
+            mat[ells] += sum(numpy.dot(dwts[alpha], dexpansion_values[alpha].T) for alpha in dwts)
         return mat
 
 
