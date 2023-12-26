@@ -30,12 +30,12 @@ def index_iterator(shp):
         return
     elif len(shp) == 1:
         for i in range(shp[0]):
-            yield [i]
+            yield (i,)
     else:
         shp_foo = shp[1:]
         for i in range(shp[0]):
             for foo in index_iterator(shp_foo):
-                yield [i] + foo
+                yield (i,) + foo
 
 
 class Functional(object):
@@ -496,7 +496,7 @@ class FrobeniusIntegralMoment(IntegralMoment):
         self.f_at_qpts = f_at_qpts
         qpts, qwts = Q.get_points(), Q.get_weights()
 
-        pt_dict = {tuple(pt) : [(wt * f_at_qpts[alpha][i], alpha) for alpha in map(tuple, index_iterator(shp))]
+        pt_dict = {tuple(pt) : [(wt * f_at_qpts[alpha][i], alpha) for alpha in index_iterator(shp)]
                    for i, (pt, wt) in enumerate(zip(qpts, qwts))}
         Functional.__init__(self, ref_el, shp, pt_dict, {}, "FrobeniusIntegralMoment")
 
