@@ -137,7 +137,7 @@ class DualSet(object):
             ells = Qs_to_ells[Q]
             cur_pts = Qs_to_pts[Q]
             indices = list(map(pts.index, cur_pts))
-            wshape = (len(ells), *tshape, len(indices))
+            wshape = (len(ells), *tshape, len(cur_pts))
             wts = numpy.zeros(wshape, "d")
             if Q is None:
                 for i, k in enumerate(ells):
@@ -145,7 +145,7 @@ class DualSet(object):
                     for pt, wc_list in ell.pt_dict.items():
                         j = cur_pts.index(pt)
                         for (w, c) in wc_list:
-                            wts[i][c][j] += w
+                            wts[i][c][j] = w
             else:
                 for i, k in enumerate(ells):
                     ell = self.nodes[k]
@@ -155,7 +155,7 @@ class DualSet(object):
             mat[ells] += numpy.dot(wts, expansion_values[indices])
 
         # Tabulate the derivative values that are needed
-        max_deriv_order = max([ell.max_deriv_order for ell in self.nodes])
+        max_deriv_order = max(ell.max_deriv_order for ell in self.nodes)
         if max_deriv_order > 0:
             dpts = list(sorted(dpts))
             # It's easiest/most efficient to get derivatives of the
@@ -173,8 +173,9 @@ class DualSet(object):
                 for pt, wac_list in ell.deriv_dict.items():
                     j = dpts.index(pt)
                     for (w, alpha, c) in wac_list:
-                        dwts[alpha][i][c][j] += w
-            mat[ells] += sum(numpy.dot(dwts[alpha], dexpansion_values[alpha].T) for alpha in dwts)
+                        dwts[alpha][i][c][j] = w
+            for alpha in dwts:
+                mat[ells] += numpy.dot(dwts[alpha], dexpansion_values[alpha].T)
         return mat
 
 

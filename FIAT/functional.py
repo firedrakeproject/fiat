@@ -330,7 +330,7 @@ class IntegralMomentOfNormalDerivative(Functional):
 
         dpt_dict = OrderedDict()
 
-        alphas = [tuple([1 if j == i else 0 for j in range(sd)]) for i in range(sd)]
+        alphas = [tuple(1 if j == i else 0 for j in range(sd)) for i in range(sd)]
         for j, pt in enumerate(dpts):
             dpt_dict[tuple(pt)] = [(qwts[j]*n[i]*f_at_qpts[j], alphas[i], tuple()) for i in range(sd)]
 
@@ -483,24 +483,22 @@ class IntegralMomentOfTensorDivergence(Functional):
                          "IntegralMomentOfDivergence")
 
 
-class FrobeniusIntegralMoment(Functional):
+class FrobeniusIntegralMoment(IntegralMoment):
 
     def __init__(self, ref_el, Q, f_at_qpts):
         # f_at_qpts is (some shape) x num_qpts
         shp = tuple(f_at_qpts.shape[:-1])
-        if len(Q.get_points()) != f_at_qpts.shape[-1]:
+        if len(Q.pts) != f_at_qpts.shape[-1]:
             raise Exception("Mismatch in number of quadrature points and values")
 
+        self.Q = Q
+        self.comp = slice(None, None)
+        self.f_at_qpts = f_at_qpts
         qpts, qwts = Q.get_points(), Q.get_weights()
-        pt_dict = {}
 
-        for i, (pt_cur, wt_cur) in enumerate(zip(map(tuple, qpts), qwts)):
-            pt_dict[pt_cur] = []
-            for alfa in index_iterator(shp):
-                qpidx = tuple(alfa + [i])
-                pt_dict[pt_cur].append((wt_cur * f_at_qpts[qpidx], tuple(alfa)))
-
-        super().__init__(ref_el, shp, pt_dict, {}, "FrobeniusIntegralMoment")
+        pt_dict = {tuple(pt) : [(wt * f_at_qpts[alpha][i], alpha) for alpha in map(tuple, index_iterator(shp))]
+                   for i, (pt, wt) in enumerate(zip(qpts, qwts))}
+        Functional.__init__(self, ref_el, shp, pt_dict, {}, "FrobeniusIntegralMoment")
 
 
 class PointNormalEvaluation(Functional):
