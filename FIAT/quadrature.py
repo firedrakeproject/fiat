@@ -14,16 +14,12 @@ from recursivenodes.quadrature import gaussjacobi, lobattogaussjacobi, simplexga
 from FIAT import reference_element
 
 
-def pseudo_determinant(A):
-    return numpy.sqrt(abs(numpy.linalg.det(numpy.dot(A.T, A))))
-
-
 def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
     """Map quadrature points and weights defined on source_cell to target_cell.
     """
     A, b = reference_element.make_affine_mapping(source_cell.get_vertices(),
                                                  target_cell.get_vertices())
-    scale = pseudo_determinant(A)
+    scale = numpy.sqrt(numpy.linalg.det(numpy.dot(A.T, A)))
     pts = numpy.dot(pts_ref.reshape((-1, A.shape[1])), A.T) + b[None, :]
     wts = scale * wts_ref
     # return immutable types
@@ -176,9 +172,6 @@ class FacetQuadratureRule(QuadratureRule):
 
     def jacobian(self):
         return self._J
-
-    def jacobian_determinant(self):
-        return pseudo_determinant(self._J)
 
 
 def make_quadrature(ref_el, m):
