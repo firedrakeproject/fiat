@@ -687,6 +687,36 @@ class UFCSimplex(Simplex):
         return abs(l1_dist)
 
 
+class DefaultSimplex(Simplex):
+
+    def get_facet_element(self):
+        dimension = self.get_spatial_dimension()
+        return self.construct_subelement(dimension - 1)
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        return default_simplex(dimension)
+
+
+class SymmetricSimplex(Simplex):
+
+    def get_facet_element(self):
+        dimension = self.get_spatial_dimension()
+        return self.construct_subelement(dimension - 1)
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        return symmetric_simplex(dimension)
+
+
 class Point(Simplex):
     """This is the reference point."""
 
@@ -705,7 +735,7 @@ class Point(Simplex):
         return self
 
 
-class DefaultLine(Simplex):
+class DefaultLine(DefaultSimplex):
     """This is the reference line with vertices (-1.0,) and (1.0,)."""
 
     def __init__(self):
@@ -714,9 +744,6 @@ class DefaultLine(Simplex):
         topology = {0: {0: (0,), 1: (1,)},
                     1: edges}
         super(DefaultLine, self).__init__(LINE, verts, topology)
-
-    def get_facet_element(self):
-        raise NotImplementedError()
 
 
 class UFCInterval(UFCSimplex):
@@ -730,7 +757,7 @@ class UFCInterval(UFCSimplex):
         super(UFCInterval, self).__init__(LINE, verts, topology)
 
 
-class DefaultTriangle(Simplex):
+class DefaultTriangle(DefaultSimplex):
     """This is the reference triangle with vertices (-1.0,-1.0),
     (1.0,-1.0), and (-1.0,1.0)."""
 
@@ -743,9 +770,6 @@ class DefaultTriangle(Simplex):
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
                     1: edges, 2: faces}
         super(DefaultTriangle, self).__init__(TRIANGLE, verts, topology)
-
-    def get_facet_element(self):
-        return DefaultLine()
 
 
 class UFCTriangle(UFCSimplex):
@@ -786,7 +810,7 @@ class IntrepidTriangle(Simplex):
         return UFCInterval()
 
 
-class DefaultTetrahedron(Simplex):
+class DefaultTetrahedron(DefaultSimplex):
     """This is the reference tetrahedron with vertices (-1,-1,-1),
     (1,-1,-1),(-1,1,-1), and (-1,-1,1)."""
 
@@ -810,9 +834,6 @@ class DefaultTetrahedron(Simplex):
         tets = {0: (0, 1, 2, 3)}
         topology = {0: vs, 1: edges, 2: faces, 3: tets}
         super(DefaultTetrahedron, self).__init__(TETRAHEDRON, verts, topology)
-
-    def get_facet_element(self):
-        return DefaultTriangle()
 
 
 class IntrepidTetrahedron(Simplex):
@@ -1306,6 +1327,18 @@ def ufc_simplex(spatial_dim):
         return UFCTetrahedron()
     else:
         raise RuntimeError("Can't create UFC simplex of dimension %s." % str(spatial_dim))
+
+
+def symmetric_simplex(spatial_dim):
+    A = numpy.array([[2, 1, 1],
+                     [0, numpy.sqrt(3), numpy.sqrt(3)/3],
+                     [0, 0, numpy.sqrt(6)*(2/3)]])
+    A = A[:spatial_dim, :][:, :spatial_dim]
+    b = A.sum(axis=1) * (-1 / (1 + spatial_dim))
+    Ref1 = ufc_simplex(spatial_dim)
+    v = numpy.dot(Ref1.get_vertices(), A.T) + b[None, :]
+    vertices = tuple(map(tuple, v))
+    return SymmetricSimplex(Ref1.get_shape(), vertices, Ref1.get_topology())
 
 
 def ufc_cell(cell):
