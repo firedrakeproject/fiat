@@ -26,16 +26,7 @@ def index_iterator(shp):
     """Constructs a generator iterating over all indices in
     shp in generalized column-major order  So if shp = (2,2), then we
     construct the sequence (0,0),(0,1),(1,0),(1,1)"""
-    if len(shp) == 0:
-        return
-    elif len(shp) == 1:
-        for i in range(shp[0]):
-            yield (i,)
-    else:
-        shp_foo = shp[1:]
-        for i in range(shp[0]):
-            for foo in index_iterator(shp_foo):
-                yield (i,) + foo
+    return numpy.ndindex(shp)
 
 
 class Functional(object):
@@ -495,9 +486,10 @@ class FrobeniusIntegralMoment(IntegralMoment):
         self.comp = slice(None, None)
         self.f_at_qpts = f_at_qpts
         qpts, qwts = Q.get_points(), Q.get_weights()
+        weights = numpy.transpose(numpy.multiply(f_at_qpts, qwts), (-1,) + tuple(range(len(shp))))
+        alphas = list(index_iterator(shp))
 
-        pt_dict = {tuple(pt) : [(wt * f_at_qpts[alpha][i], alpha) for alpha in index_iterator(shp)]
-                   for i, (pt, wt) in enumerate(zip(qpts, qwts))}
+        pt_dict = {tuple(pt): [(wt[alpha], alpha) for alpha in alphas] for pt, wt in zip(qpts, weights)}
         Functional.__init__(self, ref_el, shp, pt_dict, {}, "FrobeniusIntegralMoment")
 
 
