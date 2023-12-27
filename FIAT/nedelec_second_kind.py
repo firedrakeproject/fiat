@@ -17,8 +17,6 @@ from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
 
-from FIAT import polynomial_set, functional
-
 
 class NedelecSecondKindDual(DualSet):
     r"""
@@ -67,48 +65,36 @@ class NedelecSecondKindDual(DualSet):
         assert (d in (2, 3)), "Second kind Nedelecs only implemented in 2/3D."
 
         # Zero vertex-based degrees of freedom (d+1 of these)
-        ids[0] = dict(list(zip(list(range(d + 1)), ([] for i in range(d + 1)))))
+        ids[0] = {i: [] for i in range(d + 1)}
 
-        # (d+1) degrees of freedom per entity of codimension 1 (edges)
-        (edge_dofs, edge_ids) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
+        # (degree+1) degrees of freedom per entity of codimension 1 (edges)
+        (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
         dofs.extend(edge_dofs)
-        ids[1] = edge_ids
 
         # Include face degrees of freedom if 3D
         if d == 3:
-            (face_dofs, face_ids) = self._generate_face_dofs(cell, degree,
-                                                             len(dofs), variant, interpolant_deg)
+            face_dofs, ids[d-1] = self._generate_facet_dofs(d-1, cell, degree,
+                                                            len(dofs), variant, interpolant_deg)
             dofs.extend(face_dofs)
-            ids[2] = face_ids
 
         # Varying degrees of freedom (possibly zero) per cell
-        (cell_dofs, cell_ids) = self._generate_cell_dofs(cell, degree, len(dofs), variant, interpolant_deg)
+        cell_dofs, ids[d] = self._generate_facet_dofs(d, cell, degree, len(dofs), variant, interpolant_deg)
         dofs.extend(cell_dofs)
-        ids[d] = cell_ids
 
         return (dofs, ids)
 
     def _generate_edge_dofs(self, cell, degree, offset, variant, interpolant_deg):
-        """Generate degrees of freedoms (dofs) for entities of
+        """Generate degrees of freedom (dofs) for entities of
         codimension 1 (edges)."""
+
+        if variant == "integral":
+            return self._generate_facet_dofs(1, cell, degree, offset, variant, interpolant_deg)
 
         # (degree+1) tangential component point evaluation degrees of
         # freedom per entity of codimension 1 (edges)
         dofs = []
         ids = {}
-
-        if variant == "integral":
-            edge = cell.construct_subelement(1)
-            Q = create_quadrature(edge, degree + interpolant_deg)
-            Pq = polynomial_set.ONPolynomialSet(edge, degree)
-            Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)]
-            for e in range(len(cell.get_topology()[1])):
-                dofs.extend(functional.IntegralMomentOfEdgeTangentEvaluation(cell, Q, phi, e)
-                            for phi in Pq_at_qpts)
-                jj = Pq_at_qpts.shape[0] * e
-                ids[e] = list(range(offset + jj, offset + jj + Pq_at_qpts.shape[0]))
-
-        elif variant == "point":
+        if variant == "point":
             for edge in range(len(cell.get_topology()[1])):
 
                 # Create points for evaluation of tangential components
@@ -123,87 +109,62 @@ class NedelecSecondKindDual(DualSet):
 
         return (dofs, ids)
 
-    def _generate_face_dofs(self, cell, degree, offset, variant, interpolant_deg):
-        """Generate degrees of freedoms (dofs) for faces."""
+    def _generate_facet_dofs(self, codim, cell, degree, offset, variant, interpolant_deg):
+        """Generate degrees of freedom (dofs) for facets."""
 
         # Initialize empty dofs and identifiers (ids)
+        num_facets = len(cell.get_topology()[codim])
         dofs = []
-        ids = dict(list(zip(list(range(4)), ([] for i in range(4)))))
+        ids = {i: [] for i in range(num_facets)}
 
         # Return empty info if not applicable
-        d = cell.get_spatial_dimension()
-        if degree < 2:
+        rt_degree = degree - codim + 1
+        if rt_degree < 1:
             return (dofs, ids)
 
         if interpolant_deg is None:
             interpolant_deg = degree
 
-        # Construct quadrature scheme for the reference face
-        ref_face = cell.get_facet_element()
-        Q_ref = create_quadrature(ref_face, interpolant_deg + degree - 1)
+        # Construct quadrature scheme for the reference facet
+        ref_facet = cell.construct_subelement(codim)
+        Q_ref = create_quadrature(ref_facet, interpolant_deg + rt_degree)
+        if codim == 1:
+            Phi = ONPolynomialSet(ref_facet, rt_degree, (codim,))
+        else:
+            # Construct Raviart-Thomas on the reference facet
+            RT = RaviartThomas(ref_facet, rt_degree, variant)
+            Phi = RT.get_nodal_basis()
 
-        # Construct Raviart-Thomas of (degree - 1) on the reference face
-        RT = RaviartThomas(ref_face, degree - 1, variant)
-        num_rts = RT.space_dimension()
-
-        # Evaluate RT basis functions at reference quadrature points
-        Phi = RT.get_nodal_basis()
-        Phis = Phi.tabulate(Q_ref.get_points())[(0, 0)]
+        # Evaluate basis functions at reference quadrature points
+        Phis = Phi.tabulate(Q_ref.get_points())[(0,) * codim]
         # Note: Phis has dimensions:
         # num_basis_functions x num_components x num_quad_points
         Phis = numpy.transpose(Phis, (0, 2, 1))
         # Note: Phis has dimensions:
         # num_basis_functions x num_quad_points x num_components
 
-        # Iterate over the faces of the tet
-        num_faces = len(cell.get_topology()[d-1])
-        for face in range(num_faces):
-            # Get the quadrature and Jacobian on this face
-            Q_face = FacetQuadratureRule(cell, d-1, face, Q_ref)
-            J = Q_face.jacobian()
+        # Iterate over the facets
+        cur = offset
+        for facet in range(num_facets):
+            # Get the quadrature and Jacobian on this facet
+            Q_facet = FacetQuadratureRule(cell, codim, facet, Q_ref)
+            J = Q_facet.jacobian()
+            detJ = Q_facet.jacobian_determinant()
 
             # Map Phis -> phis (reference values to physical values)
-            piola_map = J / numpy.sqrt(numpy.linalg.det(numpy.dot(J.T, J)))
+            piola_map = J / detJ
             phis = numpy.dot(Phis, piola_map.T)
             phis = numpy.transpose(phis, (0, 2, 1))
 
             # Construct degrees of freedom as integral moments on this cell,
             # using the face quadrature weighted against the values
             # of the (physical) Raviart--Thomas'es on the face
-            dofs.extend(IntegralMoment(cell, Q_face, phi) for phi in phis)
+            dofs.extend(IntegralMoment(cell, Q_facet, phi) for phi in phis)
 
             # Assign identifiers (num RTs per face + previous edge dofs)
-            ids[face] = list(range(offset + num_rts*face, offset + num_rts*(face + 1)))
+            ids[facet].extend(range(cur, cur + len(phis)))
+            cur += len(phis)
 
-        return (dofs, ids)
-
-    def _generate_cell_dofs(self, cell, degree, offset, variant, interpolant_deg):
-        """Generate degrees of freedoms (dofs) for entities of
-        codimension d (cells)."""
-
-        # Return empty info if not applicable
-        d = cell.get_spatial_dimension()
-        rt_degree = degree - d + 1
-        if rt_degree < 1:
-            return ([], {0: []})
-
-        # Create quadrature points
-        interpolant_deg = interpolant_deg or degree
-        Q = create_quadrature(cell, interpolant_deg + rt_degree)
-
-        # Create Raviart-Thomas nodal basis
-        RT = RaviartThomas(cell, rt_degree, variant)
-        phi = RT.get_nodal_basis()
-
-        # Evaluate Raviart-Thomas basis at quadrature points
-        phi_at_qs = phi.tabulate(Q.get_points())[(0,) * d]
-
-        # Use (Frobenius) integral moments against RTs as dofs
-        dofs = [IntegralMoment(cell, Q, phi)
-                for phi in phi_at_qs]
-
-        # Associate these dofs with the interior
-        ids = {0: list(range(offset, offset + len(dofs)))}
         return (dofs, ids)
 
 

@@ -11,6 +11,7 @@ from itertools import chain
 import numpy
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.quadrature import FacetQuadratureRule
 
 
 def NedelecSpace2D(ref_el, degree):
@@ -35,9 +36,7 @@ def NedelecSpace2D(ref_el, degree):
     PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
-
-    Qpts = Q.get_points()
-    Qwts = Q.get_weights()
+    Qpts, Qwts = Q.get_points(), Q.get_weights()
 
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
@@ -102,9 +101,7 @@ def NedelecSpace3D(ref_el, degree):
     Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
-
-    Qpts = Q.get_points()
-    Qwts = Q.get_weights()
+    Qpts, Qwts = Q.get_points(), Q.get_weights()
 
     PkCrossXcoeffs = numpy.zeros((vec_Pke.get_num_members(),
                                   sd,
@@ -138,180 +135,81 @@ def NedelecSpace3D(ref_el, degree):
     return polynomial_set.polynomial_set_union_normalized(vec_Pk, PkCrossX)
 
 
-class NedelecDual2D(dual_set.DualSet):
-    """Dual basis for first-kind Nedelec in 2D."""
+class NedelecDual(dual_set.DualSet):
+    """Dual basis for first-kind Nedelec."""
 
     def __init__(self, ref_el, degree, variant, interpolant_deg):
-        sd = ref_el.get_spatial_dimension()
-        if sd != 2:
-            raise Exception("Nedelec2D only works on triangles")
-
         nodes = []
-
-        t = ref_el.get_topology()
-
-        if variant == "integral":
-            # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
-            # degree is q - 1
-            edge = ref_el.get_facet_element()
-            Q = create_quadrature(edge, interpolant_deg + degree - 1)
-            Pq = polynomial_set.ONPolynomialSet(edge, degree - 1)
-            Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
-            nodes.extend(functional.IntegralMomentOfEdgeTangentEvaluation(ref_el, Q, phi, e)
-                         for e in range(len(t[sd - 1])) for phi in Pq_at_qpts)
-
-            # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^2
-            if degree > 1:
-                Q = create_quadrature(ref_el, interpolant_deg + degree - 2)
-                qpts = Q.get_points()
-                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
-                Pkm1_at_qpts = Pkm1.tabulate(qpts)[(0,) * sd]
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                             for d in range(sd) for phi in Pkm1_at_qpts)
-
-        elif variant == "point":
-            num_edges = len(t[1])
-
-            # edge tangents
-            for i in range(num_edges):
-                pts_cur = ref_el.make_points(1, i, degree + 1)
-                nodes.extend(functional.PointEdgeTangentEvaluation(ref_el, i, pt) for pt in pts_cur)
-
-            # internal moments
-            if degree > 1:
-                Q = create_quadrature(ref_el, 2 * degree - 2)
-                qpts = Q.get_points()
-                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
-                Pkm1_at_qpts = Pkm1.tabulate(qpts)[(0,) * sd]
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                             for d in range(sd) for phi in Pkm1_at_qpts)
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
 
         entity_ids = {}
-
         # set to empty
-        for i in range(sd + 1):
-            entity_ids[i] = {}
-            for j in range(len(t[i])):
-                entity_ids[i][j] = []
-
-        cur = 0
-
-        # edges
-        num_edge_pts = len(ref_el.make_points(1, 0, degree + 1))
-
-        for i in range(len(t[1])):
-            entity_ids[1][i] = list(range(cur, cur + num_edge_pts))
-            cur += num_edge_pts
-
-        # moments against P_{degree-1} internally, if degree > 1
-        if degree > 1:
-            num_internal_dof = sd * Pkm1_at_qpts.shape[0]
-            entity_ids[2][0] = list(range(cur, cur + num_internal_dof))
-
-        super(NedelecDual2D, self).__init__(nodes, ref_el, entity_ids)
-
-
-class NedelecDual3D(dual_set.DualSet):
-    """Dual basis for first-kind Nedelec in 3D."""
-
-    def __init__(self, ref_el, degree, variant, interpolant_deg):
-        sd = ref_el.get_spatial_dimension()
-        if sd != 3:
-            raise Exception("NedelecDual3D only works on tetrahedra")
-
-        nodes = []
-
-        t = ref_el.get_topology()
+        for dim in top:
+            entity_ids[dim] = {}
+            for entity in top[dim]:
+                entity_ids[dim][entity] = []
 
         if variant == "integral":
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
-            edge = ref_el.get_facet_element().get_facet_element()
-            Q = create_quadrature(edge, interpolant_deg + degree - 1)
-            Pq = polynomial_set.ONPolynomialSet(edge, degree - 1)
-            Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)]
-            nodes.extend(functional.IntegralMomentOfEdgeTangentEvaluation(ref_el, Q, phi, e)
-                         for e in range(len(t[1])) for phi in Pq_at_qpts)
 
             # face nodes are \int_F v\cdot p dA where p \in P_{q-2}(f)^3 with p \cdot n = 0 (cmp. Monk)
             # these are equivalent to dofs from Fenics book defined by
             # \int_F v\times n \cdot p ds where p \in P_{q-2}(f)^2
-            if degree > 1:
-                facet = ref_el.get_facet_element()
-                Q = create_quadrature(facet, interpolant_deg + degree - 2)
-                Pq = polynomial_set.ONPolynomialSet(facet, degree - 2, (sd,))
-                Pq_at_qpts = Pq.tabulate(Q.get_points())[(0, 0)]
+            for dim in range(1, sd):
+                phi_deg = degree - dim
+                if phi_deg >= 0:
+                    facet = ref_el.construct_subelement(dim)
+                    Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
+                    Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
+                    Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * dim]
+                    Phis = numpy.transpose(Phis, (0, 2, 1))
 
-                for f in range(len(t[2])):
-                    # R is used to map [1,0,0] to tangent1 and [0,1,0] to tangent2
-                    R = ref_el.compute_face_tangents(f)
-
-                    # Skip last functionals because we only want p with p \cdot n = 0
-                    nodes.extend(functional.MonkIntegralMoment(ref_el, Q, numpy.dot(phi.T, R), f)
-                                 for phi in Pq_at_qpts[:2 * Pq.get_num_members() // 3, :-1, ...])
-
-            # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-3}^3(T)
-            if degree > 2:
-                Q = create_quadrature(ref_el, interpolant_deg + degree - 3)
-                qpts = Q.get_points()
-                Pkm2 = polynomial_set.ONPolynomialSet(ref_el, degree - 3)
-                Pkm2_at_qpts = Pkm2.tabulate(qpts)[(0,) * sd]
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                             for d in range(sd) for phi in Pkm2_at_qpts)
+                    for entity in top[dim]:
+                        cur = len(nodes)
+                        R = ref_el.compute_tangents(dim, entity)
+                        Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+                        Jdet = Q.jacobian_determinant()
+                        phis = numpy.dot(Phis, R / Jdet)
+                        phis = numpy.transpose(phis, (0, 2, 1))
+                        nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
+                                     for phi in phis)
+                        entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         elif variant == "point":
-            num_edges = len(t[1])
-
-            for i in range(num_edges):
+            interpolant_deg = degree
+            for i in top[1]:
+                cur = len(nodes)
                 # points to specify P_k on each edge
                 pts_cur = ref_el.make_points(1, i, degree + 1)
                 nodes.extend(functional.PointEdgeTangentEvaluation(ref_el, i, pt)
                              for pt in pts_cur)
+                entity_ids[1][i] = list(range(cur, len(nodes)))
 
-            if degree > 1:  # face tangents
-                num_faces = len(t[2])
-                for i in range(num_faces):  # loop over faces
+            if sd == 3 and degree > 1:  # face tangents
+                for i in top[2]:  # loop over faces
+                    cur = len(nodes)
                     pts_cur = ref_el.make_points(2, i, degree + 1)
                     nodes.extend(functional.PointFaceTangentEvaluation(ref_el, i, k, pt)
                                  for k in range(2)  # loop over tangents
                                  for pt in pts_cur  # loop over points
                                  )
+                    entity_ids[2][i] = list(range(cur, len(nodes)))
 
-            if degree > 2:  # internal moments
-                Q = create_quadrature(ref_el, 2 * degree - 3)
-                qpts = Q.get_points()
-                Pkm2 = polynomial_set.ONPolynomialSet(ref_el, degree - 3)
-                Pkm2_at_qpts = Pkm2.tabulate(qpts)[(0,) * sd]
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                             for d in range(sd) for phi in Pkm2_at_qpts)
+        # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-d}^3(T)
+        dim = sd
+        phi_deg = degree - dim
+        if phi_deg >= 0:
+            cur = len(nodes)
+            Q = create_quadrature(ref_el, interpolant_deg + phi_deg)
+            Pqmd = polynomial_set.ONPolynomialSet(ref_el, phi_deg)
+            Pqmd_at_qpts = Pqmd.tabulate(Q.get_points())[(0,) * dim]
+            nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (dim,))
+                         for d in range(dim) for phi in Pqmd_at_qpts)
+            entity_ids[dim][0] = list(range(cur, len(nodes)))
 
-        entity_ids = {}
-        # set to empty
-        for i in range(sd + 1):
-            entity_ids[i] = {}
-            for j in range(len(t[i])):
-                entity_ids[i][j] = []
-
-        cur = 0
-
-        # edge dof
-        num_pts_per_edge = len(ref_el.make_points(1, 0, degree + 1))
-        for i in range(len(t[1])):
-            entity_ids[1][i] = list(range(cur, cur + num_pts_per_edge))
-            cur += num_pts_per_edge
-
-        # face dof
-        if degree > 1:
-            num_pts_per_face = len(ref_el.make_points(2, 0, degree + 1))
-            for i in range(len(t[2])):
-                entity_ids[2][i] = list(range(cur, cur + 2 * num_pts_per_face))
-                cur += 2 * num_pts_per_face
-
-        if degree > 2:
-            num_internal_dof = Pkm2_at_qpts.shape[0] * sd
-            entity_ids[3][0] = list(range(cur, cur + num_internal_dof))
-
-        super(NedelecDual3D, self).__init__(nodes, ref_el, entity_ids)
+        super(NedelecDual, self).__init__(nodes, ref_el, entity_ids)
 
 
 class Nedelec(finite_element.CiarletElement):
@@ -339,12 +237,11 @@ class Nedelec(finite_element.CiarletElement):
         variant, interpolant_deg = check_format_variant(variant, degree)
         if ref_el.get_spatial_dimension() == 3:
             poly_set = NedelecSpace3D(ref_el, degree)
-            dual = NedelecDual3D(ref_el, degree, variant, interpolant_deg)
         elif ref_el.get_spatial_dimension() == 2:
             poly_set = NedelecSpace2D(ref_el, degree)
-            dual = NedelecDual2D(ref_el, degree, variant, interpolant_deg)
         else:
             raise Exception("Not implemented")
+        dual = NedelecDual(ref_el, degree, variant, interpolant_deg)
         formdegree = 1  # 1-form
         super(Nedelec, self).__init__(poly_set, dual, degree, formdegree,
                                       mapping="covariant piola")
