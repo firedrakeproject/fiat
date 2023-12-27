@@ -36,9 +36,7 @@ def NedelecSpace2D(ref_el, degree):
     PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
-
-    Qpts = Q.get_points()
-    Qwts = Q.get_weights()
+    Qpts, Qwts = Q.get_points(), Q.get_weights()
 
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
@@ -103,9 +101,7 @@ def NedelecSpace3D(ref_el, degree):
     Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
-
-    Qpts = Q.get_points()
-    Qwts = Q.get_weights()
+    Qpts, Qwts = Q.get_points(), Q.get_weights()
 
     PkCrossXcoeffs = numpy.zeros((vec_Pke.get_num_members(),
                                   sd,
