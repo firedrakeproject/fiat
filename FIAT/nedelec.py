@@ -41,36 +41,18 @@ def NedelecSpace2D(ref_el, degree):
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
 
-    PkH_crossx_coeffs = numpy.zeros((PkH.get_num_members(),
-                                     sd,
-                                     Pkp1.get_num_members()), "d")
+    CrossX = numpy.dot(numpy.array([[0.0, 1.0], [-1.0, 0.0]]), Qpts.T)
+    PkHCrossX_at_Qpts = PkH_at_Qpts[:, None, :] * CrossX[None, :, :]
+    PkHCrossX_coeffs = numpy.dot(numpy.multiply(PkHCrossX_at_Qpts, Qwts), Pkp1_at_Qpts.T)
 
-    def rot_x_foo(a):
-        if a == 0:
-            return 1, 1.0
-        elif a == 1:
-            return 0, -1.0
-
-    for i in range(PkH.get_num_members()):
-        for j in range(sd):
-            (ind, sign) = rot_x_foo(j)
-            for k in range(Pkp1.get_num_members()):
-                PkH_crossx_coeffs[i, j, k] = sign * sum(Qwts * PkH_at_Qpts[i, :] * Qpts[:, ind] * Pkp1_at_Qpts[k, :])
-#                for l in range( len( Qpts ) ):
-#                    PkH_crossx_coeffs[i,j,k] += Qwts[ l ] \
-#                                                * PkH_at_Qpts[i,l] \
-#                                                * Qpts[l][ind] \
-#                                                * Pkp1_at_Qpts[k,l] \
-#                                                * sign
-
-    PkHcrossx = polynomial_set.PolynomialSet(ref_el,
+    PkHcrossX = polynomial_set.PolynomialSet(ref_el,
                                              k + 1,
                                              k + 1,
                                              vec_Pkp1.get_expansion_set(),
-                                             PkH_crossx_coeffs)
+                                             PkHCrossX_coeffs)
 
     return polynomial_set.polynomial_set_union_normalized(vec_Pk_from_Pkp1,
-                                                          PkHcrossx)
+                                                          PkHcrossX)
 
 
 def NedelecSpace3D(ref_el, degree):
@@ -84,10 +66,7 @@ def NedelecSpace3D(ref_el, degree):
 
     dimPkp1 = expansions.polynomial_dimension(ref_el, k + 1)
     dimPk = expansions.polynomial_dimension(ref_el, k)
-    if k > 0:
-        dimPkm1 = expansions.polynomial_dimension(ref_el, k - 1)
-    else:
-        dimPkm1 = 0
+    dimPkm1 = expansions.polynomial_dimension(ref_el, k - 1)
 
     vec_Pk_indices = list(chain(*(range(i * dimPkp1, i * dimPkp1 + dimPk)
                                   for i in range(sd))))
@@ -95,7 +74,6 @@ def NedelecSpace3D(ref_el, degree):
 
     vec_Pke_indices = list(chain(*(range(i * dimPkp1 + dimPkm1, i * dimPkp1 + dimPk)
                                    for i in range(sd))))
-
     vec_Pke = vec_Pkp1.take(vec_Pke_indices)
 
     Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
@@ -103,29 +81,12 @@ def NedelecSpace3D(ref_el, degree):
     Q = create_quadrature(ref_el, 2 * (k + 1))
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
-    PkCrossXcoeffs = numpy.zeros((vec_Pke.get_num_members(),
-                                  sd,
-                                  Pkp1.get_num_members()), "d")
-
     Pke_qpts = vec_Pke.tabulate(Qpts)[(0,) * sd]
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
 
-    for i in range(vec_Pke.get_num_members()):
-        for j in range(sd):  # vector components
-            qwts_cur_bf_val = (
-                Qpts[:, (j + 2) % 3] * Pke_qpts[i, (j + 1) % 3, :] -
-                Qpts[:, (j + 1) % 3] * Pke_qpts[i, (j + 2) % 3, :]) * Qwts
-            PkCrossXcoeffs[i, j, :] = numpy.dot(Pkp1_at_Qpts, qwts_cur_bf_val)
-#            for k in range( Pkp1.get_num_members() ):
-#                 PkCrossXcoeffs[i,j,k] = sum( Qwts * cur_bf_val * Pkp1_at_Qpts[k,:] )
-#                for l in range( len( Qpts ) ):
-#                    cur_bf_val = Qpts[l][(j+2)%3] \
-#                                 * Pke_qpts[i,(j+1)%3,l] \
-#                                 - Qpts[l][(j+1)%3] \
-#                                 * Pke_qpts[i,(j+2)%3,l]
-#                    PkCrossXcoeffs[i,j,k] += Qwts[l] \
-#                                             * cur_bf_val \
-#                                             * Pkp1_at_Qpts[k,l]
+    x = Qpts.T
+    PkCrossX_at_Qpts = numpy.cross(Pke_qpts, x[None, :, :], axis=1)
+    PkCrossXcoeffs = numpy.dot(numpy.multiply(PkCrossX_at_Qpts, Qwts), Pkp1_at_Qpts.T)
 
     PkCrossX = polynomial_set.PolynomialSet(ref_el,
                                             k + 1,
@@ -168,9 +129,9 @@ class NedelecDual(dual_set.DualSet):
 
                     for entity in top[dim]:
                         cur = len(nodes)
-                        R = ref_el.compute_tangents(dim, entity)
                         Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                         Jdet = Q.jacobian_determinant()
+                        R = numpy.array(ref_el.compute_tangents(dim, entity))
                         phis = numpy.dot(Phis, R / Jdet)
                         phis = numpy.transpose(phis, (0, 2, 1))
                         nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
@@ -178,7 +139,6 @@ class NedelecDual(dual_set.DualSet):
                         entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         elif variant == "point":
-            interpolant_deg = degree
             for i in top[1]:
                 cur = len(nodes)
                 # points to specify P_k on each edge
@@ -187,7 +147,7 @@ class NedelecDual(dual_set.DualSet):
                              for pt in pts_cur)
                 entity_ids[1][i] = list(range(cur, len(nodes)))
 
-            if sd == 3 and degree > 1:  # face tangents
+            if sd > 2 and degree > 1:  # face tangents
                 for i in top[2]:  # loop over faces
                     cur = len(nodes)
                     pts_cur = ref_el.make_points(2, i, degree + 1)
@@ -201,12 +161,14 @@ class NedelecDual(dual_set.DualSet):
         dim = sd
         phi_deg = degree - dim
         if phi_deg >= 0:
+            if interpolant_deg is None:
+                interpolant_deg = degree
             cur = len(nodes)
             Q = create_quadrature(ref_el, interpolant_deg + phi_deg)
             Pqmd = polynomial_set.ONPolynomialSet(ref_el, phi_deg)
-            Pqmd_at_qpts = Pqmd.tabulate(Q.get_points())[(0,) * dim]
+            Phis = Pqmd.tabulate(Q.get_points())[(0,) * dim]
             nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (dim,))
-                         for d in range(dim) for phi in Pqmd_at_qpts)
+                         for d in range(dim) for phi in Phis)
             entity_ids[dim][0] = list(range(cur, len(nodes)))
 
         super(NedelecDual, self).__init__(nodes, ref_el, entity_ids)

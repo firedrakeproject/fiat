@@ -42,15 +42,14 @@ def RTSpace(ref_el, degree):
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
 
     x = Qpts.T
-    xPkH_at_Qpts = PkH_at_Qpts[:, None, :] * x[None, :, :]
-    PkHx_coeffs = numpy.dot(numpy.multiply(xPkH_at_Qpts, Qwts), Pkp1_at_Qpts.T)
+    PkHx_at_Qpts = PkH_at_Qpts[:, None, :] * x[None, :, :]
+    PkHx_coeffs = numpy.dot(numpy.multiply(PkHx_at_Qpts, Qwts), Pkp1_at_Qpts.T)
 
     PkHx = polynomial_set.PolynomialSet(ref_el,
                                         k,
                                         k + 1,
                                         vec_Pkp1.get_expansion_set(),
                                         PkHx_coeffs)
-
     return polynomial_set.polynomial_set_union_normalized(vec_Pk_from_Pkp1, PkHx)
 
 
