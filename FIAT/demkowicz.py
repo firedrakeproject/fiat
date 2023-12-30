@@ -11,6 +11,8 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.nedelec import Nedelec
 from FIAT.raviart_thomas import RaviartThomas
+from FIAT.reference_element import symmetric_simplex
+from FIAT.fdm_element import sym_eig
 
 
 def as_table(P):
@@ -148,17 +150,103 @@ class DemkowiczDual(dual_set.DualSet):
         phis = as_table(Pkm1.tabulate(Qpts)[(0,) * dim])
 
         new_coeffs = galerkin(1, dtest, phis)
-        U, S, VT = numpy.linalg.svd(new_coeffs)
-        num_sv = len([s for s in S if s > 1E-10])
-        coeffs = VT[:num_sv]
+        u, sig, vt = numpy.linalg.svd(new_coeffs)
+        num_sv = len([s for s in sig if abs(s) > 1.e-10])
+        coeffs = vt[:num_sv]
         return numpy.dot(coeffs, galerkin(1, phis, trial))
+
+
+class FDMDual(dual_set.DualSet):
+
+    def __init__(self, ref_el, degree, sobolev_space):
+        nodes = []
+        entity_ids = {}
+        sd = ref_el.get_spatial_dimension()
+        if sobolev_space == "HCurl":
+            element = N2Curl
+            d = curl
+        elif sobolev_space == "HDiv":
+            element = N2Div
+            d = div
+        else:
+            raise ValueError("Invalid Sobolev space")
+        Ref_el = symmetric_simplex(sd)
+        fe = element(Ref_el, degree)
+        ells = fe.dual_basis()
+        entity_dofs = fe.entity_dofs()
+        self.formdegree = fe.formdegree
+
+        Q = create_quadrature(Ref_el, 2 * degree)
+        X, W = Q.get_points(), Q.get_weights()
+
+        inner = lambda v: numpy.dot(numpy.multiply(v, W), v.T)
+        galerkin = lambda V, dofs: sum(inner(V[k][dofs]) for k in V if sum(k) == 1)
+        V = fe.tabulate(1, X)
+        V1 = d(V)
+        V0 = as_table(V[(0,) * sd])
+
+        for dim in sorted(entity_dofs):
+            entity_ids[dim] = {}
+            for entity in entity_dofs[dim]:
+                entity_ids[dim][entity] = []
+
+            dofs = entity_dofs[dim][0]
+            if len(dofs) > 0:
+                A = galerkin(V1, dofs)
+                B = galerkin(V0, dofs)
+                _, S = sym_eig(A, B)
+                Sinv = numpy.dot(S.T, B)
+
+                Q_dof = ells[dofs[0]].Q
+                Q_ref = Q_dof.reference_rule()
+                Phis = numpy.array([ells[i].f_at_qpts for i in dofs])
+                if dim == sd or self.formdegree == 0:
+                    trace = None
+                else:
+                    trace = "tangential" if sobolev_space == "HCurl" else "normal"
+
+                # apply pushforward
+                Jdet = Q_dof.jacobian_determinant()
+                if trace == "normal":
+                    n = Ref_el.compute_scaled_normal(0) / Jdet
+                    n *= 1 / numpy.dot(n, n)
+                    Phis = numpy.dot(n[None, :], Phis).transpose((1, 0, 2))
+                elif trace == "tangential":
+                    J = Q_dof.jacobian()
+                    Phis = numpy.dot(J.T, Phis).transpose((1, 0, 2))
+                else:
+                    Phis *= Jdet
+
+                shp = Phis.shape
+                Phis = numpy.dot(Sinv, Phis.reshape((Sinv.shape[0], -1))).reshape(shp)
+                for entity in sorted(entity_dofs[dim]):
+                    cur = len(nodes)
+                    Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+                    # apply pullback
+                    Jdet = Q_facet.jacobian_determinant()
+                    if trace == "normal":
+                        n = ref_el.compute_scaled_normal(entity) / Jdet
+                        phis = n[None, :, None] * Phis
+                    elif trace == "tangential":
+                        J = Q_facet.jacobian()
+                        piola_map = numpy.linalg.pinv(J.T)
+                        phis = numpy.dot(piola_map, Phis).transpose((1, 0, 2))
+                    else:
+                        phis = (1 / Jdet) * Phis
+
+                    nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q_facet, phi)
+                                 for phi in phis)
+                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
+
+        super(FDMDual, self).__init__(nodes, ref_el, entity_ids)
 
 
 class N2Curl(finite_element.CiarletElement):
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant=None):
         sd = ref_el.get_spatial_dimension()
-        dual = DemkowiczDual(ref_el, degree, "HCurl")
+        make_dual = FDMDual if variant == "fdm" else DemkowiczDual
+        dual = make_dual(ref_el, degree, "HCurl")
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd,))
         super(N2Curl, self).__init__(poly_set, dual, degree, dual.formdegree,
                                      mapping="covariant piola")
@@ -166,9 +254,10 @@ class N2Curl(finite_element.CiarletElement):
 
 class N2Div(finite_element.CiarletElement):
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant=None):
         sd = ref_el.get_spatial_dimension()
-        dual = DemkowiczDual(ref_el, degree, "HDiv")
+        make_dual = FDMDual if variant == "fdm" else DemkowiczDual
+        dual = make_dual(ref_el, degree, "HDiv")
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd,))
         super(N2Div, self).__init__(poly_set, dual, degree, dual.formdegree,
                                     mapping="contravariant piola")
@@ -176,7 +265,6 @@ class N2Div(finite_element.CiarletElement):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    from FIAT.reference_element import symmetric_simplex
     dim = 3
     degree = 7
     ref_el = symmetric_simplex(dim)
@@ -185,8 +273,9 @@ if __name__ == "__main__":
     inner = lambda v, u: numpy.dot(numpy.multiply(v, Qwts), u.T)
     galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
 
-    d, fe = curl, N2Curl(ref_el, degree)
-    # d, fe = div, N2Div(ref_el, degree)
+    variant = "fdm"
+    d, fe = curl, N2Curl(ref_el, degree, variant)
+    # d, fe = div, N2Div(ref_el, degree, variant)
 
     phi = fe.tabulate(1, Qpts)
     dphi = d(phi)
