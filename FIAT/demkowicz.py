@@ -37,7 +37,8 @@ def curl(table_u):
     for k, (i, j) in enumerate(indices):
         s = (-1)**k
         curl_u[:, k, :] = s*grad_u[i][:, j, :] - s*grad_u[j][:, i, :]
-    return as_table(curl_u)
+    new_table = as_table(curl_u)
+    return new_table
 
 
 def div(table_u):
@@ -48,7 +49,8 @@ def div(table_u):
     nbfs, *_, npts = grad_u[0].shape
     div_u = numpy.empty((nbfs, 1, npts), "d")
     div_u[:, 0, :] = sum(grad_u[i][:, i, :] for i in range(len(grad_u)))
-    return as_table(div_u)
+    new_table = as_table(div_u)
+    return new_table
 
 
 class DemkowiczDual(dual_set.DualSet):
@@ -67,12 +69,10 @@ class DemkowiczDual(dual_set.DualSet):
                     entity_ids[dim][entity] = []
             else:
                 Q_ref, Phis = self._reference_duals(ref_el, dim, degree, sobolev_space)
-                if dim == sd:
+                if dim == sd or self.formdegree == 0:
                     trace = None
                 else:
                     trace = "tangential" if sobolev_space == "HCurl" else "normal"
-                if trace == "tangential":
-                    Phis = numpy.transpose(Phis, (0, 2, 1))
 
                 for entity in top[dim]:
                     cur = len(nodes)
@@ -84,8 +84,7 @@ class DemkowiczDual(dual_set.DualSet):
                     elif trace == "tangential":
                         J = Q.jacobian()
                         piola_map = numpy.linalg.pinv(J.T)
-                        phis = numpy.dot(Phis, piola_map.T)
-                        phis = numpy.transpose(phis, (0, 2, 1))
+                        phis = numpy.dot(piola_map, Phis).transpose((1, 0, 2))
                     else:
                         phis = Phis
                     nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
@@ -103,63 +102,56 @@ class DemkowiczDual(dual_set.DualSet):
             return Q, duals
 
         Qpts, Qwts = Q.get_points(), Q.get_weights()
-        inner = lambda v, u: numpy.dot(numpy.multiply(v, Qwts), u.T)
-        galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
         P = polynomial_set.ONPolynomialSet(facet, degree, (dim,))
         P_table = P.tabulate(Qpts, 1)
+        trial = as_table(P_table[(0,) * dim])
+
+        rot = sobolev_space == "HDiv"
+        dtrial = div(P_table) if rot else curl(P_table)
 
         if self.formdegree == 1:
-            B = polynomial_set.make_bubbles(facet, degree+1)
-            grad_basis = B.tabulate(Qpts, 1)
-
-            if sobolev_space == "HCurl":
-                curl_coeffs, curl_basis = self.exterior_derivative_bubbles(facet, degree, 1, Qpts, galerkin)
-                K1 = numpy.dot(curl_coeffs, galerkin(1, curl_basis, curl(P_table)))
-
-            elif sobolev_space == "HDiv":
-                # Swap grad -> rot, and curl -> div
-                grad_basis[(1, 0)], grad_basis[(0, 1)] = grad_basis[(0, 1)], -grad_basis[(1, 0)]
-                div_coeffs, div_basis = self.exterior_derivative_bubbles(facet, degree, 2, Qpts, galerkin)
-                K1 = numpy.dot(div_coeffs, galerkin(1, div_basis, div(P_table)))
-            else:
-                raise ValueError("Invalid Sobolev space")
-
-            K0 = galerkin(1, grad_basis, as_table(P_table[(0,) * dim]))
-            K = numpy.vstack((K0, K1))
-
+            K0 = self._bubble_moments(facet, degree+1, 0, Qpts, Qwts, trial, rot=rot)
+            K1 = self._bubble_moments(facet, degree, 1 + rot, Qpts, Qwts, dtrial)
         elif self.formdegree == 2:
-            curl_coeffs, curl_basis = self.exterior_derivative_bubbles(facet, degree+1, 1, Qpts, galerkin)
-            K1 = numpy.dot(curl_coeffs, galerkin(1, curl_basis, as_table(P_table[(0,) * dim])))
-
-            div_coeffs, div_basis = self.exterior_derivative_bubbles(facet, degree, 2, Qpts, galerkin)
-            K2 = numpy.dot(div_coeffs, galerkin(1, div_basis, div(P_table)))
-            K = numpy.vstack((K1, K2))
+            K0 = self._bubble_moments(facet, degree+1, 1, Qpts, Qwts, trial)
+            K1 = self._bubble_moments(facet, degree, 2, Qpts, Qwts, dtrial)
         else:
             raise ValueError("Invalid form degree")
 
+        K = numpy.vstack((K0, K1))
         duals = P_table[(0,) * dim]
         shp = (-1, ) + duals.shape[1:]
         duals = numpy.dot(K, duals.reshape((K.shape[1], -1))).reshape(shp)
         return Q, duals
 
-    def exterior_derivative_bubbles(self, facet, degree, formdegree, Qpts, galerkin):
+    def _bubble_moments(self, facet, degree, formdegree, Qpts, Qwts, trial, rot=False):
+        inner = lambda v, u: numpy.dot(numpy.multiply(v, Qwts), u.T)
+        galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
+
         dim = facet.get_spatial_dimension()
+        element = (None, Nedelec, RaviartThomas)[formdegree]
+        if element is None:
+            B = polynomial_set.make_bubbles(facet, degree)
+        else:
+            fe = element(facet, degree)
+            B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
+
+        d = (grad, curl, div)[formdegree]
+        dtest = d(B.tabulate(Qpts, 1))
+        if rot:
+            dtest[(1, 0)], dtest[(0, 1)] = dtest[(0, 1)], -dtest[(1, 0)]
+        # if formdegree == 0:
+        #     return galerkin(1, dtest, trial)
+
         comp = (dim, dim*(dim-1)//2, 1)[formdegree]
         Pkm1 = polynomial_set.ONPolynomialSet(facet, degree-1, (comp,))
-        basis = as_table(Pkm1.tabulate(Qpts)[(0,) * dim])
+        phis = as_table(Pkm1.tabulate(Qpts)[(0,) * dim])
 
-        family = (None, Nedelec, RaviartThomas)[formdegree]
-        d = (grad, curl, div)[formdegree]
-
-        N1 = family(facet, degree)
-        B = N1.get_nodal_basis().take(N1.entity_dofs()[dim][0])
-        dB = d(B.tabulate(Qpts, 1))
-
-        new_coeffs = galerkin(1, dB, basis)
+        new_coeffs = galerkin(1, dtest, phis)
         U, S, VT = numpy.linalg.svd(new_coeffs)
         num_sv = len([s for s in S if s > 1E-10])
         coeffs = VT[:num_sv]
-        return coeffs, basis
+        return numpy.dot(coeffs, galerkin(1, phis, trial))
 
 
 class N2Curl(finite_element.CiarletElement):
@@ -198,14 +190,13 @@ if __name__ == "__main__":
 
     phi = fe.tabulate(1, Qpts)
     dphi = d(phi)
-    A = galerkin(1, dphi, dphi)
-    A[abs(A) < 1E-10] = 0.0
+    stiff = galerkin(1, dphi, dphi)
 
     phi_table = as_table(phi[(0,) * dim])
-    B = galerkin(1, phi_table, phi_table)
-    B[abs(B) < 1E-10] = 0.0
+    mass = galerkin(1, phi_table, phi_table)
 
-    # A = B
+    A = numpy.hstack([stiff, mass])
+    A[abs(A) < 1E-10] = 0.0
     plt.spy(A, markersize=0)
     plt.pcolor(numpy.log(abs(A)))
     plt.show()

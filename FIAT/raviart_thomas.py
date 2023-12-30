@@ -77,7 +77,6 @@ class RTDualSet(dual_set.DualSet):
             Q_ref = create_quadrature(facet, interpolant_deg + degree - 1)
             Pq = polynomial_set.ONPolynomialSet(facet, degree - 1)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
-
             for f in top[sd - 1]:
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
