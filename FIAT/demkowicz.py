@@ -7,12 +7,12 @@
 from FIAT import (polynomial_set, dual_set,
                   finite_element, functional)
 import numpy
+import scipy
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.nedelec import Nedelec
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.reference_element import symmetric_simplex
-from FIAT.fdm_element import sym_eig
 
 
 def as_table(P):
@@ -64,7 +64,7 @@ class DemkowiczDual(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         self.formdegree = 1 if sobolev_space == "HCurl" else sd - 1
 
-        for dim in top:
+        for dim in sorted(top):
             entity_ids[dim] = {}
             if dim < self.formdegree or degree < dim:
                 for entity in top[dim]:
@@ -76,7 +76,7 @@ class DemkowiczDual(dual_set.DualSet):
                 else:
                     trace = "tangential" if sobolev_space == "HCurl" else "normal"
 
-                for entity in top[dim]:
+                for entity in sorted(top[dim]):
                     cur = len(nodes)
                     Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                     if trace == "normal":
@@ -194,18 +194,19 @@ class FDMDual(dual_set.DualSet):
             if len(dofs) > 0:
                 A = galerkin(V1, dofs)
                 B = galerkin(V0, dofs)
-                _, S = sym_eig(A, B)
-                Sinv = numpy.dot(S.T, B)
+                A += B
+                _, S = scipy.linalg.eigh(B, A)
+                Sinv = numpy.dot(S.T, A)
 
                 Q_dof = ells[dofs[0]].Q
                 Q_ref = Q_dof.reference_rule()
-                Phis = numpy.array([ells[i].f_at_qpts for i in dofs])
                 if dim == sd or self.formdegree == 0:
                     trace = None
                 else:
                     trace = "tangential" if sobolev_space == "HCurl" else "normal"
 
                 # apply pushforward
+                Phis = numpy.array([ells[i].f_at_qpts for i in dofs])
                 Jdet = Q_dof.jacobian_determinant()
                 if trace == "normal":
                     n = Ref_el.compute_scaled_normal(0) / Jdet
@@ -217,14 +218,28 @@ class FDMDual(dual_set.DualSet):
                 else:
                     Phis *= Jdet
 
-                shp = Phis.shape
-                Phis = numpy.dot(Sinv, Phis.reshape((Sinv.shape[0], -1))).reshape(shp)
+                Phis = numpy.dot(Sinv, Phis.reshape((Sinv.shape[0], -1))).reshape(Phis.shape)
+
                 for entity in sorted(entity_dofs[dim]):
                     cur = len(nodes)
                     Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                     # apply pullback
                     Jdet = Q_facet.jacobian_determinant()
                     if trace == "normal":
+                        if entity != 0:
+                            # FIXME need to figure out correct transformation
+                            dofs = entity_dofs[dim][entity]
+                            A = galerkin(V1, dofs)
+                            B = galerkin(V0, dofs)
+                            A += B
+                            _, S = scipy.linalg.eigh(B, A)
+                            Sinv = numpy.dot(S.T, A)
+                            Phis = numpy.array([ells[i].f_at_qpts for i in dofs])
+                            n = Ref_el.compute_scaled_normal(entity) / Q_dof.jacobian_determinant()
+                            n *= 1 / numpy.dot(n, n)
+                            Phis = numpy.dot(n[None, :], Phis).transpose((1, 0, 2))
+                            Phis = numpy.dot(Sinv, Phis.reshape((Sinv.shape[0], -1))).reshape(Phis.shape)
+
                         n = ref_el.compute_scaled_normal(entity) / Jdet
                         phis = n[None, :, None] * Phis
                     elif trace == "tangential":
@@ -274,8 +289,9 @@ if __name__ == "__main__":
     galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
 
     variant = "fdm"
-    d, fe = curl, N2Curl(ref_el, degree, variant)
-    # d, fe = div, N2Div(ref_el, degree, variant)
+    # variant = None
+    # d, fe = curl, N2Curl(ref_el, degree, variant)
+    d, fe = div, N2Div(ref_el, degree, variant)
 
     phi = fe.tabulate(1, Qpts)
     dphi = d(phi)
