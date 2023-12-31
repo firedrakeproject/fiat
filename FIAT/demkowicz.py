@@ -34,13 +34,12 @@ def curl(table_u):
     nbfs, *_, npts = grad_u[0].shape
     d = len(grad_u)
     ncomp = (d * (d - 1)) // 2
-    indices = ((i, j) for i in range(d) for j in range(i+1, d))
-    curl_u = numpy.empty((nbfs, ncomp, npts), "d")
+    indices = ((i, j) for i in reversed(range(d)) for j in reversed(range(i+1, d)))
+    curl_u = numpy.empty((nbfs, ncomp, npts), grad_u[0].dtype)
     for k, (i, j) in enumerate(indices):
         s = (-1)**k
-        curl_u[:, k, :] = s*grad_u[i][:, j, :] - s*grad_u[j][:, i, :]
-    new_table = as_table(curl_u)
-    return new_table
+        curl_u[:, k, :] = s*grad_u[j][:, i, :] - s*grad_u[i][:, j, :]
+    return as_table(curl_u)
 
 
 def div(table_u):
@@ -51,8 +50,7 @@ def div(table_u):
     nbfs, *_, npts = grad_u[0].shape
     div_u = numpy.empty((nbfs, 1, npts), "d")
     div_u[:, 0, :] = sum(grad_u[i][:, i, :] for i in range(len(grad_u)))
-    new_table = as_table(div_u)
-    return new_table
+    return as_table(div_u)
 
 
 class DemkowiczDual(dual_set.DualSet):
@@ -88,7 +86,8 @@ class DemkowiczDual(dual_set.DualSet):
                         piola_map = numpy.linalg.pinv(J.T)
                         phis = numpy.dot(piola_map, Phis).transpose((1, 0, 2))
                     else:
-                        phis = Phis
+                        Jdet = Q.jacobian_determinant()
+                        phis = Phis / Jdet
                     nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                                  for phi in phis)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
@@ -97,6 +96,7 @@ class DemkowiczDual(dual_set.DualSet):
 
     def _reference_duals(self, ref_el, dim, degree, sobolev_space):
         facet = ref_el.construct_subelement(dim)
+        # facet = symmetric_simplex(dim)
         Q = create_quadrature(facet, 2 * degree)
         if dim == self.formdegree:
             P = polynomial_set.ONPolynomialSet(facet, degree, (1,))
@@ -108,19 +108,14 @@ class DemkowiczDual(dual_set.DualSet):
         P_table = P.tabulate(Qpts, 1)
         trial = as_table(P_table[(0,) * dim])
 
-        rot = sobolev_space == "HDiv"
-        dtrial = div(P_table) if rot else curl(P_table)
+        fd = self.formdegree
+        rot = fd == 1 and sobolev_space == "HDiv"
+        dtrial = div(P_table) if sobolev_space == "HDiv" else curl(P_table)
 
-        if self.formdegree == 1:
-            K0 = self._bubble_moments(facet, degree+1, 0, Qpts, Qwts, trial, rot=rot)
-            K1 = self._bubble_moments(facet, degree, 1 + rot, Qpts, Qwts, dtrial)
-        elif self.formdegree == 2:
-            K0 = self._bubble_moments(facet, degree+1, 1, Qpts, Qwts, trial)
-            K1 = self._bubble_moments(facet, degree, 2, Qpts, Qwts, dtrial)
-        else:
-            raise ValueError("Invalid form degree")
-
+        K0 = self._bubble_moments(facet, degree+1, fd-1, Qpts, Qwts, trial, rot=rot)
+        K1 = self._bubble_moments(facet, degree, fd, Qpts, Qwts, dtrial)
         K = numpy.vstack((K0, K1))
+
         duals = P_table[(0,) * dim]
         shp = (-1, ) + duals.shape[1:]
         duals = numpy.dot(K, duals.reshape((K.shape[1], -1))).reshape(shp)
@@ -131,6 +126,12 @@ class DemkowiczDual(dual_set.DualSet):
         galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
 
         dim = facet.get_spatial_dimension()
+        if formdegree >= dim - 1:
+            Pkm1 = polynomial_set.ONPolynomialSet(facet, degree-1, (1,))
+            P0 = Pkm1.take(list(range(1, Pkm1.get_num_members())))
+            dtest = as_table(P0.tabulate(Qpts)[(0,) * dim])
+            return galerkin(1, dtest, trial)
+
         element = (None, Nedelec, RaviartThomas)[formdegree]
         if element is None:
             B = polynomial_set.make_bubbles(facet, degree)
@@ -141,19 +142,15 @@ class DemkowiczDual(dual_set.DualSet):
         d = (grad, curl, div)[formdegree]
         dtest = d(B.tabulate(Qpts, 1))
         if rot:
+            assert dim == 2
             dtest[(1, 0)], dtest[(0, 1)] = dtest[(0, 1)], -dtest[(1, 0)]
-        # if formdegree == 0:
-        #     return galerkin(1, dtest, trial)
 
-        comp = (dim, dim*(dim-1)//2, 1)[formdegree]
-        Pkm1 = polynomial_set.ONPolynomialSet(facet, degree-1, (comp,))
-        phis = as_table(Pkm1.tabulate(Qpts)[(0,) * dim])
-
-        new_coeffs = galerkin(1, dtest, phis)
-        u, sig, vt = numpy.linalg.svd(new_coeffs)
-        num_sv = len([s for s in sig if abs(s) > 1.e-10])
-        coeffs = vt[:num_sv]
-        return numpy.dot(coeffs, galerkin(1, phis, trial))
+        A = galerkin(1, dtest, dtest)
+        sig, S = scipy.linalg.eigh(A)
+        ind = abs(sig) > 1.e-10
+        S = S[:, ind]
+        S = S * numpy.sqrt(1 / sig[None, ind])
+        return numpy.dot(S.T, galerkin(1, dtest, trial))
 
 
 class FDMDual(dual_set.DualSet):
@@ -170,6 +167,7 @@ class FDMDual(dual_set.DualSet):
             d = div
         else:
             raise ValueError("Invalid Sobolev space")
+
         Ref_el = symmetric_simplex(sd)
         fe = element(Ref_el, degree)
         ells = fe.dual_basis()
@@ -194,9 +192,8 @@ class FDMDual(dual_set.DualSet):
             if len(dofs) > 0:
                 A = galerkin(V1, dofs)
                 B = galerkin(V0, dofs)
-                A += B
-                _, S = scipy.linalg.eigh(B, A)
-                Sinv = numpy.dot(S.T, A)
+                _, S = scipy.linalg.eigh(A, B)
+                Sinv = numpy.dot(S.T, B)
 
                 Q_dof = ells[dofs[0]].Q
                 Q_ref = Q_dof.reference_rule()
@@ -226,20 +223,6 @@ class FDMDual(dual_set.DualSet):
                     # apply pullback
                     Jdet = Q_facet.jacobian_determinant()
                     if trace == "normal":
-                        if entity != 0:
-                            # FIXME need to figure out correct transformation
-                            dofs = entity_dofs[dim][entity]
-                            A = galerkin(V1, dofs)
-                            B = galerkin(V0, dofs)
-                            A += B
-                            _, S = scipy.linalg.eigh(B, A)
-                            Sinv = numpy.dot(S.T, A)
-                            Phis = numpy.array([ells[i].f_at_qpts for i in dofs])
-                            n = Ref_el.compute_scaled_normal(entity) / Q_dof.jacobian_determinant()
-                            n *= 1 / numpy.dot(n, n)
-                            Phis = numpy.dot(n[None, :], Phis).transpose((1, 0, 2))
-                            Phis = numpy.dot(Sinv, Phis.reshape((Sinv.shape[0], -1))).reshape(Phis.shape)
-
                         n = ref_el.compute_scaled_normal(entity) / Jdet
                         phis = n[None, :, None] * Phis
                     elif trace == "tangential":
@@ -281,7 +264,7 @@ class N2Div(finite_element.CiarletElement):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     dim = 3
-    degree = 7
+    degree = 5
     ref_el = symmetric_simplex(dim)
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
@@ -292,7 +275,6 @@ if __name__ == "__main__":
     # variant = None
     # d, fe = curl, N2Curl(ref_el, degree, variant)
     d, fe = div, N2Div(ref_el, degree, variant)
-
     phi = fe.tabulate(1, Qpts)
     dphi = d(phi)
     stiff = galerkin(1, dphi, dphi)
