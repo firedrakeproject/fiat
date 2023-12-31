@@ -261,5 +261,10 @@ def make_bubbles(ref_el, degree, shape=()):
             for alpha in mis(dim, p):
                 if alpha[0] > 1 and min(alpha[1:]) > 0:
                     indices.append(idx(*alpha))
+
+    if shape != ():
+        ncomp = numpy.prod(shape)
+        dimPk = poly_set.get_num_members() // ncomp
+        indices = list((numpy.array(indices)[:, None] + dimPk * numpy.arange(ncomp)[None, :]).flat)
     poly_set = poly_set.take(indices)
     return poly_set
