@@ -9,81 +9,61 @@ from FIAT import (finite_element, functional, dual_set,
                   polynomial_set, nedelec)
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.quadrature import FacetQuadratureRule
 
 
 class BDMDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, interpolant_deg):
-
-        # Initialize containers for map: mesh_entity -> dof number and
-        # dual basis
-        entity_ids = {}
         nodes = []
-
         sd = ref_el.get_spatial_dimension()
-        t = ref_el.get_topology()
+        top = ref_el.get_topology()
+
+        entity_ids = {}
+        # set to empty
+        for dim in top:
+            entity_ids[dim] = {}
+            for entity in top[dim]:
+                entity_ids[dim][entity] = []
 
         if variant == "integral":
             facet = ref_el.get_facet_element()
-            # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
-            # degree is q - 1
-            Q = create_quadrature(facet, interpolant_deg + degree)
+            # Facet nodes are \int_F v\cdot n p ds where p \in P_{q}
+            # degree is q
+            Q_ref = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
-            Pq_at_qpts = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
-            nodes.extend(functional.IntegralMomentOfScaledNormalEvaluation(ref_el, Q, phi, f)
-                         for f in range(len(t[sd - 1]))
-                         for phi in Pq_at_qpts)
-
-            # internal nodes
-            if degree > 1:
-                Q = create_quadrature(ref_el, interpolant_deg + degree - 1)
-                qpts = Q.get_points()
-                Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
-                Nedfs = Nedel.get_nodal_basis()
-                Ned_at_qpts = Nedfs.tabulate(qpts)[(0,) * sd]
+            Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
+            for f in top[sd - 1]:
+                cur = len(nodes)
+                Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
+                Jdet = Q.jacobian_determinant()
+                n = ref_el.compute_scaled_normal(f) / Jdet
+                phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                             for phi in Ned_at_qpts)
+                             for phi in phis)
+                entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
 
         elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
-            for i in range(len(t[sd - 1])):
-                pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
-                nodes.extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
+            for f in top[sd - 1]:
+                cur = len(nodes)
+                pts_cur = ref_el.make_points(sd - 1, f, sd + degree)
+                nodes.extend(functional.PointScaledNormalEvaluation(ref_el, f, pt)
                              for pt in pts_cur)
+                entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
 
-            # internal nodes
-            if degree > 1:
-                Q = create_quadrature(ref_el, 2 * degree - 1)
-                qpts = Q.get_points()
-                Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
-                Nedfs = Nedel.get_nodal_basis()
-                Ned_at_qpts = Nedfs.tabulate(qpts)[(0,) * sd]
-                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                             for phi in Ned_at_qpts)
-
-        # sets vertices (and in 3d, edges) to have no nodes
-        for i in range(sd - 1):
-            entity_ids[i] = {}
-            for j in range(len(t[i])):
-                entity_ids[i][j] = []
-
-        cur = 0
-
-        # set codimension 1 (edges 2d, faces 3d) dof
-        pts_facet_0 = ref_el.make_points(sd - 1, 0, sd + degree)
-        pts_per_facet = len(pts_facet_0)
-
-        entity_ids[sd - 1] = {}
-        for i in range(len(t[sd - 1])):
-            entity_ids[sd - 1][i] = list(range(cur, cur + pts_per_facet))
-            cur += pts_per_facet
-
-        # internal nodes, if applicable
-        entity_ids[sd] = {0: []}
-
+        # internal nodes
         if degree > 1:
-            num_internal_nodes = len(Ned_at_qpts)
-            entity_ids[sd][0] = list(range(cur, cur + num_internal_nodes))
+            if interpolant_deg is None:
+                interpolant_deg = degree
+            cur = len(nodes)
+            Q = create_quadrature(ref_el, interpolant_deg + degree - 1)
+            Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
+            Nedfs = Nedel.get_nodal_basis()
+            Ned_at_qpts = Nedfs.tabulate(Q.get_points())[(0,) * sd]
+            nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
+                         for phi in Ned_at_qpts)
+            entity_ids[sd][0] = list(range(cur, len(nodes)))
 
         super(BDMDualSet, self).__init__(nodes, ref_el, entity_ids)
 
