@@ -16,6 +16,7 @@ from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
+from FIAT import demkowicz
 
 
 class NedelecSecondKindDual(DualSet):
@@ -191,27 +192,18 @@ class NedelecSecondKind(CiarletElement):
     interpolation.
     """
 
-    def __init__(self, cell, degree, variant=None):
+    def __init__(self, ref_el, degree, variant=None):
+        if degree < 1:
+            raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
 
-        variant, interpolant_deg = check_format_variant(variant, degree)
-
-        # Check degree
-        assert degree >= 1, "Second kind Nedelecs start at 1!"
-
-        # Get dimension
-        d = cell.get_spatial_dimension()
-
-        # Construct polynomial basis for d-vector fields
-        Ps = ONPolynomialSet(cell, degree, (d, ))
-
-        # Construct dual space
-        Ls = NedelecSecondKindDual(cell, degree, variant, interpolant_deg)
-
-        # Set form degree
+        sd = ref_el.get_spatial_dimension()
+        poly_set = ONPolynomialSet(ref_el, degree, (sd, ))
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl")
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "HCurl", type(self))
+        else:
+            variant, interpolant_deg = check_format_variant(variant, degree)
+            dual = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg)
         formdegree = 1  # 1-form
-
-        # Set mapping
-        mapping = "covariant piola"
-
-        # Call init of super-class
-        super(NedelecSecondKind, self).__init__(Ps, Ls, degree, formdegree, mapping=mapping)
+        super(NedelecSecondKind, self).__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")

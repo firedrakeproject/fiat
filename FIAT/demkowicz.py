@@ -4,8 +4,7 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from FIAT import (polynomial_set, dual_set,
-                  finite_element, functional)
+from FIAT import polynomial_set, dual_set, functional
 import numpy
 import scipy
 from FIAT.quadrature_schemes import create_quadrature
@@ -61,22 +60,22 @@ class DemkowiczDual(dual_set.DualSet):
         entity_ids = {}
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
-        self.formdegree = {"H1": 0, "HCurl": 1, "HDiv": sd-1, "L2": sd}[sobolev_space]
+        formdegree = {"H1": 0, "HCurl": 1, "HDiv": sd-1, "L2": sd}[sobolev_space]
 
         for dim in sorted(top):
             entity_ids[dim] = {}
-            if dim < self.formdegree or degree < dim:
+            if dim < formdegree or degree <= dim - formdegree:
                 for entity in top[dim]:
                     entity_ids[dim][entity] = []
-            elif dim == 0 and self.formdegree == 0:
+            elif dim == 0 and formdegree == 0:
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
                     pts = ref_el.make_points(dim, entity, degree)
                     nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
             else:
-                Q_ref, Phis = self._reference_duals(dim, degree, sobolev_space)
-                if dim == sd or self.formdegree == 0:
+                Q_ref, Phis = self._reference_duals(dim, degree, formdegree, sobolev_space)
+                if dim == sd or formdegree == 0:
                     trace = None
                 else:
                     trace = "tangential" if sobolev_space == "HCurl" else "normal"
@@ -100,29 +99,28 @@ class DemkowiczDual(dual_set.DualSet):
 
         super(DemkowiczDual, self).__init__(nodes, ref_el, entity_ids)
 
-    def _reference_duals(self, dim, degree, sobolev_space):
+    def _reference_duals(self, dim, degree, formdegree, sobolev_space):
         facet = symmetric_simplex(dim)
         Q = create_quadrature(facet, 2 * degree)
-        if dim == self.formdegree:
+        if dim == formdegree:
             P = polynomial_set.ONPolynomialSet(facet, degree, (1,))
             duals = P.tabulate(Q.get_points())[(0,) * dim]
             return Q, duals
 
         Qpts, Qwts = Q.get_points(), Q.get_weights()
-        fd = self.formdegree
-        shp = () if fd == 0 else (dim,)
+        shp = () if formdegree == 0 else (dim,)
         P = polynomial_set.ONPolynomialSet(facet, degree, shp)
         P_table = P.tabulate(Qpts, 1)
         if sobolev_space == "H1":
             dtrial = grad(P_table)
-            K = self._bubble_moments(facet, degree, fd, Qpts, Qwts, dtrial)
+            K = self._bubble_moments(facet, degree, formdegree, Qpts, Qwts, dtrial)
         else:
-            rot = fd == 1 and sobolev_space == "HDiv"
+            rot = formdegree == 1 and sobolev_space == "HDiv"
             trial = as_table(P_table[(0,) * dim])
             dtrial = div(P_table) if sobolev_space == "HDiv" else curl(P_table)
-            K0 = self._bubble_moments(facet, degree+1, fd-1, Qpts, Qwts, trial, rot=rot)
-            K1 = self._bubble_moments(facet, degree, fd, Qpts, Qwts, dtrial)
-            K = numpy.vstack((K0, K1))
+            K1 = self._bubble_moments(facet, degree, formdegree, Qpts, Qwts, dtrial)
+            K2 = self._bubble_moments(facet, degree+1, formdegree-1, Qpts, Qwts, trial, rot=rot)
+            K = numpy.vstack((K1, K2))
 
         duals = P_table[(0,) * dim]
         shp = (-1, ) + duals.shape[1:]
@@ -163,20 +161,21 @@ class DemkowiczDual(dual_set.DualSet):
 
 class FDMDual(dual_set.DualSet):
 
-    def __init__(self, ref_el, degree, sobolev_space):
+    def __init__(self, ref_el, degree, sobolev_space, element):
         nodes = []
         entity_ids = {}
-        element, d = {"H1": (CG, grad),
-                      "HCurl": (N2Curl, curl),
-                      "HDiv": (N2Div, div),
-                      }[sobolev_space]
+        d = {"H1": grad,
+             "HCurl": curl,
+             "HDiv": div,
+             }[sobolev_space]
 
         sd = ref_el.get_spatial_dimension()
         Ref_el = symmetric_simplex(sd)
-        fe = element(Ref_el, degree)
+
+        fe = element(Ref_el, degree, variant="demkowicz")
         ells = fe.dual_basis()
         entity_dofs = fe.entity_dofs()
-        self.formdegree = fe.formdegree
+        formdegree = fe.formdegree
 
         Q = create_quadrature(Ref_el, 2 * degree)
         X, W = Q.get_points(), Q.get_weights()
@@ -189,7 +188,7 @@ class FDMDual(dual_set.DualSet):
 
         for dim in sorted(entity_dofs):
             entity_ids[dim] = {}
-            if dim == 0 and self.formdegree == 0:
+            if dim == 0 and formdegree == 0:
                 for entity in sorted(entity_dofs[dim]):
                     cur = len(nodes)
                     pts = ref_el.make_points(dim, entity, degree)
@@ -205,14 +204,14 @@ class FDMDual(dual_set.DualSet):
             A = galerkin(V1, dofs)
             B = galerkin(V0, dofs)
             nullspace = [i for i, a in enumerate(A.diagonal()) if a < 1E-10]
-            if len(nullspace) == 0:
-                A, B = B, A
-            _, S = scipy.linalg.eigh(A, B)
-            Sinv = numpy.dot(S.T, B)
+            if len(nullspace) > 0:
+                A += B
+            _, S = scipy.linalg.eigh(B, A)
+            Sinv = numpy.dot(S.T, A)
 
             Q_dof = ells[dofs[0]].Q
             Q_ref = Q_dof.reference_rule()
-            if dim == sd or self.formdegree == 0:
+            if dim == sd or formdegree == 0:
                 trace = None
             else:
                 trace = "tangential" if sobolev_space == "HCurl" else "normal"
@@ -248,56 +247,28 @@ class FDMDual(dual_set.DualSet):
                     phis = (1 / Jdet) * Phis
 
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q_facet, phi)
-                             for phi in reversed(phis))
+                             for phi in phis)
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         super(FDMDual, self).__init__(nodes, ref_el, entity_ids)
 
 
-class CG(finite_element.CiarletElement):
-
-    def __init__(self, ref_el, degree, variant=None):
-        make_dual = FDMDual if variant == "fdm" else DemkowiczDual
-        dual = make_dual(ref_el, degree, "H1")
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
-        super(CG, self).__init__(poly_set, dual, degree, dual.formdegree,
-                                 mapping="affine")
-
-
-class N2Curl(finite_element.CiarletElement):
-
-    def __init__(self, ref_el, degree, variant=None):
-        sd = ref_el.get_spatial_dimension()
-        make_dual = FDMDual if variant == "fdm" else DemkowiczDual
-        dual = make_dual(ref_el, degree, "HCurl")
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd,))
-        super(N2Curl, self).__init__(poly_set, dual, degree, dual.formdegree,
-                                     mapping="covariant piola")
-
-
-class N2Div(finite_element.CiarletElement):
-
-    def __init__(self, ref_el, degree, variant=None):
-        sd = ref_el.get_spatial_dimension()
-        make_dual = FDMDual if variant == "fdm" else DemkowiczDual
-        dual = make_dual(ref_el, degree, "HDiv")
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd,))
-        super(N2Div, self).__init__(poly_set, dual, degree, dual.formdegree,
-                                    mapping="contravariant piola")
-
-
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    from FIAT import IntegratedLegendre as CG
+    from FIAT import NedelecSecondKind as N2Curl
+    from FIAT import BrezziDouglasMarini as N2Div
+
     dim = 3
     degree = 7
     ref_el = symmetric_simplex(dim)
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
     inner = lambda v, u: numpy.dot(numpy.multiply(v, Qwts), u.T)
-    galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
+    galerkin = lambda V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == 1)
 
     variant = "fdm"
-    # variant = None
+    # variant = "demkowicz"
     spaces = ("H1", "HCurl", "HDiv")
 
     space_dict = {"H1": (CG, grad),
@@ -312,10 +283,10 @@ if __name__ == "__main__":
         fe = element(ref_el, degree, variant)
         phi = fe.tabulate(1, Qpts)
         dphi = d(phi)
-        stiff = galerkin(1, dphi, dphi)
+        stiff = galerkin(dphi, dphi)
 
         phi_table = as_table(phi[(0,) * dim])
-        mass = galerkin(1, phi_table, phi_table)
+        mass = galerkin(phi_table, phi_table)
 
         mats = (stiff, mass)
         title = f"{type(fe).__name__}({degree})"
