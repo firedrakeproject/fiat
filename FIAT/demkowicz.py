@@ -37,6 +37,10 @@ def div(table_u):
     return div_u
 
 
+def inner(v, u, Qwts):
+    return numpy.tensordot(numpy.multiply(v, Qwts), u, axes=(range(1, v.ndim), range(1, u.ndim)))
+
+
 def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
     Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
     if mapping == "normal":
@@ -114,15 +118,13 @@ class DemkowiczDual(DualSet):
             K = numpy.vstack((K, M))
 
         duals = P_at_qpts[(0,) * dim]
-        shp = (-1, ) + duals.shape[1:]
-        duals = numpy.dot(K, duals.reshape((K.shape[1], -1))).reshape(shp)
+        duals = numpy.dot(K, duals.reshape((K.shape[1], -1))).reshape((-1,) + duals.shape[1:])
         return Q, duals
 
     def _bubble_derivative_moments(self, facet, degree, formdegree, Qpts, Qwts, trial):
         """Integrate trial expressions against an orthonormal basis for
            the exterior derivative of bubbles.
         """
-        inner = lambda v, u: numpy.tensordot(numpy.multiply(v, Qwts), u, axes=(range(1, v.ndim), range(1, u.ndim)))
 
         dim = facet.get_spatial_dimension()
         if formdegree >= dim - 1:
@@ -131,7 +133,7 @@ class DemkowiczDual(DualSet):
             Pkm1 = ONPolynomialSet(facet, degree-1, trial.shape[1:-1])
             P0 = Pkm1.take(list(range(1, Pkm1.get_num_members())))
             dtest = P0.tabulate(Qpts)[(0,) * dim]
-            return inner(dtest, trial)
+            return inner(dtest, trial, Qwts)
 
         # Get bubbles
         element = (None, Nedelec, RaviartThomas)[formdegree]
@@ -144,14 +146,14 @@ class DemkowiczDual(DualSet):
         d = (grad, curl, div)[formdegree]
         dtest = d(B.tabulate(Qpts, 1))
         # Build an orthonormal basis, remove nullspace
-        A = inner(dtest, dtest)
+        A = inner(dtest, dtest, Qwts)
         sig, S = scipy.linalg.eigh(A)
         nullspace_dim = len([s for s in sig if abs(s) <= 1.e-10])
         S = S[:, nullspace_dim:]
         S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
-
-        dtest = numpy.dot(S.T, dtest.reshape((dtest.shape[0], -1))).reshape((-1,) + dtest.shape[1:])
-        return inner(dtest, trial)
+        # Apply change of basis
+        dtest = numpy.dot(S.T, dtest.reshape((S.shape[0], -1))).reshape((-1,) + dtest.shape[1:])
+        return inner(dtest, trial, Qwts)
 
 
 class FDMDual(DualSet):
@@ -169,10 +171,9 @@ class FDMDual(DualSet):
 
         Q = create_quadrature(Ref_el, 2 * degree)
         X, W = Q.get_points(), Q.get_weights()
-        inner = lambda v: numpy.tensordot(numpy.multiply(v, W), v, axes=(range(1, v.ndim), range(1, v.ndim)))
-        dual_mapping = {"HCurl": "contravariant", "HDiv": "covariant"}.get(sobolev_space, None)
-        trace = {"HCurl": "contravariant", "HDiv": "normal"}.get(sobolev_space, None)
         exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
+        trace = {"HCurl": "contravariant", "HDiv": "normal"}.get(sobolev_space, None)
+        dual_mapping = {"HCurl": "contravariant", "HDiv": "covariant"}.get(sobolev_space, None)
 
         phi_at_qpts = fe.tabulate(1, X)
         V0 = phi_at_qpts[(0,) * sd]
@@ -193,12 +194,12 @@ class FDMDual(DualSet):
                     entity_ids[dim][entity] = []
                 continue
 
-            B = inner(V0[dofs])
+            B = inner(V0[dofs], V0[dofs], W)
             if dim == sd:
                 _, S = scipy.linalg.eigh(B)
                 Sinv = S.T
             else:
-                A = inner(V1[dofs])
+                A = inner(V1[dofs], V1[dofs], W)
                 nullspace = [i for i, a in enumerate(A.diagonal()) if a < 1E-10]
                 if len(nullspace) > 0:
                     A += B
@@ -245,10 +246,9 @@ if __name__ == "__main__":
     ref_el = symmetric_simplex(dim)
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
-    inner = lambda v, u: numpy.tensordot(numpy.multiply(v, Qwts), u, axes=(range(1, v.ndim), range(1, u.ndim)))
 
     variant = "fdm"
-    # variant = "demkowicz"
+    variant = "demkowicz"
     # variant = None
     space_dict = {"H1": (CG, grad),
                   "HCurl": (N2Curl, curl),
@@ -264,8 +264,8 @@ if __name__ == "__main__":
         phi_at_qpts = fe.tabulate(1, Qpts)
         V0 = phi_at_qpts[(0,) * dim]
         V1 = d(phi_at_qpts)
-        mass = inner(V0, V0)
-        stiff = inner(V1, V1)
+        mass = inner(V0, V0, Qwts)
+        stiff = inner(V1, V1, Qwts)
 
         mats = (stiff, mass)
         title = f"{type(fe).__name__}({degree})"
