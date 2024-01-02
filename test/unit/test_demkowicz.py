@@ -58,6 +58,35 @@ def test_galerkin_symmetry(dim, family, degree, variant):
                 assert numpy.allclose(Aref, A1, rtol=1E-14)
 
 
+@pytest.mark.parametrize("family, dim, degree, variant",
+                         [(f, d, p, v)
+                          for f in (CG, )
+                          for v in (None, "demkowicz", "fdm")
+                          for d in (1, 2, 3)
+                          for p in range(1, 7)])
+def test_hierachical_interpolation(dim, family, degree, variant):
+    from FIAT.reference_element import symmetric_simplex
+
+    s = symmetric_simplex(dim)
+    Vp = family(s, degree, variant=variant)
+    V1 = family(s, 1, variant=variant)
+
+    primal = V1.get_nodal_basis()
+    dual = Vp.get_dual_set()
+    A = dual.to_riesz(primal)
+    B = primal.get_coeffs()
+    D = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
+
+    dim1 = V1.space_dimension()
+    dimp = Vp.space_dimension()
+    dofs_per_entity = len(V1.entity_dofs()[V1.formdegree][0])
+    dofs = Vp.entity_dofs()[Vp.formdegree]
+    dof1 = sum((dofs[entity][:dofs_per_entity] for entity in sorted(dofs)), [])
+    dofp = numpy.setdiff1d(numpy.arange(dimp), dof1)
+    assert numpy.allclose(D[dofp], 0.0)
+    assert numpy.allclose(D[dof1], numpy.eye(dim1))
+
+
 if __name__ == '__main__':
     import os
     pytest.main(os.path.abspath(__file__))

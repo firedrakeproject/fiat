@@ -100,14 +100,12 @@ class DemkowiczDual(DualSet):
             duals = P.tabulate(Q.get_points())[(0,) * dim]
             return Q, duals
 
+        exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
         Qpts, Qwts = Q.get_points(), Q.get_weights()
         shp = () if formdegree == 0 else (dim,)
         P = ONPolynomialSet(facet, degree, shp)
         P_at_qpts = P.tabulate(Qpts, 1)
-
-        exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
         dtrial = exterior_derivative(P_at_qpts)
-
         K = self._bubble_derivative_moments(facet, degree, formdegree, Qpts, Qwts, dtrial)
         if formdegree > 0:
             trial = P_at_qpts[(0,) * dim]
@@ -117,15 +115,13 @@ class DemkowiczDual(DualSet):
             M = self._bubble_derivative_moments(facet, degree+1, formdegree-1, Qpts, Qwts, trial)
             K = numpy.vstack((K, M))
 
-        duals = P_at_qpts[(0,) * dim]
-        duals = numpy.dot(K, duals.reshape((K.shape[1], -1))).reshape((-1,) + duals.shape[1:])
+        duals = numpy.tensordot(K, P_at_qpts[(0,) * dim], axes=(1, 0))
         return Q, duals
 
     def _bubble_derivative_moments(self, facet, degree, formdegree, Qpts, Qwts, trial):
         """Integrate trial expressions against an orthonormal basis for
            the exterior derivative of bubbles.
         """
-
         dim = facet.get_spatial_dimension()
         if formdegree >= dim - 1:
             # We are at the end of the complex
@@ -152,7 +148,7 @@ class DemkowiczDual(DualSet):
         S = S[:, nullspace_dim:]
         S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
         # Apply change of basis
-        dtest = numpy.dot(S.T, dtest.reshape((S.shape[0], -1))).reshape((-1,) + dtest.shape[1:])
+        dtest = numpy.tensordot(S.T, dtest, axes=(1, 0))
         return inner(dtest, trial, Qwts)
 
 
@@ -197,17 +193,15 @@ class FDMDual(DualSet):
             B = inner(V0[dofs], V0[dofs], W)
             if dim == sd:
                 _, S = scipy.linalg.eigh(B)
-                Sinv = S.T
             else:
                 A = inner(V1[dofs], V1[dofs], W)
-                nullspace = [i for i, a in enumerate(A.diagonal()) if a < 1E-10]
-                if len(nullspace) > 0:
+                if formdegree > 0:
                     A += B
                 _, S = scipy.linalg.eigh(B, A)
-                Sinv = numpy.dot(S.T, A)
+                S = numpy.dot(A, S)
 
             phis = numpy.array([ells[i].f_at_qpts for i in dofs])
-            phis = numpy.dot(Sinv, phis.reshape((Sinv.shape[0], -1))).reshape(phis.shape)
+            phis = numpy.tensordot(S.T, phis, axes=(1, 0))
 
             Q_dof = ells[dofs[0]].Q
             Q_ref = Q_dof.reference_rule()
@@ -248,7 +242,7 @@ if __name__ == "__main__":
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
     variant = "fdm"
-    variant = "demkowicz"
+    # variant = "demkowicz"
     # variant = None
     space_dict = {"H1": (CG, grad),
                   "HCurl": (N2Curl, curl),

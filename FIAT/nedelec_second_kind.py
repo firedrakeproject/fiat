@@ -197,7 +197,7 @@ class NedelecSecondKind(CiarletElement):
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
-        poly_set = ONPolynomialSet(ref_el, degree, (sd, ))
+        poly_set = ONPolynomialSet(ref_el, degree, (sd, ), variant="integral")
         if variant == "demkowicz":
             dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl")
         elif variant == "fdm":
