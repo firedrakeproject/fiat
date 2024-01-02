@@ -134,13 +134,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
         Qkm1 = create_quadrature(ref_el, 2 * (degree-1))
         qpts, qwts = Qkm1.get_points(), Qkm1.get_weights()
         inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
+        galerkin = lambda V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == 1)
 
         P = Lagrange(ref_el, degree, variant=variant)
         P_table = P.tabulate(1, qpts)
         B = make_bubbles(ref_el, degree)
         B_table = B.tabulate(qpts, 1)
-        phis = galerkin(1, B_table, P_table)
+        phis = galerkin(B_table, P_table)
 
         points = []
         for node in P.dual_basis():
