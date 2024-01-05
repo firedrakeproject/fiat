@@ -9,7 +9,7 @@ import scipy
 
 from FIAT.dual_set import DualSet
 from FIAT.functional import PointEvaluation, FrobeniusIntegralMoment
-from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
+from FIAT.polynomial_set import make_bubbles, ONPolynomialSet, PolynomialSet
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import symmetric_simplex
@@ -227,6 +227,26 @@ class FDMDual(DualSet):
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         super(FDMDual, self).__init__(nodes, ref_el, entity_ids)
+
+
+def project_derivative(fe, op):
+    """Return a PolynomialSet with the projection of the derivative of a FiniteElement fe.
+       The type of derivative is specified by op, must be either "grad", "curl", or "div".
+    """
+    ref_el = fe.ref_el
+    degree = fe.degree() - 1
+
+    Q = create_quadrature(ref_el, 2 * degree)
+    Qpts, Qwts = Q.get_points(), Q.get_weights()
+    expr = {"grad": grad, "curl": curl, "div": div}[op](fe.tabulate(1, Qpts))
+
+    sd = ref_el.get_spatial_dimension()
+    P = ONPolynomialSet(ref_el, degree, expr.shape[1:-1])
+    wts = P.tabulate(Qpts)[(0,) * sd]
+    numpy.multiply(wts, Qwts, out=wts)
+    wts *= 2 ** sd
+    coeffs = numpy.tensordot(expr, wts, axes=(range(1, expr.ndim), range(1, expr.ndim)))
+    return PolynomialSet(ref_el, degree, degree, P.get_expansion_set(), coeffs)
 
 
 if __name__ == "__main__":
