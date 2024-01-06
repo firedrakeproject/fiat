@@ -6,7 +6,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import (polynomial_set, expansions, dual_set,
-                  finite_element, functional)
+                  finite_element, functional, demkowicz)
 from itertools import chain
 import numpy
 from FIAT.check_format_variant import check_format_variant
@@ -196,14 +196,20 @@ class Nedelec(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant=None):
 
-        variant, interpolant_deg = check_format_variant(variant, degree)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", kind=1)
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "HCurl", type(self))
+        else:
+            variant, interpolant_deg = check_format_variant(variant, degree)
+            dual = NedelecDual(ref_el, degree, variant, interpolant_deg)
+
         if ref_el.get_spatial_dimension() == 3:
             poly_set = NedelecSpace3D(ref_el, degree)
         elif ref_el.get_spatial_dimension() == 2:
             poly_set = NedelecSpace2D(ref_el, degree)
         else:
             raise Exception("Not implemented")
-        dual = NedelecDual(ref_el, degree, variant, interpolant_deg)
         formdegree = 1  # 1-form
         super(Nedelec, self).__init__(poly_set, dual, degree, formdegree,
                                       mapping="covariant piola")

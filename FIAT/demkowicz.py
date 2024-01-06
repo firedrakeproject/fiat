@@ -13,8 +13,6 @@ from FIAT.polynomial_set import make_bubbles, ONPolynomialSet, PolynomialSet
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import symmetric_simplex
-from FIAT.nedelec import Nedelec
-from FIAT.raviart_thomas import RaviartThomas
 
 
 def grad(table_u):
@@ -60,7 +58,7 @@ def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
 
 class DemkowiczDual(DualSet):
 
-    def __init__(self, ref_el, degree, sobolev_space):
+    def __init__(self, ref_el, degree, sobolev_space, kind=2):
         nodes = []
         entity_ids = {}
         top = ref_el.get_topology()
@@ -81,7 +79,7 @@ class DemkowiczDual(DualSet):
                     nodes.extend(PointEvaluation(ref_el, pt) for pt in pts)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
             else:
-                Q_ref, Phis = self._reference_duals(dim, degree, formdegree, sobolev_space)
+                Q_ref, Phis = self._reference_duals(dim, degree, formdegree, sobolev_space, kind)
                 mapping = dual_mapping if dim == sd else trace
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
@@ -91,12 +89,13 @@ class DemkowiczDual(DualSet):
 
         super(DemkowiczDual, self).__init__(nodes, ref_el, entity_ids)
 
-    def _reference_duals(self, dim, degree, formdegree, sobolev_space):
+    def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind):
+        k = degree if kind == 2 else degree - 1
         facet = symmetric_simplex(dim)
         Q = create_quadrature(facet, 2 * degree)
         if formdegree == dim:
             shp = (dim,) if sobolev_space == "HCurl" else ()
-            P = ONPolynomialSet(facet, degree, shp)
+            P = ONPolynomialSet(facet, k, shp)
             duals = P.tabulate(Q.get_points())[(0,) * dim]
             return Q, duals
 
@@ -106,13 +105,14 @@ class DemkowiczDual(DualSet):
         P = ONPolynomialSet(facet, degree, shp)
         P_at_qpts = P.tabulate(Qpts, 1)
         dtrial = exterior_derivative(P_at_qpts)
+
         K = self._bubble_derivative_moments(facet, degree, formdegree, Qpts, Qwts, dtrial)
         if formdegree > 0:
             trial = P_at_qpts[(0,) * dim]
             if formdegree == 1 and sobolev_space == "HDiv":
                 rot = numpy.array([[0.0, 1.0], [-1.0, 0.0]], "d")
                 trial = numpy.dot(rot, trial).transpose((1, 0, 2))
-            M = self._bubble_derivative_moments(facet, degree+1, formdegree-1, Qpts, Qwts, trial)
+            M = self._bubble_derivative_moments(facet, k+1, formdegree-1, Qpts, Qwts, trial)
             K = numpy.vstack((K, M))
 
         duals = numpy.tensordot(K, P_at_qpts[(0,) * dim], axes=(1, 0))
@@ -125,30 +125,33 @@ class DemkowiczDual(DualSet):
         dim = facet.get_spatial_dimension()
         if formdegree >= dim - 1:
             # We are at the end of the complex
-            # derivative of bubbles is P_k-1 minus constants
+            # bubbles have derivative in P_k-1 minus constants
             Pkm1 = ONPolynomialSet(facet, degree-1, trial.shape[1:-1])
             P0 = Pkm1.take(list(range(1, Pkm1.get_num_members())))
             dtest = P0.tabulate(Qpts)[(0,) * dim]
             return inner(dtest, trial, Qwts)
 
         # Get bubbles
-        element = (None, Nedelec, RaviartThomas)[formdegree]
-        if element is None:
+        if formdegree == 0:
             B = make_bubbles(facet, degree)
-        else:
-            fe = element(facet, degree)
+        elif formdegree == 1:
+            from FIAT.nedelec import Nedelec
+            fe = Nedelec(facet, degree)
             B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
+        else:
+            raise ValueError(f"{formdegree}-form bubbles not supported")
         # Tabulate the exterior derivate
         d = (grad, curl, div)[formdegree]
         dtest = d(B.tabulate(Qpts, 1))
-        # Build an orthonormal basis, remove nullspace
-        A = inner(dtest, dtest, Qwts)
-        sig, S = scipy.linalg.eigh(A)
-        nullspace_dim = len([s for s in sig if abs(s) <= 1.e-10])
-        S = S[:, nullspace_dim:]
-        S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
-        # Apply change of basis
-        dtest = numpy.tensordot(S.T, dtest, axes=(1, 0))
+        if len(dtest) > 0:
+            # Build an orthonormal basis, remove nullspace
+            A = inner(dtest, dtest, Qwts)
+            sig, S = scipy.linalg.eigh(A)
+            nullspace_dim = len([s for s in sig if abs(s) <= 1.e-10])
+            S = S[:, nullspace_dim:]
+            S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
+            # Apply change of basis
+            dtest = numpy.tensordot(S.T, dtest, axes=(1, 0))
         return inner(dtest, trial, Qwts)
 
 
@@ -252,6 +255,8 @@ def project_derivative(fe, op):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from FIAT import IntegratedLegendre as CG
+    from FIAT import Nedelec as N1Curl
+    from FIAT import RaviartThomas as N1Div
     from FIAT import NedelecSecondKind as N2Curl
     from FIAT import BrezziDouglasMarini as N2Div
 
@@ -261,12 +266,13 @@ if __name__ == "__main__":
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
+    kind = 1
     variant = "fdm"
     # variant = "demkowicz"
     # variant = None
     space_dict = {"H1": (CG, grad),
-                  "HCurl": (N2Curl, curl),
-                  "HDiv": (N2Div, div),
+                  "HCurl": (N1Curl if kind == 1 else N2Curl, curl),
+                  "HDiv": (N1Div if kind == 1 else N2Div, div),
                   }
     spaces = list(space_dict.keys())
 

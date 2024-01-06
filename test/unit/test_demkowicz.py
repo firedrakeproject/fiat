@@ -22,16 +22,18 @@
 import pytest
 import numpy
 from FIAT.hierarchical import IntegratedLegendre as CG
+from FIAT.nedelec import Nedelec as N1Curl
+from FIAT.raviart_thomas import RaviartThomas as N1Div
 from FIAT.nedelec_second_kind import NedelecSecondKind as N2Curl
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini as N2Div
 
 
 @pytest.mark.parametrize("family, dim, degree, variant",
                          [(f, d, p, v)
-                          for f in (CG, N2Curl, N2Div)
+                          for f in (CG, N1Curl, N1Div, N2Curl, N2Div)
                           for v in ("demkowicz", "fdm")
                           for d in (2, 3)
-                          for p in range(1, 7)])
+                          for p in range(1, 6)])
 def test_galerkin_symmetry(dim, family, degree, variant):
     from FIAT.quadrature_schemes import create_quadrature
     from FIAT.reference_element import symmetric_simplex
@@ -39,7 +41,7 @@ def test_galerkin_symmetry(dim, family, degree, variant):
 
     s = symmetric_simplex(dim)
     fe = family(s, degree, variant=variant)
-    exterior_derivative = {CG: grad, N2Curl: curl, N2Div: div}[family]
+    exterior_derivative = {CG: grad, N1Curl: curl, N2Curl: curl, N1Div: div, N2Div: div}[family]
 
     Q = create_quadrature(s, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
@@ -60,7 +62,7 @@ def test_galerkin_symmetry(dim, family, degree, variant):
 
 @pytest.mark.parametrize("family, dim, degree, variant",
                          [(f, d, p, v)
-                          for f in (CG, )
+                          for f in (CG,)
                           for v in (None, "demkowicz", "fdm")
                           for d in (1, 2, 3)
                           for p in range(1, 7)])
