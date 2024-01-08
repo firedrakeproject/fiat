@@ -9,8 +9,7 @@ to allow users to get coordinates that they want."""
 
 import numpy
 import math
-from FIAT import reference_element
-from FIAT import jacobi
+from FIAT import reference_element, jacobi
 
 
 def morton_index2(p, q=0):
@@ -52,7 +51,7 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
+def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale):
     """Dubiner recurrence from (Kirby 2010)"""
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
@@ -65,8 +64,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
     sym_outer = lambda x, y: outer(x, y) + outer(y, x)
 
     pad_dim = dim + 2
-    dX = pad_jacobian(jacobian, pad_dim)
-    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
+    dX = pad_jacobian(Jinv, pad_dim)
+    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
     if dphi is not None:
         dphi[0] = (phi[0] - phi[0]) * dX[0]
     if ddphi is not None:
@@ -115,9 +114,10 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian):
                                 c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
 
         # normalize
-        for alpha in reference_element.lattice_iter(0, n+1, codim+1):
-            icur = idx(*alpha)
-            scale = math.sqrt(sum(alpha) + 0.5 * len(alpha))
+        d = codim + 1
+        for index in reference_element.lattice_iter(0, n+1, d):
+            icur = idx(*index)
+            scale = math.sqrt((2.0 * sum(index) + d) / d)
             for result in results:
                 result[icur] *= scale
     return results
@@ -165,7 +165,7 @@ class ExpansionSet(object):
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+        self.scale = numpy.sqrt(1.0 / ref_el.volume())
         self._dmats_cache = {}
 
     def get_num_members(self, n):
@@ -184,7 +184,7 @@ class ExpansionSet(object):
         """A version of tabulate() that also works for a single point.
         """
         D = self.ref_el.get_spatial_dimension()
-        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A)
+        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, self.scale)
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -289,7 +289,7 @@ class LineExpansionSet(ExpansionSet):
         vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
         xs = self._mapping(pts).T
         results = []
-        scale = numpy.sqrt(0.5 + numpy.arange(n+1))
+        scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:

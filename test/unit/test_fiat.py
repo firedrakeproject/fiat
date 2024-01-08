@@ -530,16 +530,21 @@ def test_error_point_high_order(element):
         eval(element)
 
 
-@pytest.mark.parametrize('cell', [I, T, S])
-def test_expansion_orthonormality(cell):
-    from FIAT import expansions, quadrature
-    U = expansions.ExpansionSet(cell)
-    degree = 10
-    rule = quadrature.make_quadrature(cell, degree + 1)
-    phi = U.tabulate(degree, rule.pts)
-    w = rule.get_weights()
-    scale = 0.5 ** -cell.get_spatial_dimension()
-    results = scale * np.dot(phi, w[:, None] * phi.T)
+@pytest.mark.parametrize('degree', [0, 10])
+@pytest.mark.parametrize('dim', range(1, 4))
+@pytest.mark.parametrize('cell', ["default", "ufc"])
+def test_expansion_orthonormality(cell, dim, degree):
+    from FIAT.expansions import ExpansionSet
+    from FIAT.quadrature_schemes import create_quadrature
+    from FIAT import reference_element
+    make_cell = {"default": reference_element.default_simplex,
+                 "ufc": reference_element.ufc_simplex}[cell]
+    ref_el = make_cell(dim)
+    U = ExpansionSet(ref_el)
+    Q = create_quadrature(ref_el, 2 * degree)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi = U.tabulate(degree, qpts)
+    results = np.dot(np.multiply(phi, qwts), phi.T)
     assert np.allclose(results, np.eye(results.shape[0]))
 
 
