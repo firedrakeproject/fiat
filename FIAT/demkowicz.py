@@ -39,6 +39,13 @@ def inner(v, u, Qwts):
     return numpy.tensordot(numpy.multiply(v, Qwts), u, axes=(range(1, v.ndim), range(1, u.ndim)))
 
 
+def perp(u):
+    u_perp = numpy.empty_like(u)
+    u_perp[:, 0, :] = u[:, 1, :]
+    u_perp[:, 1, :] = -u[:, 0, :]
+    return u_perp
+
+
 def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
     Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
     if mapping == "normal":
@@ -110,8 +117,7 @@ class DemkowiczDual(DualSet):
         if formdegree > 0:
             trial = P_at_qpts[(0,) * dim]
             if formdegree == 1 and sobolev_space == "HDiv":
-                rot = numpy.array([[0.0, 1.0], [-1.0, 0.0]], "d")
-                trial = numpy.dot(rot, trial).transpose((1, 0, 2))
+                trial = perp(trial)
             M = self._bubble_derivative_moments(facet, k+1, formdegree-1, Qpts, Qwts, trial)
             K = numpy.vstack((K, M))
 
@@ -129,6 +135,8 @@ class DemkowiczDual(DualSet):
             Pkm1 = ONPolynomialSet(facet, degree-1, trial.shape[1:-1])
             P0 = Pkm1.take(list(range(1, Pkm1.get_num_members())))
             dtest = P0.tabulate(Qpts)[(0,) * dim]
+            if degree-1 == 0:
+                dtest *= numpy.sqrt(0.5)
             return inner(dtest, trial, Qwts)
 
         # Get bubbles
@@ -238,10 +246,17 @@ def project_derivative(fe, op):
     """
     ref_el = fe.ref_el
     degree = fe.degree() - 1
+    rot = None
+    if fe.formdegree == 0:
+        if op == "curl":
+            rot = perp
+        op = "grad"
 
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
     expr = {"grad": grad, "curl": curl, "div": div}[op](fe.tabulate(1, Qpts))
+    if rot is not None:
+        expr = rot(expr)
 
     sd = ref_el.get_spatial_dimension()
     P = ONPolynomialSet(ref_el, degree, expr.shape[1:-1])
@@ -292,7 +307,6 @@ if __name__ == "__main__":
         names = (f"{title} stiff", f"{title} mass")
         for name, A in zip(names, mats):
             A[abs(A) < 1E-10] = 0.0
-            # print(A.diagonal())
             nnz = numpy.count_nonzero(A)
             ax = next(axes)
             ax.spy(A, markersize=0)

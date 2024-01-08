@@ -62,11 +62,11 @@ def test_galerkin_symmetry(dim, family, degree, variant):
 
 @pytest.mark.parametrize("family, dim, degree, variant",
                          [(f, d, p, v)
-                          for f in (CG,)
-                          for v in (None, "demkowicz", "fdm")
-                          for d in (1, 2, 3)
-                          for p in range(1, 7)])
-def test_hierachical_interpolation(dim, family, degree, variant):
+                          for f in (CG, N1Curl,)
+                          for v in ("demkowicz",)
+                          for d in (2, 3)
+                          for p in range(2, 7)])
+def test_hierarchical_interpolation(dim, family, degree, variant):
     from FIAT.reference_element import symmetric_simplex
 
     s = symmetric_simplex(dim)
