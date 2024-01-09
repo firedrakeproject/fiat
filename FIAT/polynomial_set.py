@@ -120,7 +120,7 @@ class ONPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, shape=tuple()):
+    def __init__(self, ref_el, degree, shape=tuple(), scale=None):
 
         if shape == tuple():
             num_components = 1
@@ -130,7 +130,7 @@ class ONPolynomialSet(PolynomialSet):
         num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
+        expansion_set = expansions.ExpansionSet(ref_el, scale=scale)
 
         # set up coefficients
         if shape == tuple():
@@ -211,7 +211,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, size=None):
+    def __init__(self, ref_el, degree, size=None, scale=None):
 
         sd = ref_el.get_spatial_dimension()
         if size is None:
@@ -222,7 +222,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
+        expansion_set = expansions.ExpansionSet(ref_el, scale=scale)
 
         # set up coefficients for symmetric tensors
         coeffs_shape = (num_members, *shape, num_exp_functions)

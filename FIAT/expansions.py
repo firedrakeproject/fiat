@@ -141,31 +141,36 @@ def xi_tetrahedron(eta):
 
 
 class ExpansionSet(object):
-    def __new__(cls, ref_el, *args, **kwargs):
+    def __new__(cls, *args, **kwargs):
         """Returns an ExpansionSet instance appopriate for the given
         reference element."""
         if cls is not ExpansionSet:
             return super(ExpansionSet, cls).__new__(cls)
+        ref_el = args[0]
         if ref_el.get_shape() == reference_element.POINT:
-            return PointExpansionSet(ref_el)
+            return PointExpansionSet(*args, **kwargs)
         elif ref_el.get_shape() == reference_element.LINE:
-            return LineExpansionSet(ref_el)
+            return LineExpansionSet(*args, **kwargs)
         elif ref_el.get_shape() == reference_element.TRIANGLE:
-            return TriangleExpansionSet(ref_el)
+            return TriangleExpansionSet(*args, **kwargs)
         elif ref_el.get_shape() == reference_element.TETRAHEDRON:
-            return TetrahedronExpansionSet(ref_el)
+            return TetrahedronExpansionSet(*args, **kwargs)
         else:
             raise ValueError("Invalid reference element type.")
 
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, scale=None):
+        if isinstance(scale, str) and scale.lower() == "l2 piola":
+            scale = 1.0 / ref_el.volume()
+        elif scale is None:
+            scale = math.sqrt(1.0 / ref_el.volume())
         self.ref_el = ref_el
+        self.scale = scale
         dim = ref_el.get_spatial_dimension()
         self.base_ref_el = reference_element.default_simplex(dim)
         v1 = ref_el.get_vertices()
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(1.0 / ref_el.volume())
         self._dmats_cache = {}
 
     def get_num_members(self, n):
@@ -266,10 +271,10 @@ class ExpansionSet(object):
 
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 0:
             raise ValueError("Must have a point")
-        super(PointExpansionSet, self).__init__(ref_el)
+        super(PointExpansionSet, self).__init__(ref_el, **kwargs)
 
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
@@ -279,10 +284,10 @@ class PointExpansionSet(ExpansionSet):
 
 class LineExpansionSet(ExpansionSet):
     """Evaluates the Legendre basis on a line reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
-        super(LineExpansionSet, self).__init__(ref_el)
+        super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
     def _tabulate(self, n, pts, order=0):
         """Returns a tuple of (vals, derivs) such that
@@ -306,18 +311,18 @@ class LineExpansionSet(ExpansionSet):
 class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
-        super(TriangleExpansionSet, self).__init__(ref_el)
+        super(TriangleExpansionSet, self).__init__(ref_el, **kwargs)
 
 
 class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expansion on a tetrahedron."""
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
-        super(TetrahedronExpansionSet, self).__init__(ref_el)
+        super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
 
 
 def polynomial_dimension(ref_el, degree):
