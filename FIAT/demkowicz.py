@@ -135,8 +135,6 @@ class DemkowiczDual(DualSet):
             Pkm1 = ONPolynomialSet(facet, degree-1, trial.shape[1:-1])
             P0 = Pkm1.take(list(range(1, Pkm1.get_num_members())))
             dtest = P0.tabulate(Qpts)[(0,) * dim]
-            if degree-1 == 0:
-                dtest *= numpy.sqrt(0.5)
             return inner(dtest, trial, Qwts)
 
         # Get bubbles
@@ -149,12 +147,15 @@ class DemkowiczDual(DualSet):
         else:
             raise ValueError(f"{formdegree}-form bubbles not supported")
         # Tabulate the exterior derivate
+        B_at_qpts = B.tabulate(Qpts, 1)
         d = (grad, curl, div)[formdegree]
-        dtest = d(B.tabulate(Qpts, 1))
+        dtest = d(B_at_qpts)
         if len(dtest) > 0:
             # Build an orthonormal basis, remove nullspace
+            test = B_at_qpts[(0,) * dim]
+            B = inner(test, test, Qwts)
             A = inner(dtest, dtest, Qwts)
-            sig, S = scipy.linalg.eigh(A)
+            sig, S = scipy.linalg.eigh(A, B)
             nullspace_dim = len([s for s in sig if abs(s) <= 1.e-10])
             S = S[:, nullspace_dim:]
             S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
@@ -262,7 +263,6 @@ def project_derivative(fe, op):
     P = ONPolynomialSet(ref_el, degree, expr.shape[1:-1])
     wts = P.tabulate(Qpts)[(0,) * sd]
     numpy.multiply(wts, Qwts, out=wts)
-    wts *= 2 ** sd
     coeffs = numpy.tensordot(expr, wts, axes=(range(1, expr.ndim), range(1, expr.ndim)))
     return PolynomialSet(ref_el, degree, degree, P.get_expansion_set(), coeffs)
 
