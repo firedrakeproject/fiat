@@ -75,13 +75,12 @@ class RTDualSet(dual_set.DualSet):
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
             # degree is q - 1
             Q_ref = create_quadrature(facet, interpolant_deg + degree - 1)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree - 1)
+            Pq = polynomial_set.ONPolynomialSet(facet, degree - 1, scale=1)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                n = ref_el.compute_normal(f)
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -91,7 +90,7 @@ class RTDualSet(dual_set.DualSet):
             if degree > 1:
                 cur = len(nodes)
                 Q = create_quadrature(ref_el, interpolant_deg + degree - 2)
-                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
+                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2, scale=1)
                 Pkm1_at_qpts = Pkm1.tabulate(Q.get_points())[(0,) * sd]
                 nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
                              for d in range(sd)

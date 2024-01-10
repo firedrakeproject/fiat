@@ -530,20 +530,23 @@ def test_error_point_high_order(element):
         eval(element)
 
 
-@pytest.mark.parametrize('cell', [I, T, S])
-def test_expansion_orthonormality(cell):
-    from FIAT import expansions
+@pytest.mark.parametrize('degree', [0, 10])
+@pytest.mark.parametrize('dim', range(1, 4))
+@pytest.mark.parametrize('cell', ["default", "ufc", "symmetric"])
+def test_expansion_orthonormality(cell, dim, degree):
+    from FIAT.expansions import ExpansionSet
     from FIAT.quadrature_schemes import create_quadrature
-    U = expansions.ExpansionSet(cell)
-    degree = 10
-    rule = create_quadrature(cell, 2*degree)
-    phi = U.tabulate(degree, rule.pts)
-    qwts = rule.get_weights()
-    scale = 0.5 ** -cell.get_spatial_dimension()
-    results = scale * np.dot(np.multiply(phi, qwts), phi.T)
-
-    assert np.allclose(results, np.diag(np.diag(results)))
-    assert np.allclose(np.diag(results), 1.0)
+    from FIAT import reference_element
+    make_cell = {"default": reference_element.default_simplex,
+                 "ufc": reference_element.ufc_simplex,
+                 "symmetric": reference_element.symmetric_simplex}[cell]
+    ref_el = make_cell(dim)
+    U = ExpansionSet(ref_el)
+    Q = create_quadrature(ref_el, 2 * degree)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi = U.tabulate(degree, qpts)
+    results = np.dot(np.multiply(phi, qwts), phi.T)
+    assert np.allclose(results, np.eye(results.shape[0]))
 
 
 @pytest.mark.parametrize('dim', range(1, 4))
@@ -647,15 +650,21 @@ def test_make_bubbles(cell):
     assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
 
 
-@pytest.mark.parametrize('cell', [I, T, S])
-def test_bubble_duality(cell):
+@pytest.mark.parametrize('degree', [0, 10])
+@pytest.mark.parametrize('dim', range(1, 4))
+@pytest.mark.parametrize('cell', ["default", "ufc", "symmetric"])
+def test_bubble_duality(cell, dim, degree):
     from FIAT.polynomial_set import make_bubbles
     from FIAT.quadrature_schemes import create_quadrature
-    degree = 10
-    sd = cell.get_spatial_dimension()
+    from FIAT import reference_element
+    degree = max(dim+1, degree)
+    make_cell = {"default": reference_element.default_simplex,
+                 "ufc": reference_element.ufc_simplex,
+                 "symmetric": reference_element.symmetric_simplex}[cell]
+    cell = make_cell(dim)
     B = make_bubbles(cell, degree)
     rule = create_quadrature(cell, 2*degree)
-    phi = B.tabulate(rule.pts)[(0,) * sd]
+    phi = B.tabulate(rule.pts)[(0,) * dim]
     qwts = rule.get_weights() / abs(phi[0])
     results = np.dot(np.multiply(phi, qwts), phi.T)
 

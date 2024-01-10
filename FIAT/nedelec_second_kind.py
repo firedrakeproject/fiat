@@ -130,7 +130,7 @@ class NedelecSecondKindDual(DualSet):
         ref_facet = cell.construct_subelement(codim)
         Q_ref = create_quadrature(ref_facet, interpolant_deg + rt_degree)
         if codim == 1:
-            Phi = ONPolynomialSet(ref_facet, rt_degree, (codim,))
+            Phi = ONPolynomialSet(ref_facet, rt_degree, (codim,), scale="L2 piola")
         else:
             # Construct Raviart-Thomas on the reference facet
             RT = RaviartThomas(ref_facet, rt_degree, variant)
@@ -150,10 +150,10 @@ class NedelecSecondKindDual(DualSet):
             # Get the quadrature and Jacobian on this facet
             Q_facet = FacetQuadratureRule(cell, codim, facet, Q_ref)
             J = Q_facet.jacobian()
-            detJ = Q_facet.jacobian_determinant()
+            Jdet = Q_facet.jacobian_determinant()
 
             # Map Phis -> phis (reference values to physical values)
-            piola_map = J / detJ
+            piola_map = J / Jdet
             phis = numpy.dot(Phis, piola_map.T)
             phis = numpy.transpose(phis, (0, 2, 1))
 

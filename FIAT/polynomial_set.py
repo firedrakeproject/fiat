@@ -121,7 +121,7 @@ class ONPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, shape=tuple(), variant=None):
+    def __init__(self, ref_el, degree, shape=tuple(), scale=None, variant=None):
 
         if shape == tuple():
             num_components = 1
@@ -131,7 +131,7 @@ class ONPolynomialSet(PolynomialSet):
         num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el, variant=variant)
+        expansion_set = expansions.ExpansionSet(ref_el, scale=scale, variant=variant)
 
         # set up coefficients
         if shape == tuple():
@@ -212,7 +212,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, size=None):
+    def __init__(self, ref_el, degree, size=None, scale=None):
 
         sd = ref_el.get_spatial_dimension()
         if size is None:
@@ -223,7 +223,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el)
+        expansion_set = expansions.ExpansionSet(ref_el, scale=scale)
 
         # set up coefficients for symmetric tensors
         coeffs_shape = (num_members, *shape, num_exp_functions)
@@ -249,7 +249,7 @@ def make_bubbles(ref_el, degree, shape=()):
 
     """
     dim = ref_el.get_spatial_dimension()
-    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, variant="integral")
+    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="integral")
     degrees = chain(range(dim + 1, degree+1, 2), range(dim + 2, degree+1, 2))
 
     if dim == 1:
