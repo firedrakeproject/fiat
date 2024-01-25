@@ -86,6 +86,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
 
+    beta = 1 if variant == "dual" else 0
     coefficients = integrated_jrc if variant == "integral" else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
@@ -98,12 +99,13 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
 
-            beta = 0
             if variant == "integral":
                 alpha = 2 * sum(sub_index)
                 a = b = 1.0
             else:
                 alpha = 2 * sum(sub_index) + len(sub_index)
+                if variant == "dual":
+                    alpha += 1 + len(sub_index)
                 a = 0.5 * (alpha + beta) + 1.0
                 b = 0.5 * (alpha - beta)
 
@@ -133,16 +135,17 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
         # normalize
         d = codim + 1
+        shift = 1 if variant == "dual" else 0
         for index in reference_element.lattice_iter(0, n+1, d):
-            p = index[-1]
-            alpha = 2 * sum(index) - 1
-            if variant == "integral" and p > (d == 1) and alpha > p:
-                norm2 = ((2*d+1)*(alpha - p)*alpha) / (2*d*p)
-            else:
-                norm2 = (2.0 * sum(index) + d) / d
+            icur = idx(*index)
+            norm2 = (2*sum(index) + d) / d
+            if variant is not None:
+                p = index[-1] + shift
+                alpha = 2 * (sum(index[:-1]) + d * shift) - 1
+                if p > 0 and p + alpha > 0:
+                    norm2 = (2*d+1) * (p + alpha) * (2*p + alpha) / (2*d*p)
 
             scale = math.sqrt(norm2)
-            icur = idx(*index)
             for result in results:
                 result[icur] *= scale
     return results
