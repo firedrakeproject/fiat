@@ -60,9 +60,8 @@ class IntegratedLegendreDual(dual_set.DualSet):
             variant = "beuchler"
 
         duals = {
+            "l2": self._L2_duals,
             "beuchler": self._beuchler_integral_duals,
-            "beuchler_point": self._beuchler_point_duals,
-            "demkowicz_point": self._demkowicz_point_duals,
         }[variant]
 
         nodes = []
@@ -71,19 +70,18 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
         top = ref_el.get_topology()
         for dim in sorted(top):
+            perms = make_entity_permutations_simplex(dim, degree - dim)
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
-            if dim == 0:
-                perms = {0: [0]}
+            if dim == 0 or degree <= dim:
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
-                    pt, = ref_el.make_points(0, entity, degree)
-                    nodes.append(functional.PointEvaluation(ref_el, pt))
+                    pts = ref_el.make_points(dim, entity, degree)
+                    nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
                     entity_permutations[dim][entity] = perms
                 continue
 
-            perms = make_entity_permutations_simplex(dim, degree - dim)
             ref_facet = symmetric_simplex(dim)
             Q_ref, phis = duals(ref_facet, degree)
             for entity in sorted(top[dim]):
@@ -100,15 +98,12 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
-    def _beuchler_point_duals(self, ref_el, degree, variant="gll"):
-        points = make_lattice(ref_el.vertices, degree, variant=variant)
-        weights = (1.0,) * len(points)
-        Q = QuadratureRule(ref_el, points, weights)
-        B = make_bubbles(ref_el, degree)
-        V = numpy.transpose(B.expansion_set.tabulate(degree, points))
-
-        PLU = scipy.linalg.lu_factor(V)
-        phis = scipy.linalg.lu_solve(PLU, B.get_coeffs().T, trans=1).T
+    def _L2_duals(self, ref_el, degree):
+        dim = ref_el.get_spatial_dimension()
+        phi_deg = degree - 1 - dim
+        Q = create_quadrature(ref_el, degree + phi_deg)
+        B = ONPolynomialSet(ref_el, phi_deg, variant="dual")
+        phis = B.tabulate(Q.get_points())[(0,) * dim]
         return Q, phis
 
     def _beuchler_integral_duals(self, ref_el, degree):
@@ -128,26 +123,6 @@ class IntegratedLegendreDual(dual_set.DualSet):
         PLU = scipy.linalg.lu_factor(V)
         phis = scipy.linalg.lu_solve(PLU, P_table)
         phis = numpy.dot(B.get_coeffs(), phis)
-        return Q, phis
-
-    def _demkowicz_point_duals(self, ref_el, degree, variant="gll"):
-        Qkm1 = create_quadrature(ref_el, 2 * (degree-1))
-        qpts, qwts = Qkm1.get_points(), Qkm1.get_weights()
-        inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        galerkin = lambda V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == 1)
-
-        P = Lagrange(ref_el, degree, variant=variant)
-        P_table = P.tabulate(1, qpts)
-        B = make_bubbles(ref_el, degree)
-        B_table = B.tabulate(qpts, 1)
-        phis = galerkin(B_table, P_table)
-
-        points = []
-        for node in P.dual_basis():
-            pt, = node.get_point_dict()
-            points.append(pt)
-        weights = (1.0,) * len(points)
-        Q = QuadratureRule(ref_el, points, weights)
         return Q, phis
 
 
