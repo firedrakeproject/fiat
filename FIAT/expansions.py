@@ -101,7 +101,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
             if variant == "integral":
                 alpha = 2 * sum(sub_index)
-                a = b = 1.0
+                a = b = 0.5
             else:
                 alpha = 2 * sum(sub_index) + len(sub_index)
                 if variant == "dual":
@@ -138,16 +138,47 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
         shift = 1 if variant == "dual" else 0
         for index in reference_element.lattice_iter(0, n+1, d):
             icur = idx(*index)
-            norm2 = (2*sum(index) + d) / d
             if variant is not None:
                 p = index[-1] + shift
                 alpha = 2 * (sum(index[:-1]) + d * shift) - 1
+                norm2 = 1.0
                 if p > 0 and p + alpha > 0:
-                    norm2 = (2*d+1) * (p + alpha) * (2*p + alpha) / (2*d*p)
+                    norm2 = (4*d+2) * (p + alpha) * (2*p + alpha) / (d*p)
+            else:
+                norm2 = (2*sum(index) + d) / d
 
             scale = math.sqrt(norm2)
             for result in results:
                 result[icur] *= scale
+
+    if variant == "integral":
+        icur = 0
+        for inext in range(1, dim+1):
+            for result in results:
+                result[icur] -= result[inext]
+
+        if dim == 2:
+            for i in range(2, n+1):
+                icur = idx(0, i)
+                iprev = idx(1, i-1)
+                for result in results:
+                    result[icur] += result[iprev]
+
+        elif dim == 3:
+            for i in range(2, n+1):
+                for j in range(0, n+1-i):
+                    icur = idx(0, i, j)
+                    iprev = idx(1, i-1, j)
+                    for result in results:
+                        result[icur] += result[iprev]
+
+                icur = idx(0, 0, i)
+                iprev0 = idx(1, 0, i-1)
+                iprev1 = idx(0, 1, i-1)
+                for result in results:
+                    result[icur] += result[iprev0]
+                    result[icur] += result[iprev1]
+
     return results
 
 
