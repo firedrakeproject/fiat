@@ -101,7 +101,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
             if variant == "integral":
                 alpha = 2 * sum(sub_index)
-                a = b = 1.0
+                a = b = 0.5
             else:
                 alpha = 2 * sum(sub_index) + len(sub_index)
                 if variant == "dual":
@@ -133,17 +133,25 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                 ddphi[inext] = (factor * ddphi[icur] + sym_outer(dphi[icur], dfactor) -
                                 c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
 
+            if variant == "integral":
+                icur = idx(*sub_index, 0)
+                inext = idx(*sub_index, 1)
+                for result in results:
+                    result[icur] -= result[inext]
+
         # normalize
         d = codim + 1
         shift = 1 if variant == "dual" else 0
         for index in reference_element.lattice_iter(0, n+1, d):
             icur = idx(*index)
-            norm2 = (2*sum(index) + d) / d
             if variant is not None:
                 p = index[-1] + shift
                 alpha = 2 * (sum(index[:-1]) + d * shift) - 1
+                norm2 = 1.0
                 if p > 0 and p + alpha > 0:
-                    norm2 = (2*d+1) * (p + alpha) * (2*p + alpha) / (2*d*p)
+                    norm2 = (4*d+2) * (p + alpha) * (2*p + alpha) / (d*p)
+            else:
+                norm2 = (2*sum(index) + d) / d
 
             scale = math.sqrt(norm2)
             for result in results:
