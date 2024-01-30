@@ -55,14 +55,8 @@ class Legendre(finite_element.CiarletElement):
 
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for integrated Legendre elements."""
-    def __init__(self, ref_el, degree, variant=None):
-        if variant is None:
-            variant = "beuchler"
-
-        duals = {
-            "l2": self._L2_duals,
-            "beuchler": self._beuchler_integral_duals,
-        }[variant]
+    def __init__(self, ref_el, degree):
+        duals = self._beuchler_integral_duals
 
         nodes = []
         entity_ids = {}
@@ -97,14 +91,6 @@ class IntegratedLegendreDual(dual_set.DualSet):
                 entity_permutations[dim][entity] = perms
 
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
-
-    def _L2_duals(self, ref_el, degree):
-        dim = ref_el.get_spatial_dimension()
-        phi_deg = degree - 1 - dim
-        Q = create_quadrature(ref_el, degree + phi_deg)
-        B = ONPolynomialSet(ref_el, phi_deg, variant="dual")
-        phis = B.tabulate(Q.get_points())[(0,) * dim]
-        return Q, phis
 
     def _beuchler_integral_duals(self, ref_el, degree):
         Q = create_quadrature(ref_el, 2 * degree)
@@ -141,6 +127,6 @@ class IntegratedLegendre(finite_element.CiarletElement):
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "H1", type(self))
         else:
-            dual = IntegratedLegendreDual(ref_el, degree, variant=variant)
+            dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)

@@ -76,6 +76,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
+    if variant == "integral":
+        scale = -scale
+
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
     if dphi is not None:
         dphi[0] = (phi[0] - phi[0]) * dX[0]
@@ -101,7 +104,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
             if variant == "integral":
                 alpha = 2 * sum(sub_index)
-                a = b = 0.5
+                a = b = -0.5
             else:
                 alpha = 2 * sum(sub_index) + len(sub_index)
                 if variant == "dual":
@@ -133,12 +136,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                 ddphi[inext] = (factor * ddphi[icur] + sym_outer(dphi[icur], dfactor) -
                                 c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
 
-            if variant == "integral":
-                icur = idx(*sub_index, 0)
-                inext = idx(*sub_index, 1)
-                for result in results:
-                    result[icur] -= result[inext]
-
         # normalize
         d = codim + 1
         shift = 1 if variant == "dual" else 0
@@ -149,13 +146,44 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                 alpha = 2 * (sum(index[:-1]) + d * shift) - 1
                 norm2 = 1.0
                 if p > 0 and p + alpha > 0:
-                    norm2 = (4*d+2) * (p + alpha) * (2*p + alpha) / (d*p)
+                    norm2 = (p + alpha) * (2*p + alpha) / p
+                    norm2 /= 2 * math.sqrt((1, 1, 6, 18)[d])
             else:
                 norm2 = (2*sum(index) + d) / d
-
             scale = math.sqrt(norm2)
             for result in results:
                 result[icur] *= scale
+
+    # recover facet modes
+    if variant == "integral":
+        icur = 0
+        result[icur] *= -1
+        for inext in range(1, dim+1):
+            for result in results:
+                result[icur] -= result[inext]
+
+        if dim == 2:
+            for i in range(2, n+1):
+                icur = idx(0, i)
+                iprev = idx(1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev]
+
+        elif dim == 3:
+            for i in range(2, n+1):
+                for j in range(0, n+1-i):
+                    icur = idx(0, i, j)
+                    iprev = idx(1, i-1, j)
+                    for result in results:
+                        result[icur] -= result[iprev]
+
+                icur = idx(0, 0, i)
+                iprev0 = idx(1, 0, i-1)
+                iprev1 = idx(0, 1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev0]
+                    result[icur] -= result[iprev1]
+
     return results
 
 
