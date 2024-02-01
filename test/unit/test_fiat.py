@@ -539,7 +539,7 @@ def test_expansion_orthonormality(cell):
     rule = create_quadrature(cell, 2*degree)
     phi = U.tabulate(degree, rule.pts)
     qwts = rule.get_weights()
-    scale = 0.5 ** -cell.get_spatial_dimension()
+    scale = 2 ** cell.get_spatial_dimension()
     results = scale * np.dot(np.multiply(phi, qwts), phi.T)
 
     assert np.allclose(results, np.diag(np.diag(results)))
@@ -640,8 +640,7 @@ def test_make_bubbles(cell):
                           P.get_num_members())))
 
     Q = create_quadrature(cell, P.degree + B.degree)
-    qpts = Q.get_points()
-    qwts = Q.get_weights()
+    qpts, qwts = Q.get_points(), Q.get_weights()
     P_at_qpts = P.tabulate(qpts)[(0,) * sd]
     B_at_qpts = B.tabulate(qpts)[(0,) * sd]
     assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
@@ -654,10 +653,13 @@ def test_bubble_duality(cell):
     degree = 10
     sd = cell.get_spatial_dimension()
     B = make_bubbles(cell, degree)
-    rule = create_quadrature(cell, 2*degree)
-    phi = B.tabulate(rule.pts)[(0,) * sd]
-    qwts = rule.get_weights() / abs(phi[0])
-    results = np.dot(np.multiply(phi, qwts), phi.T)
+
+    Q = create_quadrature(cell, 2*B.degree - sd - 1)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi = B.tabulate(qpts)[(0,) * sd]
+    phi_dual = phi / abs(phi[0])
+    scale = 2 ** sd
+    results = scale * np.dot(np.multiply(phi_dual, qwts), phi.T)
 
     assert np.allclose(results, np.diag(np.diag(results)))
     assert np.allclose(np.diag(results), 1.0)
