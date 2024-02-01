@@ -156,7 +156,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     # recover facet modes
     if variant == "integral":
         icur = 0
-        result[icur] *= -1
+        for result in results:
+            result[icur] *= -1
         for inext in range(1, dim+1):
             for result in results:
                 result[icur] -= result[inext]
