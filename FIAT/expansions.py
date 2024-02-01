@@ -9,8 +9,7 @@ to allow users to get coordinates that they want."""
 
 import numpy
 import math
-from FIAT import reference_element
-from FIAT import jacobi
+from FIAT import reference_element, jacobi
 
 
 def morton_index2(p, q=0):
@@ -63,7 +62,7 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
+def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     """Dubiner recurrence from (Kirby 2010)"""
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
@@ -76,8 +75,11 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
     sym_outer = lambda x, y: outer(x, y) + outer(y, x)
 
     pad_dim = dim + 2
-    dX = pad_jacobian(jacobian, pad_dim)
-    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 1.)
+    dX = pad_jacobian(Jinv, pad_dim)
+    if variant == "integral":
+        scale = -scale
+
+    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
     if dphi is not None:
         dphi[0] = (phi[0] - phi[0]) * dX[0]
     if ddphi is not None:
@@ -87,6 +89,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
 
+    beta = 1 if variant == "dual" else 0
     coefficients = integrated_jrc if variant == "integral" else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
@@ -99,12 +102,13 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
 
-            beta = 0
             if variant == "integral":
                 alpha = 2 * sum(sub_index)
-                a = b = 1.0
+                a = b = -0.5
             else:
                 alpha = 2 * sum(sub_index) + len(sub_index)
+                if variant == "dual":
+                    alpha += 1 + len(sub_index)
                 a = 0.5 * (alpha + beta) + 1.0
                 b = 0.5 * (alpha - beta)
 
@@ -133,19 +137,53 @@ def dubiner_recurrence(dim, n, order, ref_pts, jacobian, variant=None):
                                 c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
 
         # normalize
-        for index in reference_element.lattice_iter(0, n+1, codim+1):
-            p = index[-1]
-            d = len(index)
-            alpha = 2 * sum(index) - 1
-            if variant == "integral" and p > (d == 1) and alpha > p:
-                norm2 = (d*(2*d+1)*(alpha - p)*alpha) / p
-            else:
-                norm2 = 2 * sum(index) + len(index)
-
-            scale = math.sqrt(0.5 * norm2)
+        d = codim + 1
+        shift = 1 if variant == "dual" else 0
+        for index in reference_element.lattice_iter(0, n+1, d):
             icur = idx(*index)
+            if variant is not None:
+                p = index[-1] + shift
+                alpha = 2 * (sum(index[:-1]) + d * shift) - 1
+                norm2 = 1.0
+                if p > 0 and p + alpha > 0:
+                    norm2 = (p + alpha) * (2*p + alpha) / p
+                    norm2 /= 2 * math.sqrt((1, 1, 6, 18)[d])
+            else:
+                norm2 = (2*sum(index) + d) / d
+            scale = math.sqrt(norm2)
             for result in results:
                 result[icur] *= scale
+
+    # recover facet modes
+    if variant == "integral":
+        icur = 0
+        result[icur] *= -1
+        for inext in range(1, dim+1):
+            for result in results:
+                result[icur] -= result[inext]
+
+        if dim == 2:
+            for i in range(2, n+1):
+                icur = idx(0, i)
+                iprev = idx(1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev]
+
+        elif dim == 3:
+            for i in range(2, n+1):
+                for j in range(0, n+1-i):
+                    icur = idx(0, i, j)
+                    iprev = idx(1, i-1, j)
+                    for result in results:
+                        result[icur] -= result[iprev]
+
+                icur = idx(0, 0, i)
+                iprev0 = idx(1, 0, i-1)
+                iprev1 = idx(0, 1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev0]
+                    result[icur] -= result[iprev1]
+
     return results
 
 
@@ -184,8 +222,13 @@ class ExpansionSet(object):
         except KeyError:
             raise ValueError("Invalid reference element type.")
 
-    def __init__(self, ref_el, variant=None):
+    def __init__(self, ref_el, scale=None, variant=None):
+        if scale is None:
+            scale = math.sqrt(1.0 / ref_el.volume())
+        elif isinstance(scale, str) and scale.lower() == "l2 piola":
+            scale = 1.0 / ref_el.volume()
         self.ref_el = ref_el
+        self.scale = scale
         self.variant = variant
         dim = ref_el.get_spatial_dimension()
         self.base_ref_el = reference_element.default_simplex(dim)
@@ -193,8 +236,6 @@ class ExpansionSet(object):
         v2 = self.base_ref_el.get_vertices()
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        detA = numpy.sqrt(numpy.linalg.det(numpy.dot(self.A.T, self.A)))
-        self.scale = numpy.sqrt(detA)
         self._dmats_cache = {}
 
     def get_num_members(self, n):
@@ -213,7 +254,7 @@ class ExpansionSet(object):
         """A version of tabulate() that also works for a single point.
         """
         D = self.ref_el.get_spatial_dimension()
-        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, variant=self.variant)
+        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, self.scale, variant=self.variant)
 
     def get_dmats(self, degree):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -321,7 +362,7 @@ class LineExpansionSet(ExpansionSet):
 
         xs = self._mapping(pts).T
         results = []
-        scale = numpy.sqrt(0.5 + numpy.arange(n+1))
+        scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
