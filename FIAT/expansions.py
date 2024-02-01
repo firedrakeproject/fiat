@@ -66,6 +66,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     """Dubiner recurrence from (Kirby 2010)"""
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
+    if variant == "integral":
+        scale = -scale
 
     num_members = math.comb(n + dim, dim)
     results = tuple([None] * num_members for i in range(order+1))
@@ -76,9 +78,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
-    if variant == "integral":
-        scale = -scale
-
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
     if dphi is not None:
         dphi[0] = (phi[0] - phi[0]) * dX[0]
@@ -147,7 +146,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                 norm2 = 1.0
                 if p > 0 and p + alpha > 0:
                     norm2 = (p + alpha) * (2*p + alpha) / p
-                    norm2 /= 2 * math.sqrt((1, 1, 6, 18)[d])
+                    norm2 *= (2*d+1) / (2*d)
             else:
                 norm2 = (2*sum(index) + d) / d
             scale = math.sqrt(norm2)
@@ -157,7 +156,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     # recover facet modes
     if variant == "integral":
         icur = 0
-        result[icur] *= -1
+        for result in results:
+            result[icur] *= -1
         for inext in range(1, dim+1):
             for result in results:
                 result[icur] -= result[inext]
@@ -223,12 +223,7 @@ class ExpansionSet(object):
             raise ValueError("Invalid reference element type.")
 
     def __init__(self, ref_el, scale=None, variant=None):
-        if scale is None:
-            scale = math.sqrt(1.0 / ref_el.volume())
-        elif isinstance(scale, str) and scale.lower() == "l2 piola":
-            scale = 1.0 / ref_el.volume()
         self.ref_el = ref_el
-        self.scale = scale
         self.variant = variant
         dim = ref_el.get_spatial_dimension()
         self.base_ref_el = reference_element.default_simplex(dim)
@@ -237,6 +232,15 @@ class ExpansionSet(object):
         self.A, self.b = reference_element.make_affine_mapping(v1, v2)
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
         self._dmats_cache = {}
+        if scale is None:
+            scale = math.sqrt(1.0 / self.base_ref_el.volume())
+        elif isinstance(scale, str):
+            scale = scale.lower()
+            if scale == "orthonormal":
+                scale = math.sqrt(1.0 / ref_el.volume())
+            elif scale == "l2 piola":
+                scale = 1.0 / ref_el.volume()
+        self.scale = scale
 
     def get_num_members(self, n):
         D = self.ref_el.get_spatial_dimension()
