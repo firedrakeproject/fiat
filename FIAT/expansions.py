@@ -66,6 +66,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     """Dubiner recurrence from (Kirby 2010)"""
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
+    if variant == "integral":
+        scale = -scale
 
     num_members = math.comb(n + dim, dim)
     results = tuple([None] * num_members for i in range(order+1))
@@ -76,9 +78,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
-    if variant == "integral":
-        scale = -scale
-
     phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
     if dphi is not None:
         dphi[0] = (phi[0] - phi[0]) * dX[0]
