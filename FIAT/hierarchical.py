@@ -9,11 +9,10 @@
 import numpy
 import scipy
 
-from FIAT import finite_element, dual_set, functional, Lagrange
+from FIAT import finite_element, dual_set, functional, demkowicz, Lagrange
 from FIAT.reference_element import (POINT, LINE, TRIANGLE, TETRAHEDRON,
                                     make_lattice, symmetric_simplex)
 from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.barycentric_interpolation import make_dmat
 from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
@@ -56,17 +55,8 @@ class Legendre(finite_element.CiarletElement):
 
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for integrated Legendre elements."""
-    def __init__(self, ref_el, degree, variant=None):
-        if variant is None:
-            variant = "beuchler"
-
-        duals = {
-            "beuchler": self._beuchler_integral_duals,
-            "beuchler_point": self._beuchler_point_duals,
-            "demkowicz": self._demkowicz_integral_duals,
-            "demkowicz_point": self._demkowicz_point_duals,
-            "orthonormal": self._orthonormal_duals,
-        }[variant]
+    def __init__(self, ref_el, degree):
+        duals = self._beuchler_integral_duals
 
         nodes = []
         entity_ids = {}
@@ -74,19 +64,18 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
         top = ref_el.get_topology()
         for dim in sorted(top):
+            perms = make_entity_permutations_simplex(dim, degree - dim)
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
-            if dim == 0:
-                perms = {0: [0]}
+            if dim == 0 or degree <= dim:
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
-                    pt, = ref_el.make_points(0, entity, degree)
-                    nodes.append(functional.PointEvaluation(ref_el, pt))
+                    pts = ref_el.make_points(dim, entity, degree)
+                    nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
                     entity_permutations[dim][entity] = perms
                 continue
 
-            perms = make_entity_permutations_simplex(dim, degree - dim)
             ref_facet = symmetric_simplex(dim)
             Q_ref, phis = duals(ref_facet, degree)
             for entity in sorted(top[dim]):
@@ -102,17 +91,6 @@ class IntegratedLegendreDual(dual_set.DualSet):
                 entity_permutations[dim][entity] = perms
 
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
-
-    def _beuchler_point_duals(self, ref_el, degree, variant="gll"):
-        points = make_lattice(ref_el.vertices, degree, variant=variant)
-        weights = (1.0,) * len(points)
-        Q = QuadratureRule(ref_el, points, weights)
-        B = make_bubbles(ref_el, degree)
-        V = numpy.transpose(B.expansion_set.tabulate(degree, points))
-
-        PLU = scipy.linalg.lu_factor(V)
-        phis = scipy.linalg.lu_solve(PLU, B.get_coeffs().T, trans=1).T
-        return Q, phis
 
     def _beuchler_integral_duals(self, ref_el, degree):
         Q = create_quadrature(ref_el, 2 * degree)
@@ -133,75 +111,6 @@ class IntegratedLegendreDual(dual_set.DualSet):
         phis = numpy.dot(B.get_coeffs(), phis)
         return Q, phis
 
-    def _demkowicz_point_duals(self, ref_el, degree, variant="gll"):
-        Qkm1 = create_quadrature(ref_el, 2 * (degree-1))
-        qpts, qwts = Qkm1.get_points(), Qkm1.get_weights()
-        inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
-
-        P = Lagrange(ref_el, degree, variant=variant)
-        P_table = P.tabulate(1, qpts)
-        B = make_bubbles(ref_el, degree)
-        B_table = B.tabulate(qpts, 1)
-        phis = galerkin(1, B_table, P_table)
-
-        points = []
-        for node in P.dual_basis():
-            pt, = node.get_point_dict()
-            points.append(pt)
-        weights = (1.0,) * len(points)
-        Q = QuadratureRule(ref_el, points, weights)
-        return Q, phis
-
-    def _demkowicz_integral_duals(self, ref_el, degree):
-        Q = create_quadrature(ref_el, 2 * degree)
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        moments = lambda v: numpy.dot(numpy.multiply(v, qwts), v.T)
-
-        dim = ref_el.get_spatial_dimension()
-        if dim == 1:
-            # Assemble a stiffness matrix in the Lagrange basis
-            dmat, _ = make_dmat(qpts.flatten())
-            K = moments(dmat)
-        else:
-            # Get ON basis
-            P = ONPolynomialSet(ref_el, degree)
-            P_table = P.tabulate(qpts, 1)
-            # Assemble a stiffness matrix in the ON basis
-            K = sum(moments(P_table[alpha]) for alpha in P_table if sum(alpha) == 1)
-            # Change of basis to Lagrange polynomials at the quadrature nodes
-            V = numpy.multiply(P_table[(0, ) * dim], qwts)
-            K = numpy.dot(numpy.dot(V.T, K), V)
-
-        B = make_bubbles(ref_el, degree)
-        phis = B.tabulate(qpts)[(0,) * dim]
-        phis = numpy.multiply(numpy.dot(phis, K), 1/qwts)
-        return Q, phis
-
-    def _orthonormal_duals(self, ref_el, degree):
-        dim = ref_el.get_spatial_dimension()
-
-        Q = create_quadrature(ref_el, 2 * degree)
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        galerkin = lambda order, V, U: sum(inner(V[k], U[k]) for k in V if sum(k) == order)
-
-        B = make_bubbles(ref_el, degree)
-        B_table = B.tabulate(qpts, 1)
-
-        P = ONPolynomialSet(ref_el, degree)
-        P_table = P.tabulate(qpts, 1)
-
-        KBP = galerkin(1, B_table, P_table)
-        phis = P_table[(0,) * dim]
-        phis = numpy.dot(KBP, phis)
-
-        if len(phis) > 0:
-            KBB = galerkin(1, B_table, B_table)
-            V = numpy.linalg.cholesky(KBB)
-            phis = numpy.linalg.solve(V, phis)
-        return Q, phis
-
 
 class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
@@ -209,7 +118,15 @@ class IntegratedLegendre(finite_element.CiarletElement):
     def __init__(self, ref_el, degree, variant=None):
         if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
             raise ValueError("%s is only defined on simplices." % type(self))
+        if degree < 1:
+            raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
+
         poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
-        dual = IntegratedLegendreDual(ref_el, degree, variant=variant)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "H1")
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "H1", type(self))
+        else:
+            dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)
