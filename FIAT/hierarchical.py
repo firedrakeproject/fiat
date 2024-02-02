@@ -9,11 +9,11 @@
 import numpy
 import scipy
 
-from FIAT import finite_element, dual_set, functional, demkowicz, Lagrange
+from FIAT import finite_element, dual_set, functional, demkowicz
 from FIAT.reference_element import (POINT, LINE, TRIANGLE, TETRAHEDRON,
-                                    make_lattice, symmetric_simplex)
+                                    symmetric_simplex)
 from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.quadrature import QuadratureRule, FacetQuadratureRule
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 
