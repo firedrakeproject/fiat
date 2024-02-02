@@ -159,19 +159,18 @@ class FDMFiniteElement(finite_element.CiarletElement):
         pass
 
     def __init__(self, ref_el, degree):
-        if ref_el.shape == LINE:
-            if degree == 0:
-                dual = P0Dual(ref_el)
-            else:
-                dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
-                               formdegree=self._formdegree, orthogonalize=self._orthogonalize)
-            if self._formdegree == 0:
-                poly_set = dual.embedded.poly_set
-            else:
-                lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
-                poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
+        if ref_el.shape != LINE:
+            raise ValueError("%s is only defined in one dimension." % type(self))
+        if degree == 0:
+            dual = P0Dual(ref_el)
         else:
-            raise ValueError(f"{type(self).__name__} is only defined on the interval")
+            dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
+                           formdegree=self._formdegree, orthogonalize=self._orthogonalize)
+        if self._formdegree == 0:
+            poly_set = dual.embedded.poly_set
+        else:
+            lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
+            poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
         super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
 
 

@@ -546,7 +546,9 @@ def test_expansion_orthonormality(cell, dim, degree):
     qpts, qwts = Q.get_points(), Q.get_weights()
     phi = U.tabulate(degree, qpts)
     results = np.dot(np.multiply(phi, qwts), phi.T)
-    assert np.allclose(results, np.eye(results.shape[0]))
+
+    assert np.allclose(results, np.diag(np.diag(results)))
+    assert np.allclose(np.diag(results), 1.0)
 
 
 @pytest.mark.parametrize('dim', range(1, 4))
@@ -643,8 +645,7 @@ def test_make_bubbles(cell):
                           P.get_num_members())))
 
     Q = create_quadrature(cell, P.degree + B.degree)
-    qpts = Q.get_points()
-    qwts = Q.get_weights()
+    qpts, qwts = Q.get_points(), Q.get_weights()
     P_at_qpts = P.tabulate(qpts)[(0,) * sd]
     B_at_qpts = B.tabulate(qpts)[(0,) * sd]
     assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
@@ -663,10 +664,13 @@ def test_bubble_duality(cell, dim, degree):
                  "symmetric": reference_element.symmetric_simplex}[cell]
     cell = make_cell(dim)
     B = make_bubbles(cell, degree)
-    rule = create_quadrature(cell, 2*degree)
-    phi = B.tabulate(rule.pts)[(0,) * dim]
-    qwts = rule.get_weights() / abs(phi[0])
-    results = np.dot(np.multiply(phi, qwts), phi.T)
+
+    Q = create_quadrature(cell, 2*B.degree - dim - 1)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi = B.tabulate(qpts)[(0,) * dim]
+    phi_dual = phi / abs(phi[0])
+    scale = 2 ** dim
+    results = scale * np.dot(np.multiply(phi_dual, qwts), phi.T)
 
     assert np.allclose(results, np.diag(np.diag(results)))
     assert np.allclose(np.diag(results), 1.0)
