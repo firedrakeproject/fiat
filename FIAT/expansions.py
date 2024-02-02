@@ -63,13 +63,29 @@ def jacobi_factors(x, y, z, dx, dy, dz):
 
 
 def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
-    """Dubiner recurrence from (Kirby 2010)"""
+    """Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).
+
+    :arg dim: The spatial dimension of the simplex.
+    :arg n: The polynomial degree.
+    :arg order: The maximum order of differenation.
+    :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.
+    :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.
+    :arg scale: A scale factor that sets the first member of expansion set.
+    :arg variant: Choose between the default (None) orthogonal basis,
+                  'integral' for integrated Jacobi polynomials,
+                  or 'dual' for the L2-duals of the integrated Jacobi polynomials.
+
+    :returns: A tuple with tabulations of the expansion set and its derivatives.
+    """
     if order > 2:
         raise ValueError("Higher order derivatives not supported")
+    if variant not in [None, "integral", "dual"]:
+        raise ValueError(f"Invalid variant {variant}")
+
     if variant == "integral":
         scale = -scale
     if n == 0:
-        # This is to make regression tests pass
+        # Always return 1 for n=0 to make regression tests pass
         scale = 1.0
 
     num_members = math.comb(n + dim, dim)
@@ -156,7 +172,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             for result in results:
                 result[icur] *= scale
 
-    # recover facet modes
+    # recover facet bubbles
     if variant == "integral":
         icur = 0
         for result in results:
