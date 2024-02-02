@@ -123,7 +123,7 @@ class NedelecDual(dual_set.DualSet):
                 if phi_deg >= 0:
                     facet = ref_el.construct_subelement(dim)
                     Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
-                    Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,), scale="L2 piola")
+                    Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
                     Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * dim]
                     Phis = numpy.transpose(Phis, (0, 2, 1))
 
@@ -165,7 +165,7 @@ class NedelecDual(dual_set.DualSet):
                 interpolant_deg = degree
             cur = len(nodes)
             Q = create_quadrature(ref_el, interpolant_deg + phi_deg)
-            Pqmd = polynomial_set.ONPolynomialSet(ref_el, phi_deg, scale="L2 piola")
+            Pqmd = polynomial_set.ONPolynomialSet(ref_el, phi_deg)
             Phis = Pqmd.tabulate(Q.get_points())[(0,) * dim]
             nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (dim,))
                          for d in range(dim) for phi in Phis)
