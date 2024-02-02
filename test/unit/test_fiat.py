@@ -637,7 +637,7 @@ def test_make_bubbles(cell):
     points = cell.make_points(sd, 0, degree)
     values = B.tabulate(points)[(0,) * sd]
     assert values.shape == (m, m)
-    assert np.linalg.matrix_rank(values.T) == m
+    assert np.linalg.matrix_rank(values.T, tol=1E-12) == m
 
     # test that B does not have components in span(P_{degree+2} \ P_{degree})
     P = ONPolynomialSet(cell, degree + 2)
