@@ -121,7 +121,6 @@ class ONPolynomialSet(PolynomialSet):
 
     """
 
-
     def __init__(self, ref_el, degree, shape=tuple(), scale=None, variant=None):
         if shape == tuple():
             num_components = 1
