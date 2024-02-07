@@ -595,11 +595,7 @@ def test_expansion_values(dim):
         return f
 
     def eval_basis(f, pt):
-        fval = f
-        for coord, pval in zip(eta, duffy_coords(pt)):
-            fval = fval.subs(coord, pval)
-        fval = float(fval)
-        return fval
+        return float(f.subs(dict(zip(eta, duffy_coords(pt)))))
 
     for i in range(n + 1):
         for indices in polynomial_set.mis(dim, i):
@@ -607,6 +603,68 @@ def test_expansion_values(dim):
             exact = np.array([eval_basis(phi, r) for r in rpoints])
             uh = Uvals[idx(*indices)]
             assert np.allclose(uh, exact, atol=1E-14)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_make_bubbles(cell):
+    from FIAT.quadrature_schemes import create_quadrature
+    from FIAT.expansions import polynomial_dimension
+    from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
+
+    degree = 10
+    B = make_bubbles(cell, degree)
+
+    # basic tests
+    sd = cell.get_spatial_dimension()
+    assert isinstance(B, PolynomialSet)
+    assert B.degree == degree
+    assert B.get_num_members() == polynomial_dimension(cell, degree - sd - 1)
+
+    # test values on the boundary
+    top = cell.get_topology()
+    points = []
+    for dim in range(len(top)-1):
+        for entity in range(len(top[dim])):
+            points.extend(cell.make_points(dim, entity, degree))
+    values = B.tabulate(points)[(0,) * sd]
+    assert np.allclose(values, 0, atol=1E-12)
+
+    # test linear independence
+    m = B.get_num_members()
+    points = cell.make_points(sd, 0, degree)
+    values = B.tabulate(points)[(0,) * sd]
+    assert values.shape == (m, m)
+    assert np.linalg.matrix_rank(values.T, tol=1E-12) == m
+
+    # test that B does not have components in span(P_{degree+2} \ P_{degree})
+    P = ONPolynomialSet(cell, degree + 2)
+    P = P.take(list(range(polynomial_dimension(cell, degree),
+                          P.get_num_members())))
+
+    Q = create_quadrature(cell, P.degree + B.degree)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    P_at_qpts = P.tabulate(qpts)[(0,) * sd]
+    B_at_qpts = B.tabulate(qpts)[(0,) * sd]
+    assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_bubble_duality(cell):
+    from FIAT.polynomial_set import make_bubbles
+    from FIAT.quadrature_schemes import create_quadrature
+    degree = 10
+    sd = cell.get_spatial_dimension()
+    B = make_bubbles(cell, degree)
+
+    Q = create_quadrature(cell, 2*B.degree - sd - 1)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi = B.tabulate(qpts)[(0,) * sd]
+    phi_dual = phi / abs(phi[0])
+    scale = 2 ** sd
+    results = scale * np.dot(np.multiply(phi_dual, qwts), phi.T)
+
+    assert np.allclose(results, np.diag(np.diag(results)))
+    assert np.allclose(np.diag(results), 1.0)
 
 
 if __name__ == '__main__':

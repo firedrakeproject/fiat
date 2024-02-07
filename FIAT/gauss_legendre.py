@@ -32,6 +32,7 @@ class GaussLegendreDualSet(dual_set.DualSet):
                 entity_permutations[dim][entity] = perms
 
         # make nodes by getting points
+        dim = ref_el.get_spatial_dimension()
         pts = make_lattice(ref_el.get_vertices(), degree, variant="gl")
         nodes = [functional.PointEvaluation(ref_el, x) for x in pts]
         entity_ids[dim][0] = list(range(len(nodes)))

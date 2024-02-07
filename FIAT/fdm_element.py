@@ -9,12 +9,12 @@
 import abc
 import numpy
 
-from FIAT import finite_element, dual_set, functional, quadrature
-from FIAT.reference_element import LINE
-from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.hierarchical import IntegratedLegendre
+from FIAT import dual_set, finite_element, functional, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
+from FIAT.hierarchical import IntegratedLegendre
+from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.P0 import P0Dual
+from FIAT.reference_element import LINE
 
 
 def sym_eig(A, B):
@@ -166,7 +166,6 @@ class FDMFiniteElement(finite_element.CiarletElement):
         else:
             dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
                            formdegree=self._formdegree, orthogonalize=self._orthogonalize)
-
         if self._formdegree == 0:
             poly_set = dual.embedded.poly_set
         else:

@@ -23,26 +23,27 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.parametrize("family, degree", [(f, degree - 1 if f == "DG" else degree)
-                                            for f in ("CG", "DG")
-                                            for degree in range(1, 7)])
-def test_hierarchical_basis_values(family, degree):
+@pytest.mark.parametrize("dim, family, degree", [(dim, f, degree - 1 if f == "DG" else degree)
+                                                 for f in ("CG", "DG")
+                                                 for dim in range(1, 4)
+                                                 for degree in range(1, 7)])
+def test_hierarchical_basis_values(dim, family, degree):
     """Ensure that integrating a simple monomial produces the expected results."""
     from FIAT import ufc_simplex, Legendre, IntegratedLegendre, make_quadrature
 
-    s = ufc_simplex(1)
-    q = make_quadrature(s, degree + 1)
+    s = ufc_simplex(dim)
+    q = make_quadrature(s, degree+1)
     if family == "CG":
         fe = IntegratedLegendre(s, degree)
     else:
         fe = Legendre(s, degree)
-    tab = fe.tabulate(0, q.pts)[(0,)]
+    tab = fe.tabulate(0, q.pts)[(0,)*dim]
 
     for test_degree in range(degree + 1):
-        coefs = [n(lambda x: x[0]**test_degree) for n in fe.dual.nodes]
+        v = lambda x: sum(x)**test_degree
+        coefs = [n(v) for n in fe.dual.nodes]
         integral = np.dot(coefs, np.dot(tab, q.wts))
-        reference = np.dot([x[0]**test_degree
-                            for x in q.pts], q.wts)
+        reference = q.integrate(v)
         assert np.allclose(integral, reference, rtol=1e-14)
 
 
@@ -65,7 +66,8 @@ def test_hierarchical_sparsity(family, degree):
     moments = lambda v, u: np.dot(np.multiply(v, q.get_weights()), u.T)
     tab = fe.tabulate(len(expected)-1, q.get_points())
     for k, ennz in enumerate(expected):
-        assert nnz(moments(tab[(k, )], tab[(k, )])) == ennz
+        A = sum(moments(tab[alpha], tab[alpha]) for alpha in tab if sum(alpha) == k)
+        assert nnz(A) == ennz
 
 
 if __name__ == '__main__':

@@ -16,6 +16,7 @@
 # an entire set of polynomials)
 
 import numpy
+from itertools import chain
 from FIAT import expansions
 from FIAT.functional import index_iterator
 
@@ -120,8 +121,8 @@ class ONPolynomialSet(PolynomialSet):
 
     """
 
-    def __init__(self, ref_el, degree, shape=tuple(), scale=None):
 
+    def __init__(self, ref_el, degree, shape=tuple(), scale=None, variant=None):
         if shape == tuple():
             num_components = 1
         else:
@@ -130,7 +131,7 @@ class ONPolynomialSet(PolynomialSet):
         num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el, scale=scale)
+        expansion_set = expansions.ExpansionSet(ref_el, scale=scale, variant=variant)
 
         # set up coefficients
         if shape == tuple():
@@ -241,3 +242,29 @@ class ONSymTensorPolynomialSet(PolynomialSet):
 
         super(ONSymTensorPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
                                                        expansion_set, coeffs)
+
+
+def make_bubbles(ref_el, degree, shape=()):
+    """Construct a polynomial set with bubbles up to the given degree.
+
+    """
+    dim = ref_el.get_spatial_dimension()
+    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="integral")
+    degrees = chain(range(dim + 1, degree+1, 2), range(dim + 2, degree+1, 2))
+
+    if dim == 1:
+        indices = list(degrees)
+    else:
+        idx = (expansions.morton_index2, expansions.morton_index3)[dim-2]
+        indices = []
+        for p in degrees:
+            for alpha in mis(dim, p):
+                if alpha[0] > 1 and min(alpha[1:]) > 0:
+                    indices.append(idx(*alpha))
+
+    if shape != ():
+        ncomp = numpy.prod(shape)
+        dimPk = poly_set.get_num_members() // ncomp
+        indices = list((numpy.array(indices)[:, None] + dimPk * numpy.arange(ncomp)[None, :]).flat)
+    poly_set = poly_set.take(indices)
+    return poly_set
