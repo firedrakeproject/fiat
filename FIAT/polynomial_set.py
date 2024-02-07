@@ -261,6 +261,7 @@ def make_bubbles(ref_el, degree, shape=()):
             for alpha in mis(dim, p):
                 if alpha[0] > 1 and min(alpha[1:]) > 0:
                     indices.append(idx(*alpha))
+        # indices = [idx(*alpha) for alpha in numpy.ndindex((degree,)*dim) if min(alpha)>0 and alpha[0]>1 and sum(alpha)<=degree]
 
     if shape != ():
         ncomp = numpy.prod(shape)

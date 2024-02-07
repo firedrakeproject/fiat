@@ -102,14 +102,14 @@ class DemkowiczDual(DualSet):
         Q = create_quadrature(facet, 2 * degree)
         if formdegree == dim:
             shp = (dim,) if sobolev_space == "HCurl" else ()
-            P = ONPolynomialSet(facet, k, shp)
+            P = ONPolynomialSet(facet, k, shp, scale="orthonormal")
             duals = P.tabulate(Q.get_points())[(0,) * dim]
             return Q, duals
 
         exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
         Qpts, Qwts = Q.get_points(), Q.get_weights()
         shp = () if formdegree == 0 else (dim,)
-        P = ONPolynomialSet(facet, degree, shp)
+        P = ONPolynomialSet(facet, degree, shp, scale="orthonormal")
         P_at_qpts = P.tabulate(Qpts, 1)
         dtrial = exterior_derivative(P_at_qpts)
 
@@ -132,7 +132,7 @@ class DemkowiczDual(DualSet):
         if formdegree >= dim - 1:
             # We are at the end of the complex
             # bubbles have derivative in P_k-1 minus constants
-            Pkm1 = ONPolynomialSet(facet, degree-1, trial.shape[1:-1])
+            Pkm1 = ONPolynomialSet(facet, degree-1, trial.shape[1:-1], scale="orthonormal")
             P0 = Pkm1.take(list(range(1, Pkm1.get_num_members())))
             dtest = P0.tabulate(Qpts)[(0,) * dim]
             return inner(dtest, trial, Qwts)
@@ -140,12 +140,12 @@ class DemkowiczDual(DualSet):
         # Get bubbles
         if formdegree == 0:
             B = make_bubbles(facet, degree)
-        elif formdegree == 1:
-            from FIAT.nedelec import Nedelec
-            fe = Nedelec(facet, degree)
-            B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
         else:
-            raise ValueError(f"{formdegree}-form bubbles not supported")
+            from FIAT.nedelec import Nedelec
+            from FIAT.raviart_thomas import RaviartThomas
+            fe = (Nedelec, RaviartThomas)[formdegree-1](facet, degree)
+            B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
+
         # Tabulate the exterior derivate
         B_at_qpts = B.tabulate(Qpts, 1)
         d = (grad, curl, div)[formdegree]
@@ -260,7 +260,7 @@ def project_derivative(fe, op):
         expr = rot(expr)
 
     sd = ref_el.get_spatial_dimension()
-    P = ONPolynomialSet(ref_el, degree, expr.shape[1:-1])
+    P = ONPolynomialSet(ref_el, degree, expr.shape[1:-1], scale="orthonormal")
     wts = P.tabulate(Qpts)[(0,) * sd]
     numpy.multiply(wts, Qwts, out=wts)
     coeffs = numpy.tensordot(expr, wts, axes=(range(1, expr.ndim), range(1, expr.ndim)))
@@ -269,14 +269,17 @@ def project_derivative(fe, op):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    from scipy.io import savemat, loadmat
+    from os.path import exists
+
     from FIAT import IntegratedLegendre as CG
     from FIAT import Nedelec as N1Curl
     from FIAT import RaviartThomas as N1Div
     from FIAT import NedelecSecondKind as N2Curl
     from FIAT import BrezziDouglasMarini as N2Div
 
-    dim = 3
-    degree = 7
+    dim = 2
+    degree = 10
     ref_el = symmetric_simplex(dim)
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
@@ -293,6 +296,11 @@ if __name__ == "__main__":
 
     fig, axes = plt.subplots(ncols=len(spaces), nrows=2, figsize=(6*len(spaces), 12))
     axes = axes.T.flat
+    fname = "fiat.mat"
+    mdict = dict()
+    if exists(fname):
+        loadmat(fname, mdict=mdict)
+
     for space in spaces:
         element, d = space_dict[space]
         fe = element(ref_el, degree, variant)
@@ -304,12 +312,27 @@ if __name__ == "__main__":
 
         mats = (stiff, mass)
         title = f"{type(fe).__name__}({degree})"
-        names = (f"{title} stiff", f"{title} mass")
+        names = ("A", "B")
         for name, A in zip(names, mats):
             A[abs(A) < 1E-10] = 0.0
-            nnz = numpy.count_nonzero(A)
+            scipy_mat = scipy.sparse.csr_matrix(A)
+            nnz = scipy_mat.count_nonzero()
+            ms = 0
             ax = next(axes)
-            ax.spy(A, markersize=0)
-            ax.pcolor(numpy.log(abs(A)))
-            ax.set_title(f"{name} nnz {nnz}")
+            ax.spy(A, markersize=ms)
+            if ms == 0:
+                ax.pcolor(numpy.log(abs(A)))
+            ax.set_title(f"{title} {name} nnz {nnz}")
+
+            if False:
+                family = {"H1": "Lagrange", "HCurl": "N1curl", "HDiv": "N1div"}[space]
+                if kind == 2:
+                    family = family.replace("N1", "N2")
+                mat_name = "%s%dd_%s%d_%s" % (name, dim, family, degree, variant or "integral")
+                old_mat = mdict.get(mat_name, None)
+                old_mat = None
+                if old_mat is None or scipy_mat.shape[0] == old_mat.shape[0]:
+                    mdict[mat_name] = scipy_mat
+
+    savemat(fname, mdict)
     plt.show()
