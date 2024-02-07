@@ -30,13 +30,12 @@ class BDMDualSet(dual_set.DualSet):
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q}
             # degree is q
             Q_ref = create_quadrature(facet, interpolant_deg + degree)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree)
+            Pq = polynomial_set.ONPolynomialSet(facet, degree, scale=1)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                n = ref_el.compute_normal(f)
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)

@@ -252,8 +252,8 @@ class ExpansionSet(object):
         self.mapping = lambda x: numpy.dot(self.A, x) + self.b
         self._dmats_cache = {}
         if scale is None:
-            scale = math.sqrt(1.0 / self.base_ref_el.volume())
-        elif isinstance(scale, str):
+            scale = "orthonormal"
+        if isinstance(scale, str):
             scale = scale.lower()
             if scale == "orthonormal":
                 scale = math.sqrt(1.0 / ref_el.volume())
