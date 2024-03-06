@@ -3,7 +3,7 @@ import pytest
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT import create_quadrature, make_quadrature, polynomial_set
-from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen as KMV
+from FIAT.mass_lumped_triangular import MassLumpedTriangular as MLT
 
 I = UFCInterval()
 T = UFCTriangle()
@@ -11,10 +11,10 @@ Te = UFCTetrahedron()
 
 
 @pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 4)])
-def test_kmv_quad_tet_schemes(p_d):  # noqa: W503
+def test_mlt_quad_tet_schemes(p_d):  # noqa: W503
     fct = np.math.factorial
     p, d = p_d
-    q = create_quadrature(Te, p, "KMV")
+    q = create_quadrature(Te, p, "MLT")
     for i in range(d + 1):
         for j in range(d + 1 - i):
             for k in range(d + 1 - i - j):
@@ -29,10 +29,10 @@ def test_kmv_quad_tet_schemes(p_d):  # noqa: W503
 
 
 @pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 5), (4, 7), (5, 9)])
-def test_kmv_quad_tri_schemes(p_d):
+def test_mlt_quad_tri_schemes(p_d):
     fct = np.math.factorial
     p, d = p_d
-    q = create_quadrature(T, p, "KMV")
+    q = create_quadrature(T, p, "MLT")
     for i in range(d + 1):
         for j in range(d + 1 - i):
             trueval = fct(i) * fct(j) / fct(i + j + 2)
@@ -43,7 +43,7 @@ def test_kmv_quad_tri_schemes(p_d):
 
 @pytest.mark.parametrize(
     "element_degree",
-    [(KMV(T, 1), 1), (KMV(T, 2), 2), (KMV(T, 3), 3), (KMV(T, 4), 4), (KMV(T, 5), 5)],
+    [(MLT(T, 1), 1), (MLT(T, 2), 2), (MLT(T, 3), 3), (MLT(T, 4), 4), (MLT(T, 5), 5)],
 )
 def test_Kronecker_property_tris(element_degree):
     """
@@ -52,13 +52,13 @@ def test_Kronecker_property_tris(element_degree):
     and quadrature points are given the same ordering.
     """
     element, degree = element_degree
-    qr = create_quadrature(T, degree, scheme="KMV")
+    qr = create_quadrature(T, degree, scheme="MLT")
     (basis,) = element.tabulate(0, qr.get_points()).values()
     assert np.allclose(basis, np.eye(*basis.shape))
 
 
 @pytest.mark.parametrize(
-    "element_degree", [(KMV(Te, 1), 1), (KMV(Te, 2), 2), (KMV(Te, 3), 3)]
+    "element_degree", [(MLT(Te, 1), 1), (MLT(Te, 2), 2), (MLT(Te, 3), 3)]
 )
 def test_Kronecker_property_tets(element_degree):
     """
@@ -67,14 +67,14 @@ def test_Kronecker_property_tets(element_degree):
     and quadrature points are given the same ordering.
     """
     element, degree = element_degree
-    qr = create_quadrature(Te, degree, scheme="KMV")
+    qr = create_quadrature(Te, degree, scheme="MLT")
     (basis,) = element.tabulate(0, qr.get_points()).values()
     assert np.allclose(basis, np.eye(*basis.shape))
 
 
 @pytest.mark.parametrize("degree", [2, 3, 4])
 def test_edge_degree(degree):
-    """Verify that the outer edges of a degree KMV element
+    """Verify that the outer edges of a degree MLT element
        are indeed of degree and the interior is of degree+1"""
     # create a degree+1 polynomial
     I = UFCInterval()
@@ -87,10 +87,10 @@ def test_edge_degree(degree):
     # tabulate at the quadrature points
     interval_vals = pset.tabulate(qr.get_points())[(0,)]
     interval_vals = np.squeeze(interval_vals)
-    # create degree KMV element (should have degree outer edges and degree+1 edge in center)
+    # create degree MLT element (should have degree outer edges and degree+1 edge in center)
     T = UFCTriangle()
-    element = KMV(T, degree)
-    # tabulate values on an edge of the KMV element
+    element = MLT(T, degree)
+    # tabulate values on an edge of the MLT element
     for e in range(3):
         edge_values = element.tabulate(0, qr.get_points(), (1, e))[(0, 0)]
         # degree edge should be orthogonal to degree+1 ONpoly edge values
@@ -100,13 +100,13 @@ def test_edge_degree(degree):
 
 @pytest.mark.parametrize(
     "element_degree",
-    [(KMV(T, 1), 1), (KMV(T, 2), 2), (KMV(T, 3), 3), (KMV(T, 4), 4), (KMV(T, 5), 5)],
+    [(MLT(T, 1), 1), (MLT(T, 2), 2), (MLT(T, 3), 3), (MLT(T, 4), 4), (MLT(T, 5), 5)],
 )
 def test_interpolate_monomials_tris(element_degree):
     element, degree = element_degree
 
-    # ordered the same way as KMV nodes
-    pts = create_quadrature(T, degree, "KMV").pts
+    # ordered the same way as MLT nodes
+    pts = create_quadrature(T, degree, "MLT").pts
 
     Q = make_quadrature(T, 2 * degree)
     phis = element.tabulate(0, Q.pts)[0, 0]
@@ -124,13 +124,13 @@ def test_interpolate_monomials_tris(element_degree):
 
 
 @pytest.mark.parametrize(
-    "element_degree", [(KMV(Te, 1), 1), (KMV(Te, 2), 2), (KMV(Te, 3), 3)]
+    "element_degree", [(MLT(Te, 1), 1), (MLT(Te, 2), 2), (MLT(Te, 3), 3)]
 )
 def test_interpolate_monomials_tets(element_degree):
     element, degree = element_degree
 
-    # ordered the same way as KMV nodes
-    pts = create_quadrature(Te, degree, "KMV").pts
+    # ordered the same way as MLT nodes
+    pts = create_quadrature(Te, degree, "MLT").pts
 
     Q = make_quadrature(Te, 2 * degree)
     phis = element.tabulate(0, Q.pts)[0, 0, 0]
