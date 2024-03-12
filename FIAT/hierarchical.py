@@ -9,7 +9,7 @@
 import numpy
 import scipy
 
-from FIAT import finite_element, dual_set, functional
+from FIAT import finite_element, dual_set, functional, demkowicz
 from FIAT.reference_element import (POINT, LINE, TRIANGLE, TETRAHEDRON,
                                     symmetric_simplex)
 from FIAT.orientation_utils import make_entity_permutations_simplex
@@ -122,6 +122,11 @@ class IntegratedLegendre(finite_element.CiarletElement):
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
 
         poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
-        dual = IntegratedLegendreDual(ref_el, degree)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "H1")
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "H1", type(self))
+        else:
+            dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)

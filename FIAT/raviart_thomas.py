@@ -6,7 +6,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import (expansions, polynomial_set, dual_set,
-                  finite_element, functional)
+                  finite_element, functional, demkowicz)
 import numpy
 from itertools import chain
 from FIAT.check_format_variant import check_format_variant
@@ -80,8 +80,7 @@ class RTDualSet(dual_set.DualSet):
             for f in top[sd - 1]:
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                n = ref_el.compute_normal(f)
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -141,10 +140,15 @@ class RaviartThomas(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant=None):
 
-        variant, interpolant_deg = check_format_variant(variant, degree)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HDiv", kind=1)
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "HDiv", type(self))
+        else:
+            variant, interpolant_deg = check_format_variant(variant, degree)
+            dual = RTDualSet(ref_el, degree, variant, interpolant_deg)
 
         poly_set = RTSpace(ref_el, degree)
-        dual = RTDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super(RaviartThomas, self).__init__(poly_set, dual, degree, formdegree,
                                             mapping="contravariant piola")

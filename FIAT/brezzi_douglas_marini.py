@@ -6,7 +6,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import (finite_element, functional, dual_set,
-                  polynomial_set, nedelec)
+                  polynomial_set, nedelec, demkowicz)
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
@@ -35,8 +35,7 @@ class BDMDualSet(dual_set.DualSet):
             for f in top[sd - 1]:
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                n = ref_el.compute_normal(f)
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -89,15 +88,18 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
-
-        variant, interpolant_deg = check_format_variant(variant, degree)
-
         if degree < 1:
-            raise Exception("BDM_k elements only valid for k >= 1")
+            raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
-        dual = BDMDualSet(ref_el, degree, variant, interpolant_deg)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HDiv")
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "HDiv", type(self))
+        else:
+            variant, interpolant_deg = check_format_variant(variant, degree)
+            dual = BDMDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = sd - 1  # (n-1)-form
         super(BrezziDouglasMarini, self).__init__(poly_set, dual, degree, formdegree,
                                                   mapping="contravariant piola")
