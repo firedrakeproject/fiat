@@ -433,6 +433,12 @@ class IntegralLegendreNormalTangentialMoment(IntegralLegendreBidirectionalMoment
         super().__init__(cell, n, t, entity, mom_deg, comp_deg,
                          "IntegralNormalTangentialLegendreMoment")
 
+class IntegralLegendreTangentialTangentialMoment(IntegralLegendreBidirectionalMoment):
+    """Moment of dot(t, dot(tau, t)) against Legendre on entity."""
+    def __init__(self, cell, entity, mom_deg, comp_deg):
+        t = cell.compute_normalized_edge_tangent(entity)
+        super().__init__(cell, t, t, entity, mom_deg, comp_deg,
+                         "IntegralTangentialTangentialLegendreMoment")
 
 class IntegralMomentOfDivergence(Functional):
     """Functional representing integral of the divergence of the input
@@ -630,6 +636,28 @@ class MonkIntegralMoment(Functional):
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
             pt_dict[pt] = [(wgt*phi[i], (i, )) for i in range(sd)]
         super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
+
+#class FrancisIntegralMoment(Functional):
+#    r"""
+#    internal nodes are \int_K v\cdot p dA where p \in P_{q-2}(f)^3 with p \cdot n = 0
+#    (cmp. Peter Monk - Finite Element Methods for Maxwell's equations p. 129)
+#    Note that we don't scale by the area of the facet
+#
+#    :arg ref_el: reference element for which F is a codim-0 entity
+#    :arg Q: quadrature rule on the face
+#    :arg P_at_qpts: polynomials evaluated at quad points
+#    :arg facet: which facet.
+#    """
+#
+#    def __init__(self, ref_el, Q, P_at_qpts, facet):
+#        sd = ref_el.get_spatial_dimension()
+#        weights = Q.get_weights()
+#        pt_dict = OrderedDict()
+#        transform = ref_el.get_entity_transform(sd-1, facet)
+#        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+#        for pt, wgt, phi in zip(pts, weights, P_at_qpts):
+#            pt_dict[pt] = [(wgt*phi[i], (i, )) for i in range(sd)]
+#        super().__init__(ref_el, (sd, ), pt_dict, {}, "FrancisIntegralMoment")
 
 
 class PointScaledNormalEvaluation(Functional):
