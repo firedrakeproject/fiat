@@ -6,13 +6,13 @@ def test_dofs():
     line = ufc_simplex(1)
     T = ufc_simplex(2)
     T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.25), (-0.75, 1.1)])
-    AW = HuZhang(T, 3)
+    HZ = HuZhang(T, 3)
 
     # check Kronecker property at vertices
 
     bases = [[[1, 0], [0, 0]], [[0, 1], [1, 0]], [[0, 0], [0, 1]]]
 
-    vert_vals = AW.tabulate(0, T.vertices)[(0, 0)]
+    vert_vals = HZ.tabulate(0, T.vertices)[(0, 0)]
     for i in range(3):
         for j in range(3):
             assert np.allclose(vert_vals[3*i+j, :, :, i], bases[j])
@@ -31,7 +31,7 @@ def test_dofs():
         wts = np.asarray(Qline.wts)
         nqpline = len(wts)
 
-        vals = AW.tabulate(0, Qline.pts, (1, ed))[(0, 0)]
+        vals = HZ.tabulate(0, Qline.pts, (1, ed))[(0, 0)]
         nnvals = np.zeros((30, nqpline))
         for i in range(30):
             for j in range(len(wts)):
@@ -45,7 +45,7 @@ def test_dofs():
                     nnmoments[bf, m] += wts[k] * nnvals[bf, k] * linevals[m, k]
 
         for bf in range(30):
-            if bf != AW.dual.entity_ids[1][ed][0] and bf != AW.dual.entity_ids[1][ed][2]:
+            if bf != HZ.dual.entity_ids[1][ed][0] and bf != HZ.dual.entity_ids[1][ed][2]:
                 assert np.allclose(nnmoments[bf, :], np.zeros(2))
 
     # n, t moments
@@ -55,7 +55,7 @@ def test_dofs():
         wts = np.asarray(Qline.wts)
         nqpline = len(wts)
 
-        vals = AW.tabulate(0, Qline.pts, (1, ed))[(0, 0)]
+        vals = HZ.tabulate(0, Qline.pts, (1, ed))[(0, 0)]
         ntvals = np.zeros((30, nqpline))
         for i in range(30):
             for j in range(len(wts)):
@@ -69,12 +69,12 @@ def test_dofs():
                     ntmoments[bf, m] += wts[k] * ntvals[bf, k] * linevals[m, k]
 
         for bf in range(30):
-            if bf != AW.dual.entity_ids[1][ed][1] and bf != AW.dual.entity_ids[1][ed][3]:
+            if bf != HZ.dual.entity_ids[1][ed][1] and bf != HZ.dual.entity_ids[1][ed][3]:
                 assert np.allclose(ntmoments[bf, :], np.zeros(2))
 
     # check internal dofs
     Q = make_quadrature(T, 6)
-    qpvals = AW.tabulate(0, Q.pts)[(0, 0)]
+    qpvals = HZ.tabulate(0, Q.pts)[(0, 0)]
     const_moms = qpvals @ Q.wts
     assert np.allclose(const_moms[:21], np.zeros((21, 2, 2)))
     assert np.allclose(const_moms[24:], np.zeros((6, 2, 2)))
@@ -92,7 +92,7 @@ def test_projection():
     T = ufc_simplex(2)
     T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.0), (0.5, 2.1)])
 
-    AW = HuZhang(T, 3)
+    HZ = HuZhang(T, 3)
 
     Q = make_quadrature(T, 4)
     qpts = np.asarray(Q.pts)
@@ -104,7 +104,7 @@ def test_projection():
     b = np.zeros((24,))
     rhs_vals = np.zeros((2, 2, nqp))
 
-    bfvals = AW.tabulate(0, qpts)[(0, 0)][:nbf, :, :, :]
+    bfvals = HZ.tabulate(0, qpts)[(0, 0)][:nbf, :, :, :]
 
     for i in range(nbf):
         for j in range(nbf):

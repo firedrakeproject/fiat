@@ -56,15 +56,21 @@ class HuZhangDual(DualSet):
         # moments of normal . sigma against degree p - 2.
         for entity_id in range(3):
             #for order in (0, degree - 1): #### NB this should also have been range() back with AW!
-            for order in range(degree - 1):
-                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, order + degree),
-                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, order + degree)]
+            #for order in range(degree - 1):
+            for order in range(2):
+                #dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, order + degree),
+                #         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, order + degree)]
+                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
+                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
             # NB, mom_deg should actually be order + degree <= 2*degree, but in AW have 6 = 2*degree
-            dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 2*(degree - 1)))
-            dof_cur += 2*(degree - 1)
+            #dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 2*(degree - 1)))
+            dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 4))
+            #dof_cur += 2*(degree - 1)
+            dof_cur += 4
 
         # internal dofs
-        Q = make_quadrature(cell, 2*(degree + 1))
+        #Q = make_quadrature(cell, 2*(degree + 1))
+        Q = make_quadrature(cell, 3)
 
         e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
         e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
@@ -73,33 +79,39 @@ class HuZhangDual(DualSet):
         # Copying DOFs of Nedelec of 2nd kind (moments against RT)
         qs = Q.get_points()
         # Create Lagrange bubble nodal basis
-        CGbubbles = Bubble(cell, degree)
+        #CGbubbles = Bubble(cell, degree)
+        CGbubbles = Bubble(cell, 3)
         phi = CGbubbles.get_nodal_basis()
 
         # Evaluate Lagrange bubble basis at quadrature points
+
+        # Copying AWc rather than AWnc internal DOFs, since latter has 4 nested for loops
         
         for (v1, v2) in basis:
             v1v2t = numpy.outer(v1, v2)
-            #phi = [phi[i]*v1v2t for i in len(phi)]
+            #phi_times_matrix = [phi[i]*v1v2t for i in len(phi)]
             fatqp = numpy.zeros((2, 2, len(Q.pts)))
+            #phiatqpts = numpy.outer(phi_times_matrix.tabulate(qs)[(0,) * 2], v1v2t)
             phiatqpts = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
             for k in range(len(Q.pts)):
-                fatqp[:, :, k] = v1v2t
-                #temp = phiatqpts[k, :]
-                #fatqp[:, :, k] = temp.reshape((2, 2))
-                phi_at_qs[:, :, k] = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
-            phi_at_qs = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
-            dofs.append([FIM(cell, Q, phi_at_qs[i, :]) for i in range(len(phi_at_qs))])
+                #fatqp[:, :, k] = v1v2t
+                temp = phiatqpts[k, :]
+                fatqp[:, :, k] = temp.reshape((2, 2))
+                #phi_at_qs[:, :, k] = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
+            #phi_at_qs = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
+            #dofs.append([FIM(cell, Q, phi_at_qs[i, :]) for i in range(len(phi_at_qs))])
             dofs.append(FIM(cell, Q, fatqp))
-        dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(degree + 1)))
-        dof_cur += 3*(degree + 1)
+        #dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(degree + 1)))
+        dof_ids[2][0] = list(range(dof_cur, dof_cur + 3))
+        #dof_cur += 3*(degree + 1)
+        dof_cur += 3
 
         #for entity_id in range(3):
         #    for order in range(1, degree):
         #        dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, degree*2)]
 
-        dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*degree*(degree - 1)/2)))
-        dof_cur += round(3*degree*(degree - 1)/2)
+        #dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*degree*(degree - 1)/2)))
+        #dof_cur += round(3*degree*(degree - 1)/2)
 
 #        # Constraint dofs
 #
