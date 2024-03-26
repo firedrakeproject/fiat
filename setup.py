@@ -27,4 +27,4 @@ setup(name="fenics-fiat",
       download_url=tarball,
       license="LGPL v3 or later",
       packages=["FIAT"],
-      install_requires=["numpy", "sympy"])
+      install_requires=["numpy", "recursivenodes", "scipy", "sympy"])

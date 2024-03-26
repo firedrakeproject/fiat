@@ -25,20 +25,15 @@ class DRTDualSet(dual_set.DualSet):
 
         # codimension 1 facets
         for i in range(len(t[sd - 1])):
-            pts_cur = ref_el.make_points(sd - 1, i, sd + degree)
-            for j in range(len(pts_cur)):
-                pt_cur = pts_cur[j]
-                f = functional.PointScaledNormalEvaluation(ref_el, i, pt_cur)
-                nodes.append(f)
+            pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1)
+            nodes.extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
+                         for pt in pts_cur)
 
         # internal nodes.  Let's just use points at a lattice
-        if degree > 0:
-            cpe = functional.ComponentPointEvaluation
-            pts = ref_el.make_points(sd, 0, degree + sd)
-            for d in range(sd):
-                for i in range(len(pts)):
-                    l_cur = cpe(ref_el, d, (sd,), pts[i])
-                    nodes.append(l_cur)
+        if degree > 1:
+            pts = ref_el.make_points(sd, 0, sd + degree - 1)
+            nodes.extend(functional.ComponentPointEvaluation(ref_el, d, (sd,), pt)
+                         for d in range(sd) for pt in pts)
 
         # sets vertices (and in 3d, edges) to have no nodes
         for i in range(sd - 1):
@@ -60,9 +55,8 @@ class DRTDualSet(dual_set.DualSet):
 class DiscontinuousRaviartThomas(finite_element.CiarletElement):
     """The discontinuous Raviart-Thomas finite element"""
 
-    def __init__(self, ref_el, q):
+    def __init__(self, ref_el, degree):
 
-        degree = q - 1
         poly_set = RTSpace(ref_el, degree)
         dual = DRTDualSet(ref_el, degree)
         super(DiscontinuousRaviartThomas, self).__init__(poly_set, dual, degree,

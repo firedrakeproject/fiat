@@ -9,6 +9,7 @@ import numpy as np
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
+from FIAT.barycentric_interpolation import LagrangeLineExpansionSet
 
 __all__ = ['NodalEnrichedElement']
 
@@ -35,35 +36,43 @@ class NodalEnrichedElement(CiarletElement):
                              "of NodalEnrichedElement are nodal")
 
         # Extract common data
-        ref_el = elements[0].get_reference_element()
-        expansion_set = elements[0].get_nodal_basis().get_expansion_set()
-        degree = min(e.get_nodal_basis().get_degree() for e in elements)
+        degree = max(e.get_nodal_basis().get_degree() for e in elements)
         embedded_degree = max(e.get_nodal_basis().get_embedded_degree()
                               for e in elements)
         order = max(e.get_order() for e in elements)
-        mapping = elements[0].mapping()[0]
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
-        value_shape = elements[0].value_shape()
+        # LagrangeExpansionSet has fixed degree, ensure we grab the embedding one
+        elem = next(e for e in elements
+                    if e.get_nodal_basis().get_embedded_degree() == embedded_degree)
+        ref_el = elem.get_reference_element()
+        expansion_set = elem.get_nodal_basis().get_expansion_set()
+        mapping = elem.mapping()[0]
+        value_shape = elem.value_shape()
 
         # Sanity check
         assert all(e.get_nodal_basis().get_reference_element() ==
                    ref_el for e in elements)
-        assert all(type(e.get_nodal_basis().get_expansion_set()) ==
-                   type(expansion_set) for e in elements)
         assert all(e_mapping == mapping for e in elements
                    for e_mapping in e.mapping())
         assert all(e.value_shape() == value_shape for e in elements)
 
         # Merge polynomial sets
-        coeffs = _merge_coeffs([e.get_coeffs() for e in elements])
-        dmats = _merge_dmats([e.dmats() for e in elements])
+        if isinstance(expansion_set, LagrangeLineExpansionSet):
+            # Obtain coefficients via interpolation
+            points = expansion_set.get_points()
+            coeffs = [e.tabulate(0, points)[(0,)] for e in elements]
+        else:
+            assert all(type(e.get_nodal_basis().get_expansion_set()) ==
+                       type(expansion_set) for e in elements)
+            coeffs = [e.get_coeffs() for e in elements]
+
+        coeffs = _merge_coeffs(coeffs)
         poly_set = PolynomialSet(ref_el,
                                  degree,
                                  embedded_degree,
                                  expansion_set,
-                                 coeffs,
-                                 dmats)
+                                 coeffs)
 
         # Renumber dof numbers
         offsets = np.cumsum([0] + [e.space_dimension() for e in elements[:-1]])
@@ -102,19 +111,6 @@ def _merge_coeffs(coeffss):
         counter += dim
     assert counter == total_dim
     return new_coeffs
-
-
-def _merge_dmats(dmatss):
-    shape, arg = max((dmats[0].shape, args) for args, dmats in enumerate(dmatss))
-    assert len(shape) == 2 and shape[0] == shape[1]
-    new_dmats = []
-    for dim in range(len(dmatss[arg])):
-        new_dmats.append(dmatss[arg][dim].copy())
-        for dmats in dmatss:
-            sl = slice(0, dmats[dim].shape[0]), slice(0, dmats[dim].shape[1])
-            assert np.allclose(dmats[dim], new_dmats[dim][sl]), \
-                "dmats of elements to be directly summed are not matching!"
-    return new_dmats
 
 
 def _merge_entity_ids(entity_ids, offsets):

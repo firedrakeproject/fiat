@@ -119,7 +119,7 @@ def test_expansions():
         E = reference_element.DefaultTriangle()
         k = 3
         pts = reference_element.make_lattice(E.get_vertices(), k)
-        Phis = expansions.get_expansion_set(E)
+        Phis = expansions.ExpansionSet(E)
         phis = Phis.tabulate(k, pts)
         dphis = Phis.tabulate_derivatives(k, pts)
         return phis, dphis

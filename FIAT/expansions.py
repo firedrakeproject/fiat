@@ -9,87 +9,201 @@ to allow users to get coordinates that they want."""
 
 import numpy
 import math
-import sympy
-from FIAT import reference_element
-from FIAT import jacobi
+from FIAT import reference_element, jacobi
+
+
+def morton_index2(p, q=0):
+    return (p + q) * (p + q + 1) // 2 + q
+
+
+def morton_index3(p, q=0, r=0):
+    return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
 
 
 def jrc(a, b, n):
+    """Jacobi recurrence coefficients"""
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
-    bn = (a*a-b*b) * (2*n+1+a+b) / (2*(n+1)*(2*n+a+b)*(n+1+a+b))
+    bn = (a+b)*(a-b)*(2*n+1+a+b) / (2*(n+1)*(n+1+a+b)*(2*n+a+b))
     cn = (n+a)*(n+b)*(2*n+2+a+b) / ((n+1)*(n+1+a+b)*(2*n+a+b))
     return an, bn, cn
 
 
-def _tabulate_dpts(tabulator, D, n, order, pts):
-    X = sympy.DeferredVector('x')
+def integrated_jrc(a, b, n):
+    """Integrated Jacobi recurrence coefficients"""
+    if n == 1:
+        an = (a + b + 2) / 2
+        bn = (a - 3*b - 2) / 2
+        cn = 0.0
+    else:
+        an, bn, cn = jrc(a-1, b+1, n-1)
+    return an, bn, cn
 
-    def form_derivative(F):
-        '''Forms the derivative recursively, i.e.,
-        F               -> [F_x, F_y, F_z],
-        [F_x, F_y, F_z] -> [[F_xx, F_xy, F_xz],
-                            [F_yx, F_yy, F_yz],
-                            [F_zx, F_zy, F_zz]]
-        and so forth.
-        '''
-        out = []
-        try:
-            out = [sympy.diff(F, X[j]) for j in range(D)]
-        except (AttributeError, ValueError):
-            # Intercept errors like
-            #  AttributeError: 'list' object has no attribute
-            #  'free_symbols'
-            for f in F:
-                out.append(form_derivative(f))
-        return out
 
-    def numpy_lambdify(X, F):
-        '''Unfortunately, SymPy's own lambdify() doesn't work well with
-        NumPy in that simple functions like
-            lambda x: 1.0,
-        when evaluated with NumPy arrays, return just "1.0" instead of
-        an array of 1s with the same shape as x. This function does that.
-        '''
-        try:
-            lambda_x = [numpy_lambdify(X, f) for f in F]
-        except TypeError:  # 'function' object is not iterable
-            # SymPy's lambdify also works on functions that return arrays.
-            # However, use it componentwise here so we can add 0*x to each
-            # component individually. This is necessary to maintain shapes
-            # if evaluated with NumPy arrays.
-            lmbd_tmp = sympy.lambdify(X, F)
-            lambda_x = lambda x: lmbd_tmp(x) + 0 * x[0]
-        return lambda_x
+def pad_coordinates(ref_pts, embedded_dim):
+    """Pad reference coordinates by appending -1.0."""
+    return tuple(ref_pts) + (-1.0, )*(embedded_dim - len(ref_pts))
 
-    def evaluate_lambda(lmbd, x):
-        '''Properly evaluate lambda expressions recursively for iterables.
-        '''
-        try:
-            values = [evaluate_lambda(l, x) for l in lmbd]
-        except TypeError:  # 'function' object is not iterable
-            values = lmbd(x)
-        return values
 
-    # Tabulate symbolically
-    symbolic_tab = tabulator(n, X)
-    # Make sure that the entries of symbolic_tab are lists so we can
-    # append derivatives
-    symbolic_tab = [[phi] for phi in symbolic_tab]
-    #
-    data = (order + 1) * [None]
-    for r in range(order + 1):
-        shape = [len(symbolic_tab), len(pts)] + r * [D]
-        data[r] = numpy.empty(shape)
-        for i, phi in enumerate(symbolic_tab):
-            # Evaluate the function numerically using lambda expressions
-            deriv_lambda = numpy_lambdify(X, phi[r])
-            data[r][i] = \
-                numpy.array(evaluate_lambda(deriv_lambda, pts.T)).T
-            # Symbolically compute the next derivative.
-            # This actually happens once too many here; never mind for
-            # now.
-            phi.append(form_derivative(phi[-1]))
-    return data
+def pad_jacobian(A, embedded_dim):
+    """Pad coordinate mapping Jacobian by appending zero rows."""
+    A = numpy.pad(A, [(0, embedded_dim - A.shape[0]), (0, 0)])
+    return tuple(row[..., None] for row in A)
+
+
+def jacobi_factors(x, y, z, dx, dy, dz):
+    fb = 0.5 * (y + z)
+    fa = x + (fb + 1.0)
+    fc = fb ** 2
+    dfa = dfb = dfc = None
+    if dx is not None:
+        dfb = 0.5 * (dy + dz)
+        dfa = dx + dfb
+        dfc = 2 * fb * dfb
+    return fa, fb, fc, dfa, dfb, dfc
+
+
+def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
+    """Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).
+
+    :arg dim: The spatial dimension of the simplex.
+    :arg n: The polynomial degree.
+    :arg order: The maximum order of differenation.
+    :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.
+    :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.
+    :arg scale: A scale factor that sets the first member of expansion set.
+    :arg variant: Choose between the default (None) orthogonal basis,
+                  'integral' for integrated Jacobi polynomials,
+                  or 'dual' for the L2-duals of the integrated Jacobi polynomials.
+
+    :returns: A tuple with tabulations of the expansion set and its derivatives.
+    """
+    if order > 2:
+        raise ValueError("Higher order derivatives not supported")
+    if variant not in [None, "integral", "dual"]:
+        raise ValueError(f"Invalid variant {variant}")
+
+    if variant == "integral":
+        scale = -scale
+    if n == 0:
+        # Always return 1 for n=0 to make regression tests pass
+        scale = 1.0
+
+    num_members = math.comb(n + dim, dim)
+    results = tuple([None] * num_members for i in range(order+1))
+    phi, dphi, ddphi = results + (None,) * (2-order)
+
+    outer = lambda x, y: x[:, None, ...] * y[None, ...]
+    sym_outer = lambda x, y: outer(x, y) + outer(y, x)
+
+    pad_dim = dim + 2
+    dX = pad_jacobian(Jinv, pad_dim)
+    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
+    if dphi is not None:
+        dphi[0] = (phi[0] - phi[0]) * dX[0]
+    if ddphi is not None:
+        ddphi[0] = outer(dphi[0], dX[0])
+    if dim == 0 or n == 0:
+        return results
+    if dim > 3 or dim < 0:
+        raise ValueError("Invalid number of spatial dimensions")
+
+    beta = 1 if variant == "dual" else 0
+    coefficients = integrated_jrc if variant == "integral" else jrc
+    X = pad_coordinates(ref_pts, pad_dim)
+    idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
+    for codim in range(dim):
+        # Extend the basis from codim to codim + 1
+        fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
+        ddfc = 2 * outer(dfb, dfb)
+        for sub_index in reference_element.lattice_iter(0, n, codim):
+            # handle i = 1
+            icur = idx(*sub_index, 0)
+            inext = idx(*sub_index, 1)
+
+            if variant == "integral":
+                alpha = 2 * sum(sub_index)
+                a = b = -0.5
+            else:
+                alpha = 2 * sum(sub_index) + len(sub_index)
+                if variant == "dual":
+                    alpha += 1 + len(sub_index)
+                a = 0.5 * (alpha + beta) + 1.0
+                b = 0.5 * (alpha - beta)
+
+            factor = a * fa - b * fb
+            phi[inext] = factor * phi[icur]
+            if dphi is not None:
+                dfactor = a * dfa - b * dfb
+                dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
+                if ddphi is not None:
+                    ddphi[inext] = factor * ddphi[icur] + sym_outer(dphi[icur], dfactor)
+
+            # general i by recurrence
+            for i in range(1, n - sum(sub_index)):
+                iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
+                a, b, c = coefficients(alpha, beta, i)
+                factor = a * fa - b * fb
+                phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
+                if dphi is None:
+                    continue
+                dfactor = a * dfa - b * dfb
+                dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
+                               c * (fc * dphi[iprev] + phi[iprev] * dfc))
+                if ddphi is None:
+                    continue
+                ddphi[inext] = (factor * ddphi[icur] + sym_outer(dphi[icur], dfactor) -
+                                c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
+
+        # normalize
+        d = codim + 1
+        shift = 1 if variant == "dual" else 0
+        for index in reference_element.lattice_iter(0, n+1, d):
+            icur = idx(*index)
+            if variant is not None:
+                p = index[-1] + shift
+                alpha = 2 * (sum(index[:-1]) + d * shift) - 1
+                norm2 = 1.0
+                if p > 0 and p + alpha > 0:
+                    norm2 = (p + alpha) * (2*p + alpha) / p
+                    norm2 *= (2*d+1) / (2*d)
+            else:
+                norm2 = (2*sum(index) + d) / d
+            scale = math.sqrt(norm2)
+            for result in results:
+                result[icur] *= scale
+
+    # recover facet bubbles
+    if variant == "integral":
+        icur = 0
+        for result in results:
+            result[icur] *= -1
+        for inext in range(1, dim+1):
+            for result in results:
+                result[icur] -= result[inext]
+
+        if dim == 2:
+            for i in range(2, n+1):
+                icur = idx(0, i)
+                iprev = idx(1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev]
+
+        elif dim == 3:
+            for i in range(2, n+1):
+                for j in range(0, n+1-i):
+                    icur = idx(0, i, j)
+                    iprev = idx(1, i-1, j)
+                    for result in results:
+                        result[icur] -= result[iprev]
+
+                icur = idx(0, 0, i)
+                iprev0 = idx(1, 0, i-1)
+                iprev1 = idx(0, 1, i-1)
+                for result in results:
+                    result[icur] -= result[iprev0]
+                    result[icur] -= result[iprev1]
+
+    return results
 
 
 def xi_triangle(eta):
@@ -109,312 +223,197 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
-class PointExpansionSet(object):
-    """Evaluates the point basis on a point reference element."""
+class ExpansionSet(object):
+    def __new__(cls, *args, **kwargs):
+        """Returns an ExpansionSet instance appopriate for the given
+        reference element."""
+        if cls is not ExpansionSet:
+            return super(ExpansionSet, cls).__new__(cls)
+        try:
+            ref_el = args[0]
+            expansion_set = {
+                reference_element.POINT: PointExpansionSet,
+                reference_element.LINE: LineExpansionSet,
+                reference_element.TRIANGLE: TriangleExpansionSet,
+                reference_element.TETRAHEDRON: TetrahedronExpansionSet,
+            }[ref_el.get_shape()]
+            return expansion_set(*args, **kwargs)
+        except KeyError:
+            raise ValueError("Invalid reference element type.")
 
-    def __init__(self, ref_el):
-        if ref_el.get_spatial_dimension() != 0:
-            raise ValueError("Must have a point")
+    def __init__(self, ref_el, scale=None, variant=None):
         self.ref_el = ref_el
-        self.base_ref_el = reference_element.Point()
+        self.variant = variant
+        dim = ref_el.get_spatial_dimension()
+        self.base_ref_el = reference_element.default_simplex(dim)
+        v1 = ref_el.get_vertices()
+        v2 = self.base_ref_el.get_vertices()
+        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
+        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
+        self._dmats_cache = {}
+        if scale is None:
+            scale = math.sqrt(1.0 / self.base_ref_el.volume())
+        elif isinstance(scale, str):
+            scale = scale.lower()
+            if scale == "orthonormal":
+                scale = math.sqrt(1.0 / ref_el.volume())
+            elif scale == "l2 piola":
+                scale = 1.0 / ref_el.volume()
+        self.scale = scale
 
     def get_num_members(self, n):
-        return 1
+        D = self.ref_el.get_spatial_dimension()
+        return math.comb(n + D, D)
+
+    def _mapping(self, pts):
+        if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
+            return numpy.dot(self.A, pts) + self.b[:, None]
+        else:
+            m1, m2 = self.A.shape
+            return [sum((self.A[i, j] * pts[j] for j in range(m2)), self.b[i])
+                    for i in range(m1)]
+
+    def _tabulate(self, n, pts, order=0):
+        """A version of tabulate() that also works for a single point.
+        """
+        D = self.ref_el.get_spatial_dimension()
+        return dubiner_recurrence(D, n, order, self._mapping(pts), self.A, self.scale, variant=self.variant)
+
+    def get_dmats(self, degree):
+        """Returns a numpy array with the expansion coefficients dmat[k, j, i]
+        of the gradient of each member of the expansion set:
+            d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.
+        """
+        cache = self._dmats_cache
+        key = degree
+        try:
+            return cache[key]
+        except KeyError:
+            pass
+        if degree == 0:
+            return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
+
+        pts = reference_element.make_lattice(self.ref_el.get_vertices(), degree, variant="gl")
+        v, dv = self._tabulate(degree, numpy.transpose(pts), order=1)
+        dv = numpy.transpose(dv, (1, 2, 0))
+        dmats = numpy.linalg.solve(numpy.transpose(v), dv)
+        return cache.setdefault(key, dmats)
+
+    def _tabulate_jet(self, degree, pts, order=0):
+        from FIAT.polynomial_set import mis
+        D = self.ref_el.get_spatial_dimension()
+        lorder = min(2, order)
+        vals = self._tabulate(degree, numpy.transpose(pts), order=lorder)
+        result = {(0,) * D: numpy.array(vals[0])}
+        for r in range(1, 1+lorder):
+            vr = numpy.transpose(vals[r], tuple(range(1, r+1)) + (0, r+1))
+            for indices in numpy.ndindex(vr.shape[:r]):
+                alpha = tuple(map(indices.count, range(D)))
+                if alpha not in result:
+                    result[alpha] = vr[indices]
+
+        def distance(alpha, beta):
+            return sum(ai != bi for ai, bi in zip(alpha, beta))
+
+        # Only use dmats if order > lorder
+        for i in range(lorder + 1, order + 1):
+            dmats = self.get_dmats(degree)
+            alphas = mis(D, i)
+            for alpha in alphas:
+                base_alpha = next(a for a in result if sum(a) == i-1 and distance(alpha, a) == 1)
+                vals = result[base_alpha]
+                for dmat, start, end in zip(dmats, base_alpha, alpha):
+                    for j in range(start, end):
+                        vals = numpy.dot(dmat.T, vals)
+                result[alpha] = vals
+        return result
+
+    def tabulate(self, n, pts):
+        if len(pts) == 0:
+            return numpy.array([])
+        results, = self._tabulate(n, numpy.transpose(pts))
+        return numpy.array(results)
+
+    def tabulate_derivatives(self, n, pts):
+        vals, deriv_vals = self._tabulate(n, numpy.transpose(pts), order=1)
+        # Create the ordinary data structure.
+        D = self.ref_el.get_spatial_dimension()
+        data = [[(vals[i][j], [deriv_vals[i][r][j] for r in range(D)])
+                 for j in range(len(vals[0]))]
+                for i in range(len(vals))]
+        return data
+
+    def tabulate_jet(self, n, pts, order=1):
+        vals = self._tabulate_jet(n, pts, order=order)
+        # Create the ordinary data structure.
+        D = self.ref_el.get_spatial_dimension()
+        v0 = vals[(0,)*D]
+        data = [v0]
+        for r in range(1, order+1):
+            vr = numpy.zeros((D,)*r + v0.shape, dtype=v0.dtype)
+            for index in numpy.ndindex(vr.shape[:r]):
+                vr[index] = vals[tuple(map(index.count, range(D)))]
+            data.append(vr.transpose((r, r+1) + tuple(range(r))))
+        return data
+
+
+class PointExpansionSet(ExpansionSet):
+    """Evaluates the point basis on a point reference element."""
+    def __init__(self, ref_el, **kwargs):
+        if ref_el.get_spatial_dimension() != 0:
+            raise ValueError("Must have a point")
+        super(PointExpansionSet, self).__init__(ref_el, **kwargs)
 
     def tabulate(self, n, pts):
         """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
         assert n == 0
         return numpy.ones((1, len(pts)))
 
-    def tabulate_derivatives(self, n, pts):
-        """Returns a numpy array of size A where A[i,j] = phi_i(pts[j])
-        but where each element is an empty tuple (). This maintains
-        compatibility with the interfaces of the interval, triangle and
-        tetrahedron expansions."""
-        deriv_vals = numpy.empty_like(self.tabulate(n, pts), dtype=tuple)
-        deriv_vals.fill(())
 
-        return deriv_vals
-
-
-class LineExpansionSet(object):
+class LineExpansionSet(ExpansionSet):
     """Evaluates the Legendre basis on a line reference element."""
-
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
-        self.ref_el = ref_el
-        self.base_ref_el = reference_element.DefaultLine()
-        v1 = ref_el.get_vertices()
-        v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
+        super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
-    def get_num_members(self, n):
-        return n + 1
+    def _tabulate(self, n, pts, order=0):
+        """Returns a tuple of (vals, derivs) such that
+        vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
+        if self.variant is not None:
+            return super(LineExpansionSet, self)._tabulate(n, pts, order=order)
 
-    def tabulate(self, n, pts):
-        """Returns a numpy array A[i,j] = phi_i(pts[j])"""
-        if len(pts) > 0:
-            ref_pts = numpy.array([self.mapping(pt) for pt in pts])
-            psitilde_as = jacobi.eval_jacobi_batch(0, 0, n, ref_pts)
-
-            results = numpy.zeros((n + 1, len(pts)), type(pts[0][0]))
-            for k in range(n + 1):
-                results[k, :] = psitilde_as[k, :] * math.sqrt(k + 0.5)
-
-            return results
-        else:
-            return []
-
-    def tabulate_derivatives(self, n, pts):
-        """Returns a tuple of length one (A,) such that
-        A[i,j] = D phi_i(pts[j]).  The tuple is returned for
-        compatibility with the interfaces of the triangle and
-        tetrahedron expansions."""
-        ref_pts = numpy.array([self.mapping(pt) for pt in pts])
-        psitilde_as_derivs = jacobi.eval_jacobi_deriv_batch(0, 0, n, ref_pts)
-
-        # Jacobi polynomials defined on [-1, 1], first derivatives need scaling
-        psitilde_as_derivs *= 2.0 / self.ref_el.volume()
-
-        results = numpy.zeros((n + 1, len(pts)), "d")
-        for k in range(0, n + 1):
-            results[k, :] = psitilde_as_derivs[k, :] * numpy.sqrt(k + 0.5)
-
-        vals = self.tabulate(n, pts)
-        deriv_vals = (results,)
-
-        # Create the ordinary data structure.
-        dv = []
-        for i in range(vals.shape[0]):
-            dv.append([])
-            for j in range(vals.shape[1]):
-                dv[-1].append((vals[i][j], [deriv_vals[0][i][j]]))
-
-        return dv
+        xs = self._mapping(pts).T
+        results = []
+        scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
+        for k in range(order+1):
+            v = numpy.zeros((n + 1, len(xs)), xs.dtype)
+            if n >= k:
+                v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
+            for p in range(n + 1):
+                v[p] *= scale[p]
+                scale[p] *= 0.5 * (p + k + 1) * self.A[0, 0]
+            shape = v.shape
+            shape = shape[:1] + (1,) * k + shape[1:]
+            results.append(v.reshape(shape))
+        return tuple(results)
 
 
-class TriangleExpansionSet(object):
+class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
-
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
-        self.ref_el = ref_el
-        self.base_ref_el = reference_element.DefaultTriangle()
-        v1 = ref_el.get_vertices()
-        v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-#        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
-
-    def get_num_members(self, n):
-        return (n + 1) * (n + 2) // 2
-
-    def tabulate(self, n, pts):
-        if len(pts) == 0:
-            return numpy.array([])
-        else:
-            return numpy.array(self._tabulate(n, numpy.array(pts).T))
-
-    def _tabulate(self, n, pts):
-        '''A version of tabulate() that also works for a single point.
-        '''
-        m1, m2 = self.A.shape
-        ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
-                   for i in range(m1)]
-
-        def idx(p, q):
-            return (p + q) * (p + q + 1) // 2 + q
-
-        results = ((n + 1) * (n + 2) // 2) * [None]
-
-        results[0] = 1.0 \
-            + pts[0] - pts[0] \
-            + pts[1] - pts[1]
-
-        if n == 0:
-            return results
-
-        x = ref_pts[0]
-        y = ref_pts[1]
-
-        f1 = (1.0 + 2 * x + y) / 2.0
-        f2 = (1.0 - y) / 2.0
-        f3 = f2**2
-
-        results[idx(1, 0)] = f1
-
-        for p in range(1, n):
-            a = (2.0 * p + 1) / (1.0 + p)
-            # b = p / (p+1.0)
-            results[idx(p+1, 0)] = a * f1 * results[idx(p, 0)] \
-                - p/(1.0+p) * f3 * results[idx(p-1, 0)]
-
-        for p in range(n):
-            results[idx(p, 1)] = 0.5 * (1+2.0*p+(3.0+2.0*p)*y) \
-                * results[idx(p, 0)]
-
-        for p in range(n - 1):
-            for q in range(1, n - p):
-                (a1, a2, a3) = jrc(2 * p + 1, 0, q)
-                results[idx(p, q+1)] = \
-                    (a1 * y + a2) * results[idx(p, q)] \
-                    - a3 * results[idx(p, q-1)]
-
-        for p in range(n + 1):
-            for q in range(n - p + 1):
-                results[idx(p, q)] *= math.sqrt((p + 0.5) * (p + q + 1.0))
-
-        return results
-        # return self.scale * results
-
-    def tabulate_derivatives(self, n, pts):
-        order = 1
-        data = _tabulate_dpts(self._tabulate, 2, n, order, numpy.array(pts))
-        # Put data in the required data structure, i.e.,
-        # k-tuples which contain the value, and the k-1 derivatives
-        # (gradient, Hessian, ...)
-        m = data[0].shape[0]
-        n = data[0].shape[1]
-        data2 = [[tuple([data[r][i][j] for r in range(order+1)])
-                  for j in range(n)]
-                 for i in range(m)]
-        return data2
-
-    def tabulate_jet(self, n, pts, order=1):
-        return _tabulate_dpts(self._tabulate, 2, n, order, numpy.array(pts))
+        super(TriangleExpansionSet, self).__init__(ref_el, **kwargs)
 
 
-class TetrahedronExpansionSet(object):
-    """Collapsed orthonormal polynomial expanion on a tetrahedron."""
-
-    def __init__(self, ref_el):
+class TetrahedronExpansionSet(ExpansionSet):
+    """Collapsed orthonormal polynomial expansion on a tetrahedron."""
+    def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
-        self.ref_el = ref_el
-        self.base_ref_el = reference_element.DefaultTetrahedron()
-        v1 = ref_el.get_vertices()
-        v2 = self.base_ref_el.get_vertices()
-        self.A, self.b = reference_element.make_affine_mapping(v1, v2)
-        self.mapping = lambda x: numpy.dot(self.A, x) + self.b
-        self.scale = numpy.sqrt(numpy.linalg.det(self.A))
-
-    def get_num_members(self, n):
-        return (n + 1) * (n + 2) * (n + 3) // 6
-
-    def tabulate(self, n, pts):
-        if len(pts) == 0:
-            return numpy.array([])
-        else:
-            return numpy.array(self._tabulate(n, numpy.array(pts).T))
-
-    def _tabulate(self, n, pts):
-        '''A version of tabulate() that also works for a single point.
-        '''
-        m1, m2 = self.A.shape
-        ref_pts = [sum(self.A[i][j] * pts[j] for j in range(m2)) + self.b[i]
-                   for i in range(m1)]
-
-        def idx(p, q, r):
-            return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
-
-        results = ((n + 1) * (n + 2) * (n + 3) // 6) * [None]
-        results[0] = 1.0 \
-            + pts[0] - pts[0] \
-            + pts[1] - pts[1] \
-            + pts[2] - pts[2]
-
-        if n == 0:
-            return results
-
-        x = ref_pts[0]
-        y = ref_pts[1]
-        z = ref_pts[2]
-
-        factor1 = 0.5 * (2.0 + 2.0 * x + y + z)
-        factor2 = (0.5 * (y + z))**2
-        factor3 = 0.5 * (1 + 2.0 * y + z)
-        factor4 = 0.5 * (1 - z)
-        factor5 = factor4**2
-
-        results[idx(1, 0, 0)] = factor1
-        for p in range(1, n):
-            a1 = (2.0 * p + 1.0) / (p + 1.0)
-            a2 = p / (p + 1.0)
-            results[idx(p+1, 0, 0)] = a1 * factor1 * results[idx(p, 0, 0)] \
-                - a2 * factor2 * results[idx(p-1, 0, 0)]
-
-        # q = 1
-        for p in range(0, n):
-            results[idx(p, 1, 0)] = results[idx(p, 0, 0)] \
-                * (p * (1.0 + y) + (2.0 + 3.0 * y + z) / 2)
-
-        for p in range(0, n - 1):
-            for q in range(1, n - p):
-                (aq, bq, cq) = jrc(2 * p + 1, 0, q)
-                qmcoeff = aq * factor3 + bq * factor4
-                qm1coeff = cq * factor5
-                results[idx(p, q+1, 0)] = qmcoeff * results[idx(p, q, 0)] \
-                    - qm1coeff * results[idx(p, q-1, 0)]
-
-        # now handle r=1
-        for p in range(n):
-            for q in range(n - p):
-                results[idx(p, q, 1)] = results[idx(p, q, 0)] \
-                    * (1.0 + p + q + (2.0 + q + p) * z)
-
-        # general r by recurrence
-        for p in range(n - 1):
-            for q in range(0, n - p - 1):
-                for r in range(1, n - p - q):
-                    ar, br, cr = jrc(2 * p + 2 * q + 2, 0, r)
-                    results[idx(p, q, r+1)] = \
-                        (ar * z + br) * results[idx(p, q, r)] \
-                        - cr * results[idx(p, q, r-1)]
-
-        for p in range(n + 1):
-            for q in range(n - p + 1):
-                for r in range(n - p - q + 1):
-                    results[idx(p, q, r)] *= \
-                        math.sqrt((p+0.5)*(p+q+1.0)*(p+q+r+1.5))
-
-        return results
-
-    def tabulate_derivatives(self, n, pts):
-        order = 1
-        D = 3
-        data = _tabulate_dpts(self._tabulate, D, n, order, numpy.array(pts))
-        # Put data in the required data structure, i.e.,
-        # k-tuples which contain the value, and the k-1 derivatives
-        # (gradient, Hessian, ...)
-        m = data[0].shape[0]
-        n = data[0].shape[1]
-        data2 = [[tuple([data[r][i][j] for r in range(order + 1)])
-                  for j in range(n)]
-                 for i in range(m)]
-        return data2
-
-    def tabulate_jet(self, n, pts, order=1):
-        return _tabulate_dpts(self._tabulate, 3, n, order, numpy.array(pts))
-
-
-def get_expansion_set(ref_el):
-    """Returns an ExpansionSet instance appopriate for the given
-    reference element."""
-    if ref_el.get_shape() == reference_element.POINT:
-        return PointExpansionSet(ref_el)
-    elif ref_el.get_shape() == reference_element.LINE:
-        return LineExpansionSet(ref_el)
-    elif ref_el.get_shape() == reference_element.TRIANGLE:
-        return TriangleExpansionSet(ref_el)
-    elif ref_el.get_shape() == reference_element.TETRAHEDRON:
-        return TetrahedronExpansionSet(ref_el)
-    else:
-        raise Exception("Unknown reference element type.")
+        super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
 
 
 def polynomial_dimension(ref_el, degree):

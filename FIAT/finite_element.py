@@ -9,10 +9,12 @@
 # Modified by Thomas H. Gibson (t.gibson15@imperial.ac.uk), 2016
 
 import numpy
+import scipy
+import warnings
 
+from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.dual_set import DualSet
 
 
 class FiniteElement(object):
@@ -124,31 +126,28 @@ class CiarletElement(FiniteElement):
         dualmat = dual.to_riesz(poly_set)
 
         shp = dualmat.shape
-        if len(shp) > 2:
-            num_cols = numpy.prod(shp[1:])
-
-            A = numpy.reshape(dualmat, (dualmat.shape[0], num_cols))
-            B = numpy.reshape(old_coeffs, (old_coeffs.shape[0], num_cols))
-        else:
-            A = dualmat
-            B = old_coeffs
-
+        A = dualmat.reshape((shp[0], -1))
+        B = old_coeffs.reshape((shp[0], -1))
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
 
-        Vinv = numpy.linalg.inv(V)
+        # new_coeffs_flat = numpy.linalg.solve(V.T, B)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error")
+            try:
+                LU, piv = scipy.linalg.lu_factor(V)
+                new_coeffs_flat = scipy.linalg.lu_solve((LU, piv), B, trans=1)
+            except scipy.linalg.LinAlgWarning:
+                raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
-        new_coeffs_flat = numpy.dot(numpy.transpose(Vinv), B)
-
-        new_shp = tuple([new_coeffs_flat.shape[0]] + list(shp[1:]))
-        new_coeffs = numpy.reshape(new_coeffs_flat, new_shp)
+        new_shp = new_coeffs_flat.shape[:1] + shp[1:]
+        new_coeffs = new_coeffs_flat.reshape(new_shp)
 
         self.poly_set = PolynomialSet(ref_el,
                                       poly_set.get_degree(),
                                       poly_set.get_embedded_degree(),
                                       poly_set.get_expansion_set(),
-                                      new_coeffs,
-                                      poly_set.get_dmats())
+                                      new_coeffs)
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."

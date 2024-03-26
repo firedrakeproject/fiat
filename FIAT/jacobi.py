@@ -90,7 +90,7 @@ def eval_jacobi_deriv_batch(a, b, n, xs):
     Returns a two-dimensional array of points, where the
     rows correspond to the Jacobi polynomials and the
     columns correspond to the points."""
-    results = numpy.zeros((n + 1, len(xs)), "d")
+    results = numpy.zeros((n + 1, len(xs)), xs.dtype)
     if n == 0:
         return results
     else:

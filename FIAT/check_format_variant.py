@@ -8,14 +8,15 @@ def check_format_variant(variant, degree):
     match = re.match(r"^integral(?:\((\d+)\))?$", variant)
     if match:
         variant = "integral"
-        quad_degree, = match.groups()
-        quad_degree = int(quad_degree) if quad_degree is not None else (degree + 1)
-        if quad_degree < degree + 1:
-            raise ValueError("Warning, quadrature degree should be at least %s" % (degree + 1))
+        extra_degree, = match.groups()
+        extra_degree = int(extra_degree) if extra_degree is not None else 0
+        interpolant_degree = degree + extra_degree
+        if interpolant_degree < degree:
+            raise ValueError("Warning, quadrature degree should be at least %s" % degree)
     elif variant == "point":
-        quad_degree = None
+        interpolant_degree = None
     else:
         raise ValueError('Choose either variant="point" or variant="integral"'
-                         'or variant="integral(Quadrature degree)"')
+                         'or variant="integral(q)"')
 
-    return (variant, quad_degree)
+    return variant, interpolant_degree

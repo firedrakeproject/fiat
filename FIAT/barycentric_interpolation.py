@@ -28,18 +28,24 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
     via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
-
     def __init__(self, ref_el, pts):
-        self.nodes = numpy.array(pts).flatten()
-        self.dmat, self.weights = make_dmat(self.nodes)
+        self.points = pts
+        self.x = numpy.array(pts).flatten()
+        self.dmat, self.weights = make_dmat(self.x)
         super(LagrangeLineExpansionSet, self).__init__(ref_el)
 
     def get_num_members(self, n):
-        return len(self.nodes)
+        return len(self.points)
+
+    def get_points(self):
+        return self.points
+
+    def get_dmats(self, degree):
+        return [self.dmat.T]
 
     def tabulate(self, n, pts):
-        assert n == len(self.nodes)-1
-        results = numpy.add.outer(-self.nodes, numpy.array(pts).flatten())
+        assert n == len(self.points)-1
+        results = numpy.add.outer(-self.x, numpy.array(pts).flatten())
         with numpy.errstate(divide='ignore', invalid='ignore'):
             numpy.reciprocal(results, out=results)
             numpy.multiply(results, self.weights[:, None], out=results)
@@ -48,11 +54,23 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
         results[results != results] = 1.0
         if results.dtype == object:
             from sympy import simplify
-            results = numpy.array(list(map(simplify, results)))
+            results = numpy.vectorize(simplify)(results)
         return results
 
-    def tabulate_derivatives(self, n, pts):
-        return numpy.dot(self.dmat, self.tabulate(n, pts))
+    def _tabulate(self, n, pts, order=0):
+        vals = self.tabulate(n, pts)
+        results = [vals]
+        for r in range(order):
+            vals = numpy.dot(self.dmat, vals)
+            if vals.dtype == object:
+                from sympy import simplify
+                vals = numpy.vectorize(simplify)(vals)
+            results.append(vals)
+        for r in range(order+1):
+            shape = results[r].shape
+            shape = shape[:1] + (1,)*r + shape[1:]
+            results[r] = numpy.reshape(results[r], shape)
+        return results
 
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):
@@ -67,32 +85,25 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
         num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = get_expansion_set(ref_el, pts)
+        if ref_el.get_shape() == reference_element.LINE:
+            expansion_set = LagrangeLineExpansionSet(ref_el, pts)
+        else:
+            raise ValueError("Invalid reference element type.")
 
         # set up coefficients
         if shape == tuple():
             coeffs = numpy.eye(num_members)
         else:
-            coeffs_shape = tuple([num_members] + list(shape) + [num_exp_functions])
+            coeffs_shape = (num_members, *shape, num_exp_functions)
             coeffs = numpy.zeros(coeffs_shape, "d")
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
                 n = expansions.polynomial_dimension(ref_el, embedded_degree)
                 for exp_bf in range(n):
-                    cur_idx = tuple([cur_bf] + list(idx) + [exp_bf])
+                    cur_idx = (cur_bf, *idx, exp_bf)
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
-        dmats = [numpy.transpose(expansion_set.dmat)]
         super(LagrangePolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                                    expansion_set, coeffs, dmats)
-
-
-def get_expansion_set(ref_el, pts):
-    """Returns an ExpansionSet instance appopriate for the given
-    reference element."""
-    if ref_el.get_shape() == reference_element.LINE:
-        return LagrangeLineExpansionSet(ref_el, pts)
-    else:
-        raise Exception("Unknown reference element type.")
+                                                    expansion_set, coeffs)

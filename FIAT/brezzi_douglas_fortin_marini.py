@@ -95,8 +95,7 @@ def BDFMSpace(ref_el, order):
                                               order,
                                               order,
                                               vec_poly_set.get_expansion_set(),
-                                              new_coeffs,
-                                              vec_poly_set.get_dmats())
+                                              new_coeffs)
 
     element_set = polynomial_set.polynomial_set_union_normalized(bubble_set, vec_poly_set)
     return element_set

@@ -144,12 +144,12 @@ elements = [
     'RaviartThomas(S, 1, variant="integral")',
     'RaviartThomas(S, 2, variant="integral")',
     'RaviartThomas(S, 3, variant="integral")',
-    'RaviartThomas(T, 1, variant="integral(2)")',
-    'RaviartThomas(T, 2, variant="integral(3)")',
-    'RaviartThomas(T, 3, variant="integral(4)")',
-    'RaviartThomas(S, 1, variant="integral(2)")',
-    'RaviartThomas(S, 2, variant="integral(3)")',
-    'RaviartThomas(S, 3, variant="integral(4)")',
+    'RaviartThomas(T, 1, variant="integral(1)")',
+    'RaviartThomas(T, 2, variant="integral(1)")',
+    'RaviartThomas(T, 3, variant="integral(1)")',
+    'RaviartThomas(S, 1, variant="integral(1)")',
+    'RaviartThomas(S, 2, variant="integral(1)")',
+    'RaviartThomas(S, 3, variant="integral(1)")',
     'RaviartThomas(T, 1, variant="point")',
     'RaviartThomas(T, 2, variant="point")',
     'RaviartThomas(T, 3, variant="point")',
@@ -174,12 +174,12 @@ elements = [
     'BrezziDouglasMarini(S, 1, variant="integral")',
     'BrezziDouglasMarini(S, 2, variant="integral")',
     'BrezziDouglasMarini(S, 3, variant="integral")',
-    'BrezziDouglasMarini(T, 1, variant="integral(2)")',
-    'BrezziDouglasMarini(T, 2, variant="integral(3)")',
-    'BrezziDouglasMarini(T, 3, variant="integral(4)")',
-    'BrezziDouglasMarini(S, 1, variant="integral(2)")',
-    'BrezziDouglasMarini(S, 2, variant="integral(3)")',
-    'BrezziDouglasMarini(S, 3, variant="integral(4)")',
+    'BrezziDouglasMarini(T, 1, variant="integral(1)")',
+    'BrezziDouglasMarini(T, 2, variant="integral(1)")',
+    'BrezziDouglasMarini(T, 3, variant="integral(1)")',
+    'BrezziDouglasMarini(S, 1, variant="integral(1)")',
+    'BrezziDouglasMarini(S, 2, variant="integral(1)")',
+    'BrezziDouglasMarini(S, 3, variant="integral(1)")',
     'BrezziDouglasMarini(T, 1, variant="point")',
     'BrezziDouglasMarini(T, 2, variant="point")',
     'BrezziDouglasMarini(T, 3, variant="point")',
@@ -198,12 +198,12 @@ elements = [
     'Nedelec(S, 1, variant="integral")',
     'Nedelec(S, 2, variant="integral")',
     'Nedelec(S, 3, variant="integral")',
-    'Nedelec(T, 1, variant="integral(2)")',
-    'Nedelec(T, 2, variant="integral(3)")',
-    'Nedelec(T, 3, variant="integral(4)")',
-    'Nedelec(S, 1, variant="integral(2)")',
-    'Nedelec(S, 2, variant="integral(3)")',
-    'Nedelec(S, 3, variant="integral(4)")',
+    'Nedelec(T, 1, variant="integral(1)")',
+    'Nedelec(T, 2, variant="integral(1)")',
+    'Nedelec(T, 3, variant="integral(1)")',
+    'Nedelec(S, 1, variant="integral(1)")',
+    'Nedelec(S, 2, variant="integral(1)")',
+    'Nedelec(S, 3, variant="integral(1)")',
     'Nedelec(T, 1, variant="point")',
     'Nedelec(T, 2, variant="point")',
     'Nedelec(T, 3, variant="point")',
@@ -222,12 +222,12 @@ elements = [
     'NedelecSecondKind(S, 1, variant="integral")',
     'NedelecSecondKind(S, 2, variant="integral")',
     'NedelecSecondKind(S, 3, variant="integral")',
-    'NedelecSecondKind(T, 1, variant="integral(2)")',
-    'NedelecSecondKind(T, 2, variant="integral(3)")',
-    'NedelecSecondKind(T, 3, variant="integral(4)")',
-    'NedelecSecondKind(S, 1, variant="integral(2)")',
-    'NedelecSecondKind(S, 2, variant="integral(3)")',
-    'NedelecSecondKind(S, 3, variant="integral(4)")',
+    'NedelecSecondKind(T, 1, variant="integral(1)")',
+    'NedelecSecondKind(T, 2, variant="integral(1)")',
+    'NedelecSecondKind(T, 3, variant="integral(1)")',
+    'NedelecSecondKind(S, 1, variant="integral(1)")',
+    'NedelecSecondKind(S, 2, variant="integral(1)")',
+    'NedelecSecondKind(S, 3, variant="integral(1)")',
     'NedelecSecondKind(T, 1, variant="point")',
     'NedelecSecondKind(T, 2, variant="point")',
     'NedelecSecondKind(T, 3, variant="point")',
@@ -247,9 +247,21 @@ elements = [
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",
     "GaussLegendre(I, 2)",
+    "GaussLegendre(T, 0)",
+    "GaussLegendre(T, 1)",
+    "GaussLegendre(T, 2)",
+    "GaussLegendre(S, 0)",
+    "GaussLegendre(S, 1)",
+    "GaussLegendre(S, 2)",
     "GaussLobattoLegendre(I, 1)",
     "GaussLobattoLegendre(I, 2)",
     "GaussLobattoLegendre(I, 3)",
+    "GaussLobattoLegendre(T, 1)",
+    "GaussLobattoLegendre(T, 2)",
+    "GaussLobattoLegendre(T, 3)",
+    "GaussLobattoLegendre(S, 1)",
+    "GaussLobattoLegendre(S, 2)",
+    "GaussLobattoLegendre(S, 3)",
     "Bubble(I, 2)",
     "Bubble(T, 3)",
     "Bubble(S, 4)",
@@ -367,17 +379,21 @@ def test_empty_bubble():
         Bubble(S, 3)
 
 
-def test_nodal_enriched_implementation():
+@pytest.mark.parametrize('elements', [
+    (Lagrange(I, 2), Lagrange(I, 1), Bubble(I, 2)),
+    (GaussLobattoLegendre(I, 3), Lagrange(I, 1),
+     RestrictedElement(GaussLobattoLegendre(I, 3), restriction_domain="interior")),
+    (RaviartThomas(T, 2),
+     RestrictedElement(RaviartThomas(T, 2), restriction_domain='facet'),
+     RestrictedElement(RaviartThomas(T, 2), restriction_domain='interior')),
+])
+def test_nodal_enriched_implementation(elements):
     """Following element pair should be the same.
     This might be fragile to dof reordering but works now.
     """
 
-    e0 = RaviartThomas(T, 2)
-
-    e1 = NodalEnrichedElement(
-        RestrictedElement(RaviartThomas(T, 2), restriction_domain='facet'),
-        RestrictedElement(RaviartThomas(T, 2), restriction_domain='interior')
-    )
+    e0 = elements[0]
+    e1 = NodalEnrichedElement(*elements[1:])
 
     for attr in ["degree",
                  "get_reference_element",
@@ -497,12 +513,156 @@ def test_facet_nodality_tabulate(element):
 
 
 @pytest.mark.parametrize('element', [
-    'Nedelec(S, 3, variant="integral(2)")',
-    'NedelecSecondKind(S, 3, variant="integral(3)")'
+    'Nedelec(S, 3, variant="integral(-1)")',
+    'NedelecSecondKind(S, 3, variant="integral(-1)")'
 ])
 def test_error_quadrature_degree(element):
     with pytest.raises(ValueError):
         eval(element)
+
+
+@pytest.mark.parametrize('element', [
+    'DiscontinuousLagrange(P, 1)',
+    'GaussLegendre(P, 1)'
+])
+def test_error_point_high_order(element):
+    with pytest.raises(ValueError):
+        eval(element)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_expansion_orthonormality(cell):
+    from FIAT import expansions
+    from FIAT.quadrature_schemes import create_quadrature
+    U = expansions.ExpansionSet(cell)
+    degree = 10
+    rule = create_quadrature(cell, 2*degree)
+    phi = U.tabulate(degree, rule.pts)
+    qwts = rule.get_weights()
+    scale = 2 ** cell.get_spatial_dimension()
+    results = scale * np.dot(np.multiply(phi, qwts), phi.T)
+
+    assert np.allclose(results, np.diag(np.diag(results)))
+    assert np.allclose(np.diag(results), 1.0)
+
+
+@pytest.mark.parametrize('dim', range(1, 4))
+def test_expansion_values(dim):
+    import sympy
+    from FIAT import expansions, polynomial_set, reference_element
+    cell = reference_element.default_simplex(dim)
+    U = expansions.ExpansionSet(cell)
+    dpoints = []
+    rpoints = []
+
+    npoints = 4
+    interior = 1
+    for alpha in reference_element.lattice_iter(interior, npoints+1-interior, dim):
+        dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
+        rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
+
+    n = 16
+    Uvals = U.tabulate(n, dpoints)
+    idx = (lambda p: p, expansions.morton_index2, expansions.morton_index3)[dim-1]
+    eta = sympy.DeferredVector("eta")
+    half = sympy.Rational(1, 2)
+
+    def duffy_coords(pt):
+        if len(pt) == 1:
+            return pt
+        elif len(pt) == 2:
+            eta0 = 2 * (1 + pt[0]) / (1 - pt[1]) - 1
+            eta1 = pt[1]
+            return eta0, eta1
+        else:
+            eta0 = 2 * (1 + pt[0]) / (-pt[1] - pt[2]) - 1
+            eta1 = 2 * (1 + pt[1]) / (1 - pt[2]) - 1
+            eta2 = pt[2]
+            return eta0, eta1, eta2
+
+    def basis(dim, p, q=0, r=0):
+        if dim >= 1:
+            f = sympy.jacobi(p, 0, 0, eta[0])
+            f *= sympy.sqrt(half + p)
+        if dim >= 2:
+            f *= sympy.jacobi(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p
+            f *= sympy.sqrt(1 + p + q)
+        if dim >= 3:
+            f *= sympy.jacobi(r, 2*p+2*q+2, 0, eta[2]) * ((1 - eta[2])/2) ** (p+q)
+            f *= sympy.sqrt(1 + half + p + q + r)
+        return f
+
+    def eval_basis(f, pt):
+        return float(f.subs(dict(zip(eta, duffy_coords(pt)))))
+
+    for i in range(n + 1):
+        for indices in polynomial_set.mis(dim, i):
+            phi = basis(dim, *indices)
+            exact = np.array([eval_basis(phi, r) for r in rpoints])
+            uh = Uvals[idx(*indices)]
+            assert np.allclose(uh, exact, atol=1E-14)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_make_bubbles(cell):
+    from FIAT.quadrature_schemes import create_quadrature
+    from FIAT.expansions import polynomial_dimension
+    from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
+
+    degree = 10
+    B = make_bubbles(cell, degree)
+
+    # basic tests
+    sd = cell.get_spatial_dimension()
+    assert isinstance(B, PolynomialSet)
+    assert B.degree == degree
+    assert B.get_num_members() == polynomial_dimension(cell, degree - sd - 1)
+
+    # test values on the boundary
+    top = cell.get_topology()
+    points = []
+    for dim in range(len(top)-1):
+        for entity in range(len(top[dim])):
+            points.extend(cell.make_points(dim, entity, degree))
+    values = B.tabulate(points)[(0,) * sd]
+    assert np.allclose(values, 0, atol=1E-12)
+
+    # test linear independence
+    m = B.get_num_members()
+    points = cell.make_points(sd, 0, degree)
+    values = B.tabulate(points)[(0,) * sd]
+    assert values.shape == (m, m)
+    assert np.linalg.matrix_rank(values.T, tol=1E-12) == m
+
+    # test that B does not have components in span(P_{degree+2} \ P_{degree})
+    P = ONPolynomialSet(cell, degree + 2)
+    P = P.take(list(range(polynomial_dimension(cell, degree),
+                          P.get_num_members())))
+
+    Q = create_quadrature(cell, P.degree + B.degree)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    P_at_qpts = P.tabulate(qpts)[(0,) * sd]
+    B_at_qpts = B.tabulate(qpts)[(0,) * sd]
+    assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
+
+
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_bubble_duality(cell):
+    from FIAT.polynomial_set import make_bubbles
+    from FIAT.quadrature_schemes import create_quadrature
+    degree = 10
+    sd = cell.get_spatial_dimension()
+    B = make_bubbles(cell, degree)
+
+    Q = create_quadrature(cell, 2*B.degree - sd - 1)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi = B.tabulate(qpts)[(0,) * sd]
+    phi_dual = phi / abs(phi[0])
+    scale = 2 ** sd
+    results = scale * np.dot(np.multiply(phi_dual, qwts), phi.T)
+
+    assert np.allclose(results, np.diag(np.diag(results)))
+    assert np.allclose(np.diag(results), 1.0)
 
 
 if __name__ == '__main__':
