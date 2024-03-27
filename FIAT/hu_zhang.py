@@ -29,6 +29,7 @@ import numpy
 
 class HuZhangDual(DualSet):
     def __init__(self, cell, degree):
+        p = degree # This just makes some code below easier to read
         dofs = []
         dof_ids = {}
         dof_ids[0] = {0: [], 1: [], 2: []}
@@ -53,24 +54,25 @@ class HuZhangDual(DualSet):
             dof_cur += 3
 
         # edge dofs now
-        # moments of normal . sigma against degree p - 2.
+        # moments of normal component of sigma against degree p - 2.
         for entity_id in range(3):
-            #for order in (0, degree - 1): #### NB this should also have been range() back with AW!
-            #for order in range(degree - 1):
+            #for order in (0, p - 1): #### NB this should also have been range() back with AW!
+            #for order in range(p - 1):
             for order in range(2):
-                #dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, order + degree),
-                #         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, order + degree)]
+                #dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, order + p),
+                #         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, order + p)]
                 dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
                          IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
-            # NB, mom_deg should actually be order + degree <= 2*degree, but in AW have 6 = 2*degree
-            #dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 2*(degree - 1)))
+            # NB, mom_deg should actually be order + p <= 2p, but in AW have 6 = 2p
+            #dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 2*(p - 1)))
             dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 4))
-            #dof_cur += 2*(degree - 1)
+            #dof_cur += 2*(p - 1)
             dof_cur += 4
 
         # internal dofs
-        #Q = make_quadrature(cell, 2*(degree + 1))
-        Q = make_quadrature(cell, 1) # In lowest order case I think integration of the product of 2 cubic tensors
+        #Q = make_quadrature(cell, 2*(p + 1))
+        #Q = make_quadrature(cell, p) # p points -> exactly integrate polys of degree 2p + 1 -> in particular a product of two degree p things, which is what this DOF is
+        Q = make_quadrature(cell, 3) # In lowest order case I think integration of the product of 2 cubic tensors
 
         e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
         e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
@@ -79,7 +81,7 @@ class HuZhangDual(DualSet):
         # Copying DOFs of Nedelec of 2nd kind (moments against RT)
         qs = Q.get_points()
         # Create Lagrange bubble nodal basis
-        #CGbubbles = Bubble(cell, degree)
+        #CGbubbles = Bubble(cell, p)
         CGbubbles = Bubble(cell, 3)
         phi = CGbubbles.get_nodal_basis()
 
@@ -101,20 +103,20 @@ class HuZhangDual(DualSet):
             #phi_at_qs = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
             #dofs.append([FIM(cell, Q, phi_at_qs[i, :]) for i in range(len(phi_at_qs))])
             dofs.append(FIM(cell, Q, fatqp))
-        #dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*(degree - 1)*(degree - 2)/2))))
+        #dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*(p - 1)*(p - 2)/2))))
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 6))
-        #dof_cur += round(3*(degree - 1)*(degree - 2)/2)
+        #dof_cur += round(3*(p - 1)*(p - 2)/2)
         #dof_cur += 3
 
         for entity_id in range(3):
-        #    for order in range(1, degree):
+        #    for order in range(1, p):
             for order in range(1, 3):
-        #        dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 2*degree)]
+        #        dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 2*p)]
                 dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 6)]
 
-        #dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(degree - 1))
+        #dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(p - 1))
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 6))
-        #dof_cur += 3*(degree - 1)
+        #dof_cur += 3*(p - 1)
         #dof_cur += 6
 
         # More internal dofs: evaluation of interior-of-edge Lagrange functions, inner product with tt^T for each edge. Note these are evaluated on the edge, but not shared between cells (hence internal).
@@ -124,9 +126,9 @@ class HuZhangDual(DualSet):
             
 
         # This counting below can be done here, or above for one type of internal DOF at a time
-        #dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*degree*(degree - 1)/2)))
+        #dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*p*(p - 1)/2)))
         dof_ids[2][0] = list(range(dof_cur, dof_cur + 9))
-        #dof_cur += round(3*degree*(degree - 1)/2)
+        #dof_cur += round(3*p*(p - 1)/2)
         dof_cur += 9
 
 #        # Constraint dofs
