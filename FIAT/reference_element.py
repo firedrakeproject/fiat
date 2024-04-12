@@ -505,7 +505,7 @@ class Simplex(Cell):
         return self.get_spatial_dimension()
 
     def symmetry_group_size(self, dim):
-        return numpy.math.factorial(dim + 1)
+        return factorial(dim + 1)
 
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
