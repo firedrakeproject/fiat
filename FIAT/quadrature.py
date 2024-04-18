@@ -54,6 +54,10 @@ class QuadratureRule(object):
 
     def integrate(self, f):
         return sum(w * f(x) for x, w in zip(self.pts, self.wts))
+    
+    @property
+    def ufl_signature(self):
+        return type(self).__name__ + str(self.ref_el) + str(self._parameters)
 
 
 class GaussJacobiQuadratureLineRule(QuadratureRule):
@@ -61,6 +65,7 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
     using m roots of m:th order Jacobi polynomial."""
 
     def __init__(self, ref_el, m, a=0, b=0):
+        self._parameters = (m, a, b)
         Ref1 = reference_element.DefaultLine()
         pts_ref, wts_ref = gaussjacobi(m, a, b)
         pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
@@ -73,6 +78,7 @@ class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
     The quadrature rule uses m points for a degree of precision of 2m-3.
     """
     def __init__(self, ref_el, m):
+        self._parameters = (m,)
         if m < 2:
             raise ValueError(
                 "Gauss-Labotto-Legendre quadrature invalid for fewer than 2 points")
@@ -88,6 +94,7 @@ class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m):
+        self._parameters = (m,)
         super(GaussLegendreQuadratureLineRule, self).__init__(ref_el, m)
 
 
@@ -97,6 +104,7 @@ class RadauQuadratureLineRule(QuadratureRule):
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m, right=True):
+        self._parameters = (m, right)
         if m < 1:
             raise ValueError(
                 "Gauss-Radau quadrature invalid for fewer than 1 points")
@@ -131,6 +139,7 @@ class CollapsedQuadratureSimplexRule(QuadratureRule):
     from the hypercube to the simplex."""
 
     def __init__(self, ref_el, m):
+        self._parameters = (m,)
         dim = ref_el.get_spatial_dimension()
         Ref1 = reference_element.default_simplex(dim)
         pts_ref, wts_ref = simplexgausslegendre(dim, m)
@@ -152,10 +161,20 @@ class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     pass
 
 
+class PointQuadradureRule(QuadratureRule):
+    """The trivial quadrature rule on a point."""
+
+    def __init__(self, ref_el):
+        if ref_el != reference_element.POINT:
+            raise ValueError("Point quadrature only valid on a point element.")
+        super().__init__(ref_el, [()], [1])
+
+
 class FacetQuadratureRule(QuadratureRule):
     """A quadrature rule on a facet mapped from a reference quadrature rule.
     """
     def __init__(self, ref_el, entity_dim, entity_id, Q_ref):
+        self._parameters = (entity_dim, entity_id, Q_ref)
         # Construct the facet of interest
         facet = ref_el.construct_subelement(entity_dim)
         facet_topology = ref_el.get_topology()[entity_dim][entity_id]
@@ -195,7 +214,7 @@ def make_quadrature(ref_el, m):
     assert (min_m > 0), msg
 
     if ref_el.get_shape() == reference_element.POINT:
-        return QuadratureRule(ref_el, [()], [1])
+        return PointQuadratureRule(ref_el)
     elif ref_el.get_shape() == reference_element.LINE:
         return GaussJacobiQuadratureLineRule(ref_el, m)
     elif ref_el.get_shape() == reference_element.TRIANGLE:
