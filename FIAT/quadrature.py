@@ -214,7 +214,7 @@ def make_quadrature(ref_el, m):
     assert (min_m > 0), msg
 
     if ref_el.get_shape() == reference_element.POINT:
-        return PointQuadratureRule(ref_el)
+        return PointQuadradureRule(ref_el)
     elif ref_el.get_shape() == reference_element.LINE:
         return GaussJacobiQuadratureLineRule(ref_el, m)
     elif ref_el.get_shape() == reference_element.TRIANGLE:
