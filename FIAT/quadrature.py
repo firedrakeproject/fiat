@@ -165,7 +165,7 @@ class PointQuadradureRule(QuadratureRule):
     """The trivial quadrature rule on a point."""
 
     def __init__(self, ref_el):
-        if ref_el != reference_element.POINT:
+        if ref_el.get_shape() != reference_element.POINT:
             raise ValueError("Point quadrature only valid on a point element.")
         super().__init__(ref_el, [()], [1])
 
