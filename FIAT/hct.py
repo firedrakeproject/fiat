@@ -37,7 +37,7 @@ class HCTDualSet(dual_set.DualSet):
             nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
-        return super(HCTDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super(HCTDualSet, self).__init__(nodes, ref_el, entity_ids)
 
 
 class HsiehCloughTocher(finite_element.CiarletElement):

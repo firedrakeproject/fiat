@@ -6,11 +6,11 @@ import pkg_resources
 
 # Import finite element classes
 from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
-from FIAT.argyris import Argyris
-from FIAT.hct import HsiehCloughTocher
+from FIAT.argyris import Argyris, QuinticArgyris
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
-from FIAT.argyris import QuinticArgyris
+from FIAT.hct import HsiehCloughTocher
+from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
 from FIAT.Sminus import TrimmedSerendipityFace  # noqa: F401
@@ -62,7 +62,6 @@ __version__ = pkg_resources.get_distribution("fenics-fiat").version
 
 # List of supported elements and mapping to element classes
 supported_elements = {"Argyris": Argyris,
-                      "HsiehCloughTocher": HsiehCloughTocher,
                       "Bell": Bell,
                       "Bernstein": Bernstein,
                       "Brezzi-Douglas-Marini": BrezziDouglasMarini,
@@ -78,6 +77,8 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
+                      "HsiehCloughTocher": HsiehCloughTocher,
+                      "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
