@@ -19,13 +19,22 @@ class JohnsonMercierDualSet(dual_set.DualSet):
         dim = sd - 1
         ref_facet = ref_el.construct_subelement(dim)
         Qref = create_quadrature(ref_facet, 2*degree)
-        P = polynomial_set.ONPolynomialSet(ref_facet, degree, shape=(sd,))
+        P = polynomial_set.ONPolynomialSet(ref_facet, degree)
         phis = P.tabulate(Qref.get_points())[(0,) * dim]
+
         for facet in sorted(top[dim]):
-            cur = len(nodes)
-            normal = ref_el.compute_normal(facet)
             Q = FacetQuadratureRule(ref_el, dim, facet, Qref)
-            nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi[:, None, :]*normal[None, :, None]) for phi in phis)
+            Jdet = Q.jacobian_determinant()
+            cur = len(nodes)
+            tangents = ref_el.compute_normalized_tangents(dim, facet)
+            normal = ref_el.compute_normal(facet)
+            scaled_normal = normal / Jdet
+            uvecs = (normal, *tangents)
+            for uvec in uvecs:
+                comp = uvec[:, None] * scaled_normal[None, :]
+                cur_phis = comp[None, :, :, None] * phis[:, None, None, :]
+                nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in cur_phis)
+
             entity_ids[dim][facet].extend(range(cur, len(nodes)))
 
         Q = create_quadrature(ref_complex, 2*degree-1)

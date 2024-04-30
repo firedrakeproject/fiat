@@ -283,7 +283,7 @@ class IntegralMoment(Functional):
 
     def __init__(self, ref_el, Q, f_at_qpts, comp=tuple(), shp=tuple()):
         self.Q = Q
-        self.f_at_qpts = f_at_qpts
+        self.f_at_qpts = numpy.array(f_at_qpts)
         qpts, qwts = Q.get_points(), Q.get_weights()
         self.comp = comp
         weights = numpy.multiply(f_at_qpts, qwts)
@@ -428,7 +428,7 @@ class IntegralMomentOfDivergence(Functional):
     """Functional representing integral of the divergence of the input
     against some tabulated function f."""
     def __init__(self, ref_el, Q, f_at_qpts):
-        self.f_at_qpts = f_at_qpts
+        self.f_at_qpts = numpy.array(f_at_qpts)
         self.Q = Q
 
         sd = ref_el.get_spatial_dimension()
@@ -451,7 +451,7 @@ class IntegralMomentOfTensorDivergence(Functional):
     """Like IntegralMomentOfDivergence, but on symmetric tensors."""
 
     def __init__(self, ref_el, Q, f_at_qpts):
-        self.f_at_qpts = f_at_qpts
+        self.f_at_qpts = numpy.array(f_at_qpts)
         self.Q = Q
         qpts, qwts = Q.get_points(), Q.get_weights()
         nqp = len(qpts)
@@ -484,7 +484,7 @@ class FrobeniusIntegralMoment(IntegralMoment):
 
         self.Q = Q
         self.comp = slice(None, None)
-        self.f_at_qpts = f_at_qpts
+        self.f_at_qpts = numpy.array(f_at_qpts)
         qpts, qwts = Q.get_points(), Q.get_weights()
         weights = numpy.transpose(numpy.multiply(f_at_qpts, qwts), (-1,) + tuple(range(len(shp))))
         alphas = list(index_iterator(shp))
