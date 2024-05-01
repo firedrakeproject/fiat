@@ -1,4 +1,5 @@
 import re
+
 from FIAT.macro import AlfeldSplit, IsoSplit
 
 # dicts mapping Lagrange variant names to recursivenodes family names
@@ -39,6 +40,12 @@ def check_format_variant(variant, degree):
 
 
 def parse_lagrange_variant(variant, discontinuous=False, integral=False):
+    """Parses variant options for Lagrange elements.
+
+    variant may be a single option or comma-separated pair
+    indicating the dof type (integral, equispaced, spectral, etc)
+    and the type of splitting to give a macro-element (Alfeld, iso)
+    """
     if variant is None:
         variant = "integral" if integral else "equispaced"
     options = variant.replace(" ", "").split(",")
