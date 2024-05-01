@@ -17,10 +17,11 @@ class JohnsonMercierDualSet(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
+        # Face dofs: bidirectional (nn and nt) Legendre moments
         dim = sd - 1
         ref_facet = ref_el.construct_subelement(dim)
-        P = polynomial_set.ONPolynomialSet(ref_facet, degree)
         Qref = create_quadrature(ref_facet, 2*degree)
+        P = polynomial_set.ONPolynomialSet(ref_facet, degree)
         phis = P.tabulate(Qref.get_points())[(0,) * dim]
 
         for facet in sorted(top[dim]):
@@ -36,6 +37,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
                          for phi in phis for comp in comps)
             entity_ids[dim][facet].extend(range(cur, len(nodes)))
 
+        # Interior dofs: moments for each independent component
         Q = create_quadrature(ref_complex, 2*degree-1)
         P = polynomial_set.ONPolynomialSet(ref_el, degree-1)
         phis = P.tabulate(Q.get_points())[(0,) * sd]
