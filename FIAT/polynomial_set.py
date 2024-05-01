@@ -228,6 +228,66 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                                                        expansion_set, coeffs)
 
 
+class TracelessTensorPolynomialSet(PolynomialSet):
+    """Constructs an orthonormal basis for traceless-tensor-valued
+    polynomials on a reference element.
+    """
+    def __init__(self, ref_el, degree, size=None, **kwargs):
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
+
+        sd = ref_el.get_spatial_dimension()
+        if size is None:
+            size = sd
+
+        shape = (size, size)
+        num_exp_functions = expansion_set.get_num_members(degree)
+        num_components = size * size - 1
+        num_members = num_components * num_exp_functions
+        embedded_degree = degree
+
+        # set up coefficients for traceless tensors
+        normalize = lambda u: u / numpy.linalg.norm(u)
+        top = ref_el.get_topology()
+        verts = ref_el.get_vertices()
+        v0 = numpy.array(verts[0])
+        rts = [numpy.array(v1) - v0 for v1 in verts[1:]]
+        rts.insert(0, -sum(rts))
+
+        rts = [ref_el.compute_reference_normal(sd-1, e) for e in top[sd-1]]
+        #rts = list(map(normalize, rts))
+
+        dev = lambda S: S - (numpy.trace(S) / S.shape[0]) * numpy.eye(*S.shape)
+        basis = numpy.zeros((num_components, *shape), "d")
+        if size == 2:
+            R = numpy.array([[0, 1], [-1, 0]])
+            for i in range(num_components):
+                i1 = (i + 1) % (sd+1)
+                i2 = (i + 2) % (sd+1)
+                basis[i] = dev(numpy.outer(rts[i1], R @ rts[i2]))
+        elif size == 3:
+            for i in range(num_components):
+                i1 = (i + 1) % (sd+1)
+                i2 = (i + 2) % (sd+1)
+                i3 = (i + 3) % (sd+1)
+                if i > sd:
+                    i1, i2, i3 = i2, i3, i1
+                basis[i] = dev(numpy.outer(rts[i1], numpy.cross(rts[i2], rts[i3])))
+        else:
+            raise NotImplementedError("TODO")
+
+        print(basis)
+        coeffs_shape = (num_members, *shape, num_exp_functions)
+        coeffs = numpy.zeros(coeffs_shape, "d")
+        cur_bf = 0
+        for S in basis:
+            for exp_bf in range(num_exp_functions):
+                coeffs[cur_bf, :, :, exp_bf] = S
+                cur_bf += 1
+
+        super(TracelessTensorPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
+                                                           expansion_set, coeffs)
+
+
 def make_bubbles(ref_el, degree, codim=0, shape=()):
     """Construct a polynomial set with codim bubbles up to the given degree.
     """
@@ -251,3 +311,30 @@ def make_bubbles(ref_el, degree, codim=0, shape=()):
         indices = list((numpy.array(indices)[:, None] + dimPk * numpy.arange(ncomp)[None, :]).flat)
     poly_set = poly_set.take(indices)
     return poly_set
+
+
+if __name__ == "__main__":
+
+    from FIAT import ufc_simplex
+    ref_el = ufc_simplex(3)
+    sd = ref_el.get_spatial_dimension()
+    degree = 3
+    phi = TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
+
+    phi_nt = []
+    top = ref_el.get_topology()
+    for facet in top[sd-1]:
+        pts = ref_el.make_points(sd-1, facet, degree)
+        phi_at_pts = phi.tabulate(pts)[(0,) * sd]
+        n = ref_el.compute_normal(facet)
+        rts = ref_el.compute_normalized_tangents(sd-1, facet)
+        for t in rts:
+            nt = numpy.outer(t, n)
+            phi_nt.append(numpy.tensordot(nt, phi_at_pts, axes=((0, 1), (1, 2))))
+
+    bubbles, = numpy.where(numpy.sum(sum(x**2 for x in phi_nt), -1) < 1E-12)
+    expected = (3*degree*(degree+1))//2 if sd == 2 else (8*degree*(degree+1)*(degree+2))//6
+    assert len(bubbles) == expected
+
+    print(len(bubbles), phi.get_num_members())
+    print(bubbles)
