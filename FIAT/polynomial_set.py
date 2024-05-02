@@ -316,25 +316,46 @@ def make_bubbles(ref_el, degree, codim=0, shape=()):
 if __name__ == "__main__":
 
     from FIAT import ufc_simplex
+    from FIAT.quadrature_schemes import create_quadrature
+    from FIAT.quadrature import FacetQuadratureRule
+    from FIAT.dual_set import make_entity_closure_ids
+
     ref_el = ufc_simplex(3)
     sd = ref_el.get_spatial_dimension()
-    degree = 3
+    degree = 4
     phi = TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
+    expansion_set = phi.get_expansion_set()
 
-    phi_nt = []
+
+    ncomp = sd**2 - 1
+    entity_ids = expansion_set.get_entity_ids(degree)
+    closure_ids = make_entity_closure_ids(entity_ids)
+    bubble_ids = numpy.ones((phi.get_num_members(),)).reshape((ncomp, -1))
+    for component in range(ncomp):
+        facet = component % len(closure_ids[sd-1])
+        bubble_ids[component][closure_ids[sd-1][facet]] = 0
+    print(bubble_ids)
+
+    facet_el = ref_el.construct_subelement(sd-1)
+    Qref = create_quadrature(facet_el, 2*degree)
     top = ref_el.get_topology()
+    norms = numpy.zeros((phi.get_num_members(),))
     for facet in top[sd-1]:
-        pts = ref_el.make_points(sd-1, facet, degree)
-        phi_at_pts = phi.tabulate(pts)[(0,) * sd]
+        Q = FacetQuadratureRule(ref_el, sd-1, facet, Qref)
+        qpts, qwts = Q.get_points(), Q.get_weights()
+        phi_at_pts = phi.tabulate(qpts)[(0,) * sd]
         n = ref_el.compute_normal(facet)
         rts = ref_el.compute_normalized_tangents(sd-1, facet)
         for t in rts:
             nt = numpy.outer(t, n)
-            phi_nt.append(numpy.tensordot(nt, phi_at_pts, axes=((0, 1), (1, 2))))
+            phi_nt = numpy.tensordot(nt, phi_at_pts, axes=((0, 1), (1, 2)))
+            norms += numpy.dot(phi_nt**2, qwts)
 
-    bubbles, = numpy.where(numpy.sum(sum(x**2 for x in phi_nt), -1) < 1E-12)
+
+    print((norms.reshape((ncomp, -1)) < 1E-12).astype(int))
+    bubbles, = numpy.where(norms < 1E-12)
     expected = (3*degree*(degree+1))//2 if sd == 2 else (8*degree*(degree+1)*(degree+2))//6
     assert len(bubbles) == expected
 
     print(len(bubbles), phi.get_num_members())
-    print(bubbles)
+    print(bubbles.reshape((ncomp, -1)))
