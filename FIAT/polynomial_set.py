@@ -253,7 +253,7 @@ class TracelessTensorPolynomialSet(PolynomialSet):
         rts = [numpy.array(v1) - v0 for v1 in verts[1:]]
         rts.insert(0, -sum(rts))
 
-        rts = [ref_el.compute_reference_normal(sd-1, e) for e in top[sd-1]]
+        #rts = [ref_el.compute_tangents(sd-1, e) for e in top[sd-1]]
         #rts = list(map(normalize, rts))
 
         dev = lambda S: S - (numpy.trace(S) / S.shape[0]) * numpy.eye(*S.shape)
@@ -319,6 +319,7 @@ if __name__ == "__main__":
     from FIAT.quadrature_schemes import create_quadrature
     from FIAT.quadrature import FacetQuadratureRule
     from FIAT.dual_set import make_entity_closure_ids
+    from FIAT.expansions import polynomial_entity_ids
 
     ref_el = ufc_simplex(3)
     sd = ref_el.get_spatial_dimension()
@@ -326,14 +327,14 @@ if __name__ == "__main__":
     phi = TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
     expansion_set = phi.get_expansion_set()
 
-
     ncomp = sd**2 - 1
-    entity_ids = expansion_set.get_entity_ids(degree)
-    closure_ids = make_entity_closure_ids(entity_ids)
-    bubble_ids = numpy.ones((phi.get_num_members(),)).reshape((ncomp, -1))
+    entity_ids = polynomial_entity_ids(ref_el, degree, continuity=expansion_set.continuity)
+    closure_ids = make_entity_closure_ids(ref_el, entity_ids)
+    mask = numpy.ones((phi.get_num_members(),), int).reshape((ncomp, -1))
     for component in range(ncomp):
         facet = component % len(closure_ids[sd-1])
-        bubble_ids[component][closure_ids[sd-1][facet]] = 0
+        mask[component][closure_ids[sd-1][facet]] = 0
+    bubble_ids = numpy.flatnonzero(mask)
     print(bubble_ids)
 
     facet_el = ref_el.construct_subelement(sd-1)
@@ -351,11 +352,10 @@ if __name__ == "__main__":
             phi_nt = numpy.tensordot(nt, phi_at_pts, axes=((0, 1), (1, 2)))
             norms += numpy.dot(phi_nt**2, qwts)
 
-
-    print((norms.reshape((ncomp, -1)) < 1E-12).astype(int))
-    bubbles, = numpy.where(norms < 1E-12)
+    bubbles = numpy.flatnonzero(norms < 1E-12)
     expected = (3*degree*(degree+1))//2 if sd == 2 else (8*degree*(degree+1)*(degree+2))//6
     assert len(bubbles) == expected
+    assert numpy.allclose(bubbles, bubble_ids)
 
     print(len(bubbles), phi.get_num_members())
-    print(bubbles.reshape((ncomp, -1)))
+    print(bubbles)
