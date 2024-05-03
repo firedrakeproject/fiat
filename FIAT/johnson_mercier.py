@@ -30,6 +30,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             Jdet = Q.jacobian_determinant()
             tangents = ref_el.compute_normalized_tangents(dim, facet)
             normal = ref_el.compute_normal(facet)
+            normal /= numpy.linalg.norm(normal)
             scaled_normal = normal * Jdet
             uvecs = (normal, *tangents)
             comps = [numpy.outer(scaled_normal, uvec) for uvec in uvecs]
