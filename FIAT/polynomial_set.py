@@ -246,40 +246,39 @@ class TracelessTensorPolynomialSet(PolynomialSet):
         embedded_degree = degree
 
         # set up coefficients for traceless tensors
-        normalize = lambda u: u / numpy.linalg.norm(u)
         top = ref_el.get_topology()
         verts = ref_el.get_vertices()
         v0 = numpy.array(verts[0])
         rts = [numpy.array(v1) - v0 for v1 in verts[1:]]
         rts.insert(0, -sum(rts))
 
-        #rts = [ref_el.compute_tangents(sd-1, e) for e in top[sd-1]]
-        #rts = list(map(normalize, rts))
+        normalize = lambda u: u / numpy.linalg.norm(u)
+        rts = list(map(normalize, rts))
 
         dev = lambda S: S - (numpy.trace(S) / S.shape[0]) * numpy.eye(*S.shape)
-        basis = numpy.zeros((num_components, *shape), "d")
+        basis = numpy.zeros((len(top[sd-1]), sd-1, *shape), "d")
         if size == 2:
             R = numpy.array([[0, 1], [-1, 0]])
-            for i in range(num_components):
+            for i in top[sd-1]:
                 i1 = (i + 1) % (sd+1)
                 i2 = (i + 2) % (sd+1)
-                basis[i] = dev(numpy.outer(rts[i1], R @ rts[i2]))
+                basis[i, 0] = dev(numpy.outer(rts[i1], R @ rts[i2]))
         elif size == 3:
-            for i in range(num_components):
+            for i in top[sd-1]:
                 i1 = (i + 1) % (sd+1)
                 i2 = (i + 2) % (sd+1)
                 i3 = (i + 3) % (sd+1)
-                if i > sd:
-                    i1, i2, i3 = i2, i3, i1
-                basis[i] = dev(numpy.outer(rts[i1], numpy.cross(rts[i2], rts[i3])))
+                for j in range(sd-1):
+                    if j > 0:
+                        i1, i2, i3 = i2, i3, i1
+                    basis[i, j] = dev(numpy.outer(rts[i1], numpy.cross(rts[i2], rts[i3])))
         else:
             raise NotImplementedError("TODO")
 
-        print(basis)
         coeffs_shape = (num_members, *shape, num_exp_functions)
         coeffs = numpy.zeros(coeffs_shape, "d")
         cur_bf = 0
-        for S in basis:
+        for S in basis.reshape(-1, *shape):
             for exp_bf in range(num_exp_functions):
                 coeffs[cur_bf, :, :, exp_bf] = S
                 cur_bf += 1
@@ -311,51 +310,3 @@ def make_bubbles(ref_el, degree, codim=0, shape=()):
         indices = list((numpy.array(indices)[:, None] + dimPk * numpy.arange(ncomp)[None, :]).flat)
     poly_set = poly_set.take(indices)
     return poly_set
-
-
-if __name__ == "__main__":
-
-    from FIAT import ufc_simplex
-    from FIAT.quadrature_schemes import create_quadrature
-    from FIAT.quadrature import FacetQuadratureRule
-    from FIAT.dual_set import make_entity_closure_ids
-    from FIAT.expansions import polynomial_entity_ids
-
-    ref_el = ufc_simplex(3)
-    sd = ref_el.get_spatial_dimension()
-    degree = 4
-    phi = TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
-    expansion_set = phi.get_expansion_set()
-
-    ncomp = sd**2 - 1
-    entity_ids = polynomial_entity_ids(ref_el, degree, continuity=expansion_set.continuity)
-    closure_ids = make_entity_closure_ids(ref_el, entity_ids)
-    mask = numpy.ones((phi.get_num_members(),), int).reshape((ncomp, -1))
-    for component in range(ncomp):
-        facet = component % len(closure_ids[sd-1])
-        mask[component][closure_ids[sd-1][facet]] = 0
-    bubble_ids = numpy.flatnonzero(mask)
-    print(bubble_ids)
-
-    facet_el = ref_el.construct_subelement(sd-1)
-    Qref = create_quadrature(facet_el, 2*degree)
-    top = ref_el.get_topology()
-    norms = numpy.zeros((phi.get_num_members(),))
-    for facet in top[sd-1]:
-        Q = FacetQuadratureRule(ref_el, sd-1, facet, Qref)
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        phi_at_pts = phi.tabulate(qpts)[(0,) * sd]
-        n = ref_el.compute_normal(facet)
-        rts = ref_el.compute_normalized_tangents(sd-1, facet)
-        for t in rts:
-            nt = numpy.outer(t, n)
-            phi_nt = numpy.tensordot(nt, phi_at_pts, axes=((0, 1), (1, 2)))
-            norms += numpy.dot(phi_nt**2, qwts)
-
-    bubbles = numpy.flatnonzero(norms < 1E-12)
-    expected = (3*degree*(degree+1))//2 if sd == 2 else (8*degree*(degree+1)*(degree+2))//6
-    assert len(bubbles) == expected
-    assert numpy.allclose(bubbles, bubble_ids)
-
-    print(len(bubbles), phi.get_num_members())
-    print(bubbles)
