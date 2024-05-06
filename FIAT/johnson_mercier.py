@@ -28,12 +28,12 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, dim, facet, Qref)
             Jdet = Q.jacobian_determinant()
-            tangents = ref_el.compute_normalized_tangents(dim, facet)
+            tangents = ref_el.compute_tangents(dim, facet)
             normal = ref_el.compute_normal(facet)
             normal /= numpy.linalg.norm(normal)
             scaled_normal = normal * Jdet
-            uvecs = (normal, *tangents)
-            comps = [numpy.outer(scaled_normal, uvec) for uvec in uvecs]
+            uvecs = (scaled_normal, *tangents)
+            comps = [numpy.outer(normal, uvec) for uvec in uvecs]
             nodes.extend(FrobeniusIntegralMoment(ref_el, Q, comp[:, :, None] * phi[None, None, :])
                          for phi in phis for comp in comps)
             entity_ids[dim][facet].extend(range(cur, len(nodes)))
