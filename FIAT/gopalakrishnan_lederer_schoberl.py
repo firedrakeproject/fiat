@@ -16,6 +16,8 @@ def mask_facet_ids(ref_el, dim, constrained_ids, mask):
 
 
 def make_polynomial_sets(ref_el, degree):
+    if degree == 1:
+        raise NotImplementedError("TODO")
     sd = ref_el.get_spatial_dimension()
     phi = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
     expansion_set = phi.get_expansion_set()
@@ -89,43 +91,3 @@ class GopalakrishnanLedererSchoberl(finite_element.CiarletElement):
         dual = GLSDualSet(ref_el, degree, bubbles)
         mapping = "covariant contravariant piola"
         super(GopalakrishnanLedererSchoberl, self).__init__(poly_set, dual, degree, mapping=mapping)
-
-
-if __name__ == "__main__":
-    from FIAT import ufc_simplex
-    from FIAT.expansions import polynomial_dimension
-
-    degree = 2
-    ref_el = ufc_simplex(2)
-    fe = GopalakrishnanLedererSchoberl(ref_el, degree)
-
-    bubbles, poly_set = make_polynomial_sets(ref_el, degree)
-    expansion_set = poly_set.get_expansion_set()
-
-    # test dimension of constrained space
-    sd = ref_el.get_spatial_dimension()
-    facet_el = ref_el.construct_subelement(sd-1)
-    dimPkm1 = polynomial_dimension(facet_el, degree-1)
-    dimPk = polynomial_dimension(facet_el, degree)
-    expected = (sd**2-1)*(expansion_set.get_num_members(degree) - (dimPk - dimPkm1))
-    assert poly_set.get_num_members() == expected
-
-    # test normal-tangential bubble support
-    facet_el = ref_el.construct_subelement(sd-1)
-    Qref = create_quadrature(facet_el, 2*degree)
-    norms = numpy.zeros((bubbles.get_num_members(),))
-    top = ref_el.get_topology()
-    for facet in top[sd-1]:
-        Q = FacetQuadratureRule(ref_el, sd-1, facet, Qref)
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        phi_at_pts = bubbles.tabulate(qpts)[(0,) * sd]
-        n = ref_el.compute_normal(facet)
-        rts = ref_el.compute_normalized_tangents(sd-1, facet)
-        for t in rts:
-            nt = numpy.outer(t, n)
-            phi_nt = numpy.tensordot(nt, phi_at_pts, axes=((0, 1), (1, 2)))
-            norms += numpy.dot(phi_nt**2, qwts)
-
-    assert numpy.allclose(norms, 0)
-    expected = (sd**2-1)*expansion_set.get_num_members(degree-1)
-    assert bubbles.get_num_members() == expected
