@@ -1,4 +1,4 @@
-from FIAT import finite_element, dual_set, macro, polynomial_set, nedelec, reference_element
+from FIAT import finite_element, dual_set, macro, polynomial_set, nedelec
 from FIAT.functional import IntegralMoment, FrobeniusIntegralMoment, IntegralMomentOfTensorDivergence
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
@@ -44,19 +44,20 @@ class JohnsonMercierDualSet(dual_set.DualSet):
 
             rbm = nedelec.Nedelec(ref_el, degree)
             rbm_at_qpts = rbm.tabulate(0, qpts)[(0,) * sd]
+            ells = rbm_at_qpts * qwts[None, None, :]
 
-            P = polynomial_set.ONPolynomialSet(ref_complex, degree-1, shape=(sd,), scale="orthonormal")
+            P = polynomial_set.ONPolynomialSet(ref_complex, degree-1, shape=(sd,),
+                                               scale="orthonormal")
             phis = P.tabulate(qpts)[(0,) * sd]
+            dual_mat = numpy.tensordot(ells, phis, axes=((1, 2), (1, 2)))
 
-            coeffs = numpy.tensordot(phis * qwts[None, None, :], rbm_at_qpts, axes=((1, 2), (1, 2)))
-            u, sig, vt = numpy.linalg.svd(coeffs.T, full_matrices=True)
+            u, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
             num_sv = len([s for s in sig if abs(s) > 1.e-10])
 
-            #Qlow = create_quadrature(ref_complex, 2*(degree-1))
-            #phis = P.tabulate(Qlow.get_points())[(0,) * sd]
-            phis = numpy.tensordot(vt[num_sv:], phis, axes=(1, 0))
+            cphis = numpy.tensordot(vt[num_sv:], phis, axes=(1, 0))
+            assert numpy.allclose(numpy.tensordot(ells, cphis, axes=((1, 2), (1, 2))), 0)
 
-            nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
+            nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in cphis)
         else:
             # Interior dofs: moments for each independent component
             Q = create_quadrature(ref_complex, 2*degree-1)
