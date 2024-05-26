@@ -26,7 +26,6 @@ from FIAT.bubble import Bubble, FacetBubble # each of these is for the interior 
 
 import numpy
 
-
 class HuZhangDual(DualSet):
     def __init__(self, cell, degree):
         p = degree # This just makes some code below easier to read
@@ -56,23 +55,23 @@ class HuZhangDual(DualSet):
         # edge dofs now
         # moments of normal component of sigma against degree p - 2.
         for entity_id in range(3):
-            #for order in (0, p - 1): #### NB this should also have been range() back with AW!
-            #for order in range(p - 1):
-            for order in range(2):
-                #dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, order + p),
-                #         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, order + p)]
-                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
-                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
+            #for order in (0, p - 1): 
+            for order in range(p - 1): #### NB this should also have been range() back with AW!
+            #for order in range(2):
+                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, order + p),
+                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, order + p)]
+                #dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
+                #         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
             # NB, mom_deg should actually be order + p <= 2p, but in AW have 6 = 2p
-            #dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 2*(p - 1)))
-            dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 4))
-            #dof_cur += 2*(p - 1)
-            dof_cur += 4
+            dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 2*(p - 1)))
+            #dof_ids[1][entity_id] = list(range(dof_cur, dof_cur + 4))
+            dof_cur += 2*(p - 1)
+            #dof_cur += 4
 
         # internal dofs
         #Q = make_quadrature(cell, 2*(p + 1))
-        #Q = make_quadrature(cell, p) # p points -> exactly integrate polys of degree 2p + 1 -> in particular a product of two degree p things, which is what this DOF is
-        Q = make_quadrature(cell, 3) # In lowest order case I think integration of the product of 2 cubic tensors
+        Q = make_quadrature(cell, p) # p points -> exactly integrate polys of degree 2p + 1 -> in particular a product of two degree p things, which is what this DOF is
+        #Q = make_quadrature(cell, 3) # In lowest order case I think integration of the product of 2 cubic tensors
 
         e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
         e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
@@ -81,8 +80,8 @@ class HuZhangDual(DualSet):
         # Copying DOFs of Nedelec of 2nd kind (moments against RT)
         qs = Q.get_points()
         # Create Lagrange bubble nodal basis
-        #CGbubbles = Bubble(cell, p)
-        CGbubbles = Bubble(cell, 3)
+        CGbubbles = Bubble(cell, p)
+        #CGbubbles = Bubble(cell, 3)
         phi = CGbubbles.get_nodal_basis()
 
         # Evaluate Lagrange bubble basis at quadrature points
@@ -109,10 +108,10 @@ class HuZhangDual(DualSet):
         #dof_cur += 3
 
         for entity_id in range(3):
-        #    for order in range(1, p):
-            for order in range(1, 3):
-        #        dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 2*p)]
-                dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 6)]
+            for order in range(1, p):
+        #    for order in range(1, 3):
+                dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 2*p)]
+        #        dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 6)]
 
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(p - 1))
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 6))
@@ -124,12 +123,11 @@ class HuZhangDual(DualSet):
         #CGEdgeBubbles = FaceBubble()
         #for entity_id in range(3):
             
-
         # This counting below can be done here, or above for one type of internal DOF at a time
-        #dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*p*(p - 1)/2)))
-        dof_ids[2][0] = list(range(dof_cur, dof_cur + 9))
-        #dof_cur += round(3*p*(p - 1)/2)
-        dof_cur += 9
+        dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*p*(p - 1)/2)))
+        #dof_ids[2][0] = list(range(dof_cur, dof_cur + 9))
+        dof_cur += round(3*p*(p - 1)/2)
+        #dof_cur += 9
 
 #        # Constraint dofs
 #
