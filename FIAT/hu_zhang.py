@@ -11,6 +11,7 @@
 from FIAT.finite_element import CiarletElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import ONSymTensorPolynomialSet, ONPolynomialSet
+from FIAT import polynomial_set
 from FIAT.functional import (
     PointwiseInnerProductEvaluation as InnerProduct,
     FrobeniusIntegralMoment as FIM,
@@ -104,7 +105,9 @@ class HuZhangDual(DualSet):
                     #fatQP[:, :, k] = phiatqpts[j*k:(j + 1)*k, :]
                     #temp = phiatqpts[j*dim_of_bubbles:(j + 1)*dim_of_bubbles, :]
                     #temp = phiatqpts[j*k, :]
-                    temp = phiatqpts[j*num_q_pts + k, :]
+                    #temp = phiatqpts[j*num_q_pts + k, :]
+                    # NOTE depends how entries of phiatqpts are ordered
+                    temp = phiatqpts[k*dim_of_bubbles + j, :]
                     #print("note: ", temp.shape)
                     fatQP[:, :, k] = temp.reshape((2, 2))
                 #fatqp[:, :, k] = v1v2t
@@ -133,12 +136,36 @@ class HuZhangDual(DualSet):
         #dof_cur += 3
 
         # More internal dofs: evaluation of interior-of-edge Lagrange functions, inner product with tt^T for each edge. Note these are evaluated on the edge, but not shared between cells (hence internal).
+        #ts = cell.compute_tangents(
+        # Copying BDM
+        #facet = cell.get_facet_element()
+        #Q_ref = create_quadrature(facet, p)
+        Q = make_quadrature(cell, p) # p points -> exactly integrate polys of degree 2p + 1 -> in particular a product of two degree p things, which is what this DOF is
+        qs = Q.get_points()
+        #Pp = polynomial_set.ONPolynomialSet(facet, p) 
+        Pp = polynomial_set.ONPolynomialSet(cell, p) 
+        Pp_at_qpts = Pp.tabulate(qs)[(0,) * 2]
+        #print(Pp_at_qpts.shape)
+        dim_of_Pp = Pp.get_num_members() # i.e. don't have to call get_nodal_basis() on Pp and then call get_num_members() on that
+        #print(dim_of_Pp)
         for entity_id in range(3):
+            t = cell.compute_edge_tangent(entity_id)
+            ttT = numpy.outer(t, t)
+            test_fns_at_qpts = numpy.outer(Pp_at_qpts, ttT)
             for order in range(1, p):
         #    for order in range(1, 3):
-                dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 2*p)]
+                ## MISTAKE Frobenius inner product with tt^T is not the same as tangential-tangential moment
+                #dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 2*p)]
         #        dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 6)]
-
+                fatQP = numpy.zeros((2, 2, len(Q.pts)))
+                num_q_pts = len(Q.pts)
+                for k in range(num_q_pts):
+                    #temp = phiatqpts[j*num_q_pts + k, :]
+                    # NOTE depends how entries of phiatqpts are ordered, exactly in analogy to the other internal DOFs
+                    temp = test_fns_at_qpts[k*dim_of_bubbles + order, :]
+                    #print("note: ", temp.shape)
+                    fatQP[:, :, k] = temp.reshape((2, 2))
+                dofs.append(FIM(cell, Q, fatQP))
         dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(p - 1)))
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 6))
         #dof_cur += 3*(p - 1)
@@ -147,6 +174,8 @@ class HuZhangDual(DualSet):
         # Could instead do the tt^T internal dofs via moments against edge bubbles.
         #CGEdgeBubbles = FaceBubble()
         #for entity_id in range(3):
+
+        ### NEW complex-based DOFs: airy of fns from the left, div against fns on the right
             
         # This counting below can be done here, or above for one type of internal DOF at a time
         dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*p*(p - 1)/2)))
