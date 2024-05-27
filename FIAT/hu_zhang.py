@@ -89,37 +89,62 @@ class HuZhangDual(DualSet):
         
         for (v1, v2) in basis:
             v1v2t = numpy.outer(v1, v2)
-            #phi_times_matrix = [phi[i]*v1v2t for i in len(phi)]
-            fatqp = numpy.zeros((2, 2, len(Q.pts)))
+            #phi_times_matrix = [phi[i]*v1v2t for i in range(phi.get_num_members())]
+            #fatqp = numpy.zeros((2, 2, len(Q.pts)))
+            Fatqp = numpy.zeros((2, 2, phi.get_num_members()))
             #phiatqpts = numpy.outer(phi_times_matrix.tabulate(qs)[(0,) * 2], v1v2t)
             phiatqpts = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
             #print(len(Q.pts))
-            for k in range(len(Q.pts)):
+            dim_of_bubbles = phi.get_num_members()
+            for j in range(dim_of_bubbles):
+                fatQP = numpy.zeros((2, 2, len(Q.pts)))
+                # Each DOF here is somehow independent of len(Q.pts)
+                num_q_pts = len(Q.pts)
+                for k in range(num_q_pts):
+                    #fatQP[:, :, k] = phiatqpts[j*k:(j + 1)*k, :]
+                    #temp = phiatqpts[j*dim_of_bubbles:(j + 1)*dim_of_bubbles, :]
+                    #temp = phiatqpts[j*k, :]
+                    temp = phiatqpts[j*num_q_pts + k, :]
+                    #print("note: ", temp.shape)
+                    fatQP[:, :, k] = temp.reshape((2, 2))
                 #fatqp[:, :, k] = v1v2t
-                temp = phiatqpts[k, :]
-                fatqp[:, :, k] = temp.reshape((2, 2))
+            #    temp = phiatqpts[k, :]
+                #fatqp[:, :, k] = temp.reshape((2, 2))
                 #phi_at_qs[:, :, k] = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
-            #phi_at_qs = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
+                dofs.append(FIM(cell, Q, fatQP))
+            phi_at_qs = numpy.outer(phi.tabulate(qs)[(0,) * 2], v1v2t)
+            #phi_at_qs = numpy.outer(phi.tabulate(qs)[(0,) * 0], v1v2t)
+            #print((phi.tabulate(qs)[(0,) * 2]).shape)
+            #print(phi_at_qs.shape)
+            #print(len(phi_at_qs))
+            #print(len(phi_at_qs[0, :]))
+            #print(len(Q.pts))
+            #print(phi.get_num_members())
             #dofs.append([FIM(cell, Q, phi_at_qs[i, :]) for i in range(len(phi_at_qs))])
-            dofs.append(FIM(cell, Q, fatqp))
-        #dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*(p - 1)*(p - 2)/2))))
+            #dofs.append([FIM(cell, Q, ) for i in range(phi.get_num_members())])
+                #Temp = temp.reshape((2, 2))
+                #dofs.append(FIM(cell, Q, Temp))
+                #dofs.append(FIM(cell, qs, Temp))
+            #print(len(FIM(cell, Q, fatqp)))
+            #dofs.append(FIM(cell, Q, fatqp))
+        dof_ids[2][0] = list(range(dof_cur, dof_cur + round(3*(p - 1)*(p - 2)/2)))
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 6))
         #dof_cur += round(3*(p - 1)*(p - 2)/2)
         #dof_cur += 3
 
+        # More internal dofs: evaluation of interior-of-edge Lagrange functions, inner product with tt^T for each edge. Note these are evaluated on the edge, but not shared between cells (hence internal).
         for entity_id in range(3):
             for order in range(1, p):
         #    for order in range(1, 3):
                 dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 2*p)]
         #        dofs += [IntegralLegendreTangentialTangentialMoment(cell, entity_id, order, 6)]
 
-        #dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(p - 1))
+        dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(p - 1)))
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 6))
         #dof_cur += 3*(p - 1)
         #dof_cur += 6
 
-        # More internal dofs: evaluation of interior-of-edge Lagrange functions, inner product with tt^T for each edge. Note these are evaluated on the edge, but not shared between cells (hence internal).
-        # Could instead do via moments against edge bubbles.
+        # Could instead do the tt^T internal dofs via moments against edge bubbles.
         #CGEdgeBubbles = FaceBubble()
         #for entity_id in range(3):
             
@@ -145,9 +170,9 @@ class HuZhangDual(DualSet):
 
         #print(dof_cur)
         #print(dof_ids)
+        #print(len(dofs))
 
         super(HuZhangDual, self).__init__(dofs, cell, dof_ids)
-
 
 class HuZhang(CiarletElement):
     """The definition of the Hu-Zhang element.
