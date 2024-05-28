@@ -7,6 +7,7 @@
 
 import itertools
 import numpy as np
+from math import factorial
 from FIAT import finite_element, polynomial_set, dual_set, functional, P0
 from FIAT.reference_element import LINE, make_lattice
 from FIAT.orientation_utils import make_entity_permutations_simplex
@@ -17,7 +18,7 @@ from FIAT.check_format_variant import parse_lagrange_variant
 
 def make_entity_permutations(dim, npoints):
     if npoints <= 0:
-        return {o: [] for o in range(np.math.factorial(dim + 1))}
+        return {o: [] for o in range(factorial(dim + 1))}
     # DG nodes are numbered, in order of significance,
     # - by g0: entity dim (vertices first, then edges, then ...)
     # - by g1: entity ids (DoFs on entities of smaller ids first)

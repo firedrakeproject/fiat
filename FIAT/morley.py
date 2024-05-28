@@ -41,7 +41,7 @@ class MorleyDualSet(dual_set.DualSet):
         degree = 2
         Q = create_quadrature(rline, degree-1)
         qpts = Q.get_points()
-        scale = numpy.ones(qpts.shape)
+        scale = numpy.ones((len(qpts),))
 
         entity_ids[1] = {}
         for e in sorted(top[1]):

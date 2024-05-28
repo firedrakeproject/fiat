@@ -1,6 +1,7 @@
 import itertools
 from collections.abc import Sequence
 import numpy as np
+from math import factorial
 
 
 def make_entity_permutations_simplex(dim, npoints):
@@ -53,7 +54,7 @@ def make_entity_permutations_simplex(dim, npoints):
     from FIAT.polynomial_set import mis
 
     if npoints <= 0:
-        return {o: [] for o in range(np.math.factorial(dim + 1))}
+        return {o: [] for o in range(factorial(dim + 1))}
     a = np.array(sorted(mis(dim + 1, npoints - 1)), dtype=int)[:, ::-1]
     index_perms = sorted(itertools.permutations(range(dim + 1)))
     perms = {}
