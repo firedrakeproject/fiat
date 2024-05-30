@@ -309,6 +309,8 @@ class ExpansionSet(object):
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        """Returns a dict of tabulations such that
+        tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
         from FIAT.polynomial_set import mis
         lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
@@ -468,10 +470,11 @@ class PointExpansionSet(ExpansionSet):
             raise ValueError("Must have a point")
         super(PointExpansionSet, self).__init__(ref_el, **kwargs)
 
-    def tabulate(self, n, pts):
-        """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
-        assert n == 0
-        return numpy.ones((1, len(pts)))
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        """Returns a dict of tabulations such that
+        tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
+        assert n == 0 and order == 0
+        return {(): numpy.ones((1, len(pts)))}
 
 
 class LineExpansionSet(ExpansionSet):
@@ -482,8 +485,8 @@ class LineExpansionSet(ExpansionSet):
         super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
-        """Returns a tuple of (vals, derivs) such that
-        vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
+        """Returns a dict of tabulations such that
+        tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
         if self.variant is not None:
             return super(LineExpansionSet, self)._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
 
