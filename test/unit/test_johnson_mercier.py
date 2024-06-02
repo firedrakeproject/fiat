@@ -6,7 +6,7 @@ from FIAT.reference_element import ufc_simplex
 from FIAT.quadrature_schemes import create_quadrature
 
 
-@pytest.fixture(params=("T-ref", "T-phys", "S-ref", "S-phis"))
+@pytest.fixture(params=("T-ref", "T-phys", "S-ref", "S-phys"))
 def cell(request):
     cell, deform = request.param.split("-")
     dim = {"T": 2, "S": 3}[cell]

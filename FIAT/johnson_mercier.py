@@ -21,7 +21,6 @@ class JohnsonMercierDualSet(dual_set.DualSet):
         Qref = create_quadrature(ref_facet, 2*degree)
         P = polynomial_set.ONPolynomialSet(ref_facet, degree)
         phis = P.tabulate(Qref.get_points())[(0,) * dim]
-
         for facet in sorted(top[dim]):
             cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, dim, facet, Qref)
@@ -47,14 +46,13 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             for j in range(sd):
                 for i in range(j+1):
                     A = numpy.zeros((sd, sd))
-                    A[i, j] += 1
-                    A[j, i] += 1
+                    A[i, j] += 0.5
+                    A[j, i] += 0.5
                     phis.append(numpy.dot(A, x))
             nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
         else:
             # Interior dofs: moments for each independent component
             Q = create_quadrature(ref_complex, 2*degree-1)
-
             P = polynomial_set.ONPolynomialSet(ref_el, degree-1)
             phis = P.tabulate(Q.get_points())[(0,) * sd]
             nodes.extend(IntegralMoment(ref_el, Q, phi, comp=(i, j))
