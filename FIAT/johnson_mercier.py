@@ -2,6 +2,7 @@ from FIAT import finite_element, dual_set, macro, polynomial_set
 from FIAT.functional import IntegralMoment, FrobeniusIntegralMoment, IntegralMomentOfTensorDivergence
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.nedelec_second_kind import NedelecSecondKind as N2curl
 import numpy
 
 
@@ -37,18 +38,23 @@ class JohnsonMercierDualSet(dual_set.DualSet):
 
         cur = len(nodes)
         if variant == "divergence":
-            # Interior dofs: moments of divergence against linear functions
-            Q = create_quadrature(ref_complex, 2*(degree-1))
-            qpts = Q.get_points()
-            x0, = ref_el.make_points(sd, 0, sd+1)
-            x = qpts.T - numpy.asarray(x0)[:, None]
-            phis = []
-            for j in range(sd):
-                for i in range(j+1):
-                    A = numpy.zeros((sd, sd))
-                    A[i, j] += 0.5
-                    A[j, i] += 0.5
-                    phis.append(numpy.dot(A, x))
+            # Interior dofs: moments of divergence against the orthogonal complement of RBMs
+            Q = create_quadrature(ref_complex, 2*degree-1)
+            qpts, qwts = Q.get_points(), Q.get_weights()
+
+            N2 = N2curl(ref_el, degree)
+            edofs = N2.entity_dofs()
+            rbm_indices = [edofs[1][entity][0] for entity in edofs[1]]
+            indices = numpy.setdiff1d(range(N2.space_dimension()), rbm_indices)
+
+            phis = N2.tabulate(0, qpts)[(0,)*sd]
+            rbms = phis[rbm_indices]
+            ells = rbms * qwts[None, None, :]
+            M = numpy.tensordot(ells, phis, axes=((1, 2), (1, 2)))
+            C = numpy.linalg.solve(M[:, rbm_indices], M[:, indices])
+
+            phis[indices] -= numpy.tensordot(C, rbms, axes=(0, 0))
+            phis = phis[indices]
             nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
         else:
             # Interior dofs: moments for each independent component

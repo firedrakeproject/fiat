@@ -29,7 +29,7 @@ def test_johnson_mercier_divergence_rigid_body_motions(cell, variant):
     JM = JohnsonMercier(cell, degree, variant=variant)
 
     ref_complex = JM.get_reference_complex()
-    Q = create_quadrature(ref_complex, 2*(degree-1))
+    Q = create_quadrature(ref_complex, 2*(degree)-1)
     qpts, qwts = Q.get_points(), Q.get_weights()
 
     tab = JM.tabulate(1, qpts)
@@ -43,5 +43,17 @@ def test_johnson_mercier_divergence_rigid_body_motions(cell, variant):
 
     edofs = JM.entity_dofs()
     idofs = edofs[sd][0]
-    L = numpy.tensordot(div[idofs, ...], ells, axes=((1, 2), (1, 2)))
-    assert numpy.allclose(L, 0)
+    L = numpy.tensordot(div, ells, axes=((1, 2), (1, 2)))
+    assert numpy.allclose(L[idofs], 0)
+
+    if variant == "divergence":
+        edofs = JM.entity_dofs()
+        cdofs = []
+        for entity in edofs[sd-1]:
+            cdofs.extend(edofs[sd-1][entity][:sd])
+        D = L[cdofs]
+        M = numpy.tensordot(rbms, ells, axes=((1, 2), (1, 2)))
+        X = numpy.linalg.solve(M, D.T).T
+
+        # print(numpy.tensordot(X, rbms, axes=(-1, 0)) - div[cdofs])
+        assert numpy.allclose(numpy.tensordot(X, rbms, axes=(-1, 0)), div[cdofs])
