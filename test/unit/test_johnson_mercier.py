@@ -53,7 +53,5 @@ def test_johnson_mercier_divergence_rigid_body_motions(cell, variant):
             cdofs.extend(edofs[sd-1][entity][:sd])
         D = L[cdofs]
         M = numpy.tensordot(rbms, ells, axes=((1, 2), (1, 2)))
-        X = numpy.linalg.solve(M, D.T).T
-
-        # print(numpy.tensordot(X, rbms, axes=(-1, 0)) - div[cdofs])
-        assert numpy.allclose(numpy.tensordot(X, rbms, axes=(-1, 0)), div[cdofs])
+        X = numpy.linalg.solve(M, D.T)
+        assert numpy.allclose(numpy.tensordot(X, rbms, axes=(0, 0)), div[cdofs])
