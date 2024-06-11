@@ -20,11 +20,11 @@ def cell(request):
     return K
 
 
-@pytest.mark.parametrize("variant", (None, "divergence"))
-def test_johnson_mercier_divergence_rigid_body_motions(cell, variant):
+def test_johnson_mercier_divergence_rigid_body_motions(cell):
     # test that the divergence of interior JM basis functions is orthogonal to
     # the rigid-body motions
     degree = 1
+    variant = None
     sd = cell.get_spatial_dimension()
     JM = JohnsonMercier(cell, degree, variant=variant)
 

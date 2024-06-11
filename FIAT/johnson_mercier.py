@@ -1,8 +1,7 @@
 from FIAT import finite_element, dual_set, macro, polynomial_set
-from FIAT.functional import IntegralMoment, FrobeniusIntegralMoment, IntegralMomentOfTensorDivergence
+from FIAT.functional import IntegralMoment, FrobeniusIntegralMoment
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.nedelec_second_kind import NedelecSecondKind as N2curl
 import numpy
 
 
@@ -10,6 +9,8 @@ class JohnsonMercierDualSet(dual_set.DualSet):
     def __init__(self, ref_complex, degree, variant=None):
         if degree != 1:
             raise ValueError("Johnson-Mercier only defined for degree=1")
+        if variant is not None:
+            raise ValueError(f"Johnson-Mercier does not have the {variant} variant")
         ref_el = ref_complex.get_parent()
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
@@ -37,26 +38,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             entity_ids[dim][facet].extend(range(cur, len(nodes)))
 
         cur = len(nodes)
-        if variant == "divergence":
-            # Interior dofs: moments of divergence against the orthogonal complement of RBMs
-            Q = create_quadrature(ref_complex, 2*(degree-1))
-            qpts, qwts = Q.get_points(), Q.get_weights()
-
-            N2 = N2curl(ref_el, degree)
-            edofs = N2.entity_dofs()
-            rbm_indices = [edofs[1][entity][0] for entity in edofs[1]]
-            indices = numpy.setdiff1d(range(N2.space_dimension()), rbm_indices)
-
-            N2_at_qpts = N2.tabulate(1, qpts)[(0,) * sd]
-            rbms = N2_at_qpts[rbm_indices]
-            ells = rbms * qwts[None, None, :]
-            M = numpy.tensordot(ells, N2_at_qpts, axes=((1, 2), (1, 2)))
-            C = numpy.linalg.solve(M[:, rbm_indices], M[:, indices])
-
-            phis = N2_at_qpts[indices]
-            phis -= numpy.tensordot(C, rbms, axes=(0, 0))
-            nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
-        else:
+        if variant is None:
             # Interior dofs: moments for each independent component
             Q = create_quadrature(ref_complex, 2*degree-1)
             P = polynomial_set.ONPolynomialSet(ref_el, degree-1)
