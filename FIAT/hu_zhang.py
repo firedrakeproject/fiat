@@ -177,6 +177,8 @@ class HuZhangDual(DualSet):
             for i in range(1, p):
                 dofs.append(InnerProduct(cell, t, t, pts[i]))
                 P += 1
+            #for J in range(p + 1):
+            #    print(pts[i])
             print(P, "here")
         dof_ids[2][0] = list(range(dof_cur, dof_cur + 3*(p - 1)))
         #dof_ids[2][0] = list(range(dof_cur, dof_cur + 6))
