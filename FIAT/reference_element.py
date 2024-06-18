@@ -587,7 +587,7 @@ class UFCSimplex(Simplex):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        (with numerical tolerance as given by the L1 distance (aka 'manhattan',
         'taxicab' or rectilinear distance) to the cell.
 
         Parameters
@@ -606,7 +606,7 @@ class UFCSimplex(Simplex):
 
     def distance_to_point_l1(self, point):
         # noqa: D301
-        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        """Get the L1 distance (aka 'manhattan', 'taxicab' or rectilinear
         distance) to a point with 0.0 if the point is inside the cell.
 
         Parameters
@@ -617,7 +617,7 @@ class UFCSimplex(Simplex):
         Returns
         -------
         float
-            The L1 distance, also known as taxicab, manhatten or rectilinear
+            The L1 distance, also known as taxicab, manhattan or rectilinear
             distance, of the cell to the point. If 0.0 the point is inside the
             cell.
 
@@ -1058,7 +1058,7 @@ class TensorProductCell(Cell):
 
     def contains_point(self, point, epsilon=0):
         """Checks if reference cell contains given point
-        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        (with numerical tolerance as given by the L1 distance (aka 'manhattan',
         'taxicab' or rectilinear distance) to the cell.
 
         Parameters
@@ -1083,7 +1083,7 @@ class TensorProductCell(Cell):
                       True)
 
     def distance_to_point_l1(self, point):
-        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
+        """Get the L1 distance (aka 'manhattan', 'taxicab' or rectilinear
         distance) to a point with 0.0 if the point is inside the cell.
 
         For more information see the docstring for the UFCSimplex method."""
@@ -1103,6 +1103,8 @@ class TensorProductCell(Cell):
         return make_cell_orientation_reflection_map_tensorproduct(self.cells)
 
     def compare(self, op, other):
+        """Parent-based comparison between simplicial complexes.
+        This is done dimension by dimension."""
         if hasattr(other, "product"):
             other = other.product
         if isinstance(other, type(self)):
@@ -1123,7 +1125,112 @@ class TensorProductCell(Cell):
         return self.compare(operator.le, other)
 
 
-class UFCQuadrilateral(Cell):
+class UFCHypercube(Cell):
+    """Abstract class for a reference unit hypercube [0, 1]^d with vertices in
+    lexicographical order."""
+    dimension = None
+    shape = None
+
+    def __init__(self):
+        cells = [UFCInterval()] * self.dimension
+        product = TensorProductCell(*cells)
+        pt = product.get_topology()
+
+        verts = product.get_vertices()
+        topology = flatten_entities(pt)
+
+        super(UFCHypercube, self).__init__(self.shape, verts, topology)
+
+        self.product = product
+        self.unflattening_map = compute_unflattening_map(pt)
+
+    def get_dimension(self):
+        """Returns the subelement dimension of the cell.  Same as the
+        spatial dimension."""
+        return self.get_spatial_dimension()
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        sd = self.get_spatial_dimension()
+        if dimension > sd:
+            raise ValueError("Invalid dimension: %d" % (dimension,))
+        elif dimension == sd:
+            return self
+        else:
+            return ufc_hypercube(dimension)
+
+    def get_entity_transform(self, dim, entity_i):
+        """Returns a mapping of point coordinates from the
+        `entity_i`-th subentity of dimension `dim` to the cell.
+
+        :arg dim: entity dimension (integer)
+        :arg entity_i: entity number (integer)
+        """
+        d, e = self.unflattening_map[(dim, entity_i)]
+        return self.product.get_entity_transform(d, e)
+
+    def volume(self):
+        """Computes the volume in the appropriate dimensional measure."""
+        return self.product.volume()
+
+    def compute_reference_normal(self, facet_dim, facet_i):
+        """Returns the unit normal in infinity norm to facet_i."""
+        sd = self.get_spatial_dimension()
+        assert facet_dim == sd - 1
+        d, i = self.unflattening_map[(facet_dim, facet_i)]
+        return self.product.compute_reference_normal(d, i)
+
+    def contains_point(self, point, epsilon=0):
+        """Checks if reference cell contains given point
+        (with numerical tolerance as given by the L1 distance (aka 'manhattan',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+
+        """
+        return self.product.contains_point(point, epsilon=epsilon)
+
+    def distance_to_point_l1(self, point):
+        """Get the L1 distance (aka 'manhattan', 'taxicab' or rectilinear
+        distance) to a point with 0.0 if the point is inside the cell.
+
+        For more information see the docstring for the UFCSimplex method."""
+        return self.product.distance_to_point_l1(point)
+
+    def symmetry_group_size(self, dim):
+        return [1, 2, 8, 48][dim]
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return self.product.cell_orientation_reflection_map()
+
+    def __gt__(self, other):
+        return self.product > other
+
+    def __lt__(self, other):
+        return self.product < other
+
+    def __ge__(self, other):
+        return self.product >= other
+
+    def __le__(self, other):
+        return self.product <= other
+
+
+class UFCQuadrilateral(UFCHypercube):
     r"""This is the reference quadrilateral with vertices
     (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).
 
@@ -1168,207 +1275,16 @@ class UFCQuadrilateral(Cell):
 
     o = 2 * 1 + 0 = 2
     """
-    def __init__(self):
-        product = TensorProductCell(UFCInterval(), UFCInterval())
-        pt = product.get_topology()
-
-        verts = product.get_vertices()
-        topology = flatten_entities(pt)
-
-        super(UFCQuadrilateral, self).__init__(QUADRILATERAL, verts, topology)
-
-        self.product = product
-        self.unflattening_map = compute_unflattening_map(pt)
-
-    def get_dimension(self):
-        """Returns the subelement dimension of the cell.  Same as the
-        spatial dimension."""
-        return self.get_spatial_dimension()
-
-    def construct_subelement(self, dimension):
-        """Constructs the reference element of a cell subentity
-        specified by subelement dimension.
-
-        :arg dimension: subentity dimension (integer)
-        """
-        if dimension == 2:
-            return self
-        elif dimension == 1:
-            return UFCInterval()
-        elif dimension == 0:
-            return Point()
-        else:
-            raise ValueError("Invalid dimension: %d" % (dimension,))
-
-    def get_entity_transform(self, dim, entity_i):
-        """Returns a mapping of point coordinates from the
-        `entity_i`-th subentity of dimension `dim` to the cell.
-
-        :arg dim: entity dimension (integer)
-        :arg entity_i: entity number (integer)
-        """
-        d, e = self.unflattening_map[(dim, entity_i)]
-        return self.product.get_entity_transform(d, e)
-
-    def volume(self):
-        """Computes the volume in the appropriate dimensional measure."""
-        return self.product.volume()
-
-    def compute_reference_normal(self, facet_dim, facet_i):
-        """Returns the unit normal in infinity norm to facet_i."""
-        assert facet_dim == 1
-        d, i = self.unflattening_map[(facet_dim, facet_i)]
-        return self.product.compute_reference_normal(d, i)
-
-    def contains_point(self, point, epsilon=0):
-        """Checks if reference cell contains given point
-        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
-        'taxicab' or rectilinear distance) to the cell.
-
-        Parameters
-        ----------
-        point : numpy.ndarray, list or symbolic expression
-            The coordinates of the point.
-        epsilon : float
-            The tolerance for the check.
-
-        Returns
-        -------
-        bool : True if the point is inside the cell, False otherwise.
-
-        """
-        return self.product.contains_point(point, epsilon=epsilon)
-
-    def distance_to_point_l1(self, point):
-        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
-        distance) to a point with 0.0 if the point is inside the cell.
-
-        For more information see the docstring for the UFCSimplex method."""
-        return self.product.distance_to_point_l1(point)
-
-    def symmetry_group_size(self, dim):
-        return [1, 2, 8][dim]
-
-    def cell_orientation_reflection_map(self):
-        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
-        return self.product.cell_orientation_reflection_map()
-
-    def __gt__(self, other):
-        return self.product > other
-
-    def __lt__(self, other):
-        return self.product < other
-
-    def __ge__(self, other):
-        return self.product >= other
-
-    def __le__(self, other):
-        return self.product <= other
+    dimension = 2
+    shape = QUADRILATERAL
 
 
-class UFCHexahedron(Cell):
+class UFCHexahedron(UFCHypercube):
     """This is the reference hexahedron with vertices
     (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
-
-    def __init__(self):
-        product = TensorProductCell(UFCInterval(), UFCInterval(), UFCInterval())
-        pt = product.get_topology()
-
-        verts = product.get_vertices()
-        topology = flatten_entities(pt)
-
-        super(UFCHexahedron, self).__init__(HEXAHEDRON, verts, topology)
-
-        self.product = product
-        self.unflattening_map = compute_unflattening_map(pt)
-
-    def get_dimension(self):
-        """Returns the subelement dimension of the cell.  Same as the
-        spatial dimension."""
-        return self.get_spatial_dimension()
-
-    def construct_subelement(self, dimension):
-        """Constructs the reference element of a cell subentity
-        specified by subelement dimension.
-
-        :arg dimension: subentity dimension (integer)
-        """
-        if dimension == 3:
-            return self
-        elif dimension == 2:
-            return UFCQuadrilateral()
-        elif dimension == 1:
-            return UFCInterval()
-        elif dimension == 0:
-            return Point()
-        else:
-            raise ValueError("Invalid dimension: %d" % (dimension,))
-
-    def get_entity_transform(self, dim, entity_i):
-        """Returns a mapping of point coordinates from the
-        `entity_i`-th subentity of dimension `dim` to the cell.
-
-        :arg dim: entity dimension (integer)
-        :arg entity_i: entity number (integer)
-        """
-        d, e = self.unflattening_map[(dim, entity_i)]
-        return self.product.get_entity_transform(d, e)
-
-    def volume(self):
-        """Computes the volume in the appropriate dimensional measure."""
-        return self.product.volume()
-
-    def compute_reference_normal(self, facet_dim, facet_i):
-        """Returns the unit normal in infinity norm to facet_i."""
-        assert facet_dim == 2
-        d, i = self.unflattening_map[(facet_dim, facet_i)]
-        return self.product.compute_reference_normal(d, i)
-
-    def contains_point(self, point, epsilon=0):
-        """Checks if reference cell contains given point
-        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
-        'taxicab' or rectilinear distance) to the cell.
-
-        Parameters
-        ----------
-        point : numpy.ndarray, list or symbolic expression
-            The coordinates of the point.
-        epsilon : float
-            The tolerance for the check.
-
-        Returns
-        -------
-        bool : True if the point is inside the cell, False otherwise.
-
-        """
-        return self.product.contains_point(point, epsilon=epsilon)
-
-    def distance_to_point_l1(self, point):
-        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
-        distance) to a point with 0.0 if the point is inside the cell.
-
-        For more information see the docstring for the UFCSimplex method."""
-        return self.product.distance_to_point_l1(point)
-
-    def symmetry_group_size(self, dim):
-        return [1, 2, 8, 48][dim]
-
-    def cell_orientation_reflection_map(self):
-        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
-        return self.product.cell_orientation_reflection_map()
-
-    def __gt__(self, other):
-        return self.product > other
-
-    def __lt__(self, other):
-        return self.product < other
-
-    def __ge__(self, other):
-        return self.product >= other
-
-    def __le__(self, other):
-        return self.product <= other
+    dimension = 3
+    shape = HEXAHEDRON
 
 
 def make_affine_mapping(xs, ys):
@@ -1405,6 +1321,21 @@ def make_affine_mapping(xs, ys):
     b = sol[dim_x * dim_y:]
 
     return A, b
+
+
+def ufc_hypercube(spatial_dim):
+    """Factory function that maps spatial dimension to an instance of
+    the UFC reference hypercube of that dimension."""
+    if spatial_dim == 0:
+        return Point()
+    elif spatial_dim == 1:
+        return UFCInterval()
+    elif spatial_dim == 2:
+        return UFCQuadrilateral()
+    elif spatial_dim == 3:
+        return UFCHexahedron()
+    else:
+        raise RuntimeError("Can't create UFC hypercube of dimension %s." % str(spatial_dim))
 
 
 def default_simplex(spatial_dim):
