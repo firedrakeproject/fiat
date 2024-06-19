@@ -457,18 +457,17 @@ class IntegralMomentOfTensorDivergence(Functional):
         nqp = len(qpts)
         dpts = qpts
         self.dpts = dpts
+        sd = ref_el.get_spatial_dimension()
 
         assert len(f_at_qpts.shape) == 2
-        assert f_at_qpts.shape[0] == 2
+        assert f_at_qpts.shape[0] == sd
         assert f_at_qpts.shape[1] == nqp
-
-        sd = ref_el.get_spatial_dimension()
 
         dpt_dict = OrderedDict()
 
         alphas = [tuple([1 if j == i else 0 for j in range(sd)]) for i in range(sd)]
         for q, pt in enumerate(dpts):
-            dpt_dict[tuple(pt)] = [(qwts[q]*f_at_qpts[i, q], alphas[j], (i, j)) for i in range(2) for j in range(2)]
+            dpt_dict[tuple(pt)] = [(qwts[q]*f_at_qpts[i, q], alphas[j], (i, j)) for i in range(sd) for j in range(sd)]
 
         super().__init__(ref_el, tuple(), {}, dpt_dict,
                          "IntegralMomentOfDivergence")

@@ -84,9 +84,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     if variant == "bubble":
         scale = -scale
-    if n == 0:
-        # Always return 1 for n=0 to make regression tests pass
-        scale = 1.0
 
     num_members = math.comb(n + dim, dim)
     results = tuple([None] * num_members for i in range(order+1))
@@ -291,17 +288,23 @@ class ExpansionSet(object):
                                 base_verts) for cell in top[sd]]
         if scale is None:
             scale = math.sqrt(1.0 / base_ref_el.volume())
-        elif isinstance(scale, str):
-            scale = scale.lower()
-            if scale == "orthonormal":
-                scale = math.sqrt(1.0 / ref_el.volume())
-            elif scale == "l2 piola":
-                scale = 1.0 / ref_el.volume()
         self.scale = scale
         self.continuity = "C0" if variant == "bubble" else None
         self.recurrence_order = 2
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
+
+    def get_scale(self, cell=0):
+        scale = self.scale
+        if isinstance(scale, str):
+            sd = self.ref_el.get_spatial_dimension()
+            vol = self.ref_el.volume_of_subcomplex(sd, cell)
+            scale = scale.lower()
+            if scale == "orthonormal":
+                scale = math.sqrt(1.0 / vol)
+            elif scale == "l2 piola":
+                scale = 1.0 / vol
+        return scale
 
     def get_num_members(self, n):
         return polynomial_dimension(self.ref_el, n, self.continuity)
@@ -322,8 +325,11 @@ class ExpansionSet(object):
         ref_pts = apply_mapping(A, b, numpy.transpose(pts))
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
+
+        # Always return 1 for n=0 to make regression tests pass
+        scale = 1.0 if n == 0 and len(self.affine_mappings) == 1 else self.get_scale(cell=cell)
         phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
-                                 self.scale, variant=self.variant)
+                                 scale, variant=self.variant)
         if self.continuity == "C0":
             phi = C0_basis(sd, n, phi)
 
@@ -520,7 +526,7 @@ class LineExpansionSet(ExpansionSet):
         Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
         xs = apply_mapping(A, b, numpy.transpose(pts)).T
         results = {}
-        scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
+        scale = self.get_scale(cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
