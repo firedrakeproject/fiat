@@ -31,7 +31,7 @@ class HCTDualSet(dual_set.DualSet):
         k = 2 if reduced else 0
         Q = create_quadrature(rline, degree-1+k)
         qpts = Q.get_points()
-        f_at_qpts = eval_jacobi(0, 0, k, 2.0*qpts - 1)
+        f_at_qpts = eval_jacobi(0, 0, k, 2.0*qpts[:, 0] - 1)
         for e in sorted(top[1]):
             cur = len(nodes)
             nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
