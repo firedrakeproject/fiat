@@ -360,11 +360,12 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
     :kwarg order: The order of continuity across subcells.
+    :kwarg vorder: The order of super-smoothness at interior vertices.
     :kwarg shape: The value shape.
     :kwarg variant: The variant for the underlying ExpansionSet.
     :kwarg scale: The scale for the underlying ExpansionSet.
     """
-    def __init__(self, ref_el, degree, order=1, shape=(), **kwargs):
+    def __init__(self, ref_el, degree, order=1, vorder=0, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         k = 1 if expansion_set.continuity == "C0" else 0
@@ -390,10 +391,39 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         if len(rows) > 0:
             dual_mat = numpy.vstack(rows)
             _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-            num_sv = len([s for s in sig if abs(s) > 1.e-10])
+            tol = sig[0] * 1E-10
+            num_sv = len([s for s in sig if abs(s) > tol])
             coeffs = vt[num_sv:]
         else:
             coeffs = numpy.eye(expansion_set.get_num_members(degree))
+
+        if vorder > order + 1:
+            # Impose C^vorder super-smoothness at interior vertices
+            top = ref_el.get_topology()
+            verts = ref_el.get_vertices()
+            pts = [verts[i] for i in ref_el.get_interior_facets(0)]
+            derivs = {cell: expansion_set._tabulate_on_cell(degree, pts, order=vorder, cell=cell)
+                      for cell in top[sd]}
+            cell_node_map = expansion_set.get_cell_node_map(degree)
+            for r in range(order+2, vorder+1):
+                rows = []
+                for facet in ref_el.get_interior_facets(sd-1):
+                    facet_verts = set(top[sd-1][facet])
+                    c0, c1 = tuple(k for k in top[sd] if facet_verts < set(top[sd][k]))
+                    v0 = ref_el.volume_of_subcomplex(sd, c0)
+                    v1 = ref_el.volume_of_subcomplex(sd, c1)
+                    a = ref_el.volume_of_subcomplex(sd-1, facet)
+                    scale = (0.5/a * (v0 + v1)) ** r
+                    for alpha in polynomial_set.mis(sd, r):
+                        jump = numpy.zeros((num_members, len(pts)))
+                        jump[cell_node_map[c1]] += scale * derivs[c1][alpha]
+                        jump[cell_node_map[c0]] -= scale * derivs[c0][alpha]
+                        rows.append(jump.T)
+                dual_mat = numpy.dot(numpy.vstack(rows), coeffs.T)
+                _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
+                tol = sig[0] * 1E-10
+                num_sv = len([s for s in sig if abs(s) > tol])
+                coeffs = numpy.dot(vt[num_sv:], coeffs)
 
         if shape != tuple():
             m, n = coeffs.shape

@@ -8,7 +8,7 @@ import pytest
 import numpy
 
 from FIAT import (
-    BrezziDouglasMarini, Morley, QuinticArgyris, CubicHermite)
+    BrezziDouglasMarini, Morley, Argyris, CubicHermite)
 
 from FIAT.reference_element import (
     UFCTriangle,
@@ -22,7 +22,7 @@ T = UFCTriangle()
 @pytest.mark.parametrize("element",
                          [CubicHermite(T),
                           Morley(T),
-                          QuinticArgyris(T),
+                          Argyris(T),
                           BrezziDouglasMarini(T, 1, variant="integral")])
 def test_pw_dual(element):
     deg = element.degree()
