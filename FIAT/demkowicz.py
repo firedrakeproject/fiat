@@ -156,7 +156,8 @@ class DemkowiczDual(DualSet):
             B = inner(test, test, Qwts)
             A = inner(dtest, dtest, Qwts)
             sig, S = scipy.linalg.eigh(A, B)
-            nullspace_dim = len([s for s in sig if abs(s) <= 1.e-10])
+            tol = sig[-1] * 1E-10
+            nullspace_dim = len([s for s in sig if abs(s) <= tol])
             S = S[:, nullspace_dim:]
             S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
             # Apply change of basis
@@ -278,15 +279,15 @@ if __name__ == "__main__":
     from FIAT import NedelecSecondKind as N2Curl
     from FIAT import BrezziDouglasMarini as N2Div
 
-    dim = 2
-    degree = 10
+    dim = 3
+    degree = 7
     ref_el = symmetric_simplex(dim)
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
     kind = 1
     variant = "fdm"
-    # variant = "demkowicz"
+    variant = "demkowicz"
     # variant = None
     space_dict = {"H1": (CG, grad),
                   "HCurl": (N1Curl if kind == 1 else N2Curl, curl),
