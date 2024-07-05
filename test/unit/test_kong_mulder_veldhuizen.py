@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import pytest
 
@@ -12,7 +13,7 @@ Te = UFCTetrahedron()
 
 @pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 4)])
 def test_kmv_quad_tet_schemes(p_d):  # noqa: W503
-    fct = np.math.factorial
+    fct = math.factorial
     p, d = p_d
     q = create_quadrature(Te, p, "KMV")
     for i in range(d + 1):
@@ -30,7 +31,7 @@ def test_kmv_quad_tet_schemes(p_d):  # noqa: W503
 
 @pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 5), (4, 7), (5, 9)])
 def test_kmv_quad_tri_schemes(p_d):
-    fct = np.math.factorial
+    fct = math.factorial
     p, d = p_d
     q = create_quadrature(T, p, "KMV")
     for i in range(d + 1):

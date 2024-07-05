@@ -42,7 +42,7 @@ class DPC0(finite_element.CiarletElement):
         super(DPC0, self).__init__(poly_set=poly_set,
                                    dual=dual,
                                    order=degree,
-                                   ref_el=ref_el,
+                                   ref_complex=ref_el,
                                    formdegree=formdegree)
 
 
@@ -108,7 +108,7 @@ class HigherOrderDPC(finite_element.CiarletElement):
         super(HigherOrderDPC, self).__init__(poly_set=poly_set,
                                              dual=dual,
                                              order=degree,
-                                             ref_el=ref_el,
+                                             ref_complex=ref_el,
                                              formdegree=formdegree)
 
 

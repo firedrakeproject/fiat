@@ -19,17 +19,18 @@ and orderings of entities have a single point of entry.
 
 Currently implemented are UFC and Default Line, Triangle and Tetrahedron.
 """
-from itertools import chain, product, count
-from functools import reduce
-from collections import defaultdict
 import operator
+from collections import defaultdict
+from functools import reduce
+from itertools import chain, count, product
 from math import factorial
-from recursivenodes.nodes import _recursive, _decode_family
-from FIAT.orientation_utils import make_cell_orientation_reflection_map_simplex, make_cell_orientation_reflection_map_tensorproduct
-
 
 import numpy
+from recursivenodes.nodes import _decode_family, _recursive
 
+from FIAT.orientation_utils import (
+    make_cell_orientation_reflection_map_simplex,
+    make_cell_orientation_reflection_map_tensorproduct)
 
 POINT = 0
 LINE = 1
@@ -77,11 +78,14 @@ def make_lattice(verts, n, interior=0, variant=None):
     and interior = 0, this function will return the vertices and
     midpoint, but with interior = 1, it will only return the
     midpoint."""
-    if variant is None or variant == "equispaced":
-        variant = "equi"
-    elif variant == "gll":
-        variant = "lgl"
-    family = _decode_family(variant)
+    if variant is None:
+        variant = "equispaced"
+    recursivenodes_families = {
+        "equispaced": "equi",
+        "equispaced_interior": "equi_interior",
+        "gll": "lgl"}
+    family = recursivenodes_families.get(variant, variant)
+    family = _decode_family(family)
     D = len(verts)
     X = numpy.array(verts)
     get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
@@ -123,7 +127,6 @@ class Cell(object):
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
     vertices that make up edges, facecs, etc."""
-
     def __init__(self, shape, vertices, topology):
         """The constructor takes a shape code, the physical vertices expressed
         as a list of tuples of numbers, and the topology of a cell.
@@ -214,7 +217,7 @@ class Cell(object):
     def get_vertices_of_subcomplex(self, t):
         """Returns the tuple of vertex coordinates associated with the labels
         contained in the iterable t."""
-        return tuple([self.vertices[ti] for ti in t])
+        return tuple(self.vertices[ti] for ti in t)
 
     def get_dimension(self):
         """Returns the subelement dimension of the cell.  For tensor
@@ -229,6 +232,16 @@ class Cell(object):
 
         :arg dimension: `tuple` for tensor product cells, `int` otherwise
         """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+
+        :arg dimension: `tuple` for tensor product cells, `int` otherwise
+        """
+        if self.get_parent() is None:
+            return self.construct_subelement(dimension)
         raise NotImplementedError("Should be implemented in a subclass.")
 
     def get_entity_transform(self, dim, entity_i):
@@ -249,75 +262,79 @@ class Cell(object):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
+    def is_simplex(self):
+        return False
 
-class Simplex(Cell):
-    r"""Abstract class for a reference simplex.
+    def is_macrocell(self):
+        return False
 
-    Orientation of a physical cell is computed systematically
-    by comparing the canonical orderings of its facets and
-    the facets in the FIAT reference cell.
+    def get_parent(self):
+        """Return the parent cell if this cell is a split and None otherwise."""
+        return None
 
-    As an example, we compute the orientation of a
-    triangular cell:
+    def __gt__(self, other):
+        return self.get_parent() == other
 
-       +                    +
-       | \                  | \
-       1   0               47   42
-       |     \              |     \
-       +--2---+             +--43--+
-    FIAT canonical     Mapped example physical cell
+    def __lt__(self, other):
+        return self == other.get_parent()
 
-    Suppose that the facets of the physical cell
-    are canonically ordered as:
+    def __ge__(self, other):
+        return self > other or self == other
 
-    C = [43, 42, 47]
+    def __le__(self, other):
+        return self < other or self == other
 
-    FIAT facet to Physical facet map is given by:
 
-    M = [42, 47, 43]
+class SimplicialComplex(Cell):
+    r"""Abstract class for a simplicial complex.
 
-    Then the orientation of the cell is computed as:
-
-    C.index(M[0]) = 1; C.remove(M[0])
-    C.index(M[1]) = 1; C.remove(M[1])
-    C.index(M[2]) = 0; C.remove(M[2])
-
-    o = (1 * 2!) + (1 * 1!) + (0 * 0!) = 3
+    This consists of list of vertex locations and a topology map defining facets.
     """
-    def compute_normal(self, facet_i):
+    def __init__(self, shape, vertices, topology):
+        # Make sure that every facet has the right number of vertices to be
+        # a simplex.
+        for dim in topology:
+            for entity in topology[dim]:
+                assert len(topology[dim][entity]) == dim + 1
+
+        super(SimplicialComplex, self).__init__(shape, vertices, topology)
+
+    def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
+
+        t = self.get_topology()
+        sd = self.get_spatial_dimension()
+
+        # To handle simplicial complex case:
+        # Find a subcell of which facet_i is on the boundary
+        # Note: this is trivial and vastly overengineered for the single-cell
+        # case.
+        if cell is None:
+            cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
+                        if facet_i in facets)
+        verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]))
         # Interval case
         if self.get_shape() == LINE:
-            verts = numpy.asarray(self.vertices)
-            v_i, = self.get_topology()[0][facet_i]
+            v_i = t[1][cell].index(t[0][facet_i][0])
             n = verts[v_i] - verts[[1, 0][v_i]]
             return n / numpy.linalg.norm(n)
 
-        # first, let's compute the span of the simplex
-        # This is trivial if we have a d-simplex in R^d.
-        # Not so otherwise.
-        vert_vecs = [numpy.array(v)
-                     for v in self.vertices]
-        vert_vecs_foo = numpy.array([vert_vecs[i] - vert_vecs[0]
-                                     for i in range(1, len(vert_vecs))])
+        # vectors from vertex 0 to each other vertex.
+        vert_vecs_from_v0 = verts[1:, :] - verts[:1, :]
 
-        (u, s, vt) = numpy.linalg.svd(vert_vecs_foo)
+        (u, s, _) = numpy.linalg.svd(vert_vecs_from_v0)
         rank = len([si for si in s if si > 1.e-10])
 
         # this is the set of vectors that span the simplex
         spanu = u[:, :rank]
 
-        t = self.get_topology()
-        sd = self.get_spatial_dimension()
         vert_coords_of_facet = \
             self.get_vertices_of_subcomplex(t[sd-1][facet_i])
 
         # now I find everything normal to the facet.
-        vcf = [numpy.array(foo)
-               for foo in vert_coords_of_facet]
-        facet_span = numpy.array([vcf[i] - vcf[0]
-                                  for i in range(1, len(vcf))])
-        (uf, sf, vft) = numpy.linalg.svd(facet_span)
+        vcf = numpy.asarray(vert_coords_of_facet)
+        facet_span = vcf[1:, :] - vcf[:1, :]
+        (_, sf, vft) = numpy.linalg.svd(facet_span)
 
         # now get the null space from vft
         rankfacet = len([si for si in sf if si > 1.e-10])
@@ -337,7 +354,7 @@ class Simplex(Cell):
         nfoo = foo[:, 0]
 
         # what is the vertex not in the facet?
-        verts_set = set(t[sd][0])
+        verts_set = set(t[sd][cell])
         verts_facet = set(t[sd - 1][facet_i])
         verts_diff = verts_set.difference(verts_facet)
         if len(verts_diff) != 1:
@@ -414,20 +431,20 @@ class Simplex(Cell):
         include in each direction."""
         if dim == 0:
             return (self.get_vertices()[entity_id], )
-        elif 0 < dim < self.get_spatial_dimension():
+        elif 0 < dim <= self.get_spatial_dimension():
             entity_verts = \
                 self.get_vertices_of_subcomplex(
                     self.get_topology()[dim][entity_id])
             return make_lattice(entity_verts, order, 1, variant=variant)
-        elif dim == self.get_spatial_dimension():
-            return make_lattice(self.get_vertices(), order, 1, variant=variant)
         else:
             raise ValueError("illegal dimension")
 
     def volume(self):
-        """Computes the volume of the simplex in the appropriate
+        """Computes the volume of the simplicial complex in the appropriate
         dimensional measure."""
-        return volume(self.get_vertices())
+        sd = self.get_spatial_dimension()
+        return sum(self.volume_of_subcomplex(sd, k)
+                   for k in self.topology[sd])
 
     def volume_of_subcomplex(self, dim, facet_no):
         vids = self.topology[dim][facet_no]
@@ -443,7 +460,7 @@ class Simplex(Cell):
     def compute_reference_normal(self, facet_dim, facet_i):
         """Returns the unit normal in infinity norm to facet_i."""
         assert facet_dim == self.get_spatial_dimension() - 1
-        n = Simplex.compute_normal(self, facet_i)  # skip UFC overrides
+        n = SimplicialComplex.compute_normal(self, facet_i)  # skip UFC overrides
         return n / numpy.linalg.norm(n, numpy.inf)
 
     def get_entity_transform(self, dim, entity):
@@ -461,7 +478,7 @@ class Simplex(Cell):
             i, = topology[dim][entity]
             vertex = self.get_vertices()[i]
             return lambda point: vertex
-        elif dim == celldim:
+        elif dim == celldim and len(self.topology[celldim]) == 1:
             assert entity == 0
             return lambda point: point
 
@@ -478,22 +495,13 @@ class Simplex(Cell):
 
         # Entity vertices in entity space.
         v_e = numpy.asarray(subcell.get_vertices())
-
-        A = numpy.zeros([subdim, subdim])
-
-        for i in range(subdim):
-            A[i, :] = (v_e[i + 1] - v_e[0])
-            A[i, :] /= A[i, :].dot(A[i, :])
+        A = v_e[1:] - v_e[:1]
 
         # Entity vertices in cell space.
         v_c = numpy.asarray(self.get_vertices_of_subcomplex(topology[dim][entity]))
+        B = v_c[1:] - v_c[:1]
 
-        B = numpy.zeros([celldim, subdim])
-
-        for j in range(subdim):
-            B[:, j] = (v_c[j + 1] - v_c[0])
-
-        C = B.dot(A)
+        C = numpy.linalg.solve(A, B).T
 
         offset = v_c[0] - C.dot(v_e[0])
 
@@ -504,8 +512,64 @@ class Simplex(Cell):
         spatial dimension."""
         return self.get_spatial_dimension()
 
+    def compute_barycentric_coordinates(self, points, entity=None):
+        """Returns the barycentric coordinates of a list of points on an
+        entity."""
+        if entity is None:
+            entity = (self.get_spatial_dimension(), 0)
+        entity_dim, entity_id = entity
+        top = self.get_topology()
+        verts = self.get_vertices_of_subcomplex(top[entity_dim][entity_id])
+        A = numpy.transpose(verts)
+        B = numpy.transpose(points)
+        B = B - A[:, :1]
+        A = A[:, 1:] - A[:, :1]
+        if A.shape[0] != A.shape[1]:
+            # Form normal equations
+            B = numpy.dot(A.T, B)
+            A = numpy.dot(A.T, A)
+        return numpy.linalg.solve(A, B).T
+
+
+class Simplex(SimplicialComplex):
+    r"""Abstract class for a reference simplex.
+
+    Orientation of a physical cell is computed systematically
+    by comparing the canonical orderings of its facets and
+    the facets in the FIAT reference cell.
+
+    As an example, we compute the orientation of a
+    triangular cell:
+
+       +                    +
+       | \                  | \
+       1   0               47   42
+       |     \              |     \
+       +--2---+             +--43--+
+    FIAT canonical     Mapped example physical cell
+
+    Suppose that the facets of the physical cell
+    are canonically ordered as:
+
+    C = [43, 42, 47]
+
+    FIAT facet to Physical facet map is given by:
+
+    M = [42, 47, 43]
+
+    Then the orientation of the cell is computed as:
+
+    C.index(M[0]) = 1; C.remove(M[0])
+    C.index(M[1]) = 1; C.remove(M[1])
+    C.index(M[2]) = 0; C.remove(M[2])
+
+    o = (1 * 2!) + (1 * 1!) + (0 * 0!) = 3
+    """
+    def is_simplex(self):
+        return True
+
     def symmetry_group_size(self, dim):
-        return numpy.math.factorial(dim + 1)
+        return factorial(dim + 1)
 
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
@@ -682,7 +746,7 @@ class UFCSimplex(Simplex):
         # sum(bary-abs(bary)) = -4.
         # - 0.5 * sum(bary-abs(bary)) = 2.0
         # which is the correct L1 distance from the cell to the point.
-        l1_dist = - 0.5 * sum([b - abs(b) for b in bary])
+        l1_dist = - 0.5 * sum(b - abs(b) for b in bary)
         # Take abs at the end to avoid negative zero.
         return abs(l1_dist)
 
@@ -950,6 +1014,15 @@ class TensorProductCell(Cell):
         return TensorProductCell(*[c.construct_subelement(d)
                                    for c, d in zip(self.cells, dimension)])
 
+    def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+
+        :arg dimension: dimension in each "direction" (tuple)
+        """
+        return TensorProductCell(*[c.construct_subcomplex(d)
+                                   for c, d in zip(self.cells, dimension)])
+
     def get_entity_transform(self, dim, entity_i):
         """Returns a mapping of point coordinates from the
         `entity_i`-th subentity of dimension `dim` to the cell.
@@ -1037,6 +1110,26 @@ class TensorProductCell(Cell):
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         return make_cell_orientation_reflection_map_tensorproduct(self.cells)
+
+    def compare(self, op, other):
+        if hasattr(other, "product"):
+            other = other.product
+        if isinstance(other, type(self)):
+            return all(op(a, b) for a, b in zip(self.cells, other.cells))
+        else:
+            return op(self, other)
+
+    def __gt__(self, other):
+        return self.compare(operator.gt, other)
+
+    def __lt__(self, other):
+        return self.compare(operator.lt, other)
+
+    def __ge__(self, other):
+        return self.compare(operator.ge, other)
+
+    def __le__(self, other):
+        return self.compare(operator.le, other)
 
 
 class UFCQuadrilateral(Cell):
@@ -1169,6 +1262,18 @@ class UFCQuadrilateral(Cell):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         return self.product.cell_orientation_reflection_map()
 
+    def __gt__(self, other):
+        return self.product > other
+
+    def __lt__(self, other):
+        return self.product < other
+
+    def __ge__(self, other):
+        return self.product >= other
+
+    def __le__(self, other):
+        return self.product <= other
+
 
 class UFCHexahedron(Cell):
     """This is the reference hexahedron with vertices
@@ -1261,6 +1366,18 @@ class UFCHexahedron(Cell):
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         return self.product.cell_orientation_reflection_map()
+
+    def __gt__(self, other):
+        return self.product > other
+
+    def __lt__(self, other):
+        return self.product < other
+
+    def __ge__(self, other):
+        return self.product >= other
+
+    def __le__(self, other):
+        return self.product <= other
 
 
 def make_affine_mapping(xs, ys):
@@ -1466,3 +1583,11 @@ def compute_unflattening_map(topology_dict):
             unflattening_map[(flat_dim, flat_entity)] = (dim, entity)
 
     return unflattening_map
+
+
+def max_complex(complexes):
+    max_cell = max(complexes)
+    if all(max_cell >= b for b in complexes):
+        return max_cell
+    else:
+        raise ValueError("Cannot find the maximal complex")

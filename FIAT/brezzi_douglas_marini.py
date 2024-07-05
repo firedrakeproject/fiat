@@ -35,7 +35,8 @@ class BDMDualSet(dual_set.DualSet):
             for f in top[sd - 1]:
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
-                n = ref_el.compute_normal(f)
+                Jdet = Q.jacobian_determinant()
+                n = ref_el.compute_scaled_normal(f) / Jdet
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)

@@ -9,46 +9,65 @@
 import numpy
 import scipy
 
-from FIAT import finite_element, dual_set, functional, demkowicz
-from FIAT.reference_element import (POINT, LINE, TRIANGLE, TETRAHEDRON,
-                                    symmetric_simplex)
+from FIAT import finite_element, dual_set, functional, P0, demkowicz
+from FIAT.reference_element import symmetric_simplex
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
+from FIAT.check_format_variant import parse_lagrange_variant
 
 
 class LegendreDual(dual_set.DualSet):
     """The dual basis for Legendre elements."""
-    def __init__(self, ref_el, degree, poly_set):
+    def __init__(self, ref_el, degree, codim=0):
+        nodes = []
         entity_ids = {}
         entity_permutations = {}
+
+        sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         for dim in sorted(top):
-            entity_ids[dim] = {}
+            npoints = degree + 1 if dim == sd - codim else 0
+            perms = make_entity_permutations_simplex(dim, npoints)
             entity_permutations[dim] = {}
-            perms = make_entity_permutations_simplex(dim, degree + 1 if dim == len(top)-1 else -1)
-            for entity in sorted(top[dim]):
-                entity_ids[dim][entity] = []
-                entity_permutations[dim][entity] = perms
+            entity_ids[dim] = {}
+            if npoints == 0:
+                for entity in sorted(top[dim]):
+                    entity_ids[dim][entity] = []
+                    entity_permutations[dim][entity] = perms
+                continue
 
-        dim = ref_el.get_spatial_dimension()
-        Q = create_quadrature(ref_el, 2 * degree)
-        phis = poly_set.tabulate(Q.get_points())[(0,) * dim]
-        nodes = [functional.IntegralMoment(ref_el, Q, phi) for phi in phis]
-        entity_ids[dim][0] = list(range(len(nodes)))
+            ref_facet = ref_el.construct_subelement(dim)
+            poly_set = ONPolynomialSet(ref_facet, degree)
+            Q_ref = create_quadrature(ref_facet, 2 * degree)
+            phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
+            for entity in sorted(top[dim]):
+                cur = len(nodes)
+                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
+                entity_ids[dim][entity] = list(range(cur, len(nodes)))
+                entity_permutations[dim][entity] = perms
 
         super(LegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class Legendre(finite_element.CiarletElement):
     """Simplicial discontinuous element with Legendre polynomials."""
+    def __new__(cls, ref_el, degree, variant=None):
+        if degree == 0:
+            splitting, _ = parse_lagrange_variant(variant, integral=True)
+            if splitting is None and not ref_el.is_macrocell():
+                # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
+                return P0.P0(ref_el)
+        return super(Legendre, cls).__new__(cls)
 
-    def __init__(self, ref_el, degree):
-        if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
-            raise ValueError("%s is only defined on simplices." % type(self))
+    def __init__(self, ref_el, degree, variant=None):
+        splitting, _ = parse_lagrange_variant(variant, integral=True)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
         poly_set = ONPolynomialSet(ref_el, degree)
-        dual = LegendreDual(ref_el, degree, poly_set)
+        dual = LegendreDual(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(Legendre, self).__init__(poly_set, dual, degree, formdegree)
 
@@ -56,8 +75,6 @@ class Legendre(finite_element.CiarletElement):
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for integrated Legendre elements."""
     def __init__(self, ref_el, degree):
-        duals = self._beuchler_integral_duals
-
         nodes = []
         entity_ids = {}
         entity_permutations = {}
@@ -77,7 +94,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
                 continue
 
             ref_facet = symmetric_simplex(dim)
-            Q_ref, phis = duals(ref_facet, degree)
+            Q_ref, phis = self.make_reference_duals(ref_facet, degree)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
@@ -92,7 +109,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
         super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
 
-    def _beuchler_integral_duals(self, ref_el, degree):
+    def make_reference_duals(self, ref_el, degree):
         Q = create_quadrature(ref_el, 2 * degree)
         qpts, qwts = Q.get_points(), Q.get_weights()
         inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
@@ -114,14 +131,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
 class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
-
     def __init__(self, ref_el, degree, variant=None):
-        if ref_el.shape not in {POINT, LINE, TRIANGLE, TETRAHEDRON}:
-            raise ValueError("%s is only defined on simplices." % type(self))
+        splitting, _ = parse_lagrange_variant(variant, integral=True)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
-
-        poly_set = ONPolynomialSet(ref_el, degree, variant="integral")
+        poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         if variant == "demkowicz":
             dual = demkowicz.DemkowiczDual(ref_el, degree, "H1")
         elif variant == "fdm":

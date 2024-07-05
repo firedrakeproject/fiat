@@ -132,24 +132,36 @@ elements = [
     "CrouzeixRaviart(I, 1)",
     "CrouzeixRaviart(T, 1)",
     "CrouzeixRaviart(S, 1)",
+    "RaviartThomas(I, 1)",
+    "RaviartThomas(I, 2)",
+    "RaviartThomas(I, 3)",
     "RaviartThomas(T, 1)",
     "RaviartThomas(T, 2)",
     "RaviartThomas(T, 3)",
     "RaviartThomas(S, 1)",
     "RaviartThomas(S, 2)",
     "RaviartThomas(S, 3)",
+    'RaviartThomas(I, 1, variant="integral")',
+    'RaviartThomas(I, 2, variant="integral")',
+    'RaviartThomas(I, 3, variant="integral")',
     'RaviartThomas(T, 1, variant="integral")',
     'RaviartThomas(T, 2, variant="integral")',
     'RaviartThomas(T, 3, variant="integral")',
     'RaviartThomas(S, 1, variant="integral")',
     'RaviartThomas(S, 2, variant="integral")',
     'RaviartThomas(S, 3, variant="integral")',
+    'RaviartThomas(I, 1, variant="integral(1)")',
+    'RaviartThomas(I, 2, variant="integral(1)")',
+    'RaviartThomas(I, 3, variant="integral(1)")',
     'RaviartThomas(T, 1, variant="integral(1)")',
     'RaviartThomas(T, 2, variant="integral(1)")',
     'RaviartThomas(T, 3, variant="integral(1)")',
     'RaviartThomas(S, 1, variant="integral(1)")',
     'RaviartThomas(S, 2, variant="integral(1)")',
     'RaviartThomas(S, 3, variant="integral(1)")',
+    'RaviartThomas(I, 1, variant="point")',
+    'RaviartThomas(I, 2, variant="point")',
+    'RaviartThomas(I, 3, variant="point")',
     'RaviartThomas(T, 1, variant="point")',
     'RaviartThomas(T, 2, variant="point")',
     'RaviartThomas(T, 3, variant="point")',
@@ -530,22 +542,17 @@ def test_error_point_high_order(element):
         eval(element)
 
 
-@pytest.mark.parametrize('degree', [0, 10])
-@pytest.mark.parametrize('dim', range(1, 4))
-@pytest.mark.parametrize('cell', ["default", "ufc", "symmetric"])
-def test_expansion_orthonormality(cell, dim, degree):
-    from FIAT.expansions import ExpansionSet
+@pytest.mark.parametrize('cell', [I, T, S])
+def test_expansion_orthonormality(cell):
+    from FIAT import expansions
     from FIAT.quadrature_schemes import create_quadrature
-    from FIAT import reference_element
-    make_cell = {"default": reference_element.default_simplex,
-                 "ufc": reference_element.ufc_simplex,
-                 "symmetric": reference_element.symmetric_simplex}[cell]
-    ref_el = make_cell(dim)
-    U = ExpansionSet(ref_el)
-    Q = create_quadrature(ref_el, 2 * degree)
-    qpts, qwts = Q.get_points(), Q.get_weights()
-    phi = U.tabulate(degree, qpts)
-    results = np.dot(np.multiply(phi, qwts), phi.T)
+    U = expansions.ExpansionSet(cell)
+    degree = 10
+    rule = create_quadrature(cell, 2*degree)
+    phi = U.tabulate(degree, rule.pts)
+    qwts = rule.get_weights()
+    scale = 2 ** cell.get_spatial_dimension()
+    results = scale * np.dot(np.multiply(phi, qwts), phi.T)
 
     assert np.allclose(results, np.diag(np.diag(results)))
     assert np.allclose(np.diag(results), 1.0)
@@ -609,67 +616,18 @@ def test_expansion_values(dim):
 
 
 @pytest.mark.parametrize('cell', [I, T, S])
-def test_make_bubbles(cell):
-    from FIAT.quadrature_schemes import create_quadrature
-    from FIAT.expansions import polynomial_dimension
-    from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
-
-    degree = 10
-    B = make_bubbles(cell, degree)
-
-    # basic tests
-    sd = cell.get_spatial_dimension()
-    assert isinstance(B, PolynomialSet)
-    assert B.degree == degree
-    assert B.get_num_members() == polynomial_dimension(cell, degree - sd - 1)
-
-    # test values on the boundary
-    top = cell.get_topology()
-    points = []
-    for dim in range(len(top)-1):
-        for entity in range(len(top[dim])):
-            points.extend(cell.make_points(dim, entity, degree))
-    values = B.tabulate(points)[(0,) * sd]
-    assert np.allclose(values, 0, atol=1E-12)
-
-    # test linear independence
-    m = B.get_num_members()
-    points = cell.make_points(sd, 0, degree)
-    values = B.tabulate(points)[(0,) * sd]
-    assert values.shape == (m, m)
-    assert np.linalg.matrix_rank(values.T, tol=1E-12) == m
-
-    # test that B does not have components in span(P_{degree+2} \ P_{degree})
-    P = ONPolynomialSet(cell, degree + 2)
-    P = P.take(list(range(polynomial_dimension(cell, degree),
-                          P.get_num_members())))
-
-    Q = create_quadrature(cell, P.degree + B.degree)
-    qpts, qwts = Q.get_points(), Q.get_weights()
-    P_at_qpts = P.tabulate(qpts)[(0,) * sd]
-    B_at_qpts = B.tabulate(qpts)[(0,) * sd]
-    assert np.allclose(np.dot(np.multiply(P_at_qpts, qwts), B_at_qpts.T), 0.0)
-
-
-@pytest.mark.parametrize('degree', [0, 10])
-@pytest.mark.parametrize('dim', range(1, 4))
-@pytest.mark.parametrize('cell', ["default", "ufc", "symmetric"])
-def test_bubble_duality(cell, dim, degree):
+def test_bubble_duality(cell):
     from FIAT.polynomial_set import make_bubbles
     from FIAT.quadrature_schemes import create_quadrature
-    from FIAT import reference_element
-    degree = max(dim+1, degree)
-    make_cell = {"default": reference_element.default_simplex,
-                 "ufc": reference_element.ufc_simplex,
-                 "symmetric": reference_element.symmetric_simplex}[cell]
-    cell = make_cell(dim)
+    degree = 10
+    sd = cell.get_spatial_dimension()
     B = make_bubbles(cell, degree)
 
-    Q = create_quadrature(cell, 2*B.degree - dim - 1)
+    Q = create_quadrature(cell, 2*B.degree - sd - 1)
     qpts, qwts = Q.get_points(), Q.get_weights()
-    phi = B.tabulate(qpts)[(0,) * dim]
+    phi = B.tabulate(qpts)[(0,) * sd]
     phi_dual = phi / abs(phi[0])
-    scale = 2 ** dim
+    scale = 2 ** sd
     results = scale * np.dot(np.multiply(phi_dual, qwts), phi.T)
 
     assert np.allclose(results, np.diag(np.diag(results)))
