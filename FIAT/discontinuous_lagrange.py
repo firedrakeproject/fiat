@@ -217,7 +217,7 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
     def __new__(cls, ref_el, degree, variant="equispaced"):
         if degree == 0:
             splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
-            if splitting is None:
+            if splitting is None and not ref_el.is_macrocell():
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0.P0(ref_el)
         return super(DiscontinuousLagrange, cls).__new__(cls)

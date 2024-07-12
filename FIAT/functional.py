@@ -215,15 +215,15 @@ class PointDerivative(Functional):
     def __call__(self, fn):
         """Evaluate the functional on the function fn. Note that this depends
         on sympy being able to differentiate fn."""
-        x = list(self.deriv_dict.keys())[0]
+        x, = self.deriv_dict
 
-        X = sympy.DeferredVector('x')
-        dX = numpy.asarray([X[i] for i in range(len(x))])
+        X = tuple(sympy.Symbol(f"X[{i}]") for i in range(len(x)))
 
-        dvars = tuple(d for d, a in zip(dX, self.alpha)
+        dvars = tuple(d for d, a in zip(X, self.alpha)
                       for count in range(a))
 
-        return sympy.diff(fn(X), *dvars).evalf(subs=dict(zip(dX, x)))
+        df = sympy.lambdify(X, sympy.diff(fn(X), *dvars))
+        return df(*x)
 
 
 class PointNormalDerivative(Functional):
@@ -457,18 +457,17 @@ class IntegralMomentOfTensorDivergence(Functional):
         nqp = len(qpts)
         dpts = qpts
         self.dpts = dpts
+        sd = ref_el.get_spatial_dimension()
 
         assert len(f_at_qpts.shape) == 2
-        assert f_at_qpts.shape[0] == 2
+        assert f_at_qpts.shape[0] == sd
         assert f_at_qpts.shape[1] == nqp
-
-        sd = ref_el.get_spatial_dimension()
 
         dpt_dict = OrderedDict()
 
         alphas = [tuple([1 if j == i else 0 for j in range(sd)]) for i in range(sd)]
         for q, pt in enumerate(dpts):
-            dpt_dict[tuple(pt)] = [(qwts[q]*f_at_qpts[i, q], alphas[j], (i, j)) for i in range(2) for j in range(2)]
+            dpt_dict[tuple(pt)] = [(qwts[q]*f_at_qpts[i, q], alphas[j], (i, j)) for i in range(sd) for j in range(sd)]
 
         super().__init__(ref_el, tuple(), {}, dpt_dict,
                          "IntegralMomentOfDivergence")

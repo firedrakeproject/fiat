@@ -24,8 +24,12 @@ def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
     A, b = reference_element.make_affine_mapping(source_cell.get_vertices(),
                                                  target_cell.get_vertices())
     scale = pseudo_determinant(A)
-    pts = numpy.dot(pts_ref.reshape((-1, A.shape[1])), A.T) + b[None, :]
     wts = scale * wts_ref
+    if pts_ref.size == 0:
+        pts = b[None, :]
+    else:
+        pts = numpy.dot(pts_ref.reshape((-1, A.shape[1])), A.T) + b[None, :]
+
     # return immutable types
     pts = tuple(map(tuple, pts))
     wts = tuple(wts.flat)

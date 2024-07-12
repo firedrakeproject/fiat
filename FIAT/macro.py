@@ -1,5 +1,5 @@
 import copy
-from itertools import chain
+from itertools import chain, combinations
 
 import numpy
 
@@ -56,6 +56,29 @@ def invert_cell_topology(T):
     return {dim: {T[dim][entity]: entity for entity in T[dim]} for dim in T}
 
 
+def make_topology(sd, num_verts, edges):
+    topology = {}
+    topology[0] = {i: (i,) for i in range(num_verts)}
+    topology[1] = dict(enumerate(sorted(edges)))
+
+    # Get an adjacency list for each vertex
+    adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
+                 for v in topology[0]}
+
+    # Complete the higher dimensional facets by appending a vertex
+    # adjacent to the vertices of codimension 1 facets
+    for dim in range(1, sd):
+        entities = []
+        for entity in topology[dim]:
+            facet = topology[dim][entity]
+            facet_verts = set(facet)
+            for v in range(min(facet)):
+                if facet_verts < adjacency[v]:
+                    entities.append((v, *facet))
+        topology[dim+1] = dict(enumerate(sorted(entities)))
+    return topology
+
+
 class SplitSimplicialComplex(SimplicialComplex):
     """Abstract class to implement a split on a Simplex.
 
@@ -90,18 +113,14 @@ class SplitSimplicialComplex(SimplicialComplex):
                 children = parent_to_children[dim][entity]
                 if len(children) > 1:
                     # sort children lexicographically
-                    parent_verts = parent.get_vertices_of_subcomplex(parent_top[dim][entity])
-                    children_verts = [tuple(numpy.average([vertices[i] for i in topology[cdim][centity]], 0))
-                                      for cdim, centity in children]
-
-                    B = numpy.transpose(children_verts)
-                    A = numpy.transpose(parent_verts[::-1])
-                    B = B - A[:, -1:]
-                    A = A[:, :-1] - A[:, -1:]
-                    coords = numpy.linalg.solve(numpy.dot(A.T, A), numpy.dot(A.T, B)).T
-                    coords = list(map(tuple, coords))
-                    children = (c for _, c in sorted(zip(coords, children)))
-                parent_to_children[dim][entity] = tuple(children)
+                    pts = [tuple(numpy.average([vertices[i] for i in topology[cdim][centity]], 0))
+                           for cdim, centity in children]
+                    bary = parent.compute_barycentric_coordinates(pts, entity=(dim, entity))
+                    order = numpy.lexsort(bary.T)
+                    children = tuple(children[j] for j in order)
+                else:
+                    children = tuple(children)
+                parent_to_children[dim][entity] = children
 
         self._child_to_parent = child_to_parent
         self._parent_to_children = parent_to_children
@@ -180,12 +199,11 @@ class AlfeldSplit(SplitSimplicialComplex):
         new_topology = copy.deepcopy(top)
         # Discard the cell interiors
         new_topology[sd] = {}
-        new_verts = tuple(ref_el.get_vertices())
+        new_verts = list(ref_el.get_vertices())
 
         for cell in top[sd]:
             # Append the barycenter as the new vertex
-            barycenter = ref_el.make_points(sd, cell, sd+1)
-            new_verts += tuple(barycenter)
+            new_verts.extend(ref_el.make_points(sd, cell, sd+1))
             new_vert_id = len(new_topology[0])
             new_topology[0][new_vert_id] = (new_vert_id,)
 
@@ -198,7 +216,7 @@ class AlfeldSplit(SplitSimplicialComplex):
                         cur = cur + 1
 
         parent = ref_el.get_parent() or ref_el
-        super(AlfeldSplit, self).__init__(parent, new_verts, new_topology)
+        super(AlfeldSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -226,8 +244,6 @@ class IsoSplit(SplitSimplicialComplex):
         new_verts = make_lattice(ref_el.vertices, degree, variant=variant)
         flat_index = {tuple(alpha): i for i, alpha in enumerate(lattice_iter(0, degree+1, sd))}
 
-        new_topology = {}
-        new_topology[0] = {i: (i,) for i in range(len(new_verts))}
         # Loop through degree-1 vertices
         # Construct a P1 simplex by connecting edges between a vertex and
         # its neighbors obtained by shifting each coordinate up by 1
@@ -236,8 +252,7 @@ class IsoSplit(SplitSimplicialComplex):
             simplex = []
             for beta in lattice_iter(0, 2, sd):
                 v1 = flat_index[tuple(a+b for a, b in zip(alpha, beta))]
-                for v0 in simplex:
-                    edges.append((v0, v1))
+                edges.extend((v0, v1) for v0 in simplex)
                 simplex.append(v1)
 
         if sd == 3:
@@ -247,25 +262,9 @@ class IsoSplit(SplitSimplicialComplex):
             v0, v1 = flat_index[(1, 0, 0)], flat_index[(0, 1, 1)]
             edges.append(tuple(sorted((v0, v1))))
 
-        new_topology[1] = dict(enumerate(edges))
-
-        # Get an adjacency list for each vertex
-        adjacency = {v: set(chain.from_iterable(verts for verts in edges if v in verts))
-                     for v in new_topology[0]}
-
-        # Complete the higher dimensional facets by appending a vertex
-        # adjacent to the vertices of codimension 1 facets
-        for dim in range(2, sd+1):
-            entities = []
-            for entity in new_topology[dim-1]:
-                facet = new_topology[dim-1][entity]
-                for v in range(min(facet)):
-                    if set(facet) < adjacency[v]:
-                        entities.append((v,) + facet)
-            new_topology[dim] = dict(enumerate(entities))
-
+        new_topology = make_topology(sd, len(new_verts), edges)
         parent = ref_el.get_parent() or ref_el
-        super(IsoSplit, self).__init__(parent, new_verts, new_topology)
+        super(IsoSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -279,6 +278,46 @@ class IsoSplit(SplitSimplicialComplex):
         else:
             # Iso on facets is Iso
             return IsoSplit(ref_el, self.degree, self.variant)
+
+
+class PowellSabinSplit(SplitSimplicialComplex):
+    """Splits a simplicial complex by connecting barycenters of subentities to
+    the barycenter of the superentity.
+    """
+    def __init__(self, ref_el):
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        inv_top = invert_cell_topology(top)
+        new_verts = list(ref_el.get_vertices())
+        edges = []
+        offset = {0: 0}
+        for dim in range(1, sd+1):
+            offset[dim] = len(new_verts)
+            for entity in top[dim]:
+                bary_id = entity + offset[dim]
+                new_verts.extend(ref_el.make_points(dim, entity, dim+1))
+
+                # Connect subentity barycenter to the entity barycenter
+                for subdim in range(dim):
+                    edges.extend((inv_top[subdim][subverts] + offset[subdim], bary_id)
+                                 for subverts in combinations(top[dim][entity], subdim+1))
+
+        new_topology = make_topology(sd, len(new_verts), edges)
+        parent = ref_el.get_parent() or ref_el
+        super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
+
+    def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+        """
+        if dimension == self.get_dimension():
+            return self
+        ref_el = self.construct_subelement(dimension)
+        if dimension == 0:
+            return ref_el
+        else:
+            # Powell-Sabin on facets is Powell-Sabin
+            return PowellSabinSplit(ref_el)
 
 
 class MacroQuadratureRule(QuadratureRule):
@@ -321,14 +360,16 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
     :kwarg order: The order of continuity across subcells.
+    :kwarg vorder: The order of super-smoothness at interior vertices.
     :kwarg shape: The value shape.
     :kwarg variant: The variant for the underlying ExpansionSet.
     :kwarg scale: The scale for the underlying ExpansionSet.
     """
-    def __init__(self, ref_el, degree, order=1, shape=(), **kwargs):
+    def __init__(self, ref_el, degree, order=1, vorder=0, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         k = 1 if expansion_set.continuity == "C0" else 0
+        num_members = expansion_set.get_num_members(degree)
 
         sd = ref_el.get_spatial_dimension()
         facet_el = ref_el.construct_subelement(sd-1)
@@ -345,15 +386,29 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
             jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
             for r in range(k, order+1):
                 num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
-                rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)).reshape(-1, jumps[r].shape[0]))
+                rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)).reshape(-1, num_members))
 
         if len(rows) > 0:
-            dual_mat = numpy.row_stack(rows)
+            dual_mat = numpy.vstack(rows)
             _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-            num_sv = len([s for s in sig if abs(s) > 1.e-10])
+            tol = sig[0] * 1E-10
+            num_sv = len([s for s in sig if abs(s) > tol])
             coeffs = vt[num_sv:]
         else:
             coeffs = numpy.eye(expansion_set.get_num_members(degree))
+
+        if vorder > order + 1:
+            # Impose C^vorder super-smoothness at interior vertices
+            # C^order automatically gives C^{order+1} at the interior vertex
+            verts = ref_el.get_vertices()
+            points = [verts[i] for i in ref_el.get_interior_facets(0)]
+            jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
+            for r in range(order+2, vorder+1):
+                dual_mat = numpy.dot(numpy.vstack(jumps[r].T), coeffs.T)
+                _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
+                tol = sig[0] * 1E-10
+                num_sv = len([s for s in sig if abs(s) > tol])
+                coeffs = numpy.dot(vt[num_sv:], coeffs)
 
         if shape != tuple():
             m, n = coeffs.shape

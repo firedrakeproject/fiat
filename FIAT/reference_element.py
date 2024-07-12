@@ -481,22 +481,13 @@ class SimplicialComplex(Cell):
 
         # Entity vertices in entity space.
         v_e = numpy.asarray(subcell.get_vertices())
-
-        A = numpy.zeros([subdim, subdim])
-
-        for i in range(subdim):
-            A[i, :] = (v_e[i + 1] - v_e[0])
-            A[i, :] /= A[i, :].dot(A[i, :])
+        A = v_e[1:] - v_e[:1]
 
         # Entity vertices in cell space.
         v_c = numpy.asarray(self.get_vertices_of_subcomplex(topology[dim][entity]))
+        B = v_c[1:] - v_c[:1]
 
-        B = numpy.zeros([celldim, subdim])
-
-        for j in range(subdim):
-            B[:, j] = (v_c[j + 1] - v_c[0])
-
-        C = B.dot(A)
+        C = numpy.linalg.solve(A, B).T
 
         offset = v_c[0] - C.dot(v_e[0])
 
@@ -506,6 +497,24 @@ class SimplicialComplex(Cell):
         """Returns the subelement dimension of the cell.  Same as the
         spatial dimension."""
         return self.get_spatial_dimension()
+
+    def compute_barycentric_coordinates(self, points, entity=None):
+        """Returns the barycentric coordinates of a list of points on an
+        entity."""
+        if entity is None:
+            entity = (self.get_spatial_dimension(), 0)
+        entity_dim, entity_id = entity
+        top = self.get_topology()
+        verts = self.get_vertices_of_subcomplex(top[entity_dim][entity_id])
+        A = numpy.transpose(verts)
+        B = numpy.transpose(points)
+        B = B - A[:, :1]
+        A = A[:, 1:] - A[:, :1]
+        if A.shape[0] != A.shape[1]:
+            # Form normal equations
+            B = numpy.dot(A.T, B)
+            A = numpy.dot(A.T, A)
+        return numpy.linalg.solve(A, B).T
 
 
 class Simplex(SimplicialComplex):
@@ -723,7 +732,7 @@ class UFCSimplex(Simplex):
         # sum(bary-abs(bary)) = -4.
         # - 0.5 * sum(bary-abs(bary)) = 2.0
         # which is the correct L1 distance from the cell to the point.
-        l1_dist = - 0.5 * sum([b - abs(b) for b in bary])
+        l1_dist = - 0.5 * sum(b - abs(b) for b in bary)
         # Take abs at the end to avoid negative zero.
         return abs(l1_dist)
 

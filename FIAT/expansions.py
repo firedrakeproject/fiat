@@ -84,9 +84,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     if variant == "bubble":
         scale = -scale
-    if n == 0:
-        # Always return 1 for n=0 to make regression tests pass
-        scale = 1.0
 
     num_members = math.comb(n + dim, dim)
     results = tuple([None] * num_members for i in range(order+1))
@@ -245,14 +242,19 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
-def apply_mapping(A, b, pts):
+def apply_mapping(A, b, pts, transpose=False):
     """Apply an affine mapping to a column-stacked array of points."""
-    if isinstance(pts, numpy.ndarray) and len(pts.shape) == 2:
-        return numpy.dot(A, pts) + b[:, None]
+    if len(pts) == 0:
+        return pts
+    if transpose:
+        Ax = numpy.dot(pts, A.T)
+        for _ in Ax.shape[:-1]:
+            b = b[None, ...]
     else:
-        m1, m2 = A.shape
-        return [sum((A[i, j] * pts[j] for j in range(m2)), b[i])
-                for i in range(m1)]
+        Ax = numpy.dot(A, pts)
+        for _ in Ax.shape[1:]:
+            b = b[..., None]
+    return Ax + b
 
 
 class ExpansionSet(object):
@@ -278,25 +280,31 @@ class ExpansionSet(object):
         self.variant = variant
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-        self.base_ref_el = reference_element.default_simplex(sd)
-        base_verts = self.base_ref_el.get_vertices()
+        base_ref_el = reference_element.default_simplex(sd)
+        base_verts = base_ref_el.get_vertices()
 
         self.affine_mappings = [reference_element.make_affine_mapping(
                                 ref_el.get_vertices_of_subcomplex(top[sd][cell]),
                                 base_verts) for cell in top[sd]]
         if scale is None:
-            scale = math.sqrt(1.0 / self.base_ref_el.volume())
-        elif isinstance(scale, str):
-            scale = scale.lower()
-            if scale == "orthonormal":
-                scale = math.sqrt(1.0 / ref_el.volume())
-            elif scale == "l2 piola":
-                scale = 1.0 / ref_el.volume()
+            scale = math.sqrt(1.0 / base_ref_el.volume())
         self.scale = scale
         self.continuity = "C0" if variant == "bubble" else None
         self.recurrence_order = 2
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
+
+    def get_scale(self, cell=0):
+        scale = self.scale
+        if isinstance(scale, str):
+            sd = self.ref_el.get_spatial_dimension()
+            vol = self.ref_el.volume_of_subcomplex(sd, cell)
+            scale = scale.lower()
+            if scale == "orthonormal":
+                scale = math.sqrt(1.0 / vol)
+            elif scale == "l2 piola":
+                scale = 1.0 / vol
+        return scale
 
     def get_num_members(self, n):
         return polynomial_dimension(self.ref_el, n, self.continuity)
@@ -309,14 +317,19 @@ class ExpansionSet(object):
             return self._cell_node_map_cache.setdefault(n, cell_node_map)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        """Returns a dict of tabulations such that
+        tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
         from FIAT.polynomial_set import mis
         lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
         ref_pts = apply_mapping(A, b, numpy.transpose(pts))
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
+
+        # Always return 1 for n=0 to make regression tests pass
+        scale = 1.0 if n == 0 and len(self.affine_mappings) == 1 else self.get_scale(cell=cell)
         phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
-                                 self.scale, variant=self.variant)
+                                 scale, variant=self.variant)
         if self.continuity == "C0":
             phi = C0_basis(sd, n, phi)
 
@@ -347,20 +360,43 @@ class ExpansionSet(object):
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point."""
         pts = numpy.asarray(pts)
-        cell_point_map = compute_cell_point_map(self.ref_el, pts)
-        phis = [self._tabulate_on_cell(n, pts[ipts], order, cell=k)
-                for k, ipts in enumerate(cell_point_map)]
+        unique = self.continuity is not None and order == 0
+        cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=unique)
+        phis = {cell: self._tabulate_on_cell(n, pts[ipts], order, cell=cell)
+                for cell, ipts in cell_point_map.items()}
 
-        if len(phis) == 1:
+        if not self.ref_el.is_macrocell():
             return phis[0]
 
+        if pts.dtype == object:
+            # If binning is undefined, scale by the characteristic function of each subcell
+            Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique)
+            for cell, phi in phis.items():
+                for alpha in phi:
+                    phi[alpha] *= Xi[cell]
+        elif not unique:
+            # If binning is not unique, divide by the multiplicity of each point
+            mult = numpy.zeros(pts.shape[:-1])
+            for cell, ipts in cell_point_map.items():
+                mult[ipts] += 1
+            for cell, ipts in cell_point_map.items():
+                phi = phis[cell]
+                for alpha in phi:
+                    phi[alpha] /= mult[None, ipts]
+
+        # Insert subcell tabulations into the corresponding submatrices
+        idx = lambda *args: args if args[1] is Ellipsis else numpy.ix_(*args)
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
         result = {}
-        for alpha in phis[0]:
-            result[alpha] = numpy.zeros((num_phis,) + pts.shape[:-1])
-            for ibfs, ipts, phi in zip(cell_node_map, cell_point_map, phis):
-                result[alpha][numpy.ix_(ibfs, ipts)] = phi[alpha]
+        base_phi = tuple(phis.values())[0]
+        for alpha in base_phi:
+            dtype = base_phi[alpha].dtype
+            result[alpha] = numpy.zeros((num_phis, *pts.shape[:-1]), dtype=dtype)
+            for cell in cell_point_map:
+                ibfs = cell_node_map[cell]
+                ipts = cell_point_map[cell]
+                result[alpha][idx(ibfs, ipts)] += phis[cell][alpha]
         return result
 
     def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
@@ -380,30 +416,61 @@ class ExpansionSet(object):
         cell_node_map = self.get_cell_node_map(n)
 
         num_phis = self.get_num_members(n)
-        results = [numpy.zeros((num_phis,) + (sd,) * (r-1) + pts.shape[:-1])
-                   for r in range(order+1)]
+        results = numpy.zeros((order+1, num_phis, *pts.shape[:-1]))
 
-        for k, (ibfs, ipts) in enumerate(zip(cell_node_map, cell_point_map)):
-            if len(ipts) > 0:
-                normal = self.ref_el.compute_normal(facet, cell=k)
-                side = numpy.dot(normal, self.ref_el.compute_normal(facet))
-                phi = self._tabulate_on_cell(n, pts[ipts], order, cell=k)
-                v0 = phi[(0,)*sd]
-                for r in range(order+1):
-                    vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
-                    for index in numpy.ndindex(vr.shape[:r]):
-                        vr[index] = phi[tuple(map(index.count, range(sd)))]
-                    if r > 0:
-                        vr = numpy.tensordot(normal, vr, axes=(0, 0))
-                    vr = vr.transpose((-2, *tuple(range(r-1)), -1))
+        for cell in cell_point_map:
+            ipts = cell_point_map[cell]
+            ibfs = cell_node_map[cell]
+            normal = self.ref_el.compute_normal(facet, cell=cell)
+            side = numpy.dot(normal, self.ref_el.compute_normal(facet))
+            phi = self._tabulate_on_cell(n, pts[ipts], order, cell=cell)
+            v0 = phi[(0,)*sd]
+            for r in range(order+1):
+                vr = numpy.zeros((sd,)*r + v0.shape, dtype=v0.dtype)
+                for index in numpy.ndindex(vr.shape[:r]):
+                    vr[index] = phi[tuple(map(index.count, range(sd)))]
+                for _ in range(r):
+                    vr = numpy.tensordot(normal, vr, axes=(0, 0))
 
-                    shape_indices = tuple(range(sd) for _ in range(r-1))
-                    indices = numpy.ix_(ibfs, *shape_indices, ipts)
-                    if r == 0 and side < 0:
-                        results[r][indices] -= vr
-                    else:
-                        results[r][indices] += vr
+                indices = numpy.ix_(ibfs, ipts)
+                if r % 2 == 0 and side < 0:
+                    results[r][indices] -= vr
+                else:
+                    results[r][indices] += vr
         return results
+
+    def tabulate_jumps(self, n, points, order=0):
+        """Tabulates derivative jumps on given points.
+
+        :arg n: the polynomial degree.
+        :arg points: an iterable of points on the cell complex.
+        :kwarg order: the order of differentiation.
+
+        :returns: a dictionary of tabulations of derivative jumps across interior facets.
+        """
+
+        from FIAT.polynomial_set import mis
+        num_members = self.get_num_members(n)
+        cell_node_map = self.get_cell_node_map(n)
+
+        top = self.ref_el.get_topology()
+        sd = self.ref_el.get_spatial_dimension()
+        interior_facets = self.ref_el.get_interior_facets(sd-1)
+        derivs = {cell: self._tabulate_on_cell(n, points, order=order, cell=cell)
+                  for cell in top[sd]}
+        jumps = {}
+        for r in range(order+1):
+            cur = 0
+            alphas = mis(sd, r)
+            jumps[r] = numpy.zeros((num_members, len(alphas)*len(interior_facets), len(points)))
+            for facet in interior_facets:
+                facet_verts = set(top[sd-1][facet])
+                c0, c1 = tuple(k for k in top[sd] if facet_verts < set(top[sd][k]))
+                for alpha in alphas:
+                    jumps[r][cell_node_map[c1], cur] += derivs[c1][alpha]
+                    jumps[r][cell_node_map[c0], cur] -= derivs[c0][alpha]
+                    cur = cur + 1
+        return jumps
 
     def get_dmats(self, degree, cell=0):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
@@ -468,10 +535,11 @@ class PointExpansionSet(ExpansionSet):
             raise ValueError("Must have a point")
         super(PointExpansionSet, self).__init__(ref_el, **kwargs)
 
-    def tabulate(self, n, pts):
-        """Returns a numpy array A[i,j] = phi_i(pts[j]) = 1.0."""
-        assert n == 0
-        return numpy.ones((1, len(pts)))
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        """Returns a dict of tabulations such that
+        tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
+        assert n == 0 and order == 0
+        return {(): numpy.ones((1, len(pts)))}
 
 
 class LineExpansionSet(ExpansionSet):
@@ -482,8 +550,8 @@ class LineExpansionSet(ExpansionSet):
         super(LineExpansionSet, self).__init__(ref_el, **kwargs)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
-        """Returns a tuple of (vals, derivs) such that
-        vals[i,j] = phi_i(pts[j]), derivs[i,j] = D vals[i,j]."""
+        """Returns a dict of tabulations such that
+        tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
         if self.variant is not None:
             return super(LineExpansionSet, self)._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
 
@@ -491,9 +559,9 @@ class LineExpansionSet(ExpansionSet):
         Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
         xs = apply_mapping(A, b, numpy.transpose(pts)).T
         results = {}
-        scale = self.scale * numpy.sqrt(2 * numpy.arange(n+1) + 1)
+        scale = self.get_scale(cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
-            v = numpy.zeros((n + 1, len(xs)), "d")
+            v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
                 v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
             for p in range(n + 1):
@@ -588,6 +656,31 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
     return cell_node_map
 
 
+def compute_l1_distance(ref_el, points, entity=None):
+    """Computes the l1 distances from a simplex entity to a set of points.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg points: an iterable of points.
+    :arg entity: a tuple of the entity dimension and id.
+    :returns: a numpy array with the l1 distance from the entity to each point.
+    """
+    if entity is None:
+        entity = (ref_el.get_spatial_dimension(), 0)
+    dim, entity_id = entity
+    ref_verts = numpy.zeros((dim + 1, dim))
+    ref_verts[range(1, dim + 1), range(dim)] = 1.0
+
+    top = ref_el.get_topology()
+    verts = ref_el.get_vertices_of_subcomplex(top[dim][entity_id])
+    A, b = reference_element.make_affine_mapping(verts, ref_verts)
+    A = numpy.vstack((A, -numpy.sum(A, axis=0)))
+    b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
+    bary = apply_mapping(A, b, points, transpose=True)
+
+    dist = 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
+    return dist
+
+
 def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     """Maps cells on a simplicial complex to points.
 
@@ -595,27 +688,62 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     :arg pts: an iterable of physical points on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
     :kwarg tol: the absolute tolerance.
-    :returns: a numpy array mapping cell id to points located on that cell.
+    :returns: a dict mapping cell id to points located on that cell.
     """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
     if len(top[sd]) == 1:
-        return (Ellipsis,)
+        return {0: Ellipsis}
 
-    cell_point_map = []
-    ref_vertices = reference_element.ufc_simplex(sd).get_vertices()
-    for cell in top[sd]:
-        verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
-        A, b = reference_element.make_affine_mapping(verts, ref_vertices)
-        A = numpy.vstack((A, -numpy.sum(A, axis=0)))
-        b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
-        x = numpy.dot(pts, A.T) + b[None, :]
+    pts = numpy.asarray(pts)
+    if pts.dtype == object:
+        return {cell: Ellipsis for cell in sorted(top[sd])}
 
+    cell_point_map = {}
+    for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_on_cell = abs(numpy.sum(abs(x) - x, axis=1)) < 2*tol
-        if unique:
-            for other in cell_point_map:
-                pts_on_cell[other] = False
-        ipts = numpy.where(pts_on_cell)[0]
-        cell_point_map.append(ipts)
+        pts_on_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
+        if len(pts_on_cell.shape) == 0:
+            # singleton case
+            if pts_on_cell:
+                cell_point_map[cell] = Ellipsis
+                if unique:
+                    break
+        else:
+            if unique:
+                for other in cell_point_map.values():
+                    pts_on_cell[other] = False
+            ipts = numpy.where(pts_on_cell)[0]
+            if len(ipts) > 0:
+                cell_point_map[cell] = ipts
     return cell_point_map
+
+
+def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
+    """Computes the partition of unity functions for each subcell.
+
+    :arg ref_el: a SimplicialComplex.
+    :arg pt: a physical point on the complex.
+    :kwarg unique: Are we assigning a unique cell to points on facets?
+    :kwarg tol: the absolute tolerance.
+    :returns: a list of (weighted) characteristic functions for each subcell.
+    """
+    from sympy import Piecewise
+    sd = ref_el.get_spatial_dimension()
+    top = ref_el.get_topology()
+    # assert singleton point
+    pt = pt.reshape((sd,))
+
+    # Compute characteristic function of each cell
+    otherwise = []
+    masks = []
+    for cell in sorted(top[sd]):
+        inside = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
+        masks.append(Piecewise(*otherwise, (1.0, inside), (0.0, True)))
+        if unique:
+            otherwise.append((0.0, inside))
+    # If the point is on a facet, divide the characteristic function by the facet multiplicity
+    if not unique:
+        mult = sum(masks)
+        masks = [m / mult for m in masks]
+    return masks

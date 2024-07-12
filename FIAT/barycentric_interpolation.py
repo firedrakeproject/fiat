@@ -36,6 +36,7 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
         numpy.multiply(phi, wts[:, None], out=phi)
         numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
     phi[phi != phi] = 1.0
+    phi = phi.reshape(-1, *pts.shape[:-1])
 
     phi = sp_simplify(phi)
     results = {(0,): phi}
@@ -63,19 +64,17 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
         self.points = pts
         self.x = numpy.array(pts, dtype="d").flatten()
         self.cell_node_map = expansions.compute_cell_point_map(ref_el, pts, unique=False)
-        self.dmats = []
-        self.weights = []
-        self.nodes = []
-        for ibfs in self.cell_node_map:
-            nodes = self.x[ibfs]
-            dmat, wts = make_dmat(nodes)
-            self.dmats.append(dmat)
-            self.weights.append(wts)
-            self.nodes.append(nodes)
+        self.dmats = [None for _ in self.cell_node_map]
+        self.weights = [None for _ in self.cell_node_map]
+        self.nodes = [None for _ in self.cell_node_map]
+        for cell, ibfs in self.cell_node_map.items():
+            self.nodes[cell] = self.x[ibfs]
+            self.dmats[cell], self.weights[cell] = make_dmat(self.nodes[cell])
 
         self.degree = max(len(wts) for wts in self.weights)-1
         self.recurrence_order = self.degree + 1
         super(LagrangeLineExpansionSet, self).__init__(ref_el)
+        self.continuity = None if len(self.x) == sum(len(xk) for xk in self.nodes) else "C0"
 
     def get_num_members(self, n):
         return len(self.points)

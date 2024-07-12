@@ -148,9 +148,8 @@ class CiarletElement(FiniteElement):
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:
-                LU, piv = scipy.linalg.lu_factor(V)
-                new_coeffs_flat = scipy.linalg.lu_solve((LU, piv), B, trans=1)
-            except scipy.linalg.LinAlgWarning:
+                new_coeffs_flat = scipy.linalg.solve(V, B, transposed=True)
+            except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
                 raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
@@ -247,7 +246,7 @@ def entity_support_dofs(elem, entity_dim):
         points = list(map(entity_transform, quad.get_points()))
 
         # Integrate the square of the basis functions on the facet.
-        vals = numpy.double(elem.tabulate(0, points)[(0,) * dim])
+        vals = elem.tabulate(0, points)[(0,) * dim]
         # Ints contains the square of the basis functions
         # integrated over the facet.
         if elem.value_shape():

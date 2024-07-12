@@ -42,7 +42,7 @@ from FIAT.restricted import RestrictedElement                   # noqa: F401
 from FIAT.tensor_product import TensorProductElement            # noqa: F401
 from FIAT.tensor_product import FlattenedDimensions             # noqa: F401
 from FIAT.hdivcurl import Hdiv, Hcurl                           # noqa: F401
-from FIAT.argyris import Argyris, QuinticArgyris                # noqa: F401
+from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.bubble import Bubble
@@ -132,24 +132,36 @@ elements = [
     "CrouzeixRaviart(I, 1)",
     "CrouzeixRaviart(T, 1)",
     "CrouzeixRaviart(S, 1)",
+    "RaviartThomas(I, 1)",
+    "RaviartThomas(I, 2)",
+    "RaviartThomas(I, 3)",
     "RaviartThomas(T, 1)",
     "RaviartThomas(T, 2)",
     "RaviartThomas(T, 3)",
     "RaviartThomas(S, 1)",
     "RaviartThomas(S, 2)",
     "RaviartThomas(S, 3)",
+    'RaviartThomas(I, 1, variant="integral")',
+    'RaviartThomas(I, 2, variant="integral")',
+    'RaviartThomas(I, 3, variant="integral")',
     'RaviartThomas(T, 1, variant="integral")',
     'RaviartThomas(T, 2, variant="integral")',
     'RaviartThomas(T, 3, variant="integral")',
     'RaviartThomas(S, 1, variant="integral")',
     'RaviartThomas(S, 2, variant="integral")',
     'RaviartThomas(S, 3, variant="integral")',
+    'RaviartThomas(I, 1, variant="integral(1)")',
+    'RaviartThomas(I, 2, variant="integral(1)")',
+    'RaviartThomas(I, 3, variant="integral(1)")',
     'RaviartThomas(T, 1, variant="integral(1)")',
     'RaviartThomas(T, 2, variant="integral(1)")',
     'RaviartThomas(T, 3, variant="integral(1)")',
     'RaviartThomas(S, 1, variant="integral(1)")',
     'RaviartThomas(S, 2, variant="integral(1)")',
     'RaviartThomas(S, 3, variant="integral(1)")',
+    'RaviartThomas(I, 1, variant="point")',
+    'RaviartThomas(I, 2, variant="point")',
+    'RaviartThomas(I, 3, variant="point")',
     'RaviartThomas(T, 1, variant="point")',
     'RaviartThomas(T, 2, variant="point")',
     'RaviartThomas(T, 3, variant="point")',
@@ -279,8 +291,9 @@ elements = [
     "    Regge(S, 1),"
     "    RestrictedElement(Regge(S, 2), restriction_domain='interior')"
     ")",
-    "Argyris(T, 5)",
-    "QuinticArgyris(T)",
+    "Argyris(T, 5, 'point')",
+    "Argyris(T, 5, 'integral')",
+    "Argyris(T, 6, 'integral')",
     "CubicHermite(I)",
     "CubicHermite(T)",
     "CubicHermite(S)",

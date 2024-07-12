@@ -138,27 +138,19 @@ def make_mass_matrix(fe, order=0):
     return M
 
 
-@pytest.mark.parametrize("degree", (1, 2, 4,))
+@pytest.mark.parametrize("degree", (1, 2, 4))
 @pytest.mark.parametrize("variant", ("equispaced", "gll"))
 def test_lagrange_alfeld_duals(cell, degree, variant):
     Pk = Lagrange(cell, degree, variant=variant)
     alfeld = Lagrange(AlfeldSplit(cell), degree, variant=variant)
 
-    Pk_dofs = Pk.entity_dofs()
-    alfeld_dofs = alfeld.entity_dofs()
-
     Pk_pts = numpy.asarray(get_lagrange_points(Pk.dual_basis()))
     alfeld_pts = numpy.asarray(get_lagrange_points(alfeld.dual_basis()))
+    ids = alfeld.entity_dofs()
 
-    sd = cell.get_dimension()
-    top = cell.get_topology()
-    for dim in sorted(top):
-        if dim == sd:
-            continue
-        for entity in sorted(top[dim]):
-            assert alfeld_dofs[dim][entity] == Pk_dofs[dim][entity]
-            assert numpy.allclose(Pk_pts[Pk_dofs[dim][entity]],
-                                  alfeld_pts[alfeld_dofs[dim][entity]])
+    sd = cell.get_spatial_dimension()
+    facet_dim = sum(len(ids[dim][entity]) for dim in range(sd) for entity in ids[dim])
+    assert numpy.allclose(alfeld_pts[:facet_dim], Pk_pts[:facet_dim])
 
     phi = Pk.tabulate(0, alfeld_pts)[(0,) * sd]
     M_Pk = make_mass_matrix(Pk)
@@ -167,22 +159,24 @@ def test_lagrange_alfeld_duals(cell, degree, variant):
     assert numpy.allclose(M_Pk, M_galerkin)
 
 
-@pytest.mark.parametrize("degree", (1, 2,))
+@pytest.mark.parametrize("degree", (1, 2, 4))
 def test_lagrange_iso_duals(cell, degree):
-    P2 = Lagrange(cell, 2*degree, variant="equispaced")
-    iso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
+    Pk = Lagrange(cell, 2*degree, variant="equispaced")
+    Piso = Lagrange(IsoSplit(cell), degree, variant="equispaced")
 
-    assert numpy.allclose(get_lagrange_points(iso.dual_basis()), get_lagrange_points(P2.dual_basis()))
+    Pk_pts = numpy.asarray(get_lagrange_points(Pk.dual_basis()))
+    Piso_pts = numpy.asarray(get_lagrange_points(Piso.dual_basis()))
+    ids = Piso.entity_dofs()
 
-    P2_ids = P2.entity_dofs()
-    iso_ids = iso.entity_dofs()
-    for dim in iso_ids:
-        for entity in iso_ids[dim]:
-            assert iso_ids[dim][entity] == P2_ids[dim][entity]
+    reorder = []
+    for dim in ids:
+        for entity in ids[dim]:
+            reorder.extend(ids[dim][entity])
+    assert numpy.allclose(Piso_pts[reorder], Pk_pts)
 
-    poly_set = iso.get_nodal_basis()
-    assert numpy.allclose(numpy.eye(iso.space_dimension()),
-                          numpy.dot(P2.get_dual_set().to_riesz(poly_set),
+    poly_set = Piso.get_nodal_basis().take(reorder)
+    assert numpy.allclose(numpy.eye(Piso.space_dimension()),
+                          numpy.dot(Pk.get_dual_set().to_riesz(poly_set),
                                     poly_set.get_coeffs().T))
 
 
@@ -329,7 +323,7 @@ def test_macro_expansion(cell, split, variant, degree):
 @pytest.mark.parametrize("degree", (1, 4))
 def test_Ck_basis(cell, order, degree, variant):
     # Test that we can correctly tabulate on points on facets.
-    # This breaks if we were binning points into more than one cell.
+    # This breaks if we were binning points into more than one cell without a partition of unity.
     # It suffices to tabulate on the vertices of the simplicial complex.
     A = AlfeldSplit(cell)
     Ck = CkPolynomialSet(A, degree, order=order, variant=variant)
@@ -347,3 +341,24 @@ def test_Ck_basis(cell, order, degree, variant):
         Uvals = U._tabulate_on_cell(degree, verts, 0, cell=cell)[(0,)*sd]
         local_phis = numpy.dot(coeffs[:, cell_node_map[cell]], Uvals)
         assert numpy.allclose(local_phis, phis[:, ipts])
+
+
+@pytest.mark.parametrize("element", (DiscontinuousLagrange, Lagrange))
+def test_macro_sympy(cell, element):
+    import sympy
+    variant = "spectral,alfeld"
+    K = IsoSplit(cell)
+    ebig = element(K, 3, variant=variant)
+    pts = get_lagrange_points(ebig.dual_basis())
+
+    dim = cell.get_spatial_dimension()
+    X = tuple(sympy.Symbol(f"X[{i}]") for i in range(dim))
+    degrees = range(1, 3) if element is Lagrange else range(3)
+    for degree in degrees:
+        fe = element(cell, degree, variant=variant)
+        tab_sympy = fe.tabulate(0, X)[(0,) * dim]
+
+        phis = sympy.lambdify(X, tab_sympy)
+        results = phis(*numpy.transpose(pts))
+        tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
+        assert numpy.allclose(results, tab_numpy)
