@@ -360,11 +360,12 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
     :kwarg order: The order of continuity across subcells.
+    :kwarg vorder: The order of super-smoothness at interior vertices.
     :kwarg shape: The value shape.
     :kwarg variant: The variant for the underlying ExpansionSet.
     :kwarg scale: The scale for the underlying ExpansionSet.
     """
-    def __init__(self, ref_el, degree, order=1, shape=(), **kwargs):
+    def __init__(self, ref_el, degree, order=1, vorder=0, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         k = 1 if expansion_set.continuity == "C0" else 0
@@ -390,10 +391,24 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         if len(rows) > 0:
             dual_mat = numpy.vstack(rows)
             _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-            num_sv = len([s for s in sig if abs(s) > 1.e-10])
+            tol = sig[0] * 1E-10
+            num_sv = len([s for s in sig if abs(s) > tol])
             coeffs = vt[num_sv:]
         else:
             coeffs = numpy.eye(expansion_set.get_num_members(degree))
+
+        if vorder > order + 1:
+            # Impose C^vorder super-smoothness at interior vertices
+            # C^order automatically gives C^{order+1} at the interior vertex
+            verts = ref_el.get_vertices()
+            points = [verts[i] for i in ref_el.get_interior_facets(0)]
+            jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
+            for r in range(order+2, vorder+1):
+                dual_mat = numpy.dot(numpy.vstack(jumps[r].T), coeffs.T)
+                _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
+                tol = sig[0] * 1E-10
+                num_sv = len([s for s in sig if abs(s) > tol])
+                coeffs = numpy.dot(vt[num_sv:], coeffs)
 
         if shape != tuple():
             m, n = coeffs.shape
