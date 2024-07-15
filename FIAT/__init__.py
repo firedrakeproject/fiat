@@ -6,7 +6,7 @@ import pkg_resources
 
 # Import finite element classes
 from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
-from FIAT.argyris import Argyris, QuinticArgyris
+from FIAT.argyris import Argyris
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.hct import HsiehCloughTocher
@@ -102,5 +102,4 @@ supported_elements = {"Argyris": Argyris,
                       "Mardal-Tai-Winther": MardalTaiWinther}
 
 # List of extra elements
-extra_elements = {"P0": P0,
-                  "Quintic Argyris": QuinticArgyris}
+extra_elements = {"P0": P0}

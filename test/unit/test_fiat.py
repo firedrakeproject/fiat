@@ -42,7 +42,7 @@ from FIAT.restricted import RestrictedElement                   # noqa: F401
 from FIAT.tensor_product import TensorProductElement            # noqa: F401
 from FIAT.tensor_product import FlattenedDimensions             # noqa: F401
 from FIAT.hdivcurl import Hdiv, Hcurl                           # noqa: F401
-from FIAT.argyris import Argyris, QuinticArgyris                # noqa: F401
+from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.bubble import Bubble
@@ -291,8 +291,9 @@ elements = [
     "    Regge(S, 1),"
     "    RestrictedElement(Regge(S, 2), restriction_domain='interior')"
     ")",
-    "Argyris(T, 5)",
-    "QuinticArgyris(T)",
+    "Argyris(T, 5, 'point')",
+    "Argyris(T, 5, 'integral')",
+    "Argyris(T, 6, 'integral')",
     "CubicHermite(I)",
     "CubicHermite(T)",
     "CubicHermite(S)",

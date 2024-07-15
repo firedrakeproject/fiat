@@ -439,6 +439,39 @@ class ExpansionSet(object):
                     results[r][indices] += vr
         return results
 
+    def tabulate_jumps(self, n, points, order=0):
+        """Tabulates derivative jumps on given points.
+
+        :arg n: the polynomial degree.
+        :arg points: an iterable of points on the cell complex.
+        :kwarg order: the order of differentiation.
+
+        :returns: a dictionary of tabulations of derivative jumps across interior facets.
+        """
+
+        from FIAT.polynomial_set import mis
+        num_members = self.get_num_members(n)
+        cell_node_map = self.get_cell_node_map(n)
+
+        top = self.ref_el.get_topology()
+        sd = self.ref_el.get_spatial_dimension()
+        interior_facets = self.ref_el.get_interior_facets(sd-1)
+        derivs = {cell: self._tabulate_on_cell(n, points, order=order, cell=cell)
+                  for cell in top[sd]}
+        jumps = {}
+        for r in range(order+1):
+            cur = 0
+            alphas = mis(sd, r)
+            jumps[r] = numpy.zeros((num_members, len(alphas)*len(interior_facets), len(points)))
+            for facet in interior_facets:
+                facet_verts = set(top[sd-1][facet])
+                c0, c1 = tuple(k for k in top[sd] if facet_verts < set(top[sd][k]))
+                for alpha in alphas:
+                    jumps[r][cell_node_map[c1], cur] += derivs[c1][alpha]
+                    jumps[r][cell_node_map[c0], cur] -= derivs[c0][alpha]
+                    cur = cur + 1
+        return jumps
+
     def get_dmats(self, degree, cell=0):
         """Returns a numpy array with the expansion coefficients dmat[k, j, i]
         of the gradient of each member of the expansion set:
