@@ -50,7 +50,7 @@ def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
     Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
     if mapping == "normal":
         n = ref_el.compute_normal(entity)
-        phis = n[None, :, None] * Phis[:, None, :]
+        phis = n[None, :, None] * Phis
     elif mapping == "covariant":
         piola_map = numpy.linalg.pinv(Q.jacobian().T)
         phis = numpy.dot(piola_map, Phis).transpose((1, 0, 2))
@@ -100,23 +100,26 @@ class DemkowiczDual(DualSet):
         k = degree if kind == 2 else degree - 1
         facet = symmetric_simplex(dim)
         Q = create_quadrature(facet, 2 * degree)
-        if formdegree == dim:
-            shp = (dim,) if sobolev_space == "HCurl" else ()
-            P = ONPolynomialSet(facet, k, shp, scale="orthonormal")
-            duals = P.tabulate(Q.get_points())[(0,) * dim]
-            return Q, duals
-
-        exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
         Qpts, Qwts = Q.get_points(), Q.get_weights()
+        exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
+
         shp = () if formdegree == 0 else (dim,)
+        if formdegree == dim:
+            shp = (1,)
+
         P = ONPolynomialSet(facet, degree, shp, scale="orthonormal")
         P_at_qpts = P.tabulate(Qpts, 1)
-        dtrial = exterior_derivative(P_at_qpts)
+        trial = P_at_qpts[(0,) * dim]
+        if formdegree == dim:
+            K = inner(trial[:1], trial, Qwts)
+        else:
+            dtrial = exterior_derivative(P_at_qpts)
+            if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
+                dtrial = dtrial[:, None, :]
+            K = self._bubble_derivative_moments(facet, degree, formdegree, Qpts, Qwts, dtrial)
 
-        K = self._bubble_derivative_moments(facet, degree, formdegree, Qpts, Qwts, dtrial)
         if formdegree > 0:
-            trial = P_at_qpts[(0,) * dim]
-            if formdegree == 1 and sobolev_space == "HDiv":
+            if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
                 trial = perp(trial)
             M = self._bubble_derivative_moments(facet, k+1, formdegree-1, Qpts, Qwts, trial)
             K = numpy.vstack((K, M))
@@ -129,14 +132,6 @@ class DemkowiczDual(DualSet):
            the exterior derivative of bubbles.
         """
         dim = facet.get_spatial_dimension()
-        if formdegree >= dim - 1:
-            # We are at the end of the complex
-            # bubbles have derivative in P_k-1 minus constants
-            Pkm1 = ONPolynomialSet(facet, degree-1, trial.shape[1:-1], scale="orthonormal")
-            P0 = Pkm1.take(list(range(1, Pkm1.get_num_members())))
-            dtest = P0.tabulate(Qpts)[(0,) * dim]
-            return inner(dtest, trial, Qwts)
-
         # Get bubbles
         if formdegree == 0:
             B = make_bubbles(facet, degree)
@@ -222,7 +217,7 @@ class FDMDual(DualSet):
             # map physical phis to reference values Phis
             if mapping == "normal":
                 n = Ref_el.compute_normal(0)
-                Phis, = numpy.dot(n[None, :], phis)
+                Phis = numpy.dot(n[None, :], phis).transpose((1, 0, 2))
             elif mapping == "covariant":
                 piola_map = Q_dof.jacobian().T
                 Phis = numpy.dot(piola_map, phis).transpose((1, 0, 2))
