@@ -97,7 +97,6 @@ class DemkowiczDual(DualSet):
         super(DemkowiczDual, self).__init__(nodes, ref_el, entity_ids)
 
     def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind):
-        k = degree if kind == 2 else degree - 1
         facet = symmetric_simplex(dim)
         Q = create_quadrature(facet, 2 * degree)
         Qpts, Qwts = Q.get_points(), Q.get_weights()
@@ -116,18 +115,19 @@ class DemkowiczDual(DualSet):
             dtrial = exterior_derivative(P_at_qpts)
             if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
                 dtrial = dtrial[:, None, :]
-            K = self._bubble_derivative_moments(facet, degree, formdegree, Qpts, Qwts, dtrial)
+            K = self._bubble_derivative_moments(facet, degree, formdegree, kind, Qpts, Qwts, dtrial)
 
         if formdegree > 0:
             if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
                 trial = perp(trial)
-            M = self._bubble_derivative_moments(facet, k+1, formdegree-1, Qpts, Qwts, trial)
+            q = degree + 1 if kind == 2 else degree
+            M = self._bubble_derivative_moments(facet, q, formdegree-1, kind, Qpts, Qwts, trial)
             K = numpy.vstack((K, M))
 
         duals = numpy.tensordot(K, P_at_qpts[(0,) * dim], axes=(1, 0))
         return Q, duals
 
-    def _bubble_derivative_moments(self, facet, degree, formdegree, Qpts, Qwts, trial):
+    def _bubble_derivative_moments(self, facet, degree, formdegree, kind, Qpts, Qwts, trial):
         """Integrate trial expressions against an orthonormal basis for
            the exterior derivative of bubbles.
         """
@@ -135,10 +135,15 @@ class DemkowiczDual(DualSet):
         # Get bubbles
         if formdegree == 0:
             B = make_bubbles(facet, degree)
+        elif kind == 1:
+            from FIAT.nedelec import Nedelec as N1curl
+            from FIAT.raviart_thomas import RaviartThomas as N1div
+            fe = (N1curl, N1div)[formdegree-1](facet, degree)
+            B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
         else:
-            from FIAT.nedelec import Nedelec
-            from FIAT.raviart_thomas import RaviartThomas
-            fe = (Nedelec, RaviartThomas)[formdegree-1](facet, degree)
+            from FIAT.nedelec_second_kind import NedelecSecondKind as N2curl
+            from FIAT.brezzi_douglas_marini import BrezziDouglasMarini as N2div
+            fe = (N2curl, N2div)[formdegree-1](facet, degree)
             B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
 
         # Tabulate the exterior derivate
@@ -151,7 +156,7 @@ class DemkowiczDual(DualSet):
             B = inner(test, test, Qwts)
             A = inner(dtest, dtest, Qwts)
             sig, S = scipy.linalg.eigh(A, B)
-            tol = sig[-1] * 1E-10
+            tol = sig[-1] * 1E-12
             nullspace_dim = len([s for s in sig if abs(s) <= tol])
             S = S[:, nullspace_dim:]
             S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
