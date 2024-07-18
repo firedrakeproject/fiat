@@ -14,4 +14,4 @@ from FIAT import lagrange
 class GaussLobattoLegendre(lagrange.Lagrange):
     """Simplicial continuous element with nodes at the (recursive) Gauss-Lobatto-Legendre points."""
     def __init__(self, ref_el, degree):
-        super(GaussLobattoLegendre, self).__init__(ref_el, degree, variant="gll")
+        super(GaussLobattoLegendre, self).__init__(ref_el, degree, variant="gll", sort_entities=True)

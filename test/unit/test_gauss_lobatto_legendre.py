@@ -59,8 +59,7 @@ def test_edge_dofs(dim, degree):
     # Test that edge DOFs are located at the GLL quadrature points
     line = s if dim == 1 else s.construct_subelement(1)
     lr = quadrature.GaussLobattoLegendreQuadratureLineRule(line, degree + 1)
-    # Edge DOFs are ordered with the two vertex DOFs followed by the interior DOFs
-    quadrature_points = lr.pts[::degree] + lr.pts[1:-1]
+    quadrature_points = lr.get_points()
 
     entity_dofs = fe.entity_closure_dofs()
     edge_dofs = entity_dofs[1]
