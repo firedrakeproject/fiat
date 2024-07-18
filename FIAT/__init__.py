@@ -1,6 +1,6 @@
 """FInite element Automatic Tabulator -- supports constructing and
 evaluating arbitrary order Lagrange and many other elements.
-Simplices in one, two, and three dimensions are supported."""
+BSimplices in one, two, and three dimensions are supported."""
 
 import pkg_resources
 
@@ -31,6 +31,7 @@ from FIAT.gauss_radau import GaussRadau
 from FIAT.morley import Morley
 from FIAT.nedelec import Nedelec
 from FIAT.nedelec_second_kind import NedelecSecondKind
+from FIAT.powell_sabin import QuadraticPowellSabin6   # noqa: F401
 from FIAT.hierarchical import Legendre, IntegratedLegendre
 from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
