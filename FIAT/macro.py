@@ -350,7 +350,6 @@ class PowellSabin12Split(SplitSimplicialComplex):
         """Constructs the reference subcomplex of the parent cell subentity
         specified by subcomplex dimension.
         """
-        print(dimension)
         if dimension == 2:
             return self
         elif dimension == 1:
