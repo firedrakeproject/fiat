@@ -83,7 +83,7 @@ class QuadraticPowellSabin12DualSet(dual_set.DualSet):
         qpts = Q.get_points()
 
         x = 2.0*qpts - 1
-        phis = eval_jacobi_batch(2, 2, 0, x)
+        phis = eval_jacobi_batch(1, 1, 0, x)
         for e in sorted(top[1]):
             cur = len(nodes)
             nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
