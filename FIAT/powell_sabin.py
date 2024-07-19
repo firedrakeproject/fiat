@@ -78,8 +78,8 @@ class QuadraticPowellSabin12DualSet(dual_set.DualSet):
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
         # integral moment of normal derivatives
-        rline = ufc_simplex(1)
-        Q = create_quadrature(rline, degree)
+        rline = macro.AlfeldSplit(ufc_simplex(1))
+        Q = create_quadrature(rline, degree-1)
         qpts = Q.get_points()
 
         x = 2.0*qpts - 1
