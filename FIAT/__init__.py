@@ -1,6 +1,6 @@
 """FInite element Automatic Tabulator -- supports constructing and
 evaluating arbitrary order Lagrange and many other elements.
-BSimplices in one, two, and three dimensions are supported."""
+Simplices in one, two, and three dimensions are supported."""
 
 import pkg_resources
 
