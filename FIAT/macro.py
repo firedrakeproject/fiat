@@ -3,9 +3,10 @@ from itertools import chain, combinations
 
 import numpy
 
-from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
-from FIAT.reference_element import SimplicialComplex, lattice_iter, make_lattice
 from FIAT import expansions, polynomial_set
+from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
+from FIAT.reference_element import (TRIANGLE, SimplicialComplex, lattice_iter,
+                                    make_lattice)
 
 
 def bary_to_xy(verts, bary, result=None):
@@ -318,6 +319,32 @@ class PowellSabinSplit(SplitSimplicialComplex):
         else:
             # Powell-Sabin on facets is Powell-Sabin
             return PowellSabinSplit(ref_el)
+
+
+class PowellSabin12Split(SplitSimplicialComplex):
+    def __init__(self, ref_el):
+        assert ref_el.get_shape() == TRIANGLE
+        verts = ref_el.get_vertices()
+        new_verts = list(verts)
+        new_verts.extend(
+            map(tuple,
+                map(lambda x: bary_to_xy(verts, x),
+                    [(1/3, 1/3, 1/3),
+                     (1/2, 1/2, 0),
+                     (1/2, 0, 1/2),
+                     (0, 1/2, 1/2),
+                     (1/2, 1/4, 1/4),
+                     (1/4, 1/2, 1/4),
+                     (1/4, 1/4, 1/2)])))
+
+        edges = [(0, 4), (0, 7), (0, 5),
+                 (1, 4), (1, 8), (1, 6),
+                 (2, 5), (2, 9), (2, 6),
+                 (3, 4), (3, 5), (3, 6), (3, 7), (3, 8), (3, 9),
+                 (4, 7), (4, 8), (5, 7), (5, 9), (6, 8), (6, 9)]
+
+        super(PowellSabin12Split, self).__init__(
+            ref_el, tuple(new_verts), make_topology(2, len(new_verts), edges))
 
 
 class MacroQuadratureRule(QuadratureRule):
