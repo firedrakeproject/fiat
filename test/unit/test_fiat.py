@@ -394,8 +394,8 @@ def test_empty_bubble():
 
 @pytest.mark.parametrize('elements', [
     (Lagrange(I, 2), Lagrange(I, 1), Bubble(I, 2)),
-    (GaussLobattoLegendre(I, 3), Lagrange(I, 1),
-     RestrictedElement(GaussLobattoLegendre(I, 3), restriction_domain="interior")),
+    (Lagrange(I, 3, variant="gll"), Lagrange(I, 1),
+     RestrictedElement(Lagrange(I, 3, variant="gll"), restriction_domain="interior")),
     (RaviartThomas(T, 2),
      RestrictedElement(RaviartThomas(T, 2), restriction_domain='facet'),
      RestrictedElement(RaviartThomas(T, 2), restriction_domain='interior')),
