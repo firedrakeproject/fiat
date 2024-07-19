@@ -346,7 +346,21 @@ class PowellSabin12Split(SplitSimplicialComplex):
         super(PowellSabin12Split, self).__init__(
             ref_el, tuple(new_verts), make_topology(2, len(new_verts), edges))
 
+    def construct_subcomplex(self, dimension):
+        """Constructs the reference subcomplex of the parent cell subentity
+        specified by subcomplex dimension.
+        """
+        print(dimension)
+        if dimension == 2:
+            return self
+        elif dimension == 1:
+            return ISOSplit(self.construct_subelement(1))
+        elif dimension == 0:
+            return self.construct_subelement(0)
+        else:
+            raise ValueError("Illegal dimension")
 
+        
 class MacroQuadratureRule(QuadratureRule):
     """Composite quadrature rule on parent facets that respects the splitting.
 
