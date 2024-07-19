@@ -36,7 +36,7 @@ from FIAT.quadrature import (QuadratureRule, make_quadrature,
 # FIAT
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, UFCTetrahedron,
-                                    UFCTriangle, ufc_simplex, symmetric_simplex)
+                                    UFCTriangle, symmetric_simplex)
 
 
 def create_quadrature(ref_el, degree, scheme="default"):
@@ -334,8 +334,8 @@ def _kmv_lump_scheme(ref_el, degree):
 
 
 def gen_quad_simplex(dim):
-    ref_el = ufc_simplex(dim)
-    ref_el.vertices = ((0., 0., 0.), (1., 0., 0.), (0., 1., 1.), (1., 1., 1.))
+    ref_el = symmetric_simplex(dim)
+    ref_el.vertices = tuple(tuple(float(i > j) for j in range(dim)) for i in range(dim+1))
     return ref_el
 
 
