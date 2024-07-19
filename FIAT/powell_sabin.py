@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Robert C. Brubeck
+# Copyright (C) 2024 Robert C. Kirby
 #
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
