@@ -1,6 +1,7 @@
 import numpy
 import pytest
 from FIAT import QuadraticPowellSabin6 as PS6
+from FIAT import QuadraticPowellSabin12 as PS12
 from FIAT.functional import PointEvaluation
 from FIAT.reference_element import make_lattice, ufc_simplex
 
@@ -10,7 +11,7 @@ def cell():
     return ufc_simplex(2)
 
 
-@pytest.mark.parametrize("el", (PS6,))
+@pytest.mark.parametrize("el", (PS6, PS12))
 def test_ps6_constant(cell, el):
     # Test that bfs associated with point evaluation sum up to 1
     fe = el(cell)
