@@ -12,7 +12,7 @@ def cell():
 
 
 @pytest.mark.parametrize("el", (PS6, PS12))
-def test_ps6_constant(cell, el):
+def test_powell_sabin_constant(cell, el):
     # Test that bfs associated with point evaluation sum up to 1
     fe = el(cell)
 

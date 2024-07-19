@@ -353,7 +353,7 @@ class PowellSabin12Split(SplitSimplicialComplex):
         if dimension == 2:
             return self
         elif dimension == 1:
-            return IsoSplit(self.construct_subelement(1))
+            return AlfeldSplit(self.construct_subelement(1))
         elif dimension == 0:
             return self.construct_subelement(0)
         else:
