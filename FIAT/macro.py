@@ -322,6 +322,9 @@ class PowellSabinSplit(SplitSimplicialComplex):
 
 
 class PowellSabin12Split(SplitSimplicialComplex):
+    """Splits a triangle (only!) by connecting each vertex to the opposite
+    edge midpoint and edge midpoints to each other.
+    """
     def __init__(self, ref_el):
         assert ref_el.get_shape() == TRIANGLE
         verts = ref_el.get_vertices()

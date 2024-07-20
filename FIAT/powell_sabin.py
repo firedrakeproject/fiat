@@ -42,7 +42,8 @@ class QuadraticPowellSabin6DualSet(dual_set.DualSet):
 
 
 class QuadraticPowellSabin6(finite_element.CiarletElement):
-    """The PS6 macroelement.
+    """The PS6 macroelement is a C^1 quadratic macroelement defined
+    on the 6-way Powell-Sabin split of a triangle.
     """
     def __init__(self, ref_el, degree=2):
         if degree != 2:
@@ -94,7 +95,8 @@ class QuadraticPowellSabin12DualSet(dual_set.DualSet):
 
 
 class QuadraticPowellSabin12(finite_element.CiarletElement):
-    """The PS12 macroelement.
+    """The PS12 macroelement is a C^1 quadratic macroelement defined
+    on the 12-way Powell-Sabin split of a triangle.
     """
     def __init__(self, ref_el, degree=2):
         if degree != 2:
