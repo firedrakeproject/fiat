@@ -330,15 +330,14 @@ class PowellSabin12Split(SplitSimplicialComplex):
         verts = ref_el.get_vertices()
         new_verts = list(verts)
         new_verts.extend(
-            map(tuple,
-                map(lambda x: bary_to_xy(verts, x),
-                    [(1/3, 1/3, 1/3),
-                     (1/2, 1/2, 0),
-                     (1/2, 0, 1/2),
-                     (0, 1/2, 1/2),
-                     (1/2, 1/4, 1/4),
-                     (1/4, 1/2, 1/4),
-                     (1/4, 1/4, 1/2)])))
+            map(tuple, bary_to_xy(verts,
+                [(1/3, 1/3, 1/3),
+                 (1/2, 1/2, 0),
+                 (1/2, 0, 1/2),
+                 (0, 1/2, 1/2),
+                 (1/2, 1/4, 1/4),
+                 (1/4, 1/2, 1/4),
+                 (1/4, 1/4, 1/2)])))
 
         edges = [(0, 4), (0, 7), (0, 5),
                  (1, 4), (1, 8), (1, 6),
