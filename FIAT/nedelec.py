@@ -111,6 +111,10 @@ class NedelecDual(dual_set.DualSet):
             for entity in top[dim]:
                 entity_ids[dim][entity] = []
 
+        ref_complex = ref_el
+        if isinstance(interpolant_deg, tuple):
+            interpolant_deg, split = interpolant_deg
+            ref_complex = split(ref_complex)
         if variant == "integral":
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
@@ -122,7 +126,8 @@ class NedelecDual(dual_set.DualSet):
                 phi_deg = degree - dim
                 if phi_deg >= 0:
                     facet = ref_el.construct_subelement(dim)
-                    Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
+                    subcomplex = ref_complex.construct_subcomplex(dim)
+                    Q_ref = create_quadrature(subcomplex, interpolant_deg + phi_deg)
                     Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
                     Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * dim]
                     Phis = numpy.transpose(Phis, (0, 2, 1))
@@ -164,7 +169,7 @@ class NedelecDual(dual_set.DualSet):
             if interpolant_deg is None:
                 interpolant_deg = degree
             cur = len(nodes)
-            Q = create_quadrature(ref_el, interpolant_deg + phi_deg)
+            Q = create_quadrature(ref_complex, interpolant_deg + phi_deg)
             Pqmd = polynomial_set.ONPolynomialSet(ref_el, phi_deg)
             Phis = Pqmd.tabulate(Q.get_points())[(0,) * dim]
             nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (dim,))

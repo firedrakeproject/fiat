@@ -22,14 +22,23 @@ def check_format_variant(variant, degree):
     if variant is None:
         variant = "integral"
 
-    match = re.match(r"^integral(?:\((\d+)\))?$", variant)
+    match = re.match(r"^integral(?:\((.+)\))?$", variant.lower())
     if match:
         variant = "integral"
-        extra_degree, = match.groups()
-        extra_degree = int(extra_degree) if extra_degree is not None else 0
+        q, = match.groups()
+        extra_degree = 0
+        split = None
+        if q == "iso":
+            split = IsoSplit
+        elif q == "alfeld":
+            split = AlfeldSplit
+        elif q is not None:
+            extra_degree = int(q)
         interpolant_degree = degree + extra_degree
         if interpolant_degree < degree:
             raise ValueError("Warning, quadrature degree should be at least %s" % degree)
+        if split is not None:
+            interpolant_degree = (interpolant_degree, split)
     elif variant == "point":
         interpolant_degree = None
     else:

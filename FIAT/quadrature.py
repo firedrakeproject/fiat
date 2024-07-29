@@ -168,7 +168,11 @@ class FacetQuadratureRule(QuadratureRule):
         # Map reference points and weights on the appropriate facet
         pts_ref = Q_ref.get_points()
         wts_ref = Q_ref.get_weights()
-        pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, facet, jacobian=True)
+        base_ref_el = Q_ref.ref_el
+        parent = base_ref_el.get_parent()
+        if parent is not None:
+            base_ref_el = parent
+        pts, wts, J = map_quadrature(pts_ref, wts_ref, base_ref_el, facet, jacobian=True)
 
         # Initialize super class with new points and weights
         QuadratureRule.__init__(self, facet, pts, wts)
