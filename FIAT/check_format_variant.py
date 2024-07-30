@@ -53,7 +53,7 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
     default = "integral" if integral else "spectral"
     if integral:
-        supported_point_variants = {"integral": None}
+        supported_point_variants = {"integral": None, "fdm": "fdm", "demkowicz": "demkowicz"}
     elif discontinuous:
         supported_point_variants = supported_dg_variants
     else:
