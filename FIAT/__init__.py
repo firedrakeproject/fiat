@@ -31,6 +31,8 @@ from FIAT.gauss_radau import GaussRadau
 from FIAT.morley import Morley
 from FIAT.nedelec import Nedelec
 from FIAT.nedelec_second_kind import NedelecSecondKind
+from FIAT.powell_sabin import QuadraticPowellSabin6
+from FIAT.powell_sabin import QuadraticPowellSabin12
 from FIAT.hierarchical import Legendre, IntegratedLegendre
 from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
@@ -93,6 +95,8 @@ supported_elements = {"Argyris": Argyris,
                       "Regge": Regge,
                       "EnrichedElement": EnrichedElement,
                       "NodalEnrichedElement": NodalEnrichedElement,
+                      "QuadraticPowellSabin6": QuadraticPowellSabin6,
+                      "QuadraticPowellSabin12": QuadraticPowellSabin12,
                       "TensorProductElement": TensorProductElement,
                       "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
