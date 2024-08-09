@@ -182,6 +182,53 @@ class DualSet(object):
                 mat[ells] += numpy.dot(dwts[alpha], dexpansion_values[alpha].T)
         return mat
 
+    def get_indices(self, restriction_domain, take_closure=True):
+        "Restriction domain can be 'interior', 'vertex', 'edge', 'face' or 'facet'"
+        entity_dofs = self.get_entity_ids()
+        if restriction_domain == "interior":
+            # Return dofs from interior
+            return entity_dofs[max(entity_dofs.keys())][0]
+
+        # otherwise return dofs with d <= dim
+        if restriction_domain == "vertex":
+            dim = 0
+        elif restriction_domain == "edge":
+            dim = 1
+        elif restriction_domain == "face":
+            dim = 2
+        elif restriction_domain == "facet":
+            dim = self.get_reference_element().get_spatial_dimension() - 1
+        else:
+            raise RuntimeError("Invalid restriction domain")
+
+        is_prodcell = isinstance(max(entity_dofs.keys()), tuple)
+
+        ldim = 0 if take_closure else dim
+        indices = []
+        for d in range(ldim, dim + 1):
+            if is_prodcell:
+                for a in range(d + 1):
+                    b = d - a
+                    try:
+                        entities = entity_dofs[(a, b)]
+                        for (entity, index) in sorted_by_key(entities):
+                            indices += index
+                    except KeyError:
+                        pass
+            else:
+                entities = entity_dofs[d]
+                for (entity, index) in sorted_by_key(entities):
+                    indices += index
+        return indices
+
+
+def sorted_by_key(mapping):
+    "Sort dict items by key, allowing different key types."
+    # Python3 doesn't allow comparing builtins of different type, therefore the typename trick here
+    def _key(x):
+        return (type(x[0]).__name__, x[0])
+    return sorted(mapping.items(), key=_key)
+
 
 def make_entity_closure_ids(ref_el, entity_ids):
     entity_closure_ids = {}

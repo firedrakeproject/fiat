@@ -18,7 +18,7 @@ class RestrictedElement(CiarletElement):
             raise RuntimeError("Either indices or restriction_domain must be passed in")
 
         if not indices:
-            indices = _get_indices(element, restriction_domain, take_closure)
+            indices = element.dual.get_indices(restriction_domain, take_closure=take_closure)
 
         if isinstance(indices, str):
             raise RuntimeError("variable 'indices' was a string; did you forget to use a keyword?")
@@ -60,52 +60,3 @@ class RestrictedElement(CiarletElement):
 
         # Call constructor of CiarletElement
         super(RestrictedElement, self).__init__(poly_set, dual, 0, element.get_formdegree(), mapping_new[0])
-
-
-def sorted_by_key(mapping):
-    "Sort dict items by key, allowing different key types."
-    # Python3 doesn't allow comparing builtins of different type, therefore the typename trick here
-    def _key(x):
-        return (type(x[0]).__name__, x[0])
-    return sorted(mapping.items(), key=_key)
-
-
-def _get_indices(element, restriction_domain, take_closure):
-    "Restriction domain can be 'interior', 'vertex', 'edge', 'face' or 'facet'"
-
-    if restriction_domain == "interior":
-        # Return dofs from interior
-        return element.entity_dofs()[max(element.entity_dofs().keys())][0]
-
-    # otherwise return dofs with d <= dim
-    if restriction_domain == "vertex":
-        dim = 0
-    elif restriction_domain == "edge":
-        dim = 1
-    elif restriction_domain == "face":
-        dim = 2
-    elif restriction_domain == "facet":
-        dim = element.get_reference_element().get_spatial_dimension() - 1
-    else:
-        raise RuntimeError("Invalid restriction domain")
-
-    is_prodcell = isinstance(max(element.entity_dofs().keys()), tuple)
-
-    ldim = 0 if take_closure else dim
-    entity_dofs = element.entity_dofs()
-    indices = []
-    for d in range(ldim, dim + 1):
-        if is_prodcell:
-            for a in range(d + 1):
-                b = d - a
-                try:
-                    entities = entity_dofs[(a, b)]
-                    for (entity, index) in sorted_by_key(entities):
-                        indices += index
-                except KeyError:
-                    pass
-        else:
-            entities = entity_dofs[d]
-            for (entity, index) in sorted_by_key(entities):
-                indices += index
-    return indices
