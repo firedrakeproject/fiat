@@ -68,6 +68,7 @@ class DemkowiczDual(DualSet):
     def __init__(self, ref_el, degree, sobolev_space, kind=2):
         nodes = []
         entity_ids = {}
+        reduced_dofs = {}
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         formdegree = {"H1": 0, "HCurl": 1, "HDiv": sd-1, "L2": sd}[sobolev_space]
@@ -79,14 +80,17 @@ class DemkowiczDual(DualSet):
             if dim < formdegree or degree <= dim - formdegree:
                 for entity in top[dim]:
                     entity_ids[dim][entity] = []
+                reduced_dofs[dim] = 0
             elif dim == 0 and formdegree == 0:
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
                     pts = ref_el.make_points(dim, entity, degree)
                     nodes.extend(PointEvaluation(ref_el, pt) for pt in pts)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
+                reduced_dofs[dim] = len(nodes)
             else:
-                Q_ref, Phis = self._reference_duals(dim, degree, formdegree, sobolev_space, kind)
+                Q_ref, Phis, rdofs = self._reference_duals(dim, degree, formdegree, sobolev_space, kind)
+                reduced_dofs[dim] = rdofs
                 mapping = dual_mapping if dim == sd else trace
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
@@ -94,6 +98,7 @@ class DemkowiczDual(DualSet):
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
+        self._reduced_dofs = reduced_dofs
         super(DemkowiczDual, self).__init__(nodes, ref_el, entity_ids)
 
     def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind):
@@ -117,6 +122,7 @@ class DemkowiczDual(DualSet):
                 dtrial = dtrial[:, None, :]
             K = self._bubble_derivative_moments(facet, degree, formdegree, kind, Qpts, Qwts, dtrial)
 
+        reduced_dofs = K.shape[0]
         if formdegree > 0:
             if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
                 trial = perp(trial)
@@ -125,7 +131,7 @@ class DemkowiczDual(DualSet):
             K = numpy.vstack((K, M))
 
         duals = numpy.tensordot(K, P_at_qpts[(0,) * dim], axes=(1, 0))
-        return Q, duals
+        return Q, duals, reduced_dofs
 
     def _bubble_derivative_moments(self, facet, degree, formdegree, kind, Qpts, Qwts, trial):
         """Integrate trial expressions against an orthonormal basis for
@@ -163,6 +169,26 @@ class DemkowiczDual(DualSet):
             # Apply change of basis
             dtest = numpy.tensordot(S.T, dtest, axes=(1, 0))
         return inner(dtest, trial, Qwts)
+
+    def get_indices(self, restriction_domain, take_closure=True):
+        """Return the list of dofs with support on the given restriction domain.
+        Allows for reduced Demkowicz elements, excluding the exterior
+        derivative of the previous space in the de Rham complex.
+
+        :arg restriction_domain: can be 'reduced', 'interior', 'vertex',
+                                 'edge', 'face' or 'facet'
+        :kwarg take_closure: Are we taking the closure of the restriction domain?
+        """
+        if restriction_domain == "reduced":
+            indices = []
+            entity_ids = self.get_entity_ids()
+            for dim in entity_ids:
+                reduced_dofs = self._reduced_dofs[dim]
+                for entity, ids in entity_ids[dim].items():
+                    indices.extend(ids[:reduced_dofs])
+            return indices
+        else:
+            return super(DemkowiczDual, self).get_indices(restriction_domain, take_closure=take_closure)
 
 
 class FDMDual(DualSet):
