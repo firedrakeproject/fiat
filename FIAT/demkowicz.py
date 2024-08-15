@@ -65,7 +65,7 @@ def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
 
 class DemkowiczDual(DualSet):
 
-    def __init__(self, ref_el, degree, sobolev_space, kind=2):
+    def __init__(self, ref_el, degree, sobolev_space, kind=None):
         nodes = []
         entity_ids = {}
         reduced_dofs = {}
@@ -74,6 +74,8 @@ class DemkowiczDual(DualSet):
         formdegree = {"H1": 0, "HCurl": 1, "HDiv": sd-1, "L2": sd}[sobolev_space]
         trace = {"HCurl": "contravariant", "HDiv": "normal"}.get(sobolev_space, None)
         dual_mapping = {"HCurl": "contravariant", "HDiv": "covariant"}.get(sobolev_space, None)
+        if kind is None:
+            kind = 1 if formdegree == 0 else 2
 
         for dim in sorted(top):
             entity_ids[dim] = {}
@@ -105,28 +107,37 @@ class DemkowiczDual(DualSet):
         facet = symmetric_simplex(dim)
         Q = create_quadrature(facet, 2 * degree)
         Qpts, Qwts = Q.get_points(), Q.get_weights()
-        exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
+        exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div, "L2": None}[sobolev_space]
 
         shp = () if formdegree == 0 else (dim,)
-        if formdegree == dim:
+        if sobolev_space == "L2" and dim > 2:
+            shp = ()
+        elif formdegree == dim:
             shp = (1,)
 
         P = ONPolynomialSet(facet, degree, shp, scale="orthonormal")
         P_at_qpts = P.tabulate(Qpts, 1)
         trial = P_at_qpts[(0,) * dim]
-        if formdegree == dim:
+        # Evaluate type-I degrees of freedom on P
+        if formdegree >= dim:
             K = inner(trial[:1], trial, Qwts)
         else:
             dtrial = exterior_derivative(P_at_qpts)
             if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
                 dtrial = dtrial[:, None, :]
             K = self._bubble_derivative_moments(facet, degree, formdegree, kind, Qpts, Qwts, dtrial)
-
         reduced_dofs = K.shape[0]
+
+        # Evaluate type-II degrees of freedom on P
         if formdegree > 0:
+            q = degree + 1 if kind == 2 else degree
+            if q > degree:
+                Q2 = create_quadrature(facet, 2 * q)
+                Qpts, Qwts = Q2.get_points(), Q2.get_weights()
+                trial = P.tabulate(Qpts, 0)[(0,) * dim]
+
             if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
                 trial = perp(trial)
-            q = degree + 1 if kind == 2 else degree
             M = self._bubble_derivative_moments(facet, q, formdegree-1, kind, Qpts, Qwts, trial)
             K = numpy.vstack((K, M))
 
@@ -168,6 +179,7 @@ class DemkowiczDual(DualSet):
             S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
             # Apply change of basis
             dtest = numpy.tensordot(S.T, dtest, axes=(1, 0))
+
         return inner(dtest, trial, Qwts)
 
     def get_indices(self, restriction_domain, take_closure=True):

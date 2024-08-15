@@ -67,7 +67,12 @@ class Legendre(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
         poly_set = ONPolynomialSet(ref_el, degree)
-        dual = LegendreDual(ref_el, degree)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "L2")
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "L2", type(self))
+        else:
+            dual = LegendreDual(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(Legendre, self).__init__(poly_set, dual, degree, formdegree)
 
