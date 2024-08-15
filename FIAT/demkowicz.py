@@ -9,7 +9,7 @@ import scipy
 
 from FIAT.dual_set import DualSet
 from FIAT.functional import PointEvaluation, FrobeniusIntegralMoment
-from FIAT.polynomial_set import make_bubbles, ONPolynomialSet, PolynomialSet
+from FIAT.polynomial_set import make_bubbles, ONPolynomialSet
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import symmetric_simplex
@@ -203,107 +203,66 @@ class DemkowiczDual(DualSet):
             return super(DemkowiczDual, self).get_indices(restriction_domain, take_closure=take_closure)
 
 
-class FDMDual(DualSet):
+class FDMDual(DemkowiczDual):
 
     def __init__(self, ref_el, degree, sobolev_space, element):
-        nodes = []
-        entity_ids = {}
-        sd = ref_el.get_spatial_dimension()
-
-        Ref_el = symmetric_simplex(sd)
-        fe = element(Ref_el, degree, variant="demkowicz")
-        ells = fe.dual_basis()
-        entity_dofs = fe.entity_dofs()
-        formdegree = fe.formdegree
-
-        Q = create_quadrature(Ref_el, 2 * degree)
-        X, W = Q.get_points(), Q.get_weights()
         exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div}[sobolev_space]
-        trace = {"HCurl": "contravariant", "HDiv": "normal"}.get(sobolev_space, None)
-        dual_mapping = {"HCurl": "contravariant", "HDiv": "covariant"}.get(sobolev_space, None)
+        self.trace = {"HCurl": "contravariant", "HDiv": "normal"}.get(sobolev_space, None)
+        self.dual_mapping = {"HCurl": "contravariant", "HDiv": "covariant"}.get(sobolev_space, None)
 
-        phi_at_qpts = fe.tabulate(1, X)
-        V0 = phi_at_qpts[(0,) * sd]
-        V1 = exterior_derivative(phi_at_qpts)
+        sd = ref_el.get_spatial_dimension()
+        base_ref_el = symmetric_simplex(sd)
+        self.fe = element(base_ref_el, degree, variant="demkowicz")
 
-        for dim in sorted(entity_dofs):
-            entity_ids[dim] = {}
-            if dim == 0 and formdegree == 0:
-                for entity in sorted(entity_dofs[dim]):
-                    cur = len(nodes)
-                    pts = ref_el.make_points(dim, entity, degree)
-                    nodes.extend(PointEvaluation(ref_el, pt) for pt in pts)
-                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
-                continue
-            dofs = entity_dofs[dim][0]
-            if len(dofs) == 0:
-                for entity in sorted(entity_dofs[dim]):
-                    entity_ids[dim][entity] = []
-                continue
+        Q = create_quadrature(base_ref_el, 2 * degree)
+        phis = self.fe.tabulate(1, Q.get_points())
+        self.Q = Q
+        self.V0 = phis[(0,) * sd]
+        self.V1 = exterior_derivative(phis)
+        super(FDMDual, self).__init__(ref_el, degree, sobolev_space, kind=None)
 
-            B = inner(V0[dofs], V0[dofs], W)
-            if dim == sd:
-                _, S = scipy.linalg.eigh(B)
-            else:
-                A = inner(V1[dofs], V1[dofs], W)
-                if formdegree > 0:
-                    A += B
-                _, S = scipy.linalg.eigh(B, A)
-                S = numpy.dot(A, S)
+    def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind):
+        entity_dofs = self.fe.entity_dofs()
+        ells = self.fe.dual_basis()
+        Ref_el = self.fe.get_reference_element()
+        sd = Ref_el.get_spatial_dimension()
 
-            phis = numpy.array([ells[i].f_at_qpts for i in dofs])
-            phis = numpy.tensordot(S.T, phis, axes=(1, 0))
+        dofs = entity_dofs[dim][0]
+        V0 = self.V0[dofs]
+        W = self.Q.get_weights()
+        B = inner(V0, V0, W)
+        if dim == sd:
+            _, S = scipy.linalg.eigh(B)
+        else:
+            V1 = self.V1[dofs]
+            A = inner(V1, V1, W)
+            if formdegree > 0:
+                A += B
+            _, S = scipy.linalg.eigh(B, A)
+            S = numpy.dot(A, S)
 
-            Q_dof = ells[dofs[0]].Q
-            Q_ref = Q_dof.reference_rule()
-            mapping = dual_mapping if dim == sd else trace
-            # map physical phis to reference values Phis
-            if mapping == "normal":
-                n = Ref_el.compute_normal(0)
-                Phis = numpy.dot(n[None, :], phis).transpose((1, 0, 2))
-            elif mapping == "covariant":
-                piola_map = Q_dof.jacobian().T
-                Phis = numpy.dot(piola_map, phis).transpose((1, 0, 2))
-            elif mapping == "contravariant":
-                piola_map = numpy.linalg.pinv(Q_dof.jacobian()) * Q_dof.jacobian_determinant()
-                Phis = numpy.dot(piola_map, phis).transpose((1, 0, 2))
-            else:
-                Jdet = Q_dof.jacobian_determinant()
-                Phis = Jdet * phis
+        phis = numpy.array([ells[i].f_at_qpts for i in dofs])
+        phis = numpy.tensordot(S.T, phis, axes=(1, 0))
 
-            for entity in sorted(entity_dofs[dim]):
-                cur = len(nodes)
-                Q_facet, phis = map_duals(ref_el, dim, entity, mapping, Q_ref, Phis)
-                nodes.extend(FrobeniusIntegralMoment(ref_el, Q_facet, phi) for phi in phis)
-                entity_ids[dim][entity] = list(range(cur, len(nodes)))
+        Q_dof = ells[dofs[0]].Q
+        Q_ref = Q_dof.reference_rule()
+        mapping = self.dual_mapping if dim == sd else self.trace
+        # map physical phis to reference values Phis
+        if mapping == "normal":
+            n = Ref_el.compute_normal(0)
+            Phis = numpy.dot(n[None, :], phis).transpose((1, 0, 2))
+        elif mapping == "covariant":
+            piola_map = Q_dof.jacobian().T
+            Phis = numpy.dot(piola_map, phis).transpose((1, 0, 2))
+        elif mapping == "contravariant":
+            piola_map = numpy.linalg.pinv(Q_dof.jacobian()) * Q_dof.jacobian_determinant()
+            Phis = numpy.dot(piola_map, phis).transpose((1, 0, 2))
+        else:
+            Jdet = Q_dof.jacobian_determinant()
+            Phis = Jdet * phis
 
-        super(FDMDual, self).__init__(nodes, ref_el, entity_ids)
-
-
-def project_derivative(fe, op):
-    """Return a PolynomialSet with the projection of the derivative of a FiniteElement fe.
-       The type of derivative is specified by op, must be either "grad", "curl", or "div".
-    """
-    ref_el = fe.ref_el
-    degree = fe.degree() - 1
-    rot = None
-    if fe.formdegree == 0:
-        if op == "curl":
-            rot = perp
-        op = "grad"
-
-    Q = create_quadrature(ref_el, 2 * degree)
-    Qpts, Qwts = Q.get_points(), Q.get_weights()
-    expr = {"grad": grad, "curl": curl, "div": div}[op](fe.tabulate(1, Qpts))
-    if rot is not None:
-        expr = rot(expr)
-
-    sd = ref_el.get_spatial_dimension()
-    P = ONPolynomialSet(ref_el, degree, expr.shape[1:-1], scale="orthonormal")
-    wts = P.tabulate(Qpts)[(0,) * sd]
-    numpy.multiply(wts, Qwts, out=wts)
-    coeffs = numpy.tensordot(expr, wts, axes=(range(1, expr.ndim), range(1, expr.ndim)))
-    return PolynomialSet(ref_el, degree, degree, P.get_expansion_set(), coeffs)
+        reduced_dofs = self.fe.dual._reduced_dofs[dim]
+        return Q_ref, Phis, reduced_dofs
 
 
 if __name__ == "__main__":
