@@ -200,7 +200,7 @@ def construct_new_coeffs(ref_el, A, B):
     # is extended to match the larger
 
     sd = ref_el.get_spatial_dimension()
-    if A.degree != B.degree:
+    if A.get_embedded_degree() != B.get_embedded_degree():
         higher = A if A.degree > B.degree else B
         lower = B if A.degree > B.degree else A
 
