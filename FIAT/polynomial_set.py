@@ -169,7 +169,9 @@ def polynomial_set_union_normalized(A, B):
     not contain any of the same members of the set, as we construct a
     span via SVD.
     """
-    new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
+    # new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
+    assert A.get_reference_element() == B.get_reference_element()
+    new_coeffs = construct_new_coeffs(A.get_reference_element(), A, B)
     func_shape = new_coeffs.shape[1:]
     if len(func_shape) == 1:
         (u, sig, vt) = numpy.linalg.svd(new_coeffs)
@@ -190,6 +192,40 @@ def polynomial_set_union_normalized(A, B):
                          A.get_embedded_degree(),
                          A.get_expansion_set(),
                          coeffs)
+
+
+def construct_new_coeffs(ref_el, A, B):
+    # Constructs new coefficients for the set union of A and B
+    # If A and B do not have the same degree the smaller one
+    # is extended to match the larger
+
+    sd = ref_el.get_spatial_dimension()
+    if A.degree != B.degree:
+        higher = A if A.degree > B.degree else B
+        lower = B if A.degree > B.degree else A
+
+        dimHigher = expansions.polynomial_dimension(ref_el, higher.degree)
+        dimLower = expansions.polynomial_dimension(ref_el, lower.degree)
+
+        if (dimLower == len(list(lower.coeffs))):
+            lower_indices = list(chain(*(range(i * dimHigher, i * dimHigher + dimLower) for i in range(sd))))
+            embedded = higher.take(lower_indices)
+            embedded_coeffs = embedded.coeffs
+        else:
+            # if lower space not complete take a different approach
+            embedded_coeffs = []
+            diff = dimHigher - dimLower
+            for coeff in lower.coeffs:
+                new_coeff = []
+                for row in coeff:
+                    new_coeff.append(numpy.append(row, [0 for i in range(diff)]))
+                embedded_coeffs.append(new_coeff)
+
+        new_coeffs = numpy.array(list(embedded_coeffs) + list(higher.coeffs))
+    else:
+        new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
+
+    return new_coeffs
 
 
 class ONSymTensorPolynomialSet(PolynomialSet):
