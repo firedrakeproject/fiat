@@ -178,7 +178,7 @@ class DemkowiczDual(DualSet):
             S = S[:, nullspace_dim:]
             S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
             # Apply change of basis
-            dtest = numpy.tensordot(S.T, dtest, axes=(1, 0))
+            dtest = numpy.tensordot(S, dtest, axes=(0, 0))
 
         return inner(dtest, trial, Qwts)
 
@@ -200,7 +200,7 @@ class DemkowiczDual(DualSet):
                     indices.extend(ids[:reduced_dofs])
             return indices
         else:
-            return super(DemkowiczDual, self).get_indices(restriction_domain, take_closure=take_closure)
+            return DualSet.get_indices(self, restriction_domain, take_closure=take_closure)
 
 
 class FDMDual(DemkowiczDual):
