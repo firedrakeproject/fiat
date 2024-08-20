@@ -204,23 +204,28 @@ def construct_new_coeffs(ref_el, A, B):
         higher = A if A.degree > B.degree else B
         lower = B if A.degree > B.degree else A
 
-        dimHigher = expansions.polynomial_dimension(ref_el, higher.degree)
-        dimLower = expansions.polynomial_dimension(ref_el, lower.degree)
+        # dimHigher = expansions.polynomial_dimension(ref_el, higher.degree)
+        # dimLower = expansions.polynomial_dimension(ref_el, lower.degree)
 
-        if (dimLower == len(list(lower.coeffs))):
-            lower_indices = list(chain(*(range(i * dimHigher, i * dimHigher + dimLower) for i in range(sd))))
-            embedded = higher.take(lower_indices)
-            embedded_coeffs = embedded.coeffs
-        else:
-            # if lower space not complete take a different approach
-            embedded_coeffs = []
-            diff = dimHigher - dimLower
-            for coeff in lower.coeffs:
+        try:
+            sd = lower.get_shape()[0]
+        except IndexError:
+            sd = 1
+        embedded_coeffs = []
+        diff = higher.coeffs.shape[-1] - lower.coeffs.shape[-1]
+        for coeff in lower.coeffs:
+            if sd > 1:
                 new_coeff = []
                 for row in coeff:
                     new_coeff.append(numpy.append(row, [0 for i in range(diff)]))
                 embedded_coeffs.append(new_coeff)
+            else:
+                embedded_coeffs.append(numpy.append(coeff, [0 for i in range(diff)]))
+        embedded_coeffs = numpy.array(embedded_coeffs)
 
+        # print("embedded", embedded_coeffs.shape)
+        # print("higher", higher.coeffs.shape)
+        # print("lower", lower.coeffs.shape)
         new_coeffs = numpy.array(list(embedded_coeffs) + list(higher.coeffs))
     else:
         new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
