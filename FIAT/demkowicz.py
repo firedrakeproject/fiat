@@ -144,7 +144,7 @@ class DemkowiczDual(DualSet):
         duals = numpy.tensordot(K, P_at_qpts[(0,) * dim], axes=(1, 0))
         return Q, duals, reduced_dofs
 
-    def _bubble_derivative_moments(self, facet, degree, formdegree, kind, Qpts, Qwts, trial):
+    def _bubble_derivative_moments(self, facet, degree, formdegree, kind, Qpts, Qwts, trial, deriv=True):
         """Integrate trial expressions against an orthonormal basis for
            the exterior derivative of bubbles.
         """
@@ -167,20 +167,21 @@ class DemkowiczDual(DualSet):
         B_at_qpts = B.tabulate(Qpts, 1)
         d = (grad, curl, div)[formdegree]
         dtest = d(B_at_qpts)
+        test = B_at_qpts[(0,) * dim]
+        expr = dtest if deriv else test
         if len(dtest) > 0:
             # Build an orthonormal basis, remove nullspace
-            test = B_at_qpts[(0,) * dim]
             B = inner(test, test, Qwts)
             A = inner(dtest, dtest, Qwts)
             sig, S = scipy.linalg.eigh(A, B)
             tol = sig[-1] * 1E-12
             nullspace_dim = len([s for s in sig if abs(s) <= tol])
             S = S[:, nullspace_dim:]
-            S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
+            if deriv:
+                S *= numpy.sqrt(1 / sig[None, nullspace_dim:])
             # Apply change of basis
-            dtest = numpy.tensordot(S, dtest, axes=(0, 0))
-
-        return inner(dtest, trial, Qwts)
+            expr = numpy.tensordot(S, expr, axes=(0, 0))
+        return inner(expr, trial, Qwts)
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Return the list of dofs with support on the given restriction domain.
