@@ -187,9 +187,11 @@ def polynomial_set_union_normalized(A, B):
 
         coeffs = numpy.reshape(vt[:num_sv], (num_sv,) + func_shape)
 
+    deg = max(A.get_degree(), B.get_degree())
+    em_deg = max(A.get_embedded_degree(), B.get_embedded_degree())
     return PolynomialSet(A.get_reference_element(),
-                         A.get_degree(),
-                         A.get_embedded_degree(),
+                         deg,
+                         em_deg,
                          A.get_expansion_set(),
                          coeffs)
 
@@ -223,9 +225,6 @@ def construct_new_coeffs(ref_el, A, B):
                 embedded_coeffs.append(numpy.append(coeff, [0 for i in range(diff)]))
         embedded_coeffs = numpy.array(embedded_coeffs)
 
-        # print("embedded", embedded_coeffs.shape)
-        # print("higher", higher.coeffs.shape)
-        # print("lower", lower.coeffs.shape)
         new_coeffs = numpy.array(list(embedded_coeffs) + list(higher.coeffs))
     else:
         new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
