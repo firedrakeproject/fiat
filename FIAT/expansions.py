@@ -327,7 +327,7 @@ class ExpansionSet(object):
         sd = self.ref_el.get_spatial_dimension()
 
         # Always return 1 for n=0 to make regression tests pass
-        scale = 1.0 if n == 0 and len(self.affine_mappings) == 1 else self.get_scale(cell=cell)
+        scale = 1.0 if n == 0 and (self.scale is None) else self.get_scale(cell=cell)
         phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
                                  scale, variant=self.variant)
         if self.continuity == "C0":

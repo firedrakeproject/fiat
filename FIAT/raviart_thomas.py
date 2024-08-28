@@ -20,7 +20,7 @@ def RTSpace(ref_el, degree):
     sd = ref_el.get_spatial_dimension()
 
     k = degree - 1
-    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, (sd,))
+    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, (sd,), scale="orthonormal")
 
     dimPkp1 = expansions.polynomial_dimension(ref_el, k + 1)
     dimPk = expansions.polynomial_dimension(ref_el, k)
@@ -30,7 +30,7 @@ def RTSpace(ref_el, degree):
                                   for i in range(sd))))
     vec_Pk_from_Pkp1 = vec_Pkp1.take(vec_Pk_indices)
 
-    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
+    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, scale="orthonormal")
     PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
@@ -39,12 +39,12 @@ def RTSpace(ref_el, degree):
     # have to work on this through "tabulate" interface
     # first, tabulate PkH at quadrature points
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
+
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
 
     x = Qpts.T
     PkHx_at_Qpts = PkH_at_Qpts[:, None, :] * x[None, :, :]
     PkHx_coeffs = numpy.dot(numpy.multiply(PkHx_at_Qpts, Qwts), Pkp1_at_Qpts.T)
-
     PkHx = polynomial_set.PolynomialSet(ref_el,
                                         k,
                                         k + 1,

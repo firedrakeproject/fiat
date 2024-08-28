@@ -169,10 +169,10 @@ def polynomial_set_union_normalized(A, B):
     not contain any of the same members of the set, as we construct a
     span via SVD.
     """
-    # new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
     assert A.get_reference_element() == B.get_reference_element()
     new_coeffs = construct_new_coeffs(A.get_reference_element(), A, B)
     func_shape = new_coeffs.shape[1:]
+
     if len(func_shape) == 1:
         (u, sig, vt) = numpy.linalg.svd(new_coeffs)
         num_sv = len([s for s in sig if abs(s) > 1.e-10])
@@ -182,7 +182,9 @@ def polynomial_set_union_normalized(A, B):
         new_shape1 = numpy.prod(func_shape)
         newshape = (new_shape0, new_shape1)
         nc = numpy.reshape(new_coeffs, newshape)
+
         (u, sig, vt) = numpy.linalg.svd(nc, 1)
+
         num_sv = len([s for s in sig if abs(s) > 1.e-10])
 
         coeffs = numpy.reshape(vt[:num_sv], (num_sv,) + func_shape)
@@ -206,13 +208,11 @@ def construct_new_coeffs(ref_el, A, B):
         higher = A if A.degree > B.degree else B
         lower = B if A.degree > B.degree else A
 
-        # dimHigher = expansions.polynomial_dimension(ref_el, higher.degree)
-        # dimLower = expansions.polynomial_dimension(ref_el, lower.degree)
-
         try:
             sd = lower.get_shape()[0]
         except IndexError:
             sd = 1
+
         embedded_coeffs = []
         diff = higher.coeffs.shape[-1] - lower.coeffs.shape[-1]
         for coeff in lower.coeffs:
@@ -224,11 +224,9 @@ def construct_new_coeffs(ref_el, A, B):
             else:
                 embedded_coeffs.append(numpy.append(coeff, [0 for i in range(diff)]))
         embedded_coeffs = numpy.array(embedded_coeffs)
-
         new_coeffs = numpy.array(list(embedded_coeffs) + list(higher.coeffs))
     else:
         new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
-
     return new_coeffs
 
 
