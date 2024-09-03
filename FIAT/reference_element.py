@@ -29,8 +29,11 @@ import numpy
 from recursivenodes.nodes import _decode_family, _recursive
 
 from FIAT.orientation_utils import (
+    Orientation,
     make_cell_orientation_reflection_map_simplex,
-    make_cell_orientation_reflection_map_tensorproduct)
+    make_cell_orientation_reflection_map_tensorproduct,
+    make_entity_permutations_simplex,
+)
 
 POINT = 0
 LINE = 1
@@ -260,6 +263,52 @@ class Cell(object):
 
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
         raise NotImplementedError("Should be implemented in a subclass.")
 
     def is_simplex(self):
@@ -690,6 +739,58 @@ class SimplicialComplex(Cell):
 
         """
         return self.distance_to_point_l1(point, entity=entity) <= epsilon
+
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        return 0
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        if axis != 0:
+            raise ValueError(f"axis ({axis}) != 0")
+        return o
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        return numpy.diag((1, )).astype(int).reshape((1, 1, 1))
 
 
 class Simplex(SimplicialComplex):
@@ -1127,6 +1228,75 @@ class TensorProductCell(Cell):
 
     def __le__(self, other):
         return self.compare(operator.le, other)
+
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        Notes
+        -----
+        The difinition of orientations used here must be consistent with
+        that used in make_entity_permutations_tensorproduct.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        dim = len(self.cells)
+        size_io = 2  # Number of possible intrinsic orientations along each axis.
+        return o // size_io**dim
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation. ``//`` and ``%`` must be overloaded in type(o).
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        Notes
+        -----
+        Must be consistent with make_entity_permutations_tensorproduct.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        dim = len(self.cells)
+        if axis >= dim:
+            raise ValueError(f"Must give 0 <= axis < {dim} : got {axis}")
+        size_io = 2  # Number of possible intrinsic orientations along each axis.
+        return o % size_io**dim // size_io**(dim - 1 - axis) % size_io
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        dim = len(self.cells)
+        a = numpy.zeros((factorial(dim), dim, dim), dtype=int)
+        ai = numpy.array(list(make_entity_permutations_simplex(dim - 1, 2).values()), dtype=int).reshape((factorial(dim), dim, 1))
+        numpy.put_along_axis(a, ai, 1, axis=2)
+        return a
 
 
 class UFCQuadrilateral(Cell):
