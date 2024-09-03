@@ -7,6 +7,7 @@
 and Sherwin.  These are parametrized over a reference element so as
 to allow users to get coordinates that they want."""
 
+from functools import reduce
 import numpy
 import math
 from FIAT import reference_element, jacobi
@@ -699,10 +700,17 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     if pts.dtype == object:
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
+    # Compute the distance from the point to each subcell
+    dist = {cell: compute_l1_distance(ref_el, pts, entity=(sd, cell))
+            for cell in sorted(top[sd])}
+
+    # Compute the minimum distance
+    min_dist = reduce(numpy.minimum, dist.values())
+
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_on_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
+        pts_on_cell = dist[cell] < min_dist + tol
         if len(pts_on_cell.shape) == 0:
             # singleton case
             if pts_on_cell:
@@ -728,20 +736,24 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     :kwarg tol: the absolute tolerance.
     :returns: a list of (weighted) characteristic functions for each subcell.
     """
-    from sympy import Piecewise
+    from sympy import Piecewise, Or, Not
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     # assert singleton point
     pt = pt.reshape((sd,))
 
-    # Compute characteristic function of each cell
+    # Compute the distance from the point to each subcell
+    dist = {cell: compute_l1_distance(ref_el, pt, entity=(sd, cell))
+            for cell in sorted(top[sd])}
+
+    # Compute characteristic function of each subcell
     otherwise = []
     masks = []
     for cell in sorted(top[sd]):
-        inside = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
-        masks.append(Piecewise(*otherwise, (1.0, inside), (0.0, True)))
+        nearest = Not(reduce(Or, (dist[cell] - dist[other] >= tol for other in dist if cell != other)))
+        masks.append(Piecewise(*otherwise, (1.0, nearest), (0.0, True)))
         if unique:
-            otherwise.append((0.0, inside))
+            otherwise.append((0.0, nearest))
     # If the point is on a facet, divide the characteristic function by the facet multiplicity
     if not unique:
         mult = sum(masks)
