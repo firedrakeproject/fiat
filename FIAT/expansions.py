@@ -677,7 +677,6 @@ def compute_l1_distance(ref_el, points, entity=None):
     A = numpy.vstack((A, -numpy.sum(A, axis=0)))
     b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
     bary = apply_mapping(A, b, points, transpose=True)
-
     dist = 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
     return dist
 
@@ -736,21 +735,26 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     :kwarg tol: the absolute tolerance.
     :returns: a list of (weighted) characteristic functions for each subcell.
     """
-    from sympy import Piecewise, Or, Not
+    from sympy import Piecewise
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     # assert singleton point
     pt = pt.reshape((sd,))
 
-    # Compute the distance from the point to each subcell
-    dist = {cell: compute_l1_distance(ref_el, pt, entity=(sd, cell))
-            for cell in sorted(top[sd])}
+    # Estimate the best distance to any subcell from the distance to parent
+    parent = ref_el.get_parent()
+    b, = numpy.asarray(parent.make_points(sd, 0, sd+1))
+    H = max(numpy.linalg.norm(b - v) for v in numpy.asarray(parent.get_vertices()))
+    best = H * compute_l1_distance(parent, pt, entity=(sd, 0))
 
     # Compute characteristic function of each subcell
     otherwise = []
     masks = []
     for cell in sorted(top[sd]):
-        nearest = Not(reduce(Or, (dist[cell] - dist[other] >= tol for other in dist if cell != other)))
+        b, = numpy.asarray(ref_el.make_points(sd, cell, sd+1))
+        h = min(numpy.linalg.norm(b - v) for v in numpy.asarray(ref_el.get_vertices_of_subcomplex(top[sd][cell])))
+        dist = h * compute_l1_distance(ref_el, pt, entity=(sd, cell))
+        nearest = dist < best + tol
         masks.append(Piecewise(*otherwise, (1.0, nearest), (0.0, True)))
         if unique:
             otherwise.append((0.0, nearest))
