@@ -7,7 +7,6 @@
 and Sherwin.  These are parametrized over a reference element so as
 to allow users to get coordinates that they want."""
 
-from functools import reduce
 import numpy
 import math
 from FIAT import reference_element, jacobi
@@ -674,11 +673,14 @@ def compute_l1_distance(ref_el, points, entity=None):
     top = ref_el.get_topology()
     verts = ref_el.get_vertices_of_subcomplex(top[dim][entity_id])
     A, b = reference_element.make_affine_mapping(verts, ref_verts)
-    A = numpy.vstack((A, -numpy.sum(A, axis=0)))
-    b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
+    A = numpy.vstack((-numpy.sum(A, axis=0), A))
+    b = numpy.hstack((1-numpy.sum(b, axis=0), b))
+
+    h = 1 / numpy.linalg.norm(A, axis=1)
+    b *= h
+    A *= h[:, None]
     bary = apply_mapping(A, b, points, transpose=True)
-    dist = 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
-    return dist
+    return 0.5 * numpy.sum(abs(bary) - bary, axis=-1)
 
 
 def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
@@ -699,17 +701,13 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     if pts.dtype == object:
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
-    # Compute the distance from the point to each subcell
-    dist = {cell: compute_l1_distance(ref_el, pts, entity=(sd, cell))
-            for cell in sorted(top[sd])}
-
-    # Compute the minimum distance
-    min_dist = reduce(numpy.minimum, dist.values())
+    best = compute_l1_distance(ref_el.get_parent(), pts)
+    tol = best + tol
 
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_on_cell = dist[cell] < min_dist + tol
+        pts_on_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
         if len(pts_on_cell.shape) == 0:
             # singleton case
             if pts_on_cell:
@@ -741,20 +739,14 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     # assert singleton point
     pt = pt.reshape((sd,))
 
-    # Estimate the best distance to any subcell from the distance to parent
-    parent = ref_el.get_parent()
-    b, = numpy.asarray(parent.make_points(sd, 0, sd+1))
-    H = max(numpy.linalg.norm(b - v) for v in numpy.asarray(parent.get_vertices()))
-    best = H * compute_l1_distance(parent, pt, entity=(sd, 0))
+    best = compute_l1_distance(ref_el.get_parent(), pt)
+    tol = best + tol
 
     # Compute characteristic function of each subcell
     otherwise = []
     masks = []
     for cell in sorted(top[sd]):
-        b, = numpy.asarray(ref_el.make_points(sd, cell, sd+1))
-        h = min(numpy.linalg.norm(b - v) for v in numpy.asarray(ref_el.get_vertices_of_subcomplex(top[sd][cell])))
-        dist = h * compute_l1_distance(ref_el, pt, entity=(sd, cell))
-        nearest = dist < best + tol
+        nearest = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
         masks.append(Piecewise(*otherwise, (1.0, nearest), (0.0, True)))
         if unique:
             otherwise.append((0.0, nearest))
