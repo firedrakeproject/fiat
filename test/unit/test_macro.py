@@ -343,6 +343,39 @@ def test_Ck_basis(cell, order, degree, variant):
         assert numpy.allclose(local_phis, phis[:, ipts])
 
 
+def test_compute_l1_distance(cell):
+    from FIAT.expansions import compute_l1_distance
+
+    A = AlfeldSplit(cell)
+    dim = A.get_spatial_dimension()
+    top = A.get_topology()
+    p0, = cell.make_points(dim, 0, dim+1)
+
+    # construct one point in front of each facet
+    pts = []
+    expected = []
+    parent_top = cell.get_topology()
+    for i in parent_top[dim-1]:
+        Fi, = numpy.asarray(cell.make_points(dim-1, i, dim))
+        n = cell.compute_normal(i)
+        n *= numpy.dot(n, Fi - p0)
+        n /= numpy.linalg.norm(n)
+        d = 0.222 + i/10
+        pts.append(Fi + d * n)
+        expected.append(d)
+
+    # the computed l1 distance agrees with the l2 distance for points in front of facets
+    parent_distance = compute_l1_distance(cell, pts)
+    assert numpy.allclose(parent_distance, expected)
+
+    # assert that the subcell measures the same distance as the parent
+    for i in top[dim]:
+        subcell_distance = compute_l1_distance(A, pts, entity=(dim, i))
+        assert numpy.isclose(subcell_distance[i], expected[i])
+        assert all(subcell_distance[:i] > expected[:i])
+        assert all(subcell_distance[i+1:] > expected[i+1:])
+
+
 @pytest.mark.parametrize("element", (DiscontinuousLagrange, Lagrange))
 def test_macro_sympy(cell, element):
     import sympy
