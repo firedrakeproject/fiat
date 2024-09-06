@@ -659,6 +659,9 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
 def compute_l1_distance(ref_el, points, entity=None):
     """Computes the l1 distances from a simplex entity to a set of points.
 
+    The l1 distance is measured with respect to rescaled barycentric coordinates,
+    such that the l1 and l2 distances agree for points opposite to a single facet.
+
     :arg ref_el: a SimplicialComplex.
     :arg points: an iterable of points.
     :arg entity: a tuple of the entity dimension and id.
@@ -676,6 +679,8 @@ def compute_l1_distance(ref_el, points, entity=None):
     A = numpy.vstack((-numpy.sum(A, axis=0), A))
     b = numpy.hstack((1-numpy.sum(b, axis=0), b))
 
+    # fix scale to match l2 distances for points directly in front of a facet
+    # the barycentric coordinates are rescaled by the height wrt. to the facet
     h = 1 / numpy.linalg.norm(A, axis=1)
     b *= h
     A *= h[:, None]
@@ -685,12 +690,13 @@ def compute_l1_distance(ref_el, points, entity=None):
 
 def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     """Maps cells on a simplicial complex to points.
+    Points outside the complex are binned to the nearest cell.
 
     :arg ref_el: a SimplicialComplex.
     :arg pts: an iterable of physical points on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
     :kwarg tol: the absolute tolerance.
-    :returns: a dict mapping cell id to points located on that cell.
+    :returns: a dict mapping cell id to the point ids nearest to that cell.
     """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
@@ -701,24 +707,25 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     if pts.dtype == object:
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
+    # The distance to the nearest cell is equal to the distance to the parent cell
     best = compute_l1_distance(ref_el.get_parent(), pts)
     tol = best + tol
 
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_on_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
-        if len(pts_on_cell.shape) == 0:
+        pts_near_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
+        if len(pts_near_cell.shape) == 0:
             # singleton case
-            if pts_on_cell:
+            if pts_near_cell:
                 cell_point_map[cell] = Ellipsis
                 if unique:
                     break
         else:
             if unique:
                 for other in cell_point_map.values():
-                    pts_on_cell[other] = False
-            ipts = numpy.where(pts_on_cell)[0]
+                    pts_near_cell[other] = False
+            ipts = numpy.where(pts_near_cell)[0]
             if len(ipts) > 0:
                 cell_point_map[cell] = ipts
     return cell_point_map
@@ -739,6 +746,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     # assert singleton point
     pt = pt.reshape((sd,))
 
+    # The distance to the nearest cell is equal to the distance to the parent cell
     best = compute_l1_distance(ref_el.get_parent(), pt)
     tol = best + tol
 
@@ -746,10 +754,11 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     otherwise = []
     masks = []
     for cell in sorted(top[sd]):
-        nearest = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
-        masks.append(Piecewise(*otherwise, (1.0, nearest), (0.0, True)))
+        # Bin points based on l1 distance
+        pt_near_cell = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
+        masks.append(Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
         if unique:
-            otherwise.append((0.0, nearest))
+            otherwise.append((0.0, pt_near_cell))
     # If the point is on a facet, divide the characteristic function by the facet multiplicity
     if not unique:
         mult = sum(masks)
