@@ -676,12 +676,12 @@ class SimplicialComplex(Cell):
         b *= h
         A *= h[:, None]
         bary = numpy.dot(points, A.T)
-        for _ in bary.shape[1:]:
+        for _ in bary.shape[:-1]:
             b = b[None, ...]
         bary += b
         return 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
 
-    def contains_point(self, point, epsilon=0, entity=None):
+    def contains_point(self, point, epsilon=0.0, entity=None):
         """Checks if reference cell contains given point
         (with numerical tolerance as given by the L1 distance (aka 'manhatten',
         'taxicab' or rectilinear distance) to the cell.
@@ -747,16 +747,16 @@ class Simplex(SimplicialComplex):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         return make_cell_orientation_reflection_map_simplex(self.get_dimension())
 
+    def get_facet_element(self):
+        dimension = self.get_spatial_dimension()
+        return self.construct_subelement(dimension - 1)
+
 
 # Backwards compatible name
 ReferenceElement = Simplex
 
 
 class UFCSimplex(Simplex):
-
-    def get_facet_element(self):
-        dimension = self.get_spatial_dimension()
-        return self.construct_subelement(dimension - 1)
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -769,10 +769,6 @@ class UFCSimplex(Simplex):
 
 class DefaultSimplex(Simplex):
 
-    def get_facet_element(self):
-        dimension = self.get_spatial_dimension()
-        return self.construct_subelement(dimension - 1)
-
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
         specified by subelement dimension.
@@ -783,10 +779,6 @@ class DefaultSimplex(Simplex):
 
 
 class SymmetricSimplex(Simplex):
-
-    def get_facet_element(self):
-        dimension = self.get_spatial_dimension()
-        return self.construct_subelement(dimension - 1)
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -1081,7 +1073,7 @@ class TensorProductCell(Cell):
                 n.extend([0] * c.get_spatial_dimension())
         return numpy.asarray(n)
 
-    def contains_point(self, point, epsilon=0):
+    def contains_point(self, point, epsilon=0.0):
         """Checks if reference cell contains given point
         (with numerical tolerance as given by the L1 distance (aka 'manhatten',
         'taxicab' or rectilinear distance) to the cell.
@@ -1098,13 +1090,12 @@ class TensorProductCell(Cell):
         bool : True if the point is inside the cell, False otherwise.
 
         """
-        subcell_dimensions = [c.get_spatial_dimension() for c in self.cells]
+        subcell_dimensions = self.get_dimension()
         assert len(point) == sum(subcell_dimensions)
         point_slices = TensorProductCell._split_slices(subcell_dimensions)
-        subcell_points = [point[s] for s in point_slices]
         return reduce(operator.and_,
-                      (c.contains_point(p, epsilon=epsilon)
-                       for c, p in zip(self.cells, subcell_points)),
+                      (c.contains_point(point[s], epsilon=epsilon)
+                       for c, s in zip(self.cells, point_slices)),
                       True)
 
     def distance_to_point_l1(self, point):
@@ -1112,13 +1103,11 @@ class TensorProductCell(Cell):
         distance) to a point with 0.0 if the point is inside the cell.
 
         For more information see the docstring for the UFCSimplex method."""
-        subcell_dimensions = [c.get_spatial_dimension() for c in self.cells]
+        subcell_dimensions = self.get_dimension()
         assert len(point) == sum(subcell_dimensions)
         point_slices = TensorProductCell._split_slices(subcell_dimensions)
-        subcell_points = [point[s] for s in point_slices]
-        subcell_distances = [c.distance_to_point_l1(p)
-                             for c, p in zip(self.cells, subcell_points)]
-        return sum(subcell_distances)
+        return sum(c.distance_to_point_l1(point[s])
+                   for c, s in zip(self.cells, point_slices))
 
     def symmetry_group_size(self, dim):
         return tuple(c.symmetry_group_size(d) for d, c in zip(dim, self.cells))
