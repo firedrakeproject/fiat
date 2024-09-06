@@ -343,9 +343,7 @@ def test_Ck_basis(cell, order, degree, variant):
         assert numpy.allclose(local_phis, phis[:, ipts])
 
 
-def test_compute_l1_distance(cell):
-    from FIAT.expansions import compute_l1_distance
-
+def test_distance_to_point_l1(cell):
     A = AlfeldSplit(cell)
     dim = A.get_spatial_dimension()
     top = A.get_topology()
@@ -364,13 +362,13 @@ def test_compute_l1_distance(cell):
         pts.append(Fi + d * n)
         expected.append(d)
 
-    # the computed l1 distance agrees with the l2 distance for points in front of facets
-    parent_distance = compute_l1_distance(cell, pts)
+    # the computed L1 distance agrees with the L2 distance for points in front of facets
+    parent_distance = cell.distance_to_point_l1(pts)
     assert numpy.allclose(parent_distance, expected)
 
     # assert that the subcell measures the same distance as the parent
     for i in top[dim]:
-        subcell_distance = compute_l1_distance(A, pts, entity=(dim, i))
+        subcell_distance = A.distance_to_point_l1(pts, entity=(dim, i))
         assert numpy.isclose(subcell_distance[i], expected[i])
         assert all(subcell_distance[:i] > expected[:i])
         assert all(subcell_distance[i+1:] > expected[i+1:])

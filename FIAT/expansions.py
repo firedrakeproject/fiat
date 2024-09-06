@@ -242,19 +242,15 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
-def apply_mapping(A, b, pts, transpose=False):
+def apply_mapping(A, b, pts):
     """Apply an affine mapping to a column-stacked array of points."""
     if len(pts) == 0:
         return pts
-    if transpose:
-        Ax = numpy.dot(pts, A.T)
-        for _ in Ax.shape[:-1]:
-            b = b[None, ...]
-    else:
-        Ax = numpy.dot(A, pts)
-        for _ in Ax.shape[1:]:
-            b = b[..., None]
-    return Ax + b
+    result = numpy.dot(A, pts)
+    for _ in result.shape[1:]:
+        b = b[..., None]
+    result += b
+    return result
 
 
 class ExpansionSet(object):
@@ -656,38 +652,6 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
     return cell_node_map
 
 
-def compute_l1_distance(ref_el, points, entity=None):
-    """Computes the l1 distances from a simplex entity to a set of points.
-
-    The l1 distance is measured with respect to rescaled barycentric coordinates,
-    such that the l1 and l2 distances agree for points opposite to a single facet.
-
-    :arg ref_el: a SimplicialComplex.
-    :arg points: an iterable of points.
-    :arg entity: a tuple of the entity dimension and id.
-    :returns: a numpy array with the l1 distance from the entity to each point.
-    """
-    if entity is None:
-        entity = (ref_el.get_spatial_dimension(), 0)
-    dim, entity_id = entity
-    ref_verts = numpy.zeros((dim + 1, dim))
-    ref_verts[range(1, dim + 1), range(dim)] = 1.0
-
-    top = ref_el.get_topology()
-    verts = ref_el.get_vertices_of_subcomplex(top[dim][entity_id])
-    A, b = reference_element.make_affine_mapping(verts, ref_verts)
-    A = numpy.vstack((-numpy.sum(A, axis=0), A))
-    b = numpy.hstack((1-numpy.sum(b, axis=0), b))
-
-    # fix scale to match l2 distances for points directly in front of a facet
-    # the barycentric coordinates are rescaled by the height wrt. to the facet
-    h = 1 / numpy.linalg.norm(A, axis=1)
-    b *= h
-    A *= h[:, None]
-    bary = apply_mapping(A, b, points, transpose=True)
-    return 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
-
-
 def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     """Maps cells on a simplicial complex to points.
     Points outside the complex are binned to the nearest cell.
@@ -708,13 +672,13 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
     # The distance to the nearest cell is equal to the distance to the parent cell
-    best = compute_l1_distance(ref_el.get_parent(), pts)
+    best = ref_el.get_parent().distance_to_point_l1(pts)
     tol = best + tol
 
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_near_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
+        pts_near_cell = ref_el.distance_to_point_l1(pts, entity=(sd, cell)) < tol
         if len(pts_near_cell.shape) == 0:
             # singleton case
             if pts_near_cell:
@@ -747,7 +711,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     pt = pt.reshape((sd,))
 
     # The distance to the nearest cell is equal to the distance to the parent cell
-    best = compute_l1_distance(ref_el.get_parent(), pt)
+    best = ref_el.get_parent().distance_to_point_l1(pt)
     tol = best + tol
 
     # Compute characteristic function of each subcell
@@ -755,7 +719,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     masks = []
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pt_near_cell = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
+        pt_near_cell = ref_el.distance_to_point_l1(pt, entity=(sd, cell)) < tol
         masks.append(Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
         if unique:
             otherwise.append((0.0, pt_near_cell))

@@ -530,102 +530,24 @@ class SimplicialComplex(Cell):
             A = numpy.dot(A.T, A)
         return numpy.linalg.solve(A, B).T
 
-
-class Simplex(SimplicialComplex):
-    r"""Abstract class for a reference simplex.
-
-    Orientation of a physical cell is computed systematically
-    by comparing the canonical orderings of its facets and
-    the facets in the FIAT reference cell.
-
-    As an example, we compute the orientation of a
-    triangular cell:
-
-       +                    +
-       | \                  | \
-       1   0               47   42
-       |     \              |     \
-       +--2---+             +--43--+
-    FIAT canonical     Mapped example physical cell
-
-    Suppose that the facets of the physical cell
-    are canonically ordered as:
-
-    C = [43, 42, 47]
-
-    FIAT facet to Physical facet map is given by:
-
-    M = [42, 47, 43]
-
-    Then the orientation of the cell is computed as:
-
-    C.index(M[0]) = 1; C.remove(M[0])
-    C.index(M[1]) = 1; C.remove(M[1])
-    C.index(M[2]) = 0; C.remove(M[2])
-
-    o = (1 * 2!) + (1 * 1!) + (0 * 0!) = 3
-    """
-    def is_simplex(self):
-        return True
-
-    def symmetry_group_size(self, dim):
-        return factorial(dim + 1)
-
-    def cell_orientation_reflection_map(self):
-        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
-        return make_cell_orientation_reflection_map_simplex(self.get_dimension())
-
-
-# Backwards compatible name
-ReferenceElement = Simplex
-
-
-class UFCSimplex(Simplex):
-
-    def get_facet_element(self):
-        dimension = self.get_spatial_dimension()
-        return self.construct_subelement(dimension - 1)
-
-    def construct_subelement(self, dimension):
-        """Constructs the reference element of a cell subentity
-        specified by subelement dimension.
-
-        :arg dimension: subentity dimension (integer)
-        """
-        return ufc_simplex(dimension)
-
-    def contains_point(self, point, epsilon=0):
-        """Checks if reference cell contains given point
-        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
-        'taxicab' or rectilinear distance) to the cell.
-
-        Parameters
-        ----------
-        point : numpy.ndarray, list or symbolic expression
-            The coordinates of the point.
-        epsilon : float
-            The tolerance for the check.
-
-        Returns
-        -------
-        bool : True if the point is inside the cell, False otherwise.
-
-        """
-        return self.distance_to_point_l1(point) <= epsilon
-
-    def distance_to_point_l1(self, point):
+    def distance_to_point_l1(self, points, entity=None):
         # noqa: D301
         """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
-        distance) to a point with 0.0 if the point is inside the cell.
+        distance) from an entity to a point with 0.0 if the point is inside the entity.
+
+        The L1 distance is measured with respect to rescaled barycentric coordinates,
+        such that the L1 and L2 distances agree for points opposite to a single facet.
 
         Parameters
         ----------
-        point : numpy.ndarray or list
-            The coordinates of the point.
+        points : numpy.ndarray or list
+            The coordinates of the points.
+        entity : tuple or None
+            A tuple of entity dimension and entity id.
 
         Returns
         -------
-        float
+        numpy.float64 or numpy.ndarray
             The L1 distance, also known as taxicab, manhatten or rectilinear
             distance, of the cell to the point. If 0.0 the point is inside the
             cell.
@@ -728,27 +650,121 @@ class UFCSimplex(Simplex):
             `beta = X[0] = x`,
             `gamma = X[1] = y` and
             `delta = X[2] = z`.
-        The rules are the same as for the triangle but with one extra
+        The rules are the same as for the tetrahedron but with one extra
         barycentric coordinate. Our approximate distance, the absolute sum of
         the negative barycentric coordinates, is at worse around 4 times the
         actual distance to the tetrahedron.
 
         """
-        # bary = [alpha, beta, gamma, delta, ...] - see docstring
-        bary = [1.0 - sum(point)] + list(point)
-        # We avoid branching so that code can be generated from this (e.g. with
-        # sympy). bary-abs(bary) gets rid of the positive barycentric
-        # coordinates and doubles the negative distances. Summing, halving and
-        # taking the negative of these gives the L1 distance. So for example
-        # point = [-1, -1]
-        # bary = [3, -1, -1],
-        # bary-abs(bary) = [0, -2, -2],
-        # sum(bary-abs(bary)) = -4.
-        # - 0.5 * sum(bary-abs(bary)) = 2.0
-        # which is the correct L1 distance from the cell to the point.
-        l1_dist = - 0.5 * sum(b - abs(b) for b in bary)
-        # Take abs at the end to avoid negative zero.
-        return abs(l1_dist)
+        if len(points) == 0:
+            return points
+        if entity is None:
+            entity = (self.get_spatial_dimension(), 0)
+        dim, entity_id = entity
+        ref_verts = numpy.zeros((dim + 1, dim))
+        ref_verts[range(1, dim + 1), range(dim)] = 1.0
+
+        top = self.get_topology()
+        verts = self.get_vertices_of_subcomplex(top[dim][entity_id])
+        A, b = make_affine_mapping(verts, ref_verts)
+        A = numpy.vstack((-numpy.sum(A, axis=0), A))
+        b = numpy.hstack((1-numpy.sum(b, axis=0), b))
+
+        # fix scale to match l2 distances for points directly in front of a facet
+        # the barycentric coordinates are rescaled by the height wrt. to the facet
+        h = 1 / numpy.linalg.norm(A, axis=1)
+        b *= h
+        A *= h[:, None]
+        bary = numpy.dot(points, A.T)
+        for _ in bary.shape[1:]:
+            b = b[None, ...]
+        bary += b
+        return 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
+
+    def contains_point(self, point, epsilon=0, entity=None):
+        """Checks if reference cell contains given point
+        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
+        'taxicab' or rectilinear distance) to the cell.
+
+        Parameters
+        ----------
+        point : numpy.ndarray, list or symbolic expression
+            The coordinates of the point.
+        epsilon : float
+            The tolerance for the check.
+        entity : tuple or None
+            A tuple of entity dimension and entity id.
+
+        Returns
+        -------
+        bool : True if the point is inside the cell, False otherwise.
+
+        """
+        return self.distance_to_point_l1(point, entity=entity) <= epsilon
+
+
+class Simplex(SimplicialComplex):
+    r"""Abstract class for a reference simplex.
+
+    Orientation of a physical cell is computed systematically
+    by comparing the canonical orderings of its facets and
+    the facets in the FIAT reference cell.
+
+    As an example, we compute the orientation of a
+    triangular cell:
+
+       +                    +
+       | \                  | \
+       1   0               47   42
+       |     \              |     \
+       +--2---+             +--43--+
+    FIAT canonical     Mapped example physical cell
+
+    Suppose that the facets of the physical cell
+    are canonically ordered as:
+
+    C = [43, 42, 47]
+
+    FIAT facet to Physical facet map is given by:
+
+    M = [42, 47, 43]
+
+    Then the orientation of the cell is computed as:
+
+    C.index(M[0]) = 1; C.remove(M[0])
+    C.index(M[1]) = 1; C.remove(M[1])
+    C.index(M[2]) = 0; C.remove(M[2])
+
+    o = (1 * 2!) + (1 * 1!) + (0 * 0!) = 3
+    """
+    def is_simplex(self):
+        return True
+
+    def symmetry_group_size(self, dim):
+        return factorial(dim + 1)
+
+    def cell_orientation_reflection_map(self):
+        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        return make_cell_orientation_reflection_map_simplex(self.get_dimension())
+
+
+# Backwards compatible name
+ReferenceElement = Simplex
+
+
+class UFCSimplex(Simplex):
+
+    def get_facet_element(self):
+        dimension = self.get_spatial_dimension()
+        return self.construct_subelement(dimension - 1)
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        return ufc_simplex(dimension)
 
 
 class DefaultSimplex(Simplex):
