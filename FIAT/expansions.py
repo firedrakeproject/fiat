@@ -685,7 +685,7 @@ def compute_l1_distance(ref_el, points, entity=None):
     b *= h
     A *= h[:, None]
     bary = apply_mapping(A, b, points, transpose=True)
-    return 0.5 * numpy.sum(abs(bary) - bary, axis=-1)
+    return 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
 
 
 def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
