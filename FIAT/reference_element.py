@@ -530,13 +530,10 @@ class SimplicialComplex(Cell):
             A = numpy.dot(A.T, A)
         return numpy.linalg.solve(A, B).T
 
-    def distance_to_point_l1(self, points, entity=None):
+    def distance_to_point_l1(self, points, entity=None, rescale=False):
         # noqa: D301
         """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
         distance) from an entity to a point with 0.0 if the point is inside the entity.
-
-        The L1 distance is measured with respect to rescaled barycentric coordinates,
-        such that the L1 and L2 distances agree for points opposite to a single facet.
 
         Parameters
         ----------
@@ -544,6 +541,10 @@ class SimplicialComplex(Cell):
             The coordinates of the points.
         entity : tuple or None
             A tuple of entity dimension and entity id.
+        rescale : bool
+            If true, the L1 distance is measured with respect to rescaled
+            barycentric coordinates, such that the L1 and L2 distances agree
+            for points opposite to a single facet.
 
         Returns
         -------
@@ -656,8 +657,6 @@ class SimplicialComplex(Cell):
         actual distance to the tetrahedron.
 
         """
-        if len(points) == 0:
-            return points
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         dim, entity_id = entity
@@ -669,16 +668,19 @@ class SimplicialComplex(Cell):
         A, b = make_affine_mapping(verts, ref_verts)
         A = numpy.vstack((-numpy.sum(A, axis=0), A))
         b = numpy.hstack((1-numpy.sum(b, axis=0), b))
-
-        # fix scale to match l2 distances for points directly in front of a facet
-        # the barycentric coordinates are rescaled by the height wrt. to the facet
-        h = 1 / numpy.linalg.norm(A, axis=1)
-        b *= h
-        A *= h[:, None]
-        bary = numpy.dot(points, A.T)
-        for _ in bary.shape[:-1]:
-            b = b[None, ...]
-        bary += b
+        if rescale:
+            # rescale barycentric coordinates by the height wrt. to the facet
+            h = 1 / numpy.linalg.norm(A, axis=1)
+            b *= h
+            A *= h[:, None]
+        if len(points) == 0:
+            bary = points
+        else:
+            bary = numpy.dot(points, A.T)
+            for _ in bary.shape[:-1]:
+                b = b[None, ...]
+            bary += b
+        # sum the negative part of each barycentric coordinate
         return 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
 
     def contains_point(self, point, epsilon=0.0, entity=None):

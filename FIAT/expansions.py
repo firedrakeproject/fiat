@@ -672,13 +672,13 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
     # The distance to the nearest cell is equal to the distance to the parent cell
-    best = ref_el.get_parent().distance_to_point_l1(pts)
+    best = ref_el.get_parent().distance_to_point_l1(pts, rescale=True)
     tol = best + tol
 
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_near_cell = ref_el.distance_to_point_l1(pts, entity=(sd, cell)) < tol
+        pts_near_cell = ref_el.distance_to_point_l1(pts, entity=(sd, cell), rescale=True) < tol
         if len(pts_near_cell.shape) == 0:
             # singleton case
             if pts_near_cell:
@@ -711,7 +711,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     pt = pt.reshape((sd,))
 
     # The distance to the nearest cell is equal to the distance to the parent cell
-    best = ref_el.get_parent().distance_to_point_l1(pt)
+    best = ref_el.get_parent().distance_to_point_l1(pt, rescale=True)
     tol = best + tol
 
     # Compute characteristic function of each subcell
@@ -719,7 +719,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     masks = []
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pt_near_cell = ref_el.distance_to_point_l1(pt, entity=(sd, cell)) < tol
+        pt_near_cell = ref_el.distance_to_point_l1(pt, entity=(sd, cell), rescale=True) < tol
         masks.append(Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
         if unique:
             otherwise.append((0.0, pt_near_cell))

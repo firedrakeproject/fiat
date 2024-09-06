@@ -363,12 +363,12 @@ def test_distance_to_point_l1(cell):
         expected.append(d)
 
     # the computed L1 distance agrees with the L2 distance for points in front of facets
-    parent_distance = cell.distance_to_point_l1(pts)
+    parent_distance = cell.distance_to_point_l1(pts, rescale=True)
     assert numpy.allclose(parent_distance, expected)
 
     # assert that the subcell measures the same distance as the parent
     for i in top[dim]:
-        subcell_distance = A.distance_to_point_l1(pts, entity=(dim, i))
+        subcell_distance = A.distance_to_point_l1(pts, entity=(dim, i), rescale=True)
         assert numpy.isclose(subcell_distance[i], expected[i])
         assert all(subcell_distance[:i] > expected[:i])
         assert all(subcell_distance[i+1:] > expected[i+1:])
