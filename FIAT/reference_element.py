@@ -512,23 +512,42 @@ class SimplicialComplex(Cell):
         spatial dimension."""
         return self.get_spatial_dimension()
 
-    def compute_barycentric_coordinates(self, points, entity=None):
+    def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
         """Returns the barycentric coordinates of a list of points on an
         entity."""
+        if len(points) == 0:
+            return points
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         entity_dim, entity_id = entity
         top = self.get_topology()
         verts = self.get_vertices_of_subcomplex(top[entity_dim][entity_id])
-        A = numpy.transpose(verts)
-        B = numpy.transpose(points)
-        B = B - A[:, :1]
-        A = A[:, 1:] - A[:, :1]
-        if A.shape[0] != A.shape[1]:
-            # Form normal equations
-            B = numpy.dot(A.T, B)
-            A = numpy.dot(A.T, A)
-        return numpy.linalg.solve(A, B).T
+        if rescale:
+            # rescale barycentric coordinates by the height wrt. to the facet
+            ref_verts = numpy.eye(entity_dim + 1)
+            A, b = make_affine_mapping(verts, ref_verts)
+            h = 1 / numpy.linalg.norm(A, axis=1)
+            b *= h
+            A *= h[:, None]
+            bary = numpy.dot(points, A.T)
+            for _ in bary.shape[:-1]:
+                b = b[None, ...]
+            bary += b
+        else:
+            A = numpy.transpose(verts)
+            B = numpy.transpose(points)
+            b = A[:, 0]
+            for _ in B.shape[1:]:
+                b = b[..., None]
+            B -= b
+            A = A[:, 1:] - A[:, :1]
+            if A.shape[0] != A.shape[1]:
+                # Form normal equations
+                B = numpy.dot(A.T, B)
+                A = numpy.dot(A.T, A)
+            bary = numpy.linalg.solve(A, B).T
+            bary = numpy.concatenate((1-numpy.sum(bary, axis=-1, keepdims=True), bary), axis=-1)
+        return bary
 
     def distance_to_point_l1(self, points, entity=None, rescale=False):
         # noqa: D301
@@ -657,30 +676,8 @@ class SimplicialComplex(Cell):
         actual distance to the tetrahedron.
 
         """
-        if entity is None:
-            entity = (self.get_spatial_dimension(), 0)
-        dim, entity_id = entity
-        ref_verts = numpy.zeros((dim + 1, dim))
-        ref_verts[range(1, dim + 1), range(dim)] = 1.0
-
-        top = self.get_topology()
-        verts = self.get_vertices_of_subcomplex(top[dim][entity_id])
-        A, b = make_affine_mapping(verts, ref_verts)
-        A = numpy.vstack((-numpy.sum(A, axis=0), A))
-        b = numpy.hstack((1-numpy.sum(b, axis=0), b))
-        if rescale:
-            # rescale barycentric coordinates by the height wrt. to the facet
-            h = 1 / numpy.linalg.norm(A, axis=1)
-            b *= h
-            A *= h[:, None]
-        if len(points) == 0:
-            bary = points
-        else:
-            bary = numpy.dot(points, A.T)
-            for _ in bary.shape[:-1]:
-                b = b[None, ...]
-            bary += b
         # sum the negative part of each barycentric coordinate
+        bary = self.compute_barycentric_coordinates(points, entity=entity, rescale=rescale)
         return 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
 
     def contains_point(self, point, epsilon=0.0, entity=None):
