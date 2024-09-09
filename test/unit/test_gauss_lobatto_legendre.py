@@ -66,7 +66,7 @@ def test_edge_dofs(dim, degree):
     for entity in edge_dofs:
         if len(edge_dofs[entity]) > 0:
             transform = s.get_entity_transform(1, entity)
-            assert np.allclose(points[edge_dofs[entity]], np.array(list(map(transform, quadrature_points))))
+            assert np.allclose(points[edge_dofs[entity]], transform(quadrature_points))
 
 
 @pytest.mark.parametrize("dim, degree", [(1, 64), (2, 16), (3, 16)])

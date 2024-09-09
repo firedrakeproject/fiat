@@ -43,7 +43,7 @@ def test_split_make_points(split, cell, degree, variant):
         for entity in top[i]:
             pts_entity = split_cell.make_points(i, entity, degree, variant=variant)
             mapping = split_cell.get_entity_transform(i, entity)
-            mapped_pts = list(map(mapping, pts_ref))
+            mapped_pts = mapping(pts_ref)
             assert numpy.allclose(mapped_pts, pts_entity)
 
 

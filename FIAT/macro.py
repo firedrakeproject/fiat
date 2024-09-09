@@ -116,7 +116,7 @@ class SplitSimplicialComplex(SimplicialComplex):
                     # sort children lexicographically
                     pts = [tuple(numpy.average([vertices[i] for i in topology[cdim][centity]], 0))
                            for cdim, centity in children]
-                    bary = parent.compute_barycentric_coordinates(pts, entity=(dim, entity))[:, 1:]
+                    bary = parent.compute_barycentric_coordinates(pts, entity=(dim, entity))
                     order = numpy.lexsort(bary.T)
                     children = tuple(children[j] for j in order)
                 else:

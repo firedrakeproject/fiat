@@ -242,17 +242,6 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
-def apply_mapping(A, b, pts):
-    """Apply an affine mapping to a column-stacked array of points."""
-    if len(pts) == 0:
-        return pts
-    result = numpy.dot(A, pts)
-    for _ in result.shape[1:]:
-        b = b[..., None]
-    result += b
-    return result
-
-
 class ExpansionSet(object):
     def __new__(cls, *args, **kwargs):
         """Returns an ExpansionSet instance appropriate for the given
@@ -318,7 +307,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
-        ref_pts = apply_mapping(A, b, numpy.transpose(pts))
+        ref_pts = numpy.add(numpy.dot(pts, A.T), b).T
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
 
@@ -407,7 +396,7 @@ class ExpansionSet(object):
         """
         sd = self.ref_el.get_spatial_dimension()
         transform = self.ref_el.get_entity_transform(sd-1, facet)
-        pts = numpy.array(list(map(transform, ref_pts)))
+        pts = transform(ref_pts)
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
         cell_node_map = self.get_cell_node_map(n)
 
@@ -553,7 +542,7 @@ class LineExpansionSet(ExpansionSet):
 
         A, b = self.affine_mappings[cell]
         Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
-        xs = apply_mapping(A, b, numpy.transpose(pts)).T
+        xs = numpy.add(numpy.dot(pts, A.T), b)
         results = {}
         scale = self.get_scale(cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):

@@ -169,7 +169,7 @@ class Serendipity(FiniteElement):
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        points = list(map(transform, points))
+        points = transform(points)
 
         phivals = {}
         dim = self.flat_el.get_spatial_dimension()
@@ -177,7 +177,6 @@ class Serendipity(FiniteElement):
             raise NotImplementedError('no tabulate method for serendipity elements of dimension 1 or less.')
         if dim >= 4:
             raise NotImplementedError('tabulate does not support higher dimensions than 3.')
-        points = np.asarray(points)
         npoints, pointdim = points.shape
         for o in range(order + 1):
             alphas = mis(dim, o)

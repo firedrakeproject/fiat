@@ -131,7 +131,7 @@ class TrimmedSerendipity(FiniteElement):
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        points = list(map(transform, points))
+        points = transform(points)
 
         phivals = {}
 

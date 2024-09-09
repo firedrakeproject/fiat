@@ -377,9 +377,8 @@ class SimplicialComplex(Cell):
         of dimension dim.  Returns a (possibly empty) list.
         These tangents are *NOT* normalized to have unit length."""
         t = self.get_topology()
-        vs = list(map(numpy.array, self.get_vertices_of_subcomplex(t[dim][i])))
-        ts = [v - vs[0] for v in vs[1:]]
-        return ts
+        vs = numpy.array(self.get_vertices_of_subcomplex(t[dim][i]))
+        return vs[1:] - vs[:1]
 
     def compute_normalized_tangents(self, dim, i):
         """Computes tangents in any dimension based on differences
@@ -387,19 +386,21 @@ class SimplicialComplex(Cell):
         of dimension dim.  Returns a (possibly empty) list.
         These tangents are normalized to have unit length."""
         ts = self.compute_tangents(dim, i)
-        return [t / numpy.linalg.norm(t) for t in ts]
+        ts /= numpy.linalg.norm(ts, axis=0)[None, :]
+        return ts
 
     def compute_edge_tangent(self, edge_i):
         """Computes the nonnormalized tangent to a 1-dimensional facet.
         returns a single vector."""
         t = self.get_topology()
-        (v0, v1) = self.get_vertices_of_subcomplex(t[1][edge_i])
-        return numpy.array(v1) - numpy.array(v0)
+        vs = numpy.asarray(self.get_vertices_of_subcomplex(t[1][edge_i]))
+        return vs[1] - vs[0]
 
     def compute_normalized_edge_tangent(self, edge_i):
         """Computes the unit tangent vector to a 1-dimensional facet"""
         v = self.compute_edge_tangent(edge_i)
-        return v / numpy.linalg.norm(v)
+        v /= numpy.linalg.norm(v)
+        return v
 
     def compute_face_tangents(self, face_i):
         """Computes the two tangents to a face.  Only implemented
@@ -407,9 +408,8 @@ class SimplicialComplex(Cell):
         if self.get_spatial_dimension() != 3:
             raise Exception("can't get face tangents yet")
         t = self.get_topology()
-        (v0, v1, v2) = list(map(numpy.array,
-                                self.get_vertices_of_subcomplex(t[2][face_i])))
-        return (v1 - v0, v2 - v0)
+        vs = numpy.asarray(self.get_vertices_of_subcomplex(t[2][face_i]))
+        return vs[1:] - vs[:1]
 
     def compute_face_edge_tangents(self, dim, entity_id):
         """Computes all the edge tangents of any k-face with k>=1.
@@ -417,13 +417,14 @@ class SimplicialComplex(Cell):
         This agrees with `compute_edge_tangent` when dim=1.
         """
         vert_ids = self.get_topology()[dim][entity_id]
-        vert_coords = [numpy.array(x)
-                       for x in self.get_vertices_of_subcomplex(vert_ids)]
-        edge_ts = []
+        vert_coords = numpy.asarray(self.get_vertices_of_subcomplex(vert_ids))
+        v0 = []
+        v1 = []
         for source in range(dim):
             for dest in range(source + 1, dim + 1):
-                edge_ts.append(vert_coords[dest] - vert_coords[source])
-        return edge_ts
+                v0.append(source)
+                v1.append(dest)
+        return vert_coords[v1] - vert_coords[v0]
 
     def make_points(self, dim, entity_id, order, variant=None):
         """Constructs a lattice of points on the entity_id:th
@@ -476,36 +477,33 @@ class SimplicialComplex(Cell):
         if dim == 0:
             # Special case vertices.
             i, = topology[dim][entity]
-            vertex = self.get_vertices()[i]
-            return lambda point: vertex
+            offset = numpy.asarray(self.get_vertices()[i])
+            C = numpy.zeros((dim, ) + offset.shape)
         elif dim == celldim and len(self.topology[celldim]) == 1:
             assert entity == 0
-            return lambda point: point
-
-        try:
+            return lambda x: x
+        else:
             subcell = self.construct_subelement(dim)
-        except NotImplementedError:
-            # Special case for 1D elements.
-            x_c, = self.get_vertices_of_subcomplex(topology[0][entity])
-            return lambda x: x_c
+            subdim = subcell.get_spatial_dimension()
+            assert subdim == celldim - codim
 
-        subdim = subcell.get_spatial_dimension()
+            # Entity vertices in entity space.
+            v_e = numpy.asarray(subcell.get_vertices())
+            A = v_e[1:] - v_e[:1]
 
-        assert subdim == celldim - codim
+            # Entity vertices in cell space.
+            v_c = numpy.asarray(self.get_vertices_of_subcomplex(topology[dim][entity]))
+            B = v_c[1:] - v_c[:1]
 
-        # Entity vertices in entity space.
-        v_e = numpy.asarray(subcell.get_vertices())
-        A = v_e[1:] - v_e[:1]
+            C = numpy.linalg.solve(A, B)
 
-        # Entity vertices in cell space.
-        v_c = numpy.asarray(self.get_vertices_of_subcomplex(topology[dim][entity]))
-        B = v_c[1:] - v_c[:1]
+            offset = v_c[0] - numpy.dot(v_e[0], C)
 
-        C = numpy.linalg.solve(A, B).T
+        def transform(point):
+            out = numpy.dot(point, C)
+            return numpy.add(out, offset, out=out)
 
-        offset = v_c[0] - C.dot(v_e[0])
-
-        return lambda x: offset + C.dot(x)
+        return transform
 
     def get_dimension(self):
         """Returns the subelement dimension of the cell.  Same as the
@@ -522,32 +520,24 @@ class SimplicialComplex(Cell):
         entity_dim, entity_id = entity
         top = self.get_topology()
         verts = self.get_vertices_of_subcomplex(top[entity_dim][entity_id])
-        if rescale:
-            # rescale barycentric coordinates by the height wrt. to the facet
+        if entity_dim == self.get_spatial_dimension():
             ref_verts = numpy.eye(entity_dim + 1)
             A, b = make_affine_mapping(verts, ref_verts)
+        else:
+            v = numpy.transpose(verts)
+            v = v[:, 1:] - v[:, :1]
+            A = numpy.linalg.solve(numpy.dot(v.T, v), v.T)
+            b = -numpy.dot(A, verts[0])
+            A = numpy.vstack((-numpy.sum(A, axis=0), A))
+            b = numpy.hstack((1 - numpy.sum(b, axis=0), b))
+
+        if rescale:
+            # rescale barycentric coordinates by the height wrt. to the facet
             h = 1 / numpy.linalg.norm(A, axis=1)
             b *= h
             A *= h[:, None]
-            bary = numpy.dot(points, A.T)
-            for _ in bary.shape[:-1]:
-                b = b[None, ...]
-            bary += b
-        else:
-            A = numpy.transpose(verts)
-            B = numpy.transpose(points)
-            b = A[:, 0]
-            for _ in B.shape[1:]:
-                b = b[..., None]
-            B -= b
-            A = A[:, 1:] - A[:, :1]
-            if A.shape[0] != A.shape[1]:
-                # Form normal equations
-                B = numpy.dot(A.T, B)
-                A = numpy.dot(A.T, A)
-            bary = numpy.linalg.solve(A, B).T
-            bary = numpy.concatenate((1-numpy.sum(bary, axis=-1, keepdims=True), bary), axis=-1)
-        return bary
+        out = numpy.dot(points, A.T)
+        return numpy.add(out, b, out=out)
 
     def distance_to_point_l1(self, points, entity=None, rescale=False):
         # noqa: D301
@@ -1049,8 +1039,10 @@ class TensorProductCell(Cell):
         slices = TensorProductCell._split_slices(dim)
 
         def transform(point):
-            return list(chain(*[t(point[s])
-                                for t, s in zip(sct, slices)]))
+            point = numpy.asarray(point)
+            return numpy.concatenate(tuple(t(point[..., s])
+                                     for t, s in zip(sct, slices)), axis=-1)
+
         return transform
 
     def volume(self):
@@ -1097,7 +1089,7 @@ class TensorProductCell(Cell):
                        for c, s in zip(self.cells, point_slices)),
                       True)
 
-    def distance_to_point_l1(self, point):
+    def distance_to_point_l1(self, point, rescale=False):
         """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
         distance) to a point with 0.0 if the point is inside the cell.
 
@@ -1105,7 +1097,8 @@ class TensorProductCell(Cell):
         subcell_dimensions = self.get_dimension()
         assert len(point) == sum(subcell_dimensions)
         point_slices = TensorProductCell._split_slices(subcell_dimensions)
-        return sum(c.distance_to_point_l1(point[s])
+        point = numpy.asarray(point)
+        return sum(c.distance_to_point_l1(point[..., s], rescale=rescale)
                    for c, s in zip(self.cells, point_slices))
 
     def symmetry_group_size(self, dim):
@@ -1252,12 +1245,12 @@ class UFCQuadrilateral(Cell):
         """
         return self.product.contains_point(point, epsilon=epsilon)
 
-    def distance_to_point_l1(self, point):
+    def distance_to_point_l1(self, point, rescale=False):
         """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
         distance) to a point with 0.0 if the point is inside the cell.
 
         For more information see the docstring for the UFCSimplex method."""
-        return self.product.distance_to_point_l1(point)
+        return self.product.distance_to_point_l1(point, rescale=rescale)
 
     def symmetry_group_size(self, dim):
         return [1, 2, 8][dim]
@@ -1357,12 +1350,12 @@ class UFCHexahedron(Cell):
         """
         return self.product.contains_point(point, epsilon=epsilon)
 
-    def distance_to_point_l1(self, point):
+    def distance_to_point_l1(self, point, rescale=False):
         """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
         distance) to a point with 0.0 if the point is inside the cell.
 
         For more information see the docstring for the UFCSimplex method."""
-        return self.product.distance_to_point_l1(point)
+        return self.product.distance_to_point_l1(point, rescale=rescale)
 
     def symmetry_group_size(self, dim):
         return [1, 2, 8, 48][dim]
