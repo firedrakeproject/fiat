@@ -258,7 +258,7 @@ def lexsort_nodes(ref_el, nodes, entity=None, offset=0):
         for node in nodes:
             pt, = node.get_point_dict()
             pts.append(pt)
-        bary = ref_el.compute_barycentric_coordinates(pts, entity=entity)
+        bary = ref_el.compute_barycentric_coordinates(pts)
         order = list(offset + numpy.lexsort(bary.T))
     else:
         order = list(range(offset, offset + len(nodes)))

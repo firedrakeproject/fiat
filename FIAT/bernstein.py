@@ -80,7 +80,7 @@ class Bernstein(FiniteElement):
 
         entity_dim, entity_id = entity
         entity_transform = ref_el.get_entity_transform(entity_dim, entity_id)
-        cell_points = list(map(entity_transform, points))
+        cell_points = entity_transform(points)
 
         # Construct Cartesian to Barycentric coordinate mapping
         vs = numpy.asarray(ref_el.get_vertices())

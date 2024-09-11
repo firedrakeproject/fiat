@@ -43,7 +43,7 @@ def test_split_make_points(split, cell, degree, variant):
         for entity in top[i]:
             pts_entity = split_cell.make_points(i, entity, degree, variant=variant)
             mapping = split_cell.get_entity_transform(i, entity)
-            mapped_pts = list(map(mapping, pts_ref))
+            mapped_pts = mapping(pts_ref)
             assert numpy.allclose(mapped_pts, pts_entity)
 
 
@@ -341,6 +341,37 @@ def test_Ck_basis(cell, order, degree, variant):
         Uvals = U._tabulate_on_cell(degree, verts, 0, cell=cell)[(0,)*sd]
         local_phis = numpy.dot(coeffs[:, cell_node_map[cell]], Uvals)
         assert numpy.allclose(local_phis, phis[:, ipts])
+
+
+def test_distance_to_point_l1(cell):
+    A = AlfeldSplit(cell)
+    dim = A.get_spatial_dimension()
+    top = A.get_topology()
+    p0, = cell.make_points(dim, 0, dim+1)
+
+    # construct one point in front of each facet
+    pts = []
+    expected = []
+    parent_top = cell.get_topology()
+    for i in parent_top[dim-1]:
+        Fi, = numpy.asarray(cell.make_points(dim-1, i, dim))
+        n = cell.compute_normal(i)
+        n *= numpy.dot(n, Fi - p0)
+        n /= numpy.linalg.norm(n)
+        d = 0.222 + i/10
+        pts.append(Fi + d * n)
+        expected.append(d)
+
+    # the computed L1 distance agrees with the L2 distance for points in front of facets
+    parent_distance = cell.distance_to_point_l1(pts, rescale=True)
+    assert numpy.allclose(parent_distance, expected)
+
+    # assert that the subcell measures the same distance as the parent
+    for i in top[dim]:
+        subcell_distance = A.distance_to_point_l1(pts, entity=(dim, i), rescale=True)
+        assert numpy.isclose(subcell_distance[i], expected[i])
+        assert all(subcell_distance[:i] > expected[:i])
+        assert all(subcell_distance[i+1:] > expected[i+1:])
 
 
 @pytest.mark.parametrize("element", (DiscontinuousLagrange, Lagrange))
