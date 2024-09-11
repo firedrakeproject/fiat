@@ -40,6 +40,10 @@ class RestrictedDualSet(DualSet):
         # Call get_indices on the parent class to support multiple restriction domains
         return type(self._dual).get_indices(self, restriction_domain, take_closure=take_closure)
 
+    def __getattr__(self, name):
+        val = getattr(self._dual, name)
+        return val
+
 
 class RestrictedElement(CiarletElement):
     """Restrict the given element to the specified list of dofs."""

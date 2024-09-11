@@ -9,7 +9,7 @@
 import numpy
 import scipy
 
-from FIAT import finite_element, dual_set, functional, P0
+from FIAT import finite_element, dual_set, functional, P0, demkowicz
 from FIAT.reference_element import symmetric_simplex
 from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.quadrature import FacetQuadratureRule
@@ -57,7 +57,7 @@ class Legendre(finite_element.CiarletElement):
     def __new__(cls, ref_el, degree, variant=None):
         if degree == 0:
             splitting, _ = parse_lagrange_variant(variant, integral=True)
-            if splitting is None:
+            if splitting is None and not ref_el.is_macrocell():
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0.P0(ref_el)
         return super(Legendre, cls).__new__(cls)
@@ -67,7 +67,12 @@ class Legendre(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
         poly_set = ONPolynomialSet(ref_el, degree)
-        dual = LegendreDual(ref_el, degree)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "L2")
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "L2", type(self))
+        else:
+            dual = LegendreDual(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super(Legendre, self).__init__(poly_set, dual, degree, formdegree)
 
@@ -138,6 +143,11 @@ class IntegratedLegendre(finite_element.CiarletElement):
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
-        dual = IntegratedLegendreDual(ref_el, degree)
+        if variant == "demkowicz":
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "H1")
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "H1", type(self))
+        else:
+            dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
         super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)
