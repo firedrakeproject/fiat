@@ -269,6 +269,16 @@ class PointNormalSecondDerivative(Functional):
         Functional.__init__(self, ref_el, tuple(), {}, dpt_dict, "PointNormalDeriv")
 
 
+class PointDivergence(Functional):
+    """Class representing point divergence of vector
+    functions at a particular point x."""
+
+    def __init__(self, ref_el, x):
+        dpt_dict = {x: [(1.0, alpha, (alpha.index(1),)) for alpha in polynomial_set.mis(len(x), 1)]}
+
+        Functional.__init__(self, ref_el, (len(x),), {}, dpt_dict, "PointDiv")
+
+
 class IntegralMoment(Functional):
     """Functional representing integral of the input against some tabulated function f.
 

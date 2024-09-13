@@ -45,6 +45,9 @@ from FIAT.hdivcurl import Hdiv, Hcurl                           # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
+from FIAT.alfeld_sorokina import AlfeldSorokina                 # noqa: F401
+from FIAT.hct import HsiehCloughTocher                          # noqa: F401
+from FIAT.johnson_mercier import JohnsonMercier                 # noqa: F401
 from FIAT.bubble import Bubble
 from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
@@ -299,6 +302,16 @@ elements = [
     "CubicHermite(S)",
     "Morley(T)",
 
+    # Macroelements
+    "Lagrange(T, 1, 'iso')",
+    "Lagrange(T, 1, 'alfeld')",
+    "Lagrange(T, 2, 'alfeld')",
+    "DiscontinuousLagrange(T, 1, 'alfeld')",
+    "HsiehCloughTocher(T)",
+    "JohnsonMercier(T)",
+    "JohnsonMercier(S)",
+    "AlfeldSorokina(T)",
+
     # MixedElement made of nodal elements should be nodal, but its API
     # is currently just broken.
     xfail_impl("MixedElement(["
@@ -351,7 +364,7 @@ def test_nodality(element):
     # Fetch primal and dual basis
     poly_set = element.get_nodal_basis()
     dual_set = element.get_dual_set()
-    assert poly_set.get_reference_element() == dual_set.get_reference_element()
+    assert poly_set.get_reference_element() >= dual_set.get_reference_element()
 
     # Get coeffs of primal and dual bases w.r.t. expansion set
     coeffs_poly = poly_set.get_coeffs()

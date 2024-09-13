@@ -1,6 +1,6 @@
 import re
 
-from FIAT.macro import AlfeldSplit, IsoSplit
+from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit
 
 # dicts mapping Lagrange variant names to recursivenodes family names
 supported_cg_variants = {
@@ -44,7 +44,7 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
     variant may be a single option or comma-separated pair
     indicating the dof type (integral, equispaced, spectral, etc)
-    and the type of splitting to give a macro-element (Alfeld, iso)
+    and the type of splitting to give a macro-element (Alfeld, Powell-Sabin, iso)
     """
     if variant is None:
         variant = "integral" if integral else "equispaced"
@@ -68,6 +68,8 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
         opt = pre_opt.lower()
         if opt == "alfeld":
             splitting = AlfeldSplit
+        elif opt == "powell-sabin":
+            splitting = PowellSabinSplit
         elif opt == "iso":
             splitting = IsoSplit
         elif opt.startswith("iso"):

@@ -452,7 +452,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
                 num_sv = len([s for s in sig if abs(s) > tol])
                 coeffs = numpy.dot(vt[num_sv:], coeffs)
 
-        if shape != tuple():
+        if shape != ():
             m, n = coeffs.shape
             coeffs = coeffs.reshape((m,) + (1,)*len(shape) + (n,))
             coeffs = numpy.tile(coeffs, (1,) + shape + (1,))
@@ -499,7 +499,7 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
                 rows.append(numpy.tensordot(wn, jump, axes=(ax, ax)))
 
         if len(rows) > 0:
-            dual_mat = numpy.row_stack(rows)
+            dual_mat = numpy.vstack(rows)
             _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
             num_sv = len([s for s in sig if abs(s) > 1.e-10])
             coeffs = numpy.tensordot(vt[num_sv:], coeffs, axes=(1, 0))
