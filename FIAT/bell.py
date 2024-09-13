@@ -53,7 +53,7 @@ class BellDualSet(dual_set.DualSet):
         from FIAT.jacobi import eval_jacobi
         rline = ufc_simplex(1)
         q1d = create_quadrature(rline, 8)
-        q1dpts = q1d.get_points()
+        q1dpts = q1d.get_points()[:, 0]
         leg4_at_qpts = eval_jacobi(0, 0, 4, 2.0*q1dpts - 1)
 
         imond = functional.IntegralMomentOfNormalDerivative
