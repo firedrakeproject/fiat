@@ -50,7 +50,7 @@ def C0DivPolynomialSet(ref_complex, degree):
 
 
 class AlfeldSorokinaDualSet(dual_set.DualSet):
-    def __init__(self, ref_complex, degree):
+    def __init__(self, ref_complex, degree, reduced=False):
         if degree != 2:
             raise ValueError("Alfeld-Sorokina only defined for degree = 2")
         ref_el = ref_complex.get_parent()
@@ -61,30 +61,35 @@ class AlfeldSorokinaDualSet(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
         nodes = []
-        dim = 0
-        for entity in sorted(top[dim]):
-            pt, = ref_el.make_points(dim, entity, degree)
-            cur = len(nodes)
-            nodes.append(PointDivergence(ref_el, pt))
-            nodes.extend(ComponentPointEvaluation(ref_el, k, (sd,), pt)
-                         for k in range(sd))
-            entity_ids[dim][entity].extend(range(cur, len(nodes)))
+        dims = (0,) if reduced else (0, 1)
+        for dim in dims:
+            for entity in sorted(top[dim]):
+                cur = len(nodes)
+                pts = ref_el.make_points(dim, entity, degree)
+                if dim == 0:
+                    pt, = pts
+                    nodes.append(PointDivergence(ref_el, pt))
+                nodes.extend(ComponentPointEvaluation(ref_el, k, (sd,), pt)
+                             for pt in pts for k in range(sd))
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-        dim = 1
-        facet = ref_el.construct_subelement(dim)
-        q = degree - 2
-        Q_ref = create_quadrature(facet, degree + q)
-        Pq = polynomial_set.ONPolynomialSet(facet, q)
-        Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
-        for entity in sorted(top[dim]):
-            cur = len(nodes)
-            Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-            n = ref_el.compute_normal(entity)
-            ts = ref_el.compute_tangents(dim, entity)
-            uvecs = (n, *ts)
-            nodes.extend(FrobeniusIntegralMoment(ref_el, Q, uvec[:, None] * phi[None, :])
-                         for phi in Pq_at_qpts for uvec in uvecs)
-            entity_ids[dim][entity].extend(range(cur, len(nodes)))
+        if reduced:
+            dim = 1
+            facet = ref_el.construct_subelement(dim)
+            q = degree - 2
+            Q_ref = create_quadrature(facet, degree + q)
+            Pq = polynomial_set.ONPolynomialSet(facet, q)
+            Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
+            for entity in sorted(top[dim]):
+                cur = len(nodes)
+                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+                Jdet = Q.jacobian_determinant()
+                n = ref_el.compute_normal(entity)
+                ts = ref_el.compute_tangents(dim, entity)
+                comps = (n, *ts)
+                nodes.extend(FrobeniusIntegralMoment(ref_el, Q, comp[:, None]*phi[None, :]/Jdet)
+                             for phi in Pq_at_qpts for comp in comps)
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         super(AlfeldSorokinaDualSet, self).__init__(nodes, ref_el, entity_ids)
 
