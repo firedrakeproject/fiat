@@ -343,6 +343,29 @@ def test_Ck_basis(cell, order, degree, variant):
         assert numpy.allclose(local_phis, phis[:, ipts])
 
 
+@pytest.mark.parametrize("degree", (2, 4))
+def test_C0DivPolynomialSet(cell, degree):
+    # Test that the derivative of the C0DivPolynomialSet is spanned by a C0 basis
+    from FIAT.alfeld_sorokina import C0DivPolynomialSet
+    A = AlfeldSplit(cell)
+    top = A.get_topology()
+    sd = A.get_spatial_dimension()
+
+    pts = []
+    for dim in top:
+        for entity in top[dim]:
+            pts.extend(A.make_points(dim, entity, degree))
+
+    Pdiv = C0DivPolynomialSet(A, degree)
+    tab = Pdiv.tabulate(pts, 1)
+    div_tab = sum(tab[alpha][:, alpha.index(1), :] for alpha in tab if sum(alpha) == 1)
+
+    P = CkPolynomialSet(A, degree-1, order=0, variant="bubble")
+    P_tab = P.tabulate(pts)[(0,)*sd]
+    _, residual, *_ = numpy.linalg.lstsq(P_tab.T, div_tab.T)
+    assert numpy.allclose(residual, 0)
+
+
 def test_distance_to_point_l1(cell):
     A = AlfeldSplit(cell)
     dim = A.get_spatial_dimension()

@@ -26,7 +26,7 @@ def C0DivPolynomialSet(ref_complex, degree):
     coeffs = P.get_coeffs()
 
     facet_el = ref_complex.construct_subelement(sd-1)
-    phi = polynomial_set.ONPolynomialSet(facet_el, degree-1)
+    phi = polynomial_set.ONPolynomialSet(facet_el, 0 if sd == 1 else degree-1)
     Q = create_quadrature(facet_el, 2 * phi.degree)
     qpts, qwts = Q.get_points(), Q.get_weights()
     phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
@@ -75,8 +75,8 @@ class AlfeldSorokinaDualSet(dual_set.DualSet):
 
         if reduced:
             dim = 1
-            facet = ref_el.construct_subelement(dim)
             q = degree - 2
+            facet = ref_el.construct_subelement(dim)
             Q_ref = create_quadrature(facet, degree + q)
             Pq = polynomial_set.ONPolynomialSet(facet, q)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
