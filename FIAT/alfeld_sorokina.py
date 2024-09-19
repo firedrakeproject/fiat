@@ -6,8 +6,8 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-from FIAT.functional import ComponentPointEvaluation, PointDivergence, FrobeniusIntegralMoment
 from FIAT import finite_element, dual_set, macro, polynomial_set
+from FIAT.functional import ComponentPointEvaluation, PointDivergence, FrobeniusIntegralMoment
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
@@ -15,9 +15,10 @@ from FIAT.quadrature import FacetQuadratureRule
 import numpy
 
 
-def C0DivPolynomialSet(ref_complex, degree):
+def AlfeldSorokinaSpace(ref_el, degree):
     """Return a vector-valued C^0 PolynomialSet whose divergence is also C^0.
     """
+    ref_complex = macro.AlfeldSplit(ref_el)
     sd = ref_complex.get_spatial_dimension()
     shp = (sd,)
     P = polynomial_set.ONPolynomialSet(ref_complex, degree, shape=shp, variant="bubble")
@@ -50,10 +51,9 @@ def C0DivPolynomialSet(ref_complex, degree):
 
 
 class AlfeldSorokinaDualSet(dual_set.DualSet):
-    def __init__(self, ref_complex, degree, reduced=False):
+    def __init__(self, ref_el, degree, reduced=False):
         if degree != 2:
             raise ValueError("Alfeld-Sorokina only defined for degree = 2")
-        ref_el = ref_complex.get_parent()
         if ref_el.get_shape() != TRIANGLE:
             raise ValueError("Alfeld-Sorokina only defined on triangles")
         top = ref_el.get_topology()
@@ -79,7 +79,7 @@ class AlfeldSorokinaDualSet(dual_set.DualSet):
             facet = ref_el.construct_subelement(dim)
             Q_ref = create_quadrature(facet, degree + q)
             Pq = polynomial_set.ONPolynomialSet(facet, q)
-            Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
+            Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*dim]
             for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
@@ -97,9 +97,8 @@ class AlfeldSorokinaDualSet(dual_set.DualSet):
 class AlfeldSorokina(finite_element.CiarletElement):
     """The Alfeld-Sorokina macroelement."""
     def __init__(self, ref_el, degree=2):
-        ref_complex = macro.AlfeldSplit(ref_el)
-        dual = AlfeldSorokinaDualSet(ref_complex, degree)
-        poly_set = C0DivPolynomialSet(ref_complex, degree)
+        dual = AlfeldSorokinaDualSet(ref_el, degree)
+        poly_set = AlfeldSorokinaSpace(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super(AlfeldSorokina, self).__init__(poly_set, dual, degree, formdegree,
                                              mapping="contravariant piola")

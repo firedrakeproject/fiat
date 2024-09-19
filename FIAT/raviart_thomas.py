@@ -15,7 +15,7 @@ from FIAT.quadrature import FacetQuadratureRule
 
 
 def RTSpace(ref_el, degree):
-    """Constructs a basis for the the Raviart-Thomas space
+    """Constructs a basis for the Raviart-Thomas space
     (P_{degree-1})^d + P_{degree-1} x"""
     sd = ref_el.get_spatial_dimension()
 

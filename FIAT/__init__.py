@@ -11,6 +11,7 @@ from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.hct import HsiehCloughTocher
 from FIAT.alfeld_sorokina import AlfeldSorokina
+from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
@@ -82,6 +83,7 @@ supported_elements = {"Argyris": Argyris,
                       "Hermite": CubicHermite,
                       "HsiehCloughTocher": HsiehCloughTocher,
                       "AlfeldSorokina": AlfeldSorokina,
+                      "ChristiansenHu": ChristiansenHu,
                       "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,

@@ -3,7 +3,10 @@ import numpy
 
 from FIAT import HsiehCloughTocher as HCT
 from FIAT import AlfeldSorokina as AS
+from FIAT import ChristiansenHu as CH
 from FIAT import Lagrange as CG
+from FIAT import DiscontinuousLagrange as DG
+from FIAT.restricted import RestrictedElement
 from FIAT.reference_element import ufc_simplex, make_lattice
 from FIAT.functional import PointEvaluation
 
@@ -37,13 +40,19 @@ def test_hct_constant(cell, reduced):
         assert numpy.allclose(vals, expected)
 
 
-def test_stokes_complex(cell):
+@pytest.mark.parametrize("reduced", (False, True))
+def test_stokes_complex(cell, reduced):
     # Test that we have the lowest-order discrete Stokes complex
     # HCT(3) -curl-> AS(2) -div-> CG(1, Alfeld)
-    H2 = HCT(cell)
-    H1 = AS(cell)
+    H2 = HCT(cell, reduced=reduced)
     ref_complex = H2.get_reference_complex()
-    L2 = CG(ref_complex, 1)
+    if reduced:
+        H2 = RestrictedElement(H2, restriction_domain="vertex")
+        H1 = CH(cell)
+        L2 = DG(cell, 0)
+    else:
+        H1 = AS(cell)
+        L2 = CG(ref_complex, 1)
 
     pts = []
     top = ref_complex.get_topology()
