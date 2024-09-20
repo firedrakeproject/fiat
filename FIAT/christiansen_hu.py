@@ -5,12 +5,12 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
 from FIAT import finite_element, dual_set, polynomial_set
-from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
+from FIAT.functional import ComponentPointEvaluation, IntegralMomentOfScaledNormalEvaluation
 from FIAT.hct import HsiehCloughTocher
 from FIAT.restricted import RestrictedElement
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
+from FIAT.jacobi import eval_jacobi
 
 import numpy
 
@@ -30,16 +30,18 @@ def ChristiansenHuSpace(ref_el, degree):
     tab = RHCT.tabulate(1, Qpts)
     curl_RHCT_at_Qpts = numpy.stack([tab[(0, 1)], -tab[(1, 0)]], axis=1)
 
-    Pk = polynomial_set.ONPolynomialSet(ref_complex, degree)
+    Pk = polynomial_set.ONPolynomialSet(ref_complex, degree, scale="orthonormal")
     Pk_at_Qpts = Pk.tabulate(Qpts)[(0,) * sd]
 
     x = Qpts.T
     P0x_at_Qpts = x[None, :, :]
 
     expansion_set = Pk.get_expansion_set()
-    duals = numpy.transpose(numpy.multiply(Pk_at_Qpts, Qwts))
-    pieces = [polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set, numpy.dot(T, duals))
+    duals = numpy.multiply(Pk_at_Qpts, Qwts)
+    pieces = [polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set,
+                                           numpy.dot(T, duals.T))
               for T in (curl_RHCT_at_Qpts, P0x_at_Qpts)]
+
     return polynomial_set.polynomial_set_union_normalized(*pieces)
 
 
@@ -63,18 +65,16 @@ class ChristiansenHuDualSet(dual_set.DualSet):
             entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         dim = 1
-        q = degree - 2
+        k = 2
         facet = ref_el.construct_subelement(dim)
-        Q_ref = create_quadrature(facet, degree + q)
-        Pq = polynomial_set.ONPolynomialSet(facet, q)
-        Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*dim]
+        Q = create_quadrature(facet, degree+k)
+        qpts = Q.get_points()
+        x, = qpts.T
+        xref = sum(x - v[0] for v in facet.get_vertices()) / facet.volume()
+        f_at_qpts = eval_jacobi(0, 0, k, xref)
         for entity in sorted(top[dim]):
             cur = len(nodes)
-            Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-            Jdet = Q.jacobian_determinant()
-            n = ref_el.compute_scaled_normal(entity) / Jdet
-            phis = n[None, :, None] * Pq_at_qpts[:, None, :]
-            nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
+            nodes.append(IntegralMomentOfScaledNormalEvaluation(ref_el, Q, f_at_qpts, entity))
             entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         super(ChristiansenHuDualSet, self).__init__(nodes, ref_el, entity_ids)

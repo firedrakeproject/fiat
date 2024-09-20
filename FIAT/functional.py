@@ -326,7 +326,7 @@ class IntegralMomentOfNormalDerivative(Functional):
 
         fmap = ref_el.get_entity_transform(sd-1, facet_no)
         qpts, qwts = Q.get_points(), Q.get_weights()
-        dpts = [fmap(pt) for pt in qpts]
+        dpts = fmap(qpts)
         self.dpts = dpts
 
         dpt_dict = OrderedDict()
@@ -350,7 +350,7 @@ class IntegralLegendreDirectionalMoment(Functional):
         legendre = numpy.polynomial.legendre.legval(2*Q.get_points()-1, [0]*mom_deg + [1])
         f_at_qpts = numpy.array([s*legendre[i] for i in range(quadpoints)])
         fmap = cell.get_entity_transform(sd-1, entity)
-        mappedqpts = [fmap(pt) for pt in Q.get_points()]
+        mappedqpts = fmap(Q.get_points())
         mappedQ = QuadratureRule(cell, mappedqpts, Q.get_weights())
         qwts = mappedQ.wts
         qpts = mappedQ.pts
@@ -401,7 +401,7 @@ class IntegralLegendreBidirectionalMoment(Functional):
 
         # Map the quadrature points
         fmap = cell.get_entity_transform(sd-1, entity)
-        mappedqpts = [fmap(pt) for pt in Q.get_points()]
+        mappedqpts = fmap(Q.get_points())
         mappedQ = QuadratureRule(cell, mappedqpts, Q.get_weights())
 
         pt_dict = OrderedDict()
@@ -549,7 +549,7 @@ class IntegralMomentOfEdgeTangentEvaluation(Functional):
         t = ref_el.compute_edge_tangent(edge)
         sd = ref_el.get_spatial_dimension()
         transform = ref_el.get_entity_transform(1, edge)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        pts = tuple(map(tuple, transform(Q.get_points())))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
@@ -593,7 +593,7 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
         transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        pts = tuple(map(tuple, transform(Q.get_points())))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
@@ -624,7 +624,7 @@ class MonkIntegralMoment(Functional):
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        pts = tuple(map(tuple, transform(Q.get_points())))
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
             pt_dict[pt] = [(wgt*phi[i], (i, )) for i in range(sd)]
         super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
@@ -663,7 +663,7 @@ class IntegralMomentOfScaledNormalEvaluation(Functional):
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
         transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        pts = tuple(map(tuple, transform(Q.get_points())))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
@@ -738,7 +738,7 @@ class IntegralMomentOfNormalEvaluation(Functional):
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
         transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        pts = tuple(map(tuple, transform(Q.get_points())))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
@@ -762,7 +762,7 @@ class IntegralMomentOfTangentialEvaluation(Functional):
         assert sd == 2
         t = ref_el.compute_edge_tangent(facet)
         transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        pts = tuple(map(tuple, transform(Q.get_points())))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):
@@ -785,7 +785,7 @@ class IntegralMomentOfNormalNormalEvaluation(Functional):
         n = ref_el.compute_scaled_normal(facet)
         sd = ref_el.get_spatial_dimension()
         transform = ref_el.get_entity_transform(sd - 1, facet)
-        pts = tuple(map(lambda p: tuple(transform(p)), Q.get_points()))
+        pts = tuple(map(tuple, transform(Q.get_points())))
         weights = Q.get_weights()
         pt_dict = OrderedDict()
         for pt, wgt, phi in zip(pts, weights, P_at_qpts):

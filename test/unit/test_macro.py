@@ -368,6 +368,32 @@ def test_AlfeldSorokinaSpace(cell, degree):
     assert numpy.allclose(residual, 0)
 
 
+def test_ChristiansenHuSpace():
+    # Test that the Christiansen-Hu space is C0
+    from FIAT.christiansen_hu import ChristiansenHuSpace
+
+    degree = 2
+    cell = ufc_simplex(2)
+    P1 = ChristiansenHuSpace(cell, degree)
+    A = P1.get_reference_element()
+    top = A.get_topology()
+    sd = A.get_spatial_dimension()
+
+    pts = []
+    for dim in top:
+        for entity in top[dim]:
+            pts.extend(A.make_points(dim, entity, degree))
+
+    P1_tab = P1.tabulate(pts, 1)[(0,)*sd]
+
+    P2 = CkPolynomialSet(A, degree, order=0, variant="bubble")
+    P2_tab = P2.tabulate(pts)[(0,)*sd]
+
+    for k in range(sd):
+        _, residual, *_ = numpy.linalg.lstsq(P2_tab.T, P1_tab[:, k, :].T)
+        assert numpy.allclose(residual, 0)
+
+
 def test_distance_to_point_l1(cell):
     A = AlfeldSplit(cell)
     dim = A.get_spatial_dimension()
