@@ -177,7 +177,7 @@ class DualSet(object):
                 for pt, wac_list in ell.deriv_dict.items():
                     j = dpts.index(pt)
                     for (w, alpha, c) in wac_list:
-                        dwts[alpha][i][c][j] = w
+                        dwts[alpha][(i, *c, j)] = w
             for alpha in dwts:
                 mat[ells] += numpy.dot(dwts[alpha], dexpansion_values[alpha].T)
         return mat
