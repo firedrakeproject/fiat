@@ -7,7 +7,6 @@
 from FIAT import finite_element, dual_set, polynomial_set
 from FIAT.functional import ComponentPointEvaluation, IntegralMomentOfScaledNormalEvaluation
 from FIAT.hct import HsiehCloughTocher
-from FIAT.restricted import RestrictedElement
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi
@@ -21,16 +20,14 @@ def ChristiansenHuSpace(ref_el, degree):
     sd = ref_el.get_spatial_dimension()
 
     HCT = HsiehCloughTocher(ref_el, degree+1, reduced=True)
-    RHCT = RestrictedElement(HCT, restriction_domain="vertex")
-
-    ref_complex = RHCT.get_reference_complex()
+    ref_complex = HCT.get_reference_complex()
     Q = create_quadrature(ref_complex, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
-    tab = RHCT.tabulate(1, Qpts)
-    curl_RHCT_at_Qpts = numpy.stack([tab[(0, 1)], -tab[(1, 0)]], axis=1)
+    tab = HCT.tabulate(1, Qpts)
+    curl_RHCT_at_Qpts = numpy.stack([tab[(0, 1)][:9], -tab[(1, 0)][:9]], axis=1)
 
-    Pk = polynomial_set.ONPolynomialSet(ref_complex, degree, scale="orthonormal")
+    Pk = polynomial_set.ONPolynomialSet(ref_complex, degree, scale=1, variant="bubble")
     Pk_at_Qpts = Pk.tabulate(Qpts)[(0,) * sd]
 
     x = Qpts.T
@@ -38,9 +35,13 @@ def ChristiansenHuSpace(ref_el, degree):
 
     expansion_set = Pk.get_expansion_set()
     duals = numpy.multiply(Pk_at_Qpts, Qwts)
+
+    M = numpy.dot(Pk_at_Qpts, duals.T)
+    duals = numpy.linalg.solve(M, duals)
+
     pieces = [polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set,
-                                           numpy.dot(T, duals.T))
-              for T in (curl_RHCT_at_Qpts, P0x_at_Qpts)]
+                                           numpy.tensordot(f_at_qpts, duals, axes=(-1, -1)))
+              for f_at_qpts in (curl_RHCT_at_Qpts, P0x_at_Qpts)]
 
     return polynomial_set.polynomial_set_union_normalized(*pieces)
 
@@ -67,11 +68,11 @@ class ChristiansenHuDualSet(dual_set.DualSet):
         dim = 1
         k = 2
         facet = ref_el.construct_subelement(dim)
+        scale = 1 / facet.volume()
         Q = create_quadrature(facet, degree+k)
         qpts = Q.get_points()
-        x, = qpts.T
-        xref = sum(x - v[0] for v in facet.get_vertices()) / facet.volume()
-        f_at_qpts = eval_jacobi(0, 0, k, xref)
+        xref = scale * sum(qpts - v[0] for v in facet.get_vertices())
+        f_at_qpts = scale * eval_jacobi(0, 0, k, xref[:, 0])
         for entity in sorted(top[dim]):
             cur = len(nodes)
             nodes.append(IntegralMomentOfScaledNormalEvaluation(ref_el, Q, f_at_qpts, entity))
