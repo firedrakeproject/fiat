@@ -5,7 +5,9 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
 from FIAT import finite_element, dual_set, polynomial_set
-from FIAT.functional import ComponentPointEvaluation, IntegralMomentOfScaledNormalEvaluation
+from FIAT.functional import (ComponentPointEvaluation,
+                             IntegralMomentOfScaledNormalEvaluation,
+                             IntegralMomentOfEdgeTangentEvaluation)
 from FIAT.hct import HsiehCloughTocher
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
@@ -24,28 +26,28 @@ def ChristiansenHuSpace(ref_el, degree):
     Q = create_quadrature(ref_complex, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
+    x = Qpts.T
+    bary = numpy.asarray(ref_el.make_points(sd, 0, sd+1))
+    P0x_at_Qpts = x[None, :, :] - bary[:, :, None]
+
     tab = HCT.tabulate(1, Qpts)
-    curl_RHCT_at_Qpts = numpy.stack([tab[(0, 1)][:9], -tab[(1, 0)][:9]], axis=1)
+    curl_at_qpts = numpy.stack([tab[(0, 1)], -tab[(1, 0)]], axis=1)
 
     Pk = polynomial_set.ONPolynomialSet(ref_complex, degree, scale=1, variant="bubble")
     Pk_at_Qpts = Pk.tabulate(Qpts)[(0,) * sd]
-
-    x = Qpts.T
-    bary, = numpy.asarray(ref_el.make_points(sd, 0, sd+1))
-    x = numpy.add(x, -bary[:, None], out=x)
-    P0x_at_Qpts = x[None, :, :]
-
-    expansion_set = Pk.get_expansion_set()
     duals = numpy.multiply(Pk_at_Qpts, Qwts)
-
     M = numpy.dot(Pk_at_Qpts, duals.T)
     duals = numpy.linalg.solve(M, duals)
 
-    pieces = [polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set,
-                                           numpy.tensordot(f_at_qpts, duals, axes=(-1, -1)))
-              for f_at_qpts in (curl_RHCT_at_Qpts, P0x_at_Qpts)]
-
-    return polynomial_set.polynomial_set_union_normalized(*pieces)
+    # Remove the constant nullspace
+    ids = [0, 3, 6]
+    A = numpy.asarray([[1, 1, 1], [1, -1, 0], [0, -1, 1]])
+    phis = curl_at_qpts
+    phis[ids] = numpy.tensordot(A, phis[ids], axes=(-1, 0))
+    # Replace the constant nullspace with P_0 x
+    phis[0] = P0x_at_Qpts
+    coeffs = numpy.tensordot(phis, duals, axes=(-1, -1))
+    return polynomial_set.PolynomialSet(ref_complex, degree, degree, Pk.get_expansion_set(), coeffs)
 
 
 class ChristiansenHuDualSet(dual_set.DualSet):
@@ -74,11 +76,14 @@ class ChristiansenHuDualSet(dual_set.DualSet):
         Q = create_quadrature(facet, degree+k)
         qpts = Q.get_points()
         xref = scale * sum(qpts - v[0] for v in facet.get_vertices())
-        f_at_qpts = scale * eval_jacobi(0, 0, k, xref[:, 0])
-        for entity in sorted(top[dim]):
-            cur = len(nodes)
-            nodes.append(IntegralMomentOfScaledNormalEvaluation(ref_el, Q, f_at_qpts, entity))
-            entity_ids[dim][entity].extend(range(cur, len(nodes)))
+        f_at_qpts = eval_jacobi(0, 0, k, xref[:, 0])
+
+        for ell in (IntegralMomentOfScaledNormalEvaluation,
+                    IntegralMomentOfEdgeTangentEvaluation):
+            for entity in sorted(top[dim]):
+                cur = len(nodes)
+                nodes.append(ell(ref_el, Q, f_at_qpts, entity))
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         super(ChristiansenHuDualSet, self).__init__(nodes, ref_el, entity_ids)
 

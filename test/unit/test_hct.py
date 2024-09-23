@@ -48,7 +48,7 @@ def test_stokes_complex(cell, reduced):
     ref_complex = H2.get_reference_complex()
     if reduced:
         H2 = RestrictedElement(H2, restriction_domain="vertex")
-        H1 = CH(cell)
+        H1 = RestrictedElement(CH(cell), indices=list(range(9)))
         L2 = DG(cell, 0)
     else:
         H1 = AS(cell)
