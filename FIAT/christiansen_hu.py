@@ -31,6 +31,8 @@ def ChristiansenHuSpace(ref_el, degree):
     Pk_at_Qpts = Pk.tabulate(Qpts)[(0,) * sd]
 
     x = Qpts.T
+    bary, = numpy.asarray(ref_el.make_points(sd, 0, sd+1))
+    x = numpy.add(x, -bary[:, None], out=x)
     P0x_at_Qpts = x[None, :, :]
 
     expansion_set = Pk.get_expansion_set()

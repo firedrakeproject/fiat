@@ -177,12 +177,6 @@ class Cell(object):
         # Default: only type matters
         return None
 
-    def __eq__(self, other):
-        return type(self) is type(other) and self._key() == other._key()
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
     def __hash__(self):
         return hash((type(self), self._key()))
 
@@ -272,17 +266,48 @@ class Cell(object):
         """Return the parent cell if this cell is a split and None otherwise."""
         return None
 
+    def get_parent_complex(self):
+        """Return the parent complex if this cell is a split and None otherwise."""
+        return None
+
+    def is_parent(self, other, strict=False):
+        """Return whether this cell is the parent of the other cell."""
+        parent = other
+        if strict:
+            parent = parent.get_parent_complex()
+        while parent is not None:
+            if self == parent:
+                return True
+            parent = parent.get_parent_complex()
+        return False
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        A, B = self.get_vertices(), other.get_vertices()
+        if not (len(A) == len(B) and numpy.allclose(A, B)):
+            return False
+        atop = self.get_topology()
+        btop = other.get_topology()
+        for dim in atop:
+            if set(atop[dim].values()) != set(btop[dim].values()):
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __gt__(self, other):
-        return self.get_parent() == other
+        return other.is_parent(self, strict=True)
 
     def __lt__(self, other):
-        return self == other.get_parent()
+        return self.is_parent(other, strict=True)
 
     def __ge__(self, other):
-        return self > other or self == other
+        return other.is_parent(self, strict=False)
 
     def __le__(self, other):
-        return self < other or self == other
+        return self.is_parent(other, strict=False)
 
 
 class SimplicialComplex(Cell):
