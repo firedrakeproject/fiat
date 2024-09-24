@@ -315,6 +315,7 @@ elements = [
     "JohnsonMercier(T)",
     "JohnsonMercier(S)",
     "AlfeldSorokina(T)",
+    "AlfeldSorokina(S)",
     "ArnoldQin(T)",
 
     # MixedElement made of nodal elements should be nodal, but its API
