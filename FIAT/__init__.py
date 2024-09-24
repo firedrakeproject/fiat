@@ -11,7 +11,7 @@ from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.hct import HsiehCloughTocher
 from FIAT.alfeld_sorokina import AlfeldSorokina
-from FIAT.christiansen_hu import ChristiansenHu
+from FIAT.arnold_qin import ArnoldQin
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
@@ -33,8 +33,7 @@ from FIAT.gauss_radau import GaussRadau
 from FIAT.morley import Morley
 from FIAT.nedelec import Nedelec
 from FIAT.nedelec_second_kind import NedelecSecondKind
-from FIAT.powell_sabin import QuadraticPowellSabin6
-from FIAT.powell_sabin import QuadraticPowellSabin12
+from FIAT.powell_sabin import QuadraticPowellSabin6, QuadraticPowellSabin12
 from FIAT.hierarchical import Legendre, IntegratedLegendre
 from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
@@ -81,9 +80,9 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
-                      "HsiehCloughTocher": HsiehCloughTocher,
-                      "AlfeldSorokina": AlfeldSorokina,
-                      "ChristiansenHu": ChristiansenHu,
+                      "Hsieh-Clough-Tocher": HsiehCloughTocher,
+                      "Alfeld-Sorokina": AlfeldSorokina,
+                      "Arnold-Qin": ArnoldQin,
                       "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,

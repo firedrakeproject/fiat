@@ -368,13 +368,13 @@ def test_AlfeldSorokinaSpace(cell, degree):
     assert numpy.allclose(residual, 0)
 
 
-def test_ChristiansenHuSpace():
-    # Test that the Christiansen-Hu space is C0
-    from FIAT.christiansen_hu import ChristiansenHuSpace
+def test_ArnoldQinSpace():
+    # Test that the ArnoldQin space is C0
+    from FIAT.arnold_qin import ArnoldQinSpace
 
     degree = 2
     cell = ufc_simplex(2)
-    P1 = ChristiansenHuSpace(cell, degree)
+    P1 = ArnoldQinSpace(cell, degree)
     A = P1.get_reference_element()
     top = A.get_topology()
     sd = A.get_spatial_dimension()

@@ -16,8 +16,8 @@ from FIAT.jacobi import eval_jacobi
 import numpy
 
 
-def ChristiansenHuSpace(ref_el, degree):
-    """Return a basis for the Christiansen-Hu space.
+def ArnoldQinSpace(ref_el, degree):
+    """Return a basis for the Arnold-Qin space.
     curl(HCT-red) + P_0 x"""
     sd = ref_el.get_spatial_dimension()
 
@@ -50,12 +50,12 @@ def ChristiansenHuSpace(ref_el, degree):
     return polynomial_set.PolynomialSet(ref_complex, degree, degree, Pk.get_expansion_set(), coeffs)
 
 
-class ChristiansenHuDualSet(dual_set.DualSet):
+class ArnoldQinDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, reduced=False):
         if degree != 2:
-            raise ValueError("Christiansen-Hu only defined for degree = 2")
+            raise ValueError("Arnold-Qin only defined for degree = 2")
         if ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Christiansen-Hu only defined on triangles")
+            raise ValueError("Arnold-Qin only defined on triangles")
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
@@ -72,11 +72,11 @@ class ChristiansenHuDualSet(dual_set.DualSet):
         dim = 1
         k = 2
         facet = ref_el.construct_subelement(dim)
-        scale = 1 / facet.volume()
+        scale = 1.0 / facet.volume()
         Q = create_quadrature(facet, degree+k)
         qpts = Q.get_points()
         xref = scale * sum(qpts - v[0] for v in facet.get_vertices())
-        f_at_qpts = eval_jacobi(0, 0, k, xref[:, 0])
+        f_at_qpts = scale * eval_jacobi(0, 0, k, xref[:, 0])
 
         for ell in (IntegralMomentOfScaledNormalEvaluation,
                     IntegralMomentOfEdgeTangentEvaluation):
@@ -85,14 +85,14 @@ class ChristiansenHuDualSet(dual_set.DualSet):
                 nodes.append(ell(ref_el, Q, f_at_qpts, entity))
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-        super(ChristiansenHuDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super(ArnoldQinDualSet, self).__init__(nodes, ref_el, entity_ids)
 
 
-class ChristiansenHu(finite_element.CiarletElement):
-    """The Christiansen-Hu macroelement."""
+class ArnoldQin(finite_element.CiarletElement):
+    """The Arnold-Qin macroelement."""
     def __init__(self, ref_el, degree=2):
-        dual = ChristiansenHuDualSet(ref_el, degree)
-        poly_set = ChristiansenHuSpace(ref_el, degree)
+        dual = ArnoldQinDualSet(ref_el, degree)
+        poly_set = ArnoldQinSpace(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
-        super(ChristiansenHu, self).__init__(poly_set, dual, degree, formdegree,
-                                             mapping="contravariant piola")
+        super(ArnoldQin, self).__init__(poly_set, dual, degree, formdegree,
+                                        mapping="contravariant piola")

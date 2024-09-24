@@ -47,7 +47,7 @@ from FIAT.hermite import CubicHermite                           # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.hct import HsiehCloughTocher                          # noqa: F401
 from FIAT.alfeld_sorokina import AlfeldSorokina                 # noqa: F401
-from FIAT.christiansen_hu import ChristiansenHu                 # noqa: F401
+from FIAT.arnold_qin import ArnoldQin                           # noqa: F401
 from FIAT.johnson_mercier import JohnsonMercier                 # noqa: F401
 from FIAT.bubble import Bubble
 from FIAT.enriched import EnrichedElement                       # noqa: F401
@@ -312,7 +312,7 @@ elements = [
     "JohnsonMercier(T)",
     "JohnsonMercier(S)",
     "AlfeldSorokina(T)",
-    "ChristiansenHu(T)",
+    "ArnoldQin(T)",
 
     # MixedElement made of nodal elements should be nodal, but its API
     # is currently just broken.
