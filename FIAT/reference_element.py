@@ -411,7 +411,7 @@ class SimplicialComplex(Cell):
         of dimension dim.  Returns a (possibly empty) list.
         These tangents are normalized to have unit length."""
         ts = self.compute_tangents(dim, i)
-        ts /= numpy.linalg.norm(ts, axis=0)[None, :]
+        ts /= numpy.linalg.norm(ts, axis=1)[:, None]
         return ts
 
     def compute_edge_tangent(self, edge_i):
