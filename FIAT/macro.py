@@ -222,8 +222,7 @@ class AlfeldSplit(SplitSimplicialComplex):
                         new_topology[dim][cur] = ids + (new_vert_id,)
                         cur = cur + 1
 
-        parent = ref_el.get_parent_complex() or ref_el
-        super(AlfeldSplit, self).__init__(parent, tuple(new_verts), new_topology)
+        super(AlfeldSplit, self).__init__(ref_el, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -270,8 +269,7 @@ class IsoSplit(SplitSimplicialComplex):
             edges.append(tuple(sorted((v0, v1))))
 
         new_topology = make_topology(sd, len(new_verts), edges)
-        parent = ref_el.get_parent_complex() or ref_el
-        super(IsoSplit, self).__init__(parent, tuple(new_verts), new_topology)
+        super(IsoSplit, self).__init__(ref_el, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -351,8 +349,9 @@ class PowellSabin12Split(SplitSimplicialComplex):
                  (3, 4), (3, 5), (3, 6), (3, 7), (3, 8), (3, 9),
                  (4, 7), (4, 8), (5, 7), (5, 9), (6, 8), (6, 9)]
 
-        super(PowellSabin12Split, self).__init__(
-            ref_el, tuple(new_verts), make_topology(2, len(new_verts), edges))
+        parent = PowellSabinSplit(ref_el)
+        new_topology = make_topology(2, len(new_verts), edges)
+        super(PowellSabin12Split, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity

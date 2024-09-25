@@ -262,6 +262,10 @@ class Cell(object):
     def is_macrocell(self):
         return False
 
+    def get_interior_facets(self, dim):
+        """Return the interior facets this cell is a split and () otherwise."""
+        return ()
+
     def get_parent(self):
         """Return the parent cell if this cell is a split and None otherwise."""
         return None

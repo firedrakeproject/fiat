@@ -35,31 +35,34 @@ class BernardiRaugelDualSet(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
         nodes = []
-        for entity in sorted(top[0]):
+        for v in sorted(top[0]):
             cur = len(nodes)
-            pt, = ref_el.make_points(0, entity, degree)
+            pt, = ref_el.make_points(0, v, degree)
             nodes.extend(ComponentPointEvaluation(ref_el, k, (sd,), pt)
                          for k in range(sd))
-            entity_ids[0][entity].extend(range(cur, len(nodes)))
+            entity_ids[0][v].extend(range(cur, len(nodes)))
 
         facet = ref_el.construct_subelement(sd-1)
         Q = create_quadrature(facet, degree)
         f_at_qpts = numpy.ones(Q.get_weights().shape)
 
-        Qs = {entity: FacetQuadratureRule(ref_el, sd-1, entity, Q)
-              for entity in sorted(top[sd-1])}
+        Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q)
+              for f in sorted(top[sd-1])}
 
-        udirs = {entity: (ref_el.compute_normal(entity),
-                          *ref_el.compute_tangents(sd-1, entity))
-                 for entity in sorted(top[sd-1])}
+        thats = {f: ref_el.compute_tangents(sd-1, f)
+                 for f in sorted(top[sd-1])}
+
         for i in range(sd):
-            for entity, Q_mapped in Qs.items():
+            for f, Q_mapped in Qs.items():
                 cur = len(nodes)
-                udir = udirs[entity][i]
-                udir /= numpy.linalg.norm(udir)
-                phi_at_qpts = udir[:, None] * f_at_qpts[None, :]
+                if i == 0:
+                    udir = ref_el.compute_scaled_normal(f) if sd == 2 else numpy.cross(*thats[f])
+                else:
+                    udir = thats[f][i-1]
+                detJ = Q_mapped.jacobian_determinant()
+                phi_at_qpts = udir[:, None] * f_at_qpts[None, :] / detJ
                 nodes.append(FrobeniusIntegralMoment(ref_el, Q_mapped, phi_at_qpts))
-                entity_ids[sd-1][entity].extend(range(cur, len(nodes)))
+                entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
         super(BernardiRaugelDualSet, self).__init__(nodes, ref_el, entity_ids)
 
