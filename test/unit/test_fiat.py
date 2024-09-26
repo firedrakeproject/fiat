@@ -317,6 +317,7 @@ elements = [
     "AlfeldSorokina(T)",
     "AlfeldSorokina(S)",
     "ArnoldQin(T)",
+    "ArnoldQin(S)",
 
     # MixedElement made of nodal elements should be nodal, but its API
     # is currently just broken.

@@ -400,8 +400,7 @@ class MacroQuadratureRule(QuadratureRule):
     def __init__(self, ref_el, Q_ref, parent_facets=None):
         parent_dim = Q_ref.ref_el.get_spatial_dimension()
         if parent_facets is not None:
-            parent_cell = ref_el.get_parent()
-            parent_to_children = parent_cell.get_parent_to_children()
+            parent_to_children = ref_el.get_parent_to_children()
             facets = []
             for parent_entity in parent_facets:
                 children = parent_to_children[parent_dim][parent_entity]
@@ -479,8 +478,9 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
 
         if shape != ():
             m, n = coeffs.shape
-            coeffs = coeffs.reshape((m,) + (1,)*len(shape) + (n,))
-            coeffs = numpy.tile(coeffs, (1,) + shape + (1,))
+            ncomp = numpy.prod(shape)
+            coeffs = numpy.kron(coeffs, numpy.eye(ncomp))
+            coeffs = coeffs.reshape(m*ncomp, *shape, n)
 
         super(CkPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
 

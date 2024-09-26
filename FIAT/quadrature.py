@@ -21,6 +21,8 @@ def pseudo_determinant(A):
 def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
     """Map quadrature points and weights defined on source_cell to target_cell.
     """
+    while source_cell.get_parent():
+        source_cell = source_cell.get_parent()
     A, b = reference_element.make_affine_mapping(source_cell.get_vertices(),
                                                  target_cell.get_vertices())
     if len(pts_ref.shape) != 2:

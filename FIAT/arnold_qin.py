@@ -4,21 +4,18 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-from FIAT import finite_element, dual_set, polynomial_set
-from FIAT.functional import (ComponentPointEvaluation,
-                             IntegralMomentOfScaledNormalEvaluation,
-                             IntegralMomentOfEdgeTangentEvaluation)
+from FIAT import finite_element, polynomial_set
 from FIAT.hct import HsiehCloughTocher
-from FIAT.reference_element import TRIANGLE
+from FIAT.bernardi_raugel import BernardiRaugelDualSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.jacobi import eval_jacobi
+from FIAT.macro import PowellSabinSplit, CkPolynomialSet
 
 import numpy
 
 
-def ArnoldQinSpace(ref_el, degree):
+def ArnoldQinSpace2D(ref_el, degree):
     """Return a basis for the Arnold-Qin space.
-    curl(HCT-red) + P_0 x"""
+    curl(HCT) + P_0 x"""
     sd = ref_el.get_spatial_dimension()
 
     HCT = HsiehCloughTocher(ref_el, degree+1, reduced=True)
@@ -36,7 +33,7 @@ def ArnoldQinSpace(ref_el, degree):
     Pk = polynomial_set.ONPolynomialSet(ref_complex, degree, scale=1, variant="bubble")
     Pk_at_Qpts = Pk.tabulate(Qpts)[(0,) * sd]
     duals = numpy.multiply(Pk_at_Qpts, Qwts)
-    M = numpy.dot(Pk_at_Qpts, duals.T)
+    M = numpy.dot(duals, Pk_at_Qpts.T)
     duals = numpy.linalg.solve(M, duals)
 
     # Remove the constant nullspace
@@ -50,49 +47,41 @@ def ArnoldQinSpace(ref_el, degree):
     return polynomial_set.PolynomialSet(ref_complex, degree, degree, Pk.get_expansion_set(), coeffs)
 
 
-class ArnoldQinDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, reduced=False):
-        if degree != 2:
-            raise ValueError("Arnold-Qin only defined for degree = 2")
-        if ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Arnold-Qin only defined on triangles")
-        top = ref_el.get_topology()
-        sd = ref_el.get_spatial_dimension()
-        entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
+def ArnoldQinSpace(ref_el, degree):
+    """Return a basis for the Arnold-Qin space.
+    v in C0 P1(WF)^d : div(v) in P_0"""
+    sd = ref_el.get_spatial_dimension()
+    if sd == 2:
+        return ArnoldQinSpace2D(ref_el, degree)
 
-        nodes = []
-        dim = 0
-        for entity in sorted(top[dim]):
-            cur = len(nodes)
-            pts = ref_el.make_points(dim, entity, degree)
-            nodes.extend(ComponentPointEvaluation(ref_el, k, (sd,), pt)
-                         for pt in pts for k in range(sd))
-            entity_ids[dim][entity].extend(range(cur, len(nodes)))
+    shp = (sd,)
+    ref_complex = PowellSabinSplit(ref_el, codim=2)
+    Q = create_quadrature(ref_complex, degree)
+    qpts, qwts = Q.get_points(), Q.get_weights()
 
-        dim = 1
-        k = 2
-        facet = ref_el.construct_subelement(dim)
-        scale = 1.0 / facet.volume()
-        Q = create_quadrature(facet, degree+k)
-        qpts = Q.get_points()
-        xref = scale * sum(qpts - v[0] for v in facet.get_vertices())
-        f_at_qpts = scale * eval_jacobi(0, 0, k, xref[:, 0])
+    C0 = CkPolynomialSet(ref_complex, degree, order=0, shape=shp, scale=1, variant="bubble")
+    tab = C0.tabulate(qpts, 1)
+    divC0 = sum(tab[alpha][:, alpha.index(1), :] for alpha in tab if sum(alpha) == 1)
 
-        for ell in (IntegralMomentOfScaledNormalEvaluation,
-                    IntegralMomentOfEdgeTangentEvaluation):
-            for entity in sorted(top[dim]):
-                cur = len(nodes)
-                nodes.append(ell(ref_el, Q, f_at_qpts, entity))
-                entity_ids[dim][entity].extend(range(cur, len(nodes)))
+    duals = numpy.multiply(qpts.T, qwts)
+    F = numpy.dot(duals, divC0.T)
+    _, sig, vt = numpy.linalg.svd(F, full_matrices=True)
+    tol = sig[0] * 1E-10
+    num_sv = len([s for s in sig if abs(s) > tol])
+    coeffs = numpy.tensordot(vt[num_sv:], C0.get_coeffs(), axes=(-1, 0))
 
-        super(ArnoldQinDualSet, self).__init__(nodes, ref_el, entity_ids)
+    return polynomial_set.PolynomialSet(ref_complex, degree, degree, C0.get_expansion_set(), coeffs)
 
 
 class ArnoldQin(finite_element.CiarletElement):
     """The Arnold-Qin macroelement."""
-    def __init__(self, ref_el, degree=2):
-        dual = ArnoldQinDualSet(ref_el, degree)
+    def __init__(self, ref_el, degree=None):
+        sd = ref_el.get_spatial_dimension()
+        if degree is None:
+            degree = 4 - sd
         poly_set = ArnoldQinSpace(ref_el, degree)
+        ref_complex = poly_set.get_reference_element()
+        dual = BernardiRaugelDualSet(ref_complex, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super(ArnoldQin, self).__init__(poly_set, dual, degree, formdegree,
                                         mapping="contravariant piola")
