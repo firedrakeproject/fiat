@@ -2,7 +2,7 @@ import math
 import numpy
 import pytest
 from FIAT import DiscontinuousLagrange, Lagrange, Legendre, P0
-from FIAT.macro import AlfeldSplit, IsoSplit, CkPolynomialSet
+from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
@@ -127,6 +127,21 @@ def test_macro_lagrange(variant, degree, split, cell):
     U = poly_set.get_expansion_set()
     V = U.tabulate(degree, pts).T
     assert numpy.allclose(fe.V, V)
+
+
+def test_powell_sabin(cell):
+    dim = cell.get_spatial_dimension()
+    A = AlfeldSplit(cell)
+    assert A > cell
+
+    PS = PowellSabinSplit(cell, codim=dim)
+    assert PS == A
+
+    for codim in range(1, dim):
+        PS = PowellSabinSplit(cell, codim=codim)
+        assert len(PS.get_topology()[dim]) == math.factorial(dim+1) // codim
+        assert PS > A
+        assert PS > cell
 
 
 def make_mass_matrix(fe, order=0):

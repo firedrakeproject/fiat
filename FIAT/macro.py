@@ -74,8 +74,9 @@ def make_topology(sd, num_verts, edges):
             facet = topology[dim][entity]
             facet_verts = set(facet)
             for v in range(min(facet)):
-                if facet_verts < adjacency[v]:
+                if (facet_verts < adjacency[v]):
                     entities.append((v, *facet))
+
         topology[dim+1] = dict(enumerate(sorted(entities)))
     return topology
 
@@ -289,14 +290,15 @@ class PowellSabinSplit(SplitSimplicialComplex):
     """Splits a simplicial complex by connecting barycenters of subentities to
     the barycenter of the superentity.
     """
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, codim=1):
+        self.codim = codim
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         inv_top = invert_cell_topology(top)
         new_verts = list(ref_el.get_vertices())
         edges = []
         offset = {0: 0}
-        for dim in range(1, sd+1):
+        for dim in range(codim, sd+1):
             offset[dim] = len(new_verts)
             for entity in top[dim]:
                 bary_id = entity + offset[dim]
@@ -304,11 +306,29 @@ class PowellSabinSplit(SplitSimplicialComplex):
 
                 # Connect subentity barycenter to the entity barycenter
                 for subdim in range(dim):
+                    if subdim not in offset:
+                        continue
                     edges.extend((inv_top[subdim][subverts] + offset[subdim], bary_id)
                                  for subverts in combinations(top[dim][entity], subdim+1))
 
+        if codim > 1:
+            edges.extend(top[1].values())
         new_topology = make_topology(sd, len(new_verts), edges)
-        parent = AlfeldSplit(ref_el)
+        if codim > 1:
+            # Valid simplices must include at least one original vertex
+            # and at least one new vertex per split dimension
+            offsets = list(offset.values())
+            offsets.append(len(new_verts))
+            ranges = [range(*offsets[d:d+2]) for d in range(len(offsets)-1)]
+            new_topology[sd] = dict(enumerate(sorted(verts for verts in new_topology[sd].values()
+                                    if all(any(v in R for v in verts) for R in ranges))))
+
+            cells = tuple(map(set, new_topology[sd].values()))
+            for dim in range(codim, sd):
+                new_topology[dim] = dict(enumerate(sorted(verts for verts in new_topology[dim].values()
+                                         if any(set(verts) < c for c in cells))))
+
+        parent = ref_el if codim == sd else AlfeldSplit(ref_el)
         super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
@@ -318,11 +338,11 @@ class PowellSabinSplit(SplitSimplicialComplex):
         if dimension == self.get_dimension():
             return self
         ref_el = self.construct_subelement(dimension)
-        if dimension == 0:
+        if dimension < self.codim:
             return ref_el
         else:
             # Powell-Sabin on facets is Powell-Sabin
-            return PowellSabinSplit(ref_el)
+            return PowellSabinSplit(ref_el, codim=self.codim)
 
 
 class PowellSabin12Split(SplitSimplicialComplex):
