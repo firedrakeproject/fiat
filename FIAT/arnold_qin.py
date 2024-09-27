@@ -77,23 +77,15 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
     coeffs = numpy.concatenate((coeffs, P0x_coeffs[None, ...]), axis=0)
 
     if not reduced:
-        dual = BernardiRaugelDualSet(ref_complex, degree)
-        dualmat = dual.to_riesz(C0)[:len(coeffs)]
-        shp = dualmat.shape
-        A = dualmat.reshape((shp[0], -1))
-        B = coeffs.reshape((shp[0], -1))
-        V = numpy.dot(A, numpy.transpose(B))
-        primal_coeffs = numpy.tensordot(numpy.linalg.inv(V.T), coeffs, axes=(-1, 0))
-        facet_bubbles = primal_coeffs[-(sd+1):]
+        nverts = len(ref_complex.get_vertices())
+        new_coeffs = numpy.zeros((2*(sd+1), sd, nverts))
         top = ref_el.get_topology()
-        ext = []
-        for f in top[sd-1]:
-            thats = ref_el.compute_tangents(sd-1, f)
-            nhat = numpy.cross(*thats)
-            for that in thats:
-                tn = numpy.outer(that, nhat)
-                ext.append(numpy.dot(tn, facet_bubbles[f]))
-        new_coeffs = numpy.array(ext)
+        cur = 0
+        for f in sorted(top[sd-1]):
+            for t in ref_el.compute_tangents(sd-1, f):
+                new_coeffs[cur, :, sd+1+f] = 1 * t
+                new_coeffs[cur, :, -1] = 0.75 * t
+                cur += 1
         coeffs = numpy.concatenate((coeffs, new_coeffs), axis=0)
 
     return polynomial_set.PolynomialSet(ref_complex, degree, degree,

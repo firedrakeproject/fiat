@@ -328,7 +328,7 @@ class PowellSabinSplit(SplitSimplicialComplex):
                 new_topology[dim] = dict(enumerate(sorted(verts for verts in new_topology[dim].values()
                                          if any(set(verts) < c for c in cells))))
 
-        parent = ref_el if codim == sd else AlfeldSplit(ref_el)
+        parent = ref_el if codim == sd else PowellSabinSplit(ref_el, codim=codim+1)
         super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
