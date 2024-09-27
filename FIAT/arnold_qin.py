@@ -13,7 +13,7 @@ from FIAT.macro import PowellSabinSplit, CkPolynomialSet
 import numpy
 
 
-def ArnoldQinSpace2D(ref_el, degree):
+def ArnoldQinSpace2D(ref_el, degree, reduced=False):
     """Return a basis for the Arnold-Qin space.
     curl(HCT) + P_0 x"""
     sd = ref_el.get_spatial_dimension()
@@ -21,19 +21,21 @@ def ArnoldQinSpace2D(ref_el, degree):
     HCT = HsiehCloughTocher(ref_el, degree+1, reduced=True)
     ref_complex = HCT.get_reference_complex()
     Q = create_quadrature(ref_complex, 2 * degree)
-    Qpts, Qwts = Q.get_points(), Q.get_weights()
+    qpts, qwts = Q.get_points(), Q.get_weights()
 
-    x = Qpts.T
+    x = qpts.T
     bary = numpy.asarray(ref_el.make_points(sd, 0, sd+1))
-    P0x_at_Qpts = x[None, :, :] - bary[:, :, None]
+    P0x_at_qpts = x[None, :, :] - bary[:, :, None]
 
-    tab = HCT.tabulate(1, Qpts)
+    tab = HCT.tabulate(1, qpts)
     curl_at_qpts = numpy.stack([tab[(0, 1)], -tab[(1, 0)]], axis=1)
+    if reduced:
+        curl_at_qpts = curl_at_qpts[:9]
 
-    Pk = polynomial_set.ONPolynomialSet(ref_complex, degree, scale=1, variant="bubble")
-    Pk_at_Qpts = Pk.tabulate(Qpts)[(0,) * sd]
-    duals = numpy.multiply(Pk_at_Qpts, Qwts)
-    M = numpy.dot(duals, Pk_at_Qpts.T)
+    C0 = polynomial_set.ONPolynomialSet(ref_complex, degree, scale=1, variant="bubble")
+    C0_at_qpts = C0.tabulate(qpts)[(0,) * sd]
+    duals = numpy.multiply(C0_at_qpts, qwts)
+    M = numpy.dot(duals, C0_at_qpts.T)
     duals = numpy.linalg.solve(M, duals)
 
     # Remove the constant nullspace
@@ -42,35 +44,60 @@ def ArnoldQinSpace2D(ref_el, degree):
     phis = curl_at_qpts
     phis[ids] = numpy.tensordot(A, phis[ids], axes=(-1, 0))
     # Replace the constant nullspace with P_0 x
-    phis[0] = P0x_at_Qpts
+    phis[0] = P0x_at_qpts
     coeffs = numpy.tensordot(phis, duals, axes=(-1, -1))
-    return polynomial_set.PolynomialSet(ref_complex, degree, degree, Pk.get_expansion_set(), coeffs)
+    return polynomial_set.PolynomialSet(ref_complex, degree, degree,
+                                        C0.get_expansion_set(), coeffs)
 
 
-def ArnoldQinSpace(ref_el, degree):
+def ArnoldQinSpace(ref_el, degree, reduced=False):
     """Return a basis for the Arnold-Qin space.
     v in C0 P1(WF)^d : div(v) in P_0"""
     sd = ref_el.get_spatial_dimension()
     if sd == 2:
-        return ArnoldQinSpace2D(ref_el, degree)
+        return ArnoldQinSpace2D(ref_el, degree, reduced=reduced)
 
+    bary = numpy.mean(ref_el.get_vertices(), axis=0, keepdims=True)
     shp = (sd,)
     ref_complex = PowellSabinSplit(ref_el, codim=2)
-    Q = create_quadrature(ref_complex, degree)
-    qpts, qwts = Q.get_points(), Q.get_weights()
+    Q = create_quadrature(ref_complex, degree-1)
+    qpts = Q.get_points()
 
     C0 = CkPolynomialSet(ref_complex, degree, order=0, shape=shp, scale=1, variant="bubble")
     tab = C0.tabulate(qpts, 1)
     divC0 = sum(tab[alpha][:, alpha.index(1), :] for alpha in tab if sum(alpha) == 1)
 
-    duals = numpy.multiply(qpts.T, qwts)
-    F = numpy.dot(duals, divC0.T)
-    _, sig, vt = numpy.linalg.svd(F, full_matrices=True)
+    _, sig, vt = numpy.linalg.svd(divC0.T, full_matrices=True)
     tol = sig[0] * 1E-10
     num_sv = len([s for s in sig if abs(s) > tol])
-    coeffs = numpy.tensordot(vt[num_sv:], C0.get_coeffs(), axes=(-1, 0))
 
-    return polynomial_set.PolynomialSet(ref_complex, degree, degree, C0.get_expansion_set(), coeffs)
+    coeffs = numpy.tensordot(vt[num_sv:], C0.get_coeffs(), axes=(-1, 0))
+    P0x_coeffs = numpy.transpose(ref_complex.get_vertices())
+    P0x_coeffs -= bary.T
+    coeffs = numpy.concatenate((coeffs, P0x_coeffs[None, ...]), axis=0)
+
+    if not reduced:
+        dual = BernardiRaugelDualSet(ref_complex, degree)
+        dualmat = dual.to_riesz(C0)[:len(coeffs)]
+        shp = dualmat.shape
+        A = dualmat.reshape((shp[0], -1))
+        B = coeffs.reshape((shp[0], -1))
+        V = numpy.dot(A, numpy.transpose(B))
+        primal_coeffs = numpy.tensordot(numpy.linalg.inv(V.T), coeffs, axes=(-1, 0))
+        facet_bubbles = primal_coeffs[-(sd+1):]
+        top = ref_el.get_topology()
+        ext = []
+        for f in top[sd-1]:
+            thats = ref_el.compute_tangents(sd-1, f)
+            nhat = numpy.cross(*thats)
+            for that in thats:
+                tn = numpy.outer(that, nhat)
+                ext.append(numpy.dot(tn, facet_bubbles[f]))
+        new_coeffs = numpy.array(ext)
+        coeffs = numpy.concatenate((coeffs, new_coeffs), axis=0)
+
+    return polynomial_set.PolynomialSet(ref_complex, degree, degree,
+                                        C0.get_expansion_set(), coeffs)
 
 
 class ArnoldQin(finite_element.CiarletElement):

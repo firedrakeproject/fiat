@@ -4,7 +4,7 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-from FIAT import finite_element, dual_set, polynomial_set, expansions, jacobi
+from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
@@ -44,11 +44,12 @@ class BernardiRaugelDualSet(dual_set.DualSet):
         if degree == 1 and facet.is_macrocell():
             P = polynomial_set.ONPolynomialSet(facet, degree, scale=1, variant="bubble")
             f_at_qpts = P.tabulate(Q.get_points())[(0,)*(sd-1)][-1]
-        elif sd == 2:
-            x = 2*Q.get_points()[:, 0]-1
-            f_at_qpts = jacobi.eval_jacobi(0, 0, degree, x)
         else:
-            f_at_qpts = numpy.ones(Q.get_weights().shape)
+            ref_facet = facet.get_parent() or facet
+            x = ref_facet.compute_barycentric_coordinates(Q.get_points())
+            f_at_qpts = numpy.prod(x, axis=1)
+
+        f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / facet.volume()
 
         Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q)
               for f in sorted(top[sd-1])}

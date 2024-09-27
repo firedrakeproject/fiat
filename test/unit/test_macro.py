@@ -383,30 +383,45 @@ def test_AlfeldSorokinaSpace(cell, degree):
     assert numpy.allclose(residual, 0)
 
 
-def test_ArnoldQinSpace():
-    # Test that the ArnoldQin space is C0
+def test_ArnoldQinSpace(cell):
     from FIAT.arnold_qin import ArnoldQinSpace
-
-    degree = 2
-    cell = ufc_simplex(2)
-    P1 = ArnoldQinSpace(cell, degree)
-    A = P1.get_reference_element()
+    sd = cell.get_spatial_dimension()
+    if sd == 1:
+        return
+    degree = 4 - sd
+    AQ = ArnoldQinSpace(cell, degree)
+    AQred = ArnoldQinSpace(cell, degree, reduced=True)
+    AQdim = AQ.get_num_members()
+    AQreddim = AQred.get_num_members()
+    A = AQ.get_reference_element()
     top = A.get_topology()
-    sd = A.get_spatial_dimension()
 
     pts = []
     for dim in top:
         for entity in top[dim]:
             pts.extend(A.make_points(dim, entity, degree))
 
-    P1_tab = P1.tabulate(pts, 1)[(0,)*sd]
+    C0 = CkPolynomialSet(A, degree, order=0, variant="bubble")
+    C0_tab = C0.tabulate(pts)
+    AQ_tab = AQ.tabulate(pts, 1)
+    AQred_tab = AQred.tabulate(pts, 1)
+    z = (0,)*sd
+    for tab in (AQred_tab, AQ_tab):
+        # Test that the space is C0
+        for k in range(sd):
+            _, residual, *_ = numpy.linalg.lstsq(C0_tab[z].T, tab[z][:, k, :].T)
+            assert numpy.allclose(residual, 0)
 
-    P2 = CkPolynomialSet(A, degree, order=0, variant="bubble")
-    P2_tab = P2.tabulate(pts)[(0,)*sd]
+        # Test that divergence is in P0
+        div = sum(tab[alpha][:, alpha.index(1), :]
+                  for alpha in tab if sum(alpha) == 1)[:AQreddim]
+        assert numpy.allclose(div, div[:, 0][:, None])
 
-    for k in range(sd):
-        _, residual, *_ = numpy.linalg.lstsq(P2_tab.T, P1_tab[:, k, :].T)
-        assert numpy.allclose(residual, 0)
+    # Test that the full space includes the reduced space
+    assert AQdim > AQreddim
+    _, residual, *_ = numpy.linalg.lstsq(AQ_tab[z].reshape(AQdim, -1).T,
+                                         AQred_tab[z].reshape(AQreddim, -1).T)
+    assert numpy.allclose(residual, 0)
 
 
 def test_distance_to_point_l1(cell):
