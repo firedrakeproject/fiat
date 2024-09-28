@@ -407,6 +407,10 @@ def test_ArnoldQinSpace(cell):
     AQred_tab = AQred.tabulate(pts, 1)
     z = (0,)*sd
     for tab in (AQred_tab, AQ_tab):
+        # Test that the space is full rank
+        _, sig, _ = numpy.linalg.svd(tab[z].reshape(-1, sd*len(pts)).T, full_matrices=True)
+        assert all(sig > 1E-10)
+
         # Test that the space is C0
         for k in range(sd):
             _, residual, *_ = numpy.linalg.lstsq(C0_tab[z].T, tab[z][:, k, :].T)

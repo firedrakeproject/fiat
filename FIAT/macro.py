@@ -294,39 +294,29 @@ class PowellSabinSplit(SplitSimplicialComplex):
         self.codim = codim
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-        inv_top = invert_cell_topology(top)
+        connectivity = ref_el.get_connectivity()
         new_verts = list(ref_el.get_vertices())
-        edges = []
-        offset = {0: 0}
+        simplices = {codim-1: {entity: [top[codim-1][entity]] for entity in top[codim-1]}}
+
         for dim in range(codim, sd+1):
-            offset[dim] = len(new_verts)
+            simplices[dim] = {}
             for entity in top[dim]:
-                bary_id = entity + offset[dim]
+                bary_id = len(new_verts)
                 new_verts.extend(ref_el.make_points(dim, entity, dim+1))
 
-                # Connect subentity barycenter to the entity barycenter
-                for subdim in range(dim):
-                    if subdim not in offset:
-                        continue
-                    edges.extend((inv_top[subdim][subverts] + offset[subdim], bary_id)
-                                 for subverts in combinations(top[dim][entity], subdim+1))
+                # Connect subentity barycenter to every subsimplex on the facet
+                simplices[dim][entity] = [(*s, bary_id)
+                                          for child in connectivity[(dim, dim-1)][entity]
+                                          for s in simplices[dim-1][child]]
 
-        if codim > 1:
-            edges.extend(top[1].values())
-        new_topology = make_topology(sd, len(new_verts), edges)
-        if codim > 1:
-            # Valid simplices must include at least one original vertex
-            # and at least one new vertex per split dimension
-            offsets = list(offset.values())
-            offsets.append(len(new_verts))
-            ranges = [range(*offsets[d:d+2]) for d in range(len(offsets)-1)]
-            new_topology[sd] = dict(enumerate(sorted(verts for verts in new_topology[sd].values()
-                                    if all(any(v in R for v in verts) for R in ranges))))
-
-            cells = tuple(map(set, new_topology[sd].values()))
-            for dim in range(codim, sd):
-                new_topology[dim] = dict(enumerate(sorted(verts for verts in new_topology[dim].values()
-                                         if any(set(verts) < c for c in cells))))
+        simplices = list(chain.from_iterable(simplices[sd].values()))
+        new_topology = {}
+        new_topology[0] = {i: (i,) for i in range(len(new_verts))}
+        for dim in range(1, sd):
+            facets = chain.from_iterable((combinations(s, dim+1) for s in simplices))
+            unique_facets = dict.fromkeys(facets)
+            new_topology[dim] = dict(enumerate(sorted(unique_facets)))
+        new_topology[sd] = dict(enumerate(sorted(simplices)))
 
         parent = ref_el if codim == sd else PowellSabinSplit(ref_el, codim=codim+1)
         super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
