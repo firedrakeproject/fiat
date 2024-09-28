@@ -134,12 +134,12 @@ def test_powell_sabin(cell):
     A = AlfeldSplit(cell)
     assert A > cell
 
-    PS = PowellSabinSplit(cell, codim=dim)
+    PS = PowellSabinSplit(cell, dim)
     assert PS == A
 
-    for codim in range(1, dim):
-        PS = PowellSabinSplit(cell, codim=codim)
-        assert len(PS.get_topology()[dim]) == math.factorial(dim+1) // codim
+    for split_dim in range(1, dim):
+        PS = PowellSabinSplit(cell, split_dim)
+        assert len(PS.get_topology()[dim]) == math.factorial(dim+1) // math.factorial(split_dim)
         assert PS > A
         assert PS > cell
 

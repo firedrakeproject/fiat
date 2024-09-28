@@ -1,4 +1,3 @@
-import copy
 from itertools import chain, combinations
 
 import numpy
@@ -196,45 +195,6 @@ class SplitSimplicialComplex(SimplicialComplex):
         return self._parent_complex
 
 
-class AlfeldSplit(SplitSimplicialComplex):
-    """Splits a simplicial complex by connecting subcell vertices to their
-    barycenter.
-    """
-    def __init__(self, ref_el):
-        sd = ref_el.get_spatial_dimension()
-        top = ref_el.get_topology()
-        # Keep old facets, respecting the old numbering
-        new_topology = copy.deepcopy(top)
-        # Discard the cell interiors
-        new_topology[sd] = {}
-        new_verts = list(ref_el.get_vertices())
-
-        for cell in top[sd]:
-            # Append the barycenter as the new vertex
-            new_verts.extend(ref_el.make_points(sd, cell, sd+1))
-            new_vert_id = len(new_topology[0])
-            new_topology[0][new_vert_id] = (new_vert_id,)
-
-            # Append new facets by adding the barycenter to old facets
-            for dim in range(1, sd + 1):
-                cur = len(new_topology[dim])
-                for entity, ids in top[dim-1].items():
-                    if set(ids) < set(top[sd][cell]):
-                        new_topology[dim][cur] = ids + (new_vert_id,)
-                        cur = cur + 1
-
-        super(AlfeldSplit, self).__init__(ref_el, tuple(new_verts), new_topology)
-
-    def construct_subcomplex(self, dimension):
-        """Constructs the reference subcomplex of the parent cell subentity
-        specified by subcomplex dimension.
-        """
-        if dimension == self.get_dimension():
-            return self
-        # Alfeld on facets is just the parent subcomplex
-        return self.get_parent_complex().construct_subcomplex(dimension)
-
-
 class IsoSplit(SplitSimplicialComplex):
     """Splits simplex into the simplicial complex obtained by
     connecting points on a regular lattice.
@@ -287,24 +247,25 @@ class IsoSplit(SplitSimplicialComplex):
 
 
 class PowellSabinSplit(SplitSimplicialComplex):
-    """Splits a simplicial complex by connecting barycenters of subentities to
-    the barycenter of the superentity.
+    """Splits a simplicial complex by connecting barycenters of subentities
+    to the barycenter of the superentities of the given dimension or higher.
     """
-    def __init__(self, ref_el, codim=1):
-        self.codim = codim
+    def __init__(self, ref_el, dimension=1):
+        self.split_dimension = dimension
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         connectivity = ref_el.get_connectivity()
         new_verts = list(ref_el.get_vertices())
-        simplices = {codim-1: {entity: [top[codim-1][entity]] for entity in top[codim-1]}}
+        dim = dimension - 1
+        simplices = {dim: {entity: [top[dim][entity]] for entity in top[dim]}}
 
-        for dim in range(codim, sd+1):
+        for dim in range(dimension, sd+1):
             simplices[dim] = {}
             for entity in top[dim]:
                 bary_id = len(new_verts)
                 new_verts.extend(ref_el.make_points(dim, entity, dim+1))
 
-                # Connect subentity barycenter to every subsimplex on the facet
+                # Connect entity barycenter to every subsimplex on the entity
                 simplices[dim][entity] = [(*s, bary_id)
                                           for child in connectivity[(dim, dim-1)][entity]
                                           for s in simplices[dim-1][child]]
@@ -315,10 +276,10 @@ class PowellSabinSplit(SplitSimplicialComplex):
         for dim in range(1, sd):
             facets = chain.from_iterable((combinations(s, dim+1) for s in simplices))
             unique_facets = dict.fromkeys(facets)
-            new_topology[dim] = dict(enumerate(sorted(unique_facets)))
-        new_topology[sd] = dict(enumerate(sorted(simplices)))
+            new_topology[dim] = dict(enumerate(unique_facets))
+        new_topology[sd] = dict(enumerate(simplices))
 
-        parent = ref_el if codim == sd else PowellSabinSplit(ref_el, codim=codim+1)
+        parent = ref_el if dimension == sd else PowellSabinSplit(ref_el, dimension=dimension+1)
         super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
@@ -327,12 +288,30 @@ class PowellSabinSplit(SplitSimplicialComplex):
         """
         if dimension == self.get_dimension():
             return self
-        ref_el = self.construct_subelement(dimension)
-        if dimension < self.codim:
-            return ref_el
+        parent = self.get_parent_complex()
+        subcomplex = parent.construct_subcomplex(dimension)
+        if dimension < self.split_dimension:
+            return subcomplex
         else:
             # Powell-Sabin on facets is Powell-Sabin
-            return PowellSabinSplit(ref_el, codim=self.codim)
+            return PowellSabinSplit(subcomplex, dimension=self.split_dimension)
+
+
+class AlfeldSplit(PowellSabinSplit):
+    """Splits a simplicial complex by connecting cell vertices to their
+    barycenter.
+    """
+    def __init__(self, ref_el):
+        sd = ref_el.get_spatial_dimension()
+        super(AlfeldSplit, self).__init__(ref_el, dimension=sd)
+
+
+class WorseyFarinSplit(PowellSabinSplit):
+    """Splits a simplicial complex by connecting cell and face vertices to their
+    barycenter.
+    """
+    def __init__(self, ref_el):
+        super(WorseyFarinSplit, self).__init__(ref_el, dimension=2)
 
 
 class PowellSabin12Split(SplitSimplicialComplex):

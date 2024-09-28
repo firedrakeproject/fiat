@@ -24,7 +24,7 @@ def ExtendedBernardiRaugelSpace(ref_el, degree):
 
 
 class BernardiRaugelDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, reduced=False):
         ref_complex = ref_el
         ref_el = ref_complex.get_parent() or ref_complex
         sd = ref_el.get_spatial_dimension()
@@ -58,7 +58,8 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                  for f in sorted(top[sd-1])}
 
         R = numpy.array([[0, 1], [-1, 0]])
-        for i in range(sd):
+        ndir = 1 if reduced else sd
+        for i in range(ndir):
             for f, Q_mapped in Qs.items():
                 cur = len(nodes)
                 if i == 0:
@@ -78,7 +79,7 @@ class BernardiRaugel(finite_element.CiarletElement):
     def __init__(self, ref_el, degree=None):
         if degree is None:
             degree = ref_el.get_spatial_dimension()
-        dual = BernardiRaugelDualSet(ref_el, degree)
+        dual = BernardiRaugelDualSet(ref_el, degree, reduced=False)
         poly_set = ExtendedBernardiRaugelSpace(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super(BernardiRaugel, self).__init__(poly_set, dual, degree, formdegree,
