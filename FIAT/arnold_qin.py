@@ -68,9 +68,8 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
     num_sv = len([s for s in sig if abs(s) > tol])
     coeffs = numpy.tensordot(vt[num_sv:], C0.get_coeffs(), axes=(-1, 0))
 
-    bary = numpy.mean(ref_el.get_vertices(), axis=0, keepdims=True)
-    P0x_coeffs = numpy.transpose(ref_complex.get_vertices())
-    P0x_coeffs -= bary.T
+    verts = numpy.array(ref_complex.get_vertices())
+    P0x_coeffs = numpy.transpose(verts - verts[-1])
     coeffs = numpy.concatenate((coeffs, P0x_coeffs[None, ...]), axis=0)
 
     if not reduced:
@@ -81,13 +80,17 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
         facet_bubbles = coeffs[-(sd+1):]
         top = ref_el.get_topology()
         ext = []
+
+        WF = verts[sd+1:-1]
+        WT = verts[-1]
         for f in top[sd-1]:
+            ehat = WF[f] - WT
+            FB = numpy.dot(ehat, facet_bubbles[f])
             thats = ref_el.compute_tangents(sd-1, f)
-            nhat = numpy.cross(*thats)
             for that in thats:
-                tn = numpy.outer(that, nhat)
-                ext.append(numpy.dot(tn, facet_bubbles[f]))
+                ext.append(that[:, None] * FB[None, :])
         ext_coeffs = numpy.array(ext)
+        ext_coeffs[abs(ext_coeffs) < 1E-10] = 0
         coeffs = numpy.concatenate((coeffs, ext_coeffs), axis=0)
 
     return polynomial_set.PolynomialSet(ref_complex, degree, degree,

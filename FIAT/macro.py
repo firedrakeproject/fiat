@@ -233,7 +233,7 @@ class IsoSplit(SplitSimplicialComplex):
         super(IsoSplit, self).__init__(ref_el, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
-        """Constructs the reference subcomplex of the parent cell subentity
+        """Constructs the reference subcomplex of the parent complex
         specified by subcomplex dimension.
         """
         if dimension == self.get_dimension():
@@ -283,7 +283,7 @@ class PowellSabinSplit(SplitSimplicialComplex):
         super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
-        """Constructs the reference subcomplex of the parent cell subentity
+        """Constructs the reference subcomplex of the parent complex
         specified by subcomplex dimension.
         """
         if dimension == self.get_dimension():
