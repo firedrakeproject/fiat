@@ -29,7 +29,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             Q = FacetQuadratureRule(ref_el, dim, facet, Qref)
             thats = ref_el.compute_tangents(dim, facet)
             nhat = numpy.dot(R, *thats) if sd == 2 else numpy.cross(*thats)
-            normal = nhat / numpy.linalg.norm(nhat)
+            normal = nhat / Q.jacobian_determinant()
 
             uvecs = (nhat, *thats)
             comps = [numpy.outer(normal, uvec) for uvec in uvecs]

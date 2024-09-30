@@ -1,6 +1,6 @@
 import re
 
-from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, PowellSabin12Split
+from FIAT.macro import IsoSplit, AlfeldSplit, WorseyFarinSplit, PowellSabinSplit, PowellSabin12Split
 
 # dicts mapping Lagrange variant names to recursivenodes family names
 supported_cg_variants = {
@@ -16,6 +16,14 @@ supported_dg_variants = {
     "equispaced_interior": "equispaced_interior",
     "gll": "gll",
     "gl": "gl"}
+
+supported_splits = {
+    "iso": IsoSplit,
+    "alfeld": AlfeldSplit,
+    "worsey-farin": WorseyFarinSplit,
+    "powell-sabin": PowellSabinSplit,
+    "powell-sabin(12)": PowellSabin12Split,
+}
 
 
 def check_format_variant(variant, degree):
@@ -66,14 +74,8 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
     for pre_opt in options:
         opt = pre_opt.lower()
-        if opt == "alfeld":
-            splitting = AlfeldSplit
-        elif opt == "powell-sabin":
-            splitting = PowellSabinSplit
-        elif opt == "powell-sabin(12)":
-            splitting = PowellSabin12Split
-        elif opt == "iso":
-            splitting = IsoSplit
+        if opt in supported_splits:
+            splitting = supported_splits[opt]
         elif opt.startswith("iso"):
             match = re.match(r"^iso(?:\((\d+)\))?$", opt)
             k, = match.groups()
