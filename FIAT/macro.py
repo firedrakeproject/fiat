@@ -275,6 +275,9 @@ class PowellSabinSplit(SplitSimplicialComplex):
         new_topology[0] = {i: (i,) for i in range(len(new_verts))}
         for dim in range(1, sd):
             facets = chain.from_iterable((combinations(s, dim+1) for s in simplices))
+            if dim < self.split_dimension:
+                # Preserve the numbering of the unsplit entities
+                facets = chain(top[dim].values(), facets)
             unique_facets = dict.fromkeys(facets)
             new_topology[dim] = dict(enumerate(unique_facets))
         new_topology[sd] = dict(enumerate(simplices))

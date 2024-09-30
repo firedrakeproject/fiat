@@ -90,7 +90,6 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
             for that in thats:
                 ext.append(that[:, None] * FB[None, :])
         ext_coeffs = numpy.array(ext)
-        ext_coeffs[abs(ext_coeffs) < 1E-10] = 0
         coeffs = numpy.concatenate((coeffs, ext_coeffs), axis=0)
 
     return polynomial_set.PolynomialSet(ref_complex, degree, degree,
