@@ -40,7 +40,7 @@ class P0Dual(dual_set.DualSet):
                 entity_ids[dim][entity] = [entity] if dim == sd else []
                 entity_permutations[dim][entity] = perms
 
-        super(P0Dual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class P0(finite_element.CiarletElement):
@@ -49,4 +49,4 @@ class P0(finite_element.CiarletElement):
         dual = P0Dual(ref_el)
         degree = 0
         formdegree = ref_el.get_spatial_dimension()  # n-form
-        super(P0, self).__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree)

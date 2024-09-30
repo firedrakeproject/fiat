@@ -29,7 +29,7 @@ class RestrictedDualSet(DualSet):
                     nodes.append(nodes_old[dof])
         assert dof_counter == len(indices)
         self._dual = dual
-        super(RestrictedDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Return the list of dofs with support on a given restriction domain.
@@ -74,4 +74,4 @@ class RestrictedElement(CiarletElement):
         assert all(e_mapping == mapping_new[0] for e_mapping in mapping_new)
 
         # Call constructor of CiarletElement
-        super(RestrictedElement, self).__init__(poly_set, dual, 0, element.get_formdegree(), mapping_new[0])
+        super().__init__(poly_set, dual, 0, element.get_formdegree(), mapping_new[0])

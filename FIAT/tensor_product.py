@@ -206,7 +206,7 @@ class TensorProductElement(FiniteElement):
 
         dual = dual_set.DualSet(nodes, ref_el, entity_ids)
 
-        super(TensorProductElement, self).__init__(ref_el, dual, order, formdegree, mapping)
+        super().__init__(ref_el, dual, order, formdegree, mapping)
         # Set up constituent elements
         self.A = A
         self.B = B
@@ -383,7 +383,7 @@ class FlattenedDimensions(FiniteElement):
 
         flat_entity_ids = flatten_entities(entity_ids)
         dual = DualSet(nodes, ref_el, flat_entity_ids)
-        super(FlattenedDimensions, self).__init__(ref_el, dual, element.get_order(), element.get_formdegree(), element._mapping)
+        super().__init__(ref_el, dual, element.get_order(), element.get_formdegree(), element._mapping)
         self.element = element
 
         # Construct unflattening map for passing correct values to tabulate()

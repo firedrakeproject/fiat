@@ -72,7 +72,7 @@ class HCTDualSet(dual_set.DualSet):
                 nodes.extend(IntegralMoment(ref_el, Q, phi * scale) for phi in phis)
                 entity_ids[sd][0] = list(range(cur, len(nodes)))
 
-        super(HCTDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class HsiehCloughTocher(finite_element.CiarletElement):
@@ -84,4 +84,4 @@ class HsiehCloughTocher(finite_element.CiarletElement):
         ref_complex = macro.AlfeldSplit(ref_el)
         dual = HCTDualSet(ref_complex, degree, reduced=reduced)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
-        super(HsiehCloughTocher, self).__init__(poly_set, dual, degree)
+        super().__init__(poly_set, dual, degree)

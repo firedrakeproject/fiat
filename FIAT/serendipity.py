@@ -121,7 +121,7 @@ class Serendipity(FiniteElement):
         assert len(s_list) == cur
         formdegree = 0
 
-        super(Serendipity, self).__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
+        super().__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
 
         self.basis = {(0,)*dim: Array(s_list)}
         polynomials, extra_vars = _replace_numbers_with_symbols(Array(s_list))

@@ -94,7 +94,7 @@ class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m):
-        super(GaussLegendreQuadratureLineRule, self).__init__(ref_el, m)
+        super().__init__(ref_el, m)
 
 
 class RadauQuadratureLineRule(QuadratureRule):

@@ -68,7 +68,7 @@ class AlfeldSorokinaDualSet(dual_set.DualSet):
                              for pt in pts for k in range(sd))
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-        super(AlfeldSorokinaDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class AlfeldSorokina(finite_element.CiarletElement):
@@ -77,5 +77,5 @@ class AlfeldSorokina(finite_element.CiarletElement):
         dual = AlfeldSorokinaDualSet(ref_el, degree)
         poly_set = AlfeldSorokinaSpace(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
-        super(AlfeldSorokina, self).__init__(poly_set, dual, degree, formdegree,
-                                             mapping="contravariant piola")
+        super().__init__(poly_set, dual, degree, formdegree,
+                         mapping="contravariant piola")

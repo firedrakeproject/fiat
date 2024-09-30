@@ -71,7 +71,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                 nodes.append(FrobeniusIntegralMoment(ref_el, Q_mapped, phi_at_qpts))
                 entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
-        super(BernardiRaugelDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class BernardiRaugel(finite_element.CiarletElement):
@@ -82,5 +82,4 @@ class BernardiRaugel(finite_element.CiarletElement):
         dual = BernardiRaugelDualSet(ref_el, degree, reduced=False)
         poly_set = ExtendedBernardiRaugelSpace(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
-        super(BernardiRaugel, self).__init__(poly_set, dual, degree, formdegree,
-                                             mapping="contravariant piola")
+        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

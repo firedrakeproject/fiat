@@ -73,7 +73,7 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
 
         self.degree = max(len(wts) for wts in self.weights)-1
         self.recurrence_order = self.degree + 1
-        super(LagrangeLineExpansionSet, self).__init__(ref_el)
+        super().__init__(ref_el)
         self.continuity = None if len(self.x) == sum(len(xk) for xk in self.nodes) else "C0"
 
     def get_num_members(self, n):
@@ -123,5 +123,4 @@ class LagrangePolynomialSet(polynomial_set.PolynomialSet):
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
-        super(LagrangePolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                                    expansion_set, coeffs)
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)

@@ -49,7 +49,7 @@ class LegendreDual(dual_set.DualSet):
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
                 entity_permutations[dim][entity] = perms
 
-        super(LegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class Legendre(finite_element.CiarletElement):
@@ -60,7 +60,7 @@ class Legendre(finite_element.CiarletElement):
             if splitting is None:
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0.P0(ref_el)
-        return super(Legendre, cls).__new__(cls)
+        return super().__new__(cls)
 
     def __init__(self, ref_el, degree, variant=None):
         splitting, _ = parse_lagrange_variant(variant, integral=True)
@@ -69,7 +69,7 @@ class Legendre(finite_element.CiarletElement):
         poly_set = ONPolynomialSet(ref_el, degree)
         dual = LegendreDual(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
-        super(Legendre, self).__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree)
 
 
 class IntegratedLegendreDual(dual_set.DualSet):
@@ -107,7 +107,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
                 entity_permutations[dim][entity] = perms
 
-        super(IntegratedLegendreDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
     def make_reference_duals(self, ref_el, degree):
         Q = create_quadrature(ref_el, 2 * degree)
@@ -140,4 +140,4 @@ class IntegratedLegendre(finite_element.CiarletElement):
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = IntegratedLegendreDual(ref_el, degree)
         formdegree = 0  # 0-form
-        super(IntegratedLegendre, self).__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree)

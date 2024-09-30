@@ -171,7 +171,7 @@ class NedelecDual(dual_set.DualSet):
                          for d in range(dim) for phi in Phis)
             entity_ids[dim][0] = list(range(cur, len(nodes)))
 
-        super(NedelecDual, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Nedelec(finite_element.CiarletElement):
@@ -205,5 +205,4 @@ class Nedelec(finite_element.CiarletElement):
             raise Exception("Not implemented")
         dual = NedelecDual(ref_el, degree, variant, interpolant_deg)
         formdegree = 1  # 1-form
-        super(Nedelec, self).__init__(poly_set, dual, degree, formdegree,
-                                      mapping="covariant piola")
+        super().__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")

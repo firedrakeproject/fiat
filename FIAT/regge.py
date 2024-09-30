@@ -42,7 +42,7 @@ class ReggeDual(DualSet):
         dofs.extend(_dofs)
         dof_ids[dim] = _dof_ids
 
-        super(ReggeDual, self).__init__(dofs, cell, dof_ids)
+        super().__init__(dofs, cell, dof_ids)
 
     @staticmethod
     def _generate_dofs(cell, entity_dim, degree, offset):
@@ -92,4 +92,4 @@ class Regge(CiarletElement):
         # mapping under affine transformation
         mapping = "double covariant piola"
 
-        super(Regge, self).__init__(Ps, Ls, degree, mapping=mapping)
+        super().__init__(Ps, Ls, degree, mapping=mapping)

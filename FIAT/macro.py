@@ -150,7 +150,7 @@ class SplitSimplicialComplex(SimplicialComplex):
                            for dim in sorted(child_to_parent)}
         self._interior_facets = interior_facets
 
-        super(SplitSimplicialComplex, self).__init__(parent.shape, vertices, topology)
+        super().__init__(parent.shape, vertices, topology)
 
     def get_child_to_parent(self):
         """Maps split complex facet tuple to its parent entity tuple."""
@@ -230,7 +230,7 @@ class IsoSplit(SplitSimplicialComplex):
             edges.append(tuple(sorted((v0, v1))))
 
         new_topology = make_topology(sd, len(new_verts), edges)
-        super(IsoSplit, self).__init__(ref_el, tuple(new_verts), new_topology)
+        super().__init__(ref_el, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent complex
@@ -280,7 +280,7 @@ class PowellSabinSplit(SplitSimplicialComplex):
         new_topology[sd] = dict(enumerate(simplices))
 
         parent = ref_el if dimension == sd else PowellSabinSplit(ref_el, dimension=dimension+1)
-        super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
+        super().__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent complex
@@ -303,7 +303,7 @@ class AlfeldSplit(PowellSabinSplit):
     """
     def __init__(self, ref_el):
         sd = ref_el.get_spatial_dimension()
-        super(AlfeldSplit, self).__init__(ref_el, dimension=sd)
+        super().__init__(ref_el, dimension=sd)
 
 
 class WorseyFarinSplit(PowellSabinSplit):
@@ -311,7 +311,7 @@ class WorseyFarinSplit(PowellSabinSplit):
     barycenter.
     """
     def __init__(self, ref_el):
-        super(WorseyFarinSplit, self).__init__(ref_el, dimension=2)
+        super().__init__(ref_el, dimension=2)
 
 
 class PowellSabin12Split(SplitSimplicialComplex):
@@ -340,7 +340,7 @@ class PowellSabin12Split(SplitSimplicialComplex):
 
         parent = PowellSabinSplit(ref_el)
         new_topology = make_topology(2, len(new_verts), edges)
-        super(PowellSabin12Split, self).__init__(parent, tuple(new_verts), new_topology)
+        super().__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -386,7 +386,7 @@ class MacroQuadratureRule(QuadratureRule):
             wts.extend(Q_cur.wts)
         pts = tuple(pts)
         wts = tuple(wts)
-        super(MacroQuadratureRule, self).__init__(ref_el, pts, wts)
+        super().__init__(ref_el, pts, wts)
 
 
 class CkPolynomialSet(polynomial_set.PolynomialSet):
@@ -451,7 +451,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
             coeffs = numpy.kron(coeffs, numpy.eye(ncomp))
             coeffs = coeffs.reshape(m*ncomp, *shape, n)
 
-        super(CkPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
+        super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
 class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
@@ -498,4 +498,4 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
             num_sv = len([s for s in sig if abs(s) > 1.e-10])
             coeffs = numpy.tensordot(vt[num_sv:], coeffs, axes=(1, 0))
 
-        super(HDivSymPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
+        super().__init__(ref_el, degree, degree, expansion_set, coeffs)

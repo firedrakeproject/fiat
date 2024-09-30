@@ -25,7 +25,7 @@ class TraceError(Exception):
     or the gradient of a trace element."""
 
     def __init__(self, msg):
-        super(TraceError, self).__init__(msg)
+        super().__init__(msg)
         self.msg = msg
 
 
@@ -114,9 +114,9 @@ class HDivTrace(FiniteElement):
         # Degree of the element
         deg = max([e.degree() for e in dg_elements.values()])
 
-        super(HDivTrace, self).__init__(ref_el, dual, order=deg,
-                                        formdegree=facet_sd,
-                                        mapping="affine")
+        super().__init__(ref_el, dual, order=deg,
+                         formdegree=facet_sd,
+                         mapping="affine")
 
         # Set up facet elements
         self.dg_elements = dg_elements

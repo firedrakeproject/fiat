@@ -48,7 +48,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
 
         entity_ids[sd][0].extend(range(cur, len(nodes)))
 
-        super(JohnsonMercierDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class JohnsonMercier(finite_element.CiarletElement):
@@ -59,5 +59,4 @@ class JohnsonMercier(finite_element.CiarletElement):
         poly_set = macro.HDivSymPolynomialSet(ref_complex, degree)
         dual = JohnsonMercierDualSet(ref_complex, degree, variant=variant)
         mapping = "double contravariant piola"
-        super(JohnsonMercier, self).__init__(poly_set, dual, degree,
-                                             mapping=mapping)
+        super().__init__(poly_set, dual, degree, mapping=mapping)

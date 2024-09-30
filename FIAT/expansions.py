@@ -247,7 +247,7 @@ class ExpansionSet(object):
         """Returns an ExpansionSet instance appropriate for the given
         reference element."""
         if cls is not ExpansionSet:
-            return super(ExpansionSet, cls).__new__(cls)
+            return super().__new__(cls)
         try:
             ref_el = args[0]
             expansion_set = {
@@ -518,7 +518,7 @@ class PointExpansionSet(ExpansionSet):
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 0:
             raise ValueError("Must have a point")
-        super(PointExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a dict of tabulations such that
@@ -532,13 +532,13 @@ class LineExpansionSet(ExpansionSet):
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
-        super(LineExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a dict of tabulations such that
         tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
         if self.variant is not None:
-            return super(LineExpansionSet, self)._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
+            return super()._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
 
         A, b = self.affine_mappings[cell]
         Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
@@ -562,7 +562,7 @@ class TriangleExpansionSet(ExpansionSet):
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
-        super(TriangleExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
 
 class TetrahedronExpansionSet(ExpansionSet):
@@ -570,7 +570,7 @@ class TetrahedronExpansionSet(ExpansionSet):
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
-        super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
 
 def polynomial_dimension(ref_el, n, continuity=None):

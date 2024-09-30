@@ -70,7 +70,7 @@ class ArnoldWintherNCDual(DualSet):
             dof_ids[1][entity_id].append(dof_cur)
             dof_cur += 1
 
-        super(ArnoldWintherNCDual, self).__init__(dofs, cell, dof_ids)
+        super().__init__(dofs, cell, dof_ids)
 
 
 class ArnoldWintherNC(CiarletElement):
@@ -82,8 +82,7 @@ class ArnoldWintherNC(CiarletElement):
         Ls = ArnoldWintherNCDual(cell, degree)
         mapping = "double contravariant piola"
 
-        super(ArnoldWintherNC, self).__init__(Ps, Ls, degree,
-                                              mapping=mapping)
+        super().__init__(Ps, Ls, degree, mapping=mapping)
 
 
 class ArnoldWintherDual(DualSet):
@@ -152,7 +151,7 @@ class ArnoldWintherDual(DualSet):
 
         dof_ids[2][0] += list(range(dof_cur, dof_cur+6))
 
-        super(ArnoldWintherDual, self).__init__(dofs, cell, dof_ids)
+        super().__init__(dofs, cell, dof_ids)
 
 
 class ArnoldWinther(CiarletElement):
@@ -163,4 +162,4 @@ class ArnoldWinther(CiarletElement):
         Ps = ONSymTensorPolynomialSet(cell, degree)
         Ls = ArnoldWintherDual(cell, degree)
         mapping = "double contravariant piola"
-        super(ArnoldWinther, self).__init__(Ps, Ls, degree, mapping=mapping)
+        super().__init__(Ps, Ls, degree, mapping=mapping)

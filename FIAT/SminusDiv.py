@@ -78,11 +78,11 @@ class TrimmedSerendipity(FiniteElement):
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
-        super(TrimmedSerendipity, self).__init__(ref_el=ref_el,
-                                                 dual=None,
-                                                 order=degree,
-                                                 formdegree=formdegree,
-                                                 mapping=mapping)
+        super().__init__(ref_el=ref_el,
+                         dual=None,
+                         order=degree,
+                         formdegree=formdegree,
+                         mapping=mapping)
 
         topology = ref_el.get_topology()
         unflattening_map = compute_unflattening_map(topology)
@@ -198,7 +198,7 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
                 IL = ()
             Sminus_list = FL + IL
             self.basis = {(0, 0, 0): Array(Sminus_list)}
-            super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
+            super().__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
 
         else:
             # Put all 2 dimensional stuff here.
@@ -213,7 +213,7 @@ class TrimmedSerendipityDiv(TrimmedSerendipity):
             Sminus_list = EL + FL
             Sminus_list = [[-a[1], a[0]] for a in Sminus_list]
             self.basis = {(0, 0): Array(Sminus_list)}
-            super(TrimmedSerendipityDiv, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
+            super().__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
 
 
 def f_lambda_2_3d(degree, dx, dy, dz, x_mid, y_mid, z_mid):

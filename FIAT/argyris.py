@@ -82,7 +82,7 @@ class ArgyrisDualSet(dual_set.DualSet):
                 entity_ids[2][0] = list(range(cur, len(nodes)))
         else:
             raise ValueError("Invalid variant for Argyris")
-        super(ArgyrisDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Argyris(finite_element.CiarletElement):
@@ -107,4 +107,4 @@ class Argyris(finite_element.CiarletElement):
 
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = ArgyrisDualSet(ref_el, degree, variant, interpolant_deg)
-        super(Argyris, self).__init__(poly_set, dual, degree)
+        super().__init__(poly_set, dual, degree)
