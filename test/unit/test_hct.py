@@ -42,7 +42,9 @@ def test_hct_constant(cell, reduced):
 
 @pytest.mark.parametrize("reduced", (False, True))
 def test_stokes_complex(cell, reduced):
-    # Test that we have the lowest-order discrete Stokes complex
+    # Test that we have the lowest-order discrete Stokes complex, verifying
+    # that the range of the exterior derivative of each space is contained by
+    # the next space in the sequence
     H2 = HCT(cell, reduced=reduced)
     ref_complex = H2.get_reference_complex()
     if reduced:
@@ -72,7 +74,7 @@ def test_stokes_complex(cell, reduced):
 
     H2dim = H2.space_dimension()
     H1dim = H1.space_dimension()
-    X, residual, *_ = numpy.linalg.lstsq(H1val.reshape(H1dim, -1).T, H2curl.reshape(H2dim, -1).T)
+    _, residual, *_ = numpy.linalg.lstsq(H1val.reshape(H1dim, -1).T, H2curl.reshape(H2dim, -1).T)
     assert numpy.allclose(residual, 0)
 
     _, residual, *_ = numpy.linalg.lstsq(L2val.T, H1div.T)

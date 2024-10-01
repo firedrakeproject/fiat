@@ -4,6 +4,11 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
+# This is not quite Bernardi-Raugel, but it has 2*dim*(dim+1) dofs and includes
+# dim**2-1 extra constraint functionals.  The first (dim+1)**2 basis functions
+# are the reference element bfs, but the extra dim**2-1 are used in the
+# transformation theory.
+
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
 from FIAT.quadrature_schemes import create_quadrature
@@ -13,13 +18,14 @@ import numpy
 
 
 def ExtendedBernardiRaugelSpace(ref_el, degree):
-    """Return a basis for the extended Bernardi-Raugel space.
-    P_1^d + (P_{d} - P_{d-1})^d"""
+    r"""Return a basis for the extended Bernardi-Raugel space.
+    P_1^d + (P_{d} \ P_{d-1})^d"""
     sd = ref_el.get_spatial_dimension()
     Pk = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), scale=1, variant="bubble")
     dimPk = expansions.polynomial_dimension(ref_el, degree, continuity="C0")
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
-    ids = [i+j*dimPk for j in range(sd) for dim in (0, sd-1) for i in chain.from_iterable(entity_ids[dim].values())]
+    ids = [i+j*dimPk for j in range(sd) for dim in (0, sd-1)
+           for i in chain.from_iterable(entity_ids[dim].values())]
     return Pk.take(ids)
 
 
@@ -77,9 +83,12 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 class BernardiRaugel(finite_element.CiarletElement):
     """The Bernardi-Raugel extended element."""
     def __init__(self, ref_el, degree=None):
+        sd = ref_el.get_spatial_dimension()
         if degree is None:
-            degree = ref_el.get_spatial_dimension()
-        dual = BernardiRaugelDualSet(ref_el, degree, reduced=False)
+            degree = sd
+        if degree != sd:
+            raise ValueError("Bernardi-Raugel only defined for degree = dim")
         poly_set = ExtendedBernardiRaugelSpace(ref_el, degree)
+        dual = BernardiRaugelDualSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

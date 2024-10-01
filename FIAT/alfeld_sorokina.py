@@ -6,23 +6,24 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-from FIAT import finite_element, dual_set, macro, polynomial_set
+from FIAT import finite_element, dual_set, polynomial_set
 from FIAT.functional import ComponentPointEvaluation, PointDivergence
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.macro import CkPolynomialSet, AlfeldSplit
 
 import numpy
 
 
 def AlfeldSorokinaSpace(ref_el, degree):
-    """Return a vector-valued C^0 PolynomialSet whose divergence is also C^0.
-    """
-    ref_complex = macro.AlfeldSplit(ref_el)
+    """Return a vector-valued C^0 PolynomialSet on an Alfeld split whose
+    divergence is also C^0.  This works for on any simplex and for all
+    polynomial degrees."""
+    ref_complex = AlfeldSplit(ref_el)
     sd = ref_complex.get_spatial_dimension()
-    shp = (sd,)
-    P = polynomial_set.ONPolynomialSet(ref_complex, degree, shape=shp, variant="bubble")
-    expansion_set = P.get_expansion_set()
-    num_members = P.get_num_members()
-    coeffs = P.get_coeffs()
+    C0 = CkPolynomialSet(ref_complex, degree, order=0, shape=(sd,), variant="bubble")
+    expansion_set = C0.get_expansion_set()
+    num_members = C0.get_num_members()
+    coeffs = C0.get_coeffs()
 
     facet_el = ref_complex.construct_subelement(sd-1)
     phi = polynomial_set.ONPolynomialSet(facet_el, 0 if sd == 1 else degree-1)
@@ -72,7 +73,8 @@ class AlfeldSorokinaDualSet(dual_set.DualSet):
 
 
 class AlfeldSorokina(finite_element.CiarletElement):
-    """The Alfeld-Sorokina macroelement."""
+    """The Alfeld-Sorokina C^0 quadratic macroelement with C^0 divergence. This element
+    belongs to a Stokes complex, and is paired with Lagrange(ref_el, 1, variant="alfeld")."""
     def __init__(self, ref_el, degree=2):
         dual = AlfeldSorokinaDualSet(ref_el, degree)
         poly_set = AlfeldSorokinaSpace(ref_el, degree)

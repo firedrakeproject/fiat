@@ -139,9 +139,9 @@ def test_powell_sabin(cell):
 
     for split_dim in range(1, dim):
         PS = PowellSabinSplit(cell, split_dim)
-        assert len(PS.get_topology()[dim]) == math.factorial(dim+1) // math.factorial(split_dim)
         assert PS > A
         assert PS > cell
+        assert len(PS.get_topology()[dim]) == math.factorial(dim+1) // math.factorial(split_dim)
 
 
 def make_mass_matrix(fe, order=0):
@@ -358,9 +358,9 @@ def test_Ck_basis(cell, order, degree, variant):
         assert numpy.allclose(local_phis, phis[:, ipts])
 
 
-@pytest.mark.parametrize("degree", (2, 4))
+@pytest.mark.parametrize("degree", (2, 3, 4))
 def test_AlfeldSorokinaSpace(cell, degree):
-    # Test that the derivative of the Alfeld-Sorokina space is spanned by a C0 basis
+    # Test that the divergence of the Alfeld-Sorokina space is spanned by a C0 basis
     from FIAT.alfeld_sorokina import AlfeldSorokinaSpace
 
     P1 = AlfeldSorokinaSpace(cell, degree)
@@ -383,30 +383,40 @@ def test_AlfeldSorokinaSpace(cell, degree):
     assert numpy.allclose(residual, 0)
 
 
-def test_ArnoldQinSpace(cell):
+def test_minimal_stokes_space(cell):
+    # Test that the C0 Stokes space is spanned by a C0 basis
+    # Also test that its divergence is constant
     from FIAT.arnold_qin import ArnoldQinSpace
+    from FIAT.christiansen_hu import ChristiansenHuSpace
     sd = cell.get_spatial_dimension()
-    if sd == 1:
+    if sd == 3:
+        degree = 1
+        space = ChristiansenHuSpace
+    elif sd == 2:
+        degree = 2
+        space = ArnoldQinSpace
+    else:
         return
-    degree = 4 - sd
-    AQ = ArnoldQinSpace(cell, degree)
-    AQred = ArnoldQinSpace(cell, degree, reduced=True)
-    AQdim = AQ.get_num_members()
-    AQreddim = AQred.get_num_members()
-    A = AQ.get_reference_element()
-    top = A.get_topology()
+
+    W = space(cell, degree)
+    V = space(cell, degree, reduced=True)
+    Wdim = W.get_num_members()
+    Vdim = V.get_num_members()
+    K = W.get_reference_element()
+    sd = K.get_spatial_dimension()
+    top = K.get_topology()
 
     pts = []
     for dim in top:
         for entity in top[dim]:
-            pts.extend(A.make_points(dim, entity, degree))
+            pts.extend(K.make_points(dim, entity, degree))
 
-    C0 = CkPolynomialSet(A, degree, order=0, variant="bubble")
+    C0 = CkPolynomialSet(K, degree, order=0, variant="bubble")
     C0_tab = C0.tabulate(pts)
-    AQ_tab = AQ.tabulate(pts, 1)
-    AQred_tab = AQred.tabulate(pts, 1)
+    Wtab = W.tabulate(pts, 1)
+    Vtab = V.tabulate(pts, 1)
     z = (0,)*sd
-    for tab in (AQred_tab, AQ_tab):
+    for tab in (Vtab, Wtab):
         # Test that the space is full rank
         _, sig, _ = numpy.linalg.svd(tab[z].reshape(-1, sd*len(pts)).T, full_matrices=True)
         assert all(sig > 1E-10)
@@ -418,13 +428,13 @@ def test_ArnoldQinSpace(cell):
 
         # Test that divergence is in P0
         div = sum(tab[alpha][:, alpha.index(1), :]
-                  for alpha in tab if sum(alpha) == 1)[:AQreddim]
+                  for alpha in tab if sum(alpha) == 1)[:Vdim]
         assert numpy.allclose(div, div[:, 0][:, None])
 
     # Test that the full space includes the reduced space
-    assert AQdim > AQreddim
-    _, residual, *_ = numpy.linalg.lstsq(AQ_tab[z].reshape(AQdim, -1).T,
-                                         AQred_tab[z].reshape(AQreddim, -1).T)
+    assert Wdim > Vdim
+    _, residual, *_ = numpy.linalg.lstsq(Wtab[z].reshape(Wdim, -1).T,
+                                         Vtab[z].reshape(Vdim, -1).T)
     assert numpy.allclose(residual, 0)
 
 
