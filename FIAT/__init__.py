@@ -13,6 +13,7 @@ from FIAT.bell import Bell
 from FIAT.hct import HsiehCloughTocher
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
+from FIAT.guzman_neilan import GuzmanNeilan
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
@@ -87,6 +88,7 @@ supported_elements = {"Argyris": Argyris,
                       "Alfeld-Sorokina": AlfeldSorokina,
                       "Arnold-Qin": ArnoldQin,
                       "Christiansen-Hu": ChristiansenHu,
+                      "Guzman-Neilan": GuzmanNeilan,
                       "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
