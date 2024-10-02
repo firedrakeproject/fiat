@@ -18,6 +18,10 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
     """Return a basis for the Arnold-Qin space
     curl(HCT-red) + P_0 x if reduced = True, and
     curl(HCT) + P_0 x if reduced = False."""
+    if ref_el.get_shape() != TRIANGLE:
+        raise ValueError("Arnold-Qin only defined on triangles")
+    if degree != 2:
+        raise ValueError("Arnold-Qin only defined for degree = 2")
     sd = ref_el.get_spatial_dimension()
     HCT = HsiehCloughTocher(ref_el, degree+1, reduced=True)
     ref_complex = HCT.get_reference_complex()
@@ -53,12 +57,8 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
 
 class ArnoldQin(finite_element.CiarletElement):
     """The Arnold-Qin C^0(Alfeld) quadratic macroelement with divergence in P0.
-    This element belongs to a Stokes complex, and is paired with DG0."""
+    This element belongs to a Stokes complex, and is paired with unsplit DG0."""
     def __init__(self, ref_el, degree=2):
-        if ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Arnold-Qin only defined on triangles")
-        if degree != 2:
-            raise ValueError("Arnold-Qin only defined for degree = 2")
         poly_set = ArnoldQinSpace(ref_el, degree)
         ref_complex = poly_set.get_reference_element()
         dual = BernardiRaugelDualSet(ref_complex, degree)
