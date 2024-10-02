@@ -11,13 +11,15 @@
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.macro import AlfeldSplit, CkPolynomialSet
-from FIAT.bernardi_raugel import BernardiRaugelDualSet
+from FIAT.bernardi_raugel import ExtendedBernardiRaugelSpace, BernardiRaugelDualSet
 from FIAT.quadrature_schemes import create_quadrature
 import numpy
 
 
 def GuzmanNeilanSpace(ref_el, degree):
     r"""Return a basis for the extended Guzman-Neilan space."""
+    BR = ExtendedBernardiRaugelSpace(ref_el, degree)
+
     top = ref_el.get_topology()
     ref_complex = AlfeldSplit(ref_el)
     sd = ref_complex.get_spatial_dimension()
@@ -26,18 +28,13 @@ def GuzmanNeilanSpace(ref_el, degree):
     dimPk = expansion_set.get_num_members(degree)
     entity_ids = expansions.polynomial_entity_ids(ref_complex, degree, continuity="C0")
 
-    bcoeffs = numpy.zeros((sd+1, sd, dimPk))
-    for f in sorted(top[sd-1]):
-        i = entity_ids[sd-1][f][0]
-        bcoeffs[f, :, i] = ref_el.compute_normal(f)
-    bubbles = polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set, bcoeffs)
-
     ids = [i + j*dimPk for j in range(sd)
            for dim in range(sd+1)
            for f in sorted(ref_complex.get_interior_facets(dim))
            for i in entity_ids[dim][f]]
     V = Pk.take(ids)
     Q = polynomial_set.ONPolynomialSet(ref_complex, degree-1)
+    Q = Q.take(list(range(1, Q.get_num_members())))
 
     div = lambda tab: sum(tab[alpha][:, alpha.index(1), :] for alpha in tab if sum(alpha) == 1)
     inner = lambda u, v, qwts: numpy.tensordot(numpy.multiply(u, qwts), v,
@@ -45,40 +42,30 @@ def GuzmanNeilanSpace(ref_el, degree):
 
     rule = create_quadrature(ref_complex, 2*degree)
     qpts, qwts = rule.get_points(), rule.get_weights()
-    Qtab = Q.tabulate(qpts)
-    Vtab = V.tabulate(qpts, 1)
-    Btab = bubbles.tabulate(qpts, 1)
-    U, P, b = Vtab[(0,)*sd], Qtab[(0,)*sd], Btab[(0,)*sd]
-    divU, divb = div(Vtab), div(Btab)
+    P = Q.tabulate(qpts)[(0,)*sd]
+    U = V.tabulate(qpts, 1)
+    X = BR.tabulate(qpts, 1)
+    stiff = lambda u, v: sum(inner(u[alpha], v[alpha], qwts) for alpha in u if sum(alpha) == 1)
 
-    c = numpy.dot(divb, qwts)[:, None]/sum(qwts)
-    A = inner(U, U, qwts)
-    B = inner(P, divU, qwts)
-    f = inner(U, -b, qwts)
-    g = inner(P, c - divb, qwts)
+    divb = div(X)
+    divb -= numpy.dot(divb, qwts)[:, None]/sum(qwts)
+    P -= numpy.dot(P, qwts)[:, None]/sum(qwts)
+    A = stiff(U, U)
+    B = inner(P, div(U), qwts)
+    f = stiff(U, X)
+    g = inner(P, divb, qwts)
 
     S = B @ numpy.linalg.solve(A, B.T)
     u = numpy.linalg.solve(A, f)
     p = numpy.linalg.solve(S, B @ u - g)
     u -= numpy.linalg.solve(A, B.T @ p)
 
-    bcoeffs += numpy.tensordot(u, V.get_coeffs(), axes=(0, 0))
-
-    tcoeffs = numpy.zeros(((sd-1)*(sd+1), sd, dimPk))
-    cur = 0
-    for f in sorted(top[sd-1]):
-        n = ref_el.compute_normal(f)
-        ncoeff = numpy.dot(n, bcoeffs[f])
-        for t in ref_el.compute_normalized_tangents(sd-1, f):
-            tcoeffs[cur] = t[:, None] * ncoeff
-            cur += 1
-
-    P1 = CkPolynomialSet(ref_el, 1, shape=(sd,), scale=1, variant="bubble")
-    pk, p1 = P1.tabulate(qpts)[(0,)*sd], Pk.tabulate(qpts)[(0,)*sd]
-    P1coeffs = numpy.tensordot(numpy.linalg.inv(inner(pk, pk, qwts)), inner(pk, p1, qwts), axes=(1, 0))
-
-    coeffs = numpy.concatenate((P1coeffs.reshape(-1, sd, dimPk), bcoeffs, tcoeffs))
-    return polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set, coeffs)
+    p1, pk = BR.tabulate(qpts)[(0,)*sd], Pk.tabulate(qpts)[(0,)*sd]
+    coeffs = numpy.tensordot(inner(p1, pk, qwts), numpy.linalg.inv(inner(pk, pk, qwts)), axes=(1, 1))
+    coeffs = coeffs.reshape(-1, sd, dimPk)
+    coeffs -= numpy.tensordot(u, V.get_coeffs(), axes=(0, 0))
+    GN = polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set, coeffs)
+    return GN
 
 
 class GuzmanNeilan(finite_element.CiarletElement):
