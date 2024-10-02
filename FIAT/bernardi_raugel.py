@@ -13,7 +13,6 @@ from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
-from itertools import chain
 import numpy
 
 
@@ -24,8 +23,11 @@ def ExtendedBernardiRaugelSpace(ref_el, degree):
     Pk = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), scale=1, variant="bubble")
     dimPk = expansions.polynomial_dimension(ref_el, degree, continuity="C0")
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
-    ids = [i+j*dimPk for j in range(sd) for dim in (0, sd-1)
-           for i in chain.from_iterable(entity_ids[dim].values())]
+    ids = [i + j * dimPk
+           for dim in (0, sd-1)
+           for f in sorted(entity_ids[dim])
+           for i in entity_ids[dim][f]
+           for j in range(sd)]
     return Pk.take(ids)
 
 

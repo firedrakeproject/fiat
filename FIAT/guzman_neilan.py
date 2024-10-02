@@ -9,61 +9,73 @@
 # are the reference element bfs, but the extra dim**2-1 are used in the
 # transformation theory.
 
-from FIAT import finite_element, dual_set, polynomial_set, expansions
-from FIAT.macro import AlfeldSplit, CkPolynomialSet
-from FIAT.bernardi_raugel import ExtendedBernardiRaugelSpace, BernardiRaugelDualSet
+from FIAT import finite_element, polynomial_set, expansions
+from FIAT.bernardi_raugel import BernardiRaugel, BernardiRaugelDualSet
+from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
 import numpy
 
 
 def GuzmanNeilanSpace(ref_el, degree):
     r"""Return a basis for the extended Guzman-Neilan space."""
-    BR = ExtendedBernardiRaugelSpace(ref_el, degree)
+    sd = ref_el.get_spatial_dimension()
+    if degree != sd:
+        raise ValueError("Guzman-Neilan only defined for degree = dim")
 
-    top = ref_el.get_topology()
+    BR = BernardiRaugel(ref_el, degree).get_nodal_basis()
+
     ref_complex = AlfeldSplit(ref_el)
-    sd = ref_complex.get_spatial_dimension()
-    Pk = CkPolynomialSet(ref_complex, degree, order=0, shape=(sd,), scale=1, variant="bubble")
-    expansion_set = Pk.get_expansion_set()
-    dimPk = expansion_set.get_num_members(degree)
-    entity_ids = expansions.polynomial_entity_ids(ref_complex, degree, continuity="C0")
+    C0 = polynomial_set.ONPolynomialSet(ref_complex, degree, shape=(sd,), scale=1, variant="bubble")
+    expansion_set = C0.get_expansion_set()
+    dimC0 = expansion_set.get_num_members(degree)
 
-    ids = [i + j*dimPk for j in range(sd)
+    entity_ids = expansions.polynomial_entity_ids(ref_complex, degree, continuity="C0")
+    ids = [i + j * dimC0
            for dim in range(sd+1)
            for f in sorted(ref_complex.get_interior_facets(dim))
-           for i in entity_ids[dim][f]]
-    V = Pk.take(ids)
+           for i in entity_ids[dim][f]
+           for j in range(sd)]
+    V = C0.take(ids)
     Q = polynomial_set.ONPolynomialSet(ref_complex, degree-1)
     Q = Q.take(list(range(1, Q.get_num_members())))
 
-    div = lambda tab: sum(tab[alpha][:, alpha.index(1), :] for alpha in tab if sum(alpha) == 1)
-    inner = lambda u, v, qwts: numpy.tensordot(numpy.multiply(u, qwts), v,
-                                               axes=(range(1, u.ndim), range(1, v.ndim)))
-
     rule = create_quadrature(ref_complex, 2*degree)
     qpts, qwts = rule.get_points(), rule.get_weights()
-    P = Q.tabulate(qpts)[(0,)*sd]
-    U = V.tabulate(qpts, 1)
+
+    # Compute the divergence from tabulation dict
+    div = lambda tab: sum(tab[alpha][:, alpha.index(1), :] for alpha in tab if sum(alpha) == 1)
+    # compute the L2 inner product from tabulation arrays and quadrature weights
+    inner = lambda v, u, qwts: numpy.tensordot(numpy.multiply(v, qwts), u,
+                                               axes=(range(1, v.ndim), range(1, u.ndim)))
+    # Stokes bilinear forms
+    a = lambda v, u: sum(inner(v[alpha], u[alpha], qwts) for alpha in u if sum(alpha) == 1)
+    b = lambda q, u: inner(q, div(u), qwts)
+
     X = BR.tabulate(qpts, 1)
-    stiff = lambda u, v: sum(inner(u[alpha], v[alpha], qwts) for alpha in u if sum(alpha) == 1)
+    U = V.tabulate(qpts, 1)
+    # Take pressure test functions in L2 \ R
+    P = Q.tabulate(qpts)[(0,)*sd]
+    P -= numpy.dot(P, qwts)[:, None] / sum(qwts)
 
-    divb = div(X)
-    divb -= numpy.dot(divb, qwts)[:, None]/sum(qwts)
-    P -= numpy.dot(P, qwts)[:, None]/sum(qwts)
-    A = stiff(U, U)
-    B = inner(P, div(U), qwts)
-    f = stiff(U, X)
-    g = inner(P, divb, qwts)
+    # Stokes LHS
+    A = a(U, U)
+    B = b(P, U)
+    # Stokes RHS
+    f = a(U, X)
+    g = b(P, X)
 
-    S = B @ numpy.linalg.solve(A, B.T)
+    # Solve using the Schur complement
+    AinvBT = numpy.linalg.solve(A, B.T)
+    S = B @ AinvBT
     u = numpy.linalg.solve(A, f)
     p = numpy.linalg.solve(S, B @ u - g)
-    u -= numpy.linalg.solve(A, B.T @ p)
+    u -= AinvBT @ p
 
-    p1, pk = BR.tabulate(qpts)[(0,)*sd], Pk.tabulate(qpts)[(0,)*sd]
-    coeffs = numpy.tensordot(inner(p1, pk, qwts), numpy.linalg.inv(inner(pk, pk, qwts)), axes=(1, 1))
-    coeffs = coeffs.reshape(-1, sd, dimPk)
+    phi = C0.tabulate(qpts)[(0,)*sd]
+    coeffs = numpy.linalg.solve(inner(phi, phi, qwts), inner(phi, X[(0,)*sd], qwts))
+    coeffs = coeffs.T.reshape(BR.get_num_members(), sd, dimC0)
     coeffs -= numpy.tensordot(u, V.get_coeffs(), axes=(0, 0))
+
     GN = polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set, coeffs)
     return GN
 
