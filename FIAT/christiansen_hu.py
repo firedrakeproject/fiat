@@ -68,7 +68,7 @@ def ChristiansenHuSpace(ref_el, degree, reduced=False):
 
 class ChristiansenHu(finite_element.CiarletElement):
     """The Christiansen-Hu C^0(Worsey-Farin) linear macroelement with divergence in P0.
-    This element belongs to a Stokes complex, and is paired with DG0."""
+    This element belongs to a Stokes complex, and is paired with unsplit DG0."""
     def __init__(self, ref_el, degree=1):
         if ref_el.get_shape() != TETRAHEDRON:
             raise ValueError("Christiansen-Hu only defined on tetrahedra")

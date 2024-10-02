@@ -16,7 +16,7 @@ import numpy
 
 def AlfeldSorokinaSpace(ref_el, degree):
     """Return a vector-valued C^0 PolynomialSet on an Alfeld split whose
-    divergence is also C^0.  This works for on any simplex and for all
+    divergence is also C^0.  This works on any simplex and for all
     polynomial degrees."""
     ref_complex = AlfeldSplit(ref_el)
     sd = ref_complex.get_spatial_dimension()
@@ -52,7 +52,7 @@ def AlfeldSorokinaSpace(ref_el, degree):
 class AlfeldSorokinaDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree):
         if degree != 2:
-            raise ValueError("Alfeld-Sorokina only defined for degree = 2")
+            raise NotImplementedError("Alfeld-Sorokina only defined for degree = 2")
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
