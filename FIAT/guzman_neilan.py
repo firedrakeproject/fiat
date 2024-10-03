@@ -10,7 +10,7 @@
 # transformation theory.
 
 from FIAT import finite_element, polynomial_set, expansions
-from FIAT.bernardi_raugel import ExtendedBernardiRaugelSpace, BernardiRaugelDualSet
+from FIAT.bernardi_raugel import ExtendedBernardiRaugelSpace, BernardiRaugelDualSet, BernardiRaugel
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
@@ -20,7 +20,7 @@ import numpy
 import math
 
 
-def ExtendedGuzmanNeilanSpace(ref_el, degree):
+def ExtendedGuzmanNeilanSpace(ref_el, degree, reduced=False):
     """Return a basis for the extended Guzman-Neilan space."""
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
@@ -28,7 +28,11 @@ def ExtendedGuzmanNeilanSpace(ref_el, degree):
     B = take_interior_bubbles(C0)
     if sd > 2:
         B = modified_bubble_subspace(B)
-    BR = ExtendedBernardiRaugelSpace(ref_el, degree)
+    if reduced:
+        BR = BernardiRaugel(ref_el, degree).get_nodal_basis().take(list(range((sd+1)**2)))
+    else:
+        BR = ExtendedBernardiRaugelSpace(ref_el, degree)
+
     GN = constant_div_projection(BR, C0, B)
     return GN
 
@@ -129,13 +133,13 @@ def constant_div_projection(BR, C0, M):
     # Invert the divergence
     B = inner(P, div(U), qwts)
     g = inner(P, div(X), qwts)
-    u = numpy.linalg.solve(B, g)
+    w = numpy.linalg.solve(B, g)
 
     # Add correction to BR bubbles
     v = C0.tabulate(qpts)[(0,)*sd]
     coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, X[(0,)*sd], qwts))
     coeffs = coeffs.T.reshape(BR.get_num_members(), sd, -1)
-    coeffs -= numpy.tensordot(u, M.get_coeffs(), axes=(0, 0))
+    coeffs -= numpy.tensordot(w, M.get_coeffs(), axes=(0, 0))
     GN = polynomial_set.PolynomialSet(ref_complex, degree, degree,
                                       C0.get_expansion_set(), coeffs)
     return GN
