@@ -14,17 +14,19 @@ from FIAT.bernardi_raugel import BernardiRaugel, BernardiRaugelDualSet
 from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
+from itertools import chain
 import numpy
+import math
 
 
 def inner(v, u, qwts):
-    """compute the L2 inner product from tabulation arrays and quadrature weights"""
+    """Compute the L2 inner product from tabulation arrays and quadrature weights"""
     return numpy.tensordot(numpy.multiply(v, qwts), u,
                            axes=(range(1, v.ndim), range(1, u.ndim)))
 
 
 def div(U):
-    """compute the divergence from tabulation dict"""
+    """Compute the divergence from tabulation dict"""
     return sum(U[k][:, k.index(1), :] for k in U if sum(k) == 1)
 
 
@@ -80,23 +82,24 @@ def modified_bubble_subspace(C0):
         qpts, qwts = rule.get_points(), rule.get_weights()
 
         hat = C0.take([sd+1])
-        hat_at_qpts = hat.tabulate(qpts)[(0,)*sd][:, 0, :]
-        bubbles = []
-        for k in range(sd):
-            if k < 2:
-                Pk = polynomial_set.ONPolynomialSet(ref_el, k, shape=(sd,))
-            else:
-                BDMk = BrezziDouglasMarini(ref_el, k)
-                entity_ids = BDMk.entity_dofs()
-                num_facet_dofs = len(entity_ids[sd-1]) * len(entity_ids[sd-1][0])
-                Pk = BDMk.get_nodal_basis().take(list(range(num_facet_dofs)))
-            phis = Pk.tabulate(qpts)[(0,)*sd]
-            bubbles.append(numpy.multiply(phis, hat_at_qpts ** (sd-k)))
+        hat_at_qpts = hat.tabulate(qpts)[(0,)*sd][0, 0]
 
-        bubbles = numpy.concatenate(bubbles)
-        _, sig, _ = numpy.linalg.svd(bubbles.reshape(bubbles.shape[0], -1), full_matrices=True)
-        phi = V.tabulate(qpts)[(0,)*sd]
-        coeffs = numpy.linalg.solve(inner(phi, phi, qwts), inner(phi, bubbles, qwts))
+        BDM = BrezziDouglasMarini(ref_el, min(2, degree-1))
+        entity_dofs = BDM.entity_dofs()
+        facet_dofs = list(range(BDM.space_dimension() - len(entity_dofs[sd][0])))
+        BDM_facet = BDM.get_nodal_basis().take(facet_dofs)
+        phis = BDM_facet.tabulate(qpts)[(0,)*sd]
+
+        bubbles = [numpy.eye(sd)[:, :, None] * hat_at_qpts[None, None, :]]
+        for k in range(1, degree):
+            dimPk = math.comb(k + sd-1, sd-1)
+            idsPk = list(chain.from_iterable(entity_dofs[sd-1][f][:dimPk]
+                         for f in entity_dofs[sd-1]))
+            bubbles.append(numpy.multiply(phis[idsPk], hat_at_qpts ** (sd-k)))
+        bubbles = numpy.concatenate(bubbles, axis=0)
+
+        v = V.tabulate(qpts)[(0,) * sd]
+        coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, bubbles, qwts))
         coeffs = numpy.tensordot(coeffs, V.get_coeffs(), axes=(0, 0))
         V = polynomial_set.PolynomialSet(ref_complex, degree, degree,
                                          C0.get_expansion_set(), coeffs)
@@ -109,8 +112,8 @@ def GuzmanNeilanSpace(ref_el, degree):
     if degree != sd:
         raise ValueError("Guzman-Neilan only defined for degree = dim")
 
-    BR = BernardiRaugel(ref_el, degree).get_nodal_basis()
     ref_complex = AlfeldSplit(ref_el)
+    BR = BernardiRaugel(ref_el, degree).get_nodal_basis()
     C0 = polynomial_set.ONPolynomialSet(ref_complex, degree, shape=(sd,), scale=1, variant="bubble")
 
     V = modified_bubble_subspace(C0)
