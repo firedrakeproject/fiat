@@ -12,22 +12,17 @@ class RestrictedDualSet(DualSet):
     """Restrict the given DualSet to the specified list of dofs."""
 
     def __init__(self, dual, indices):
+        indices = list(sorted(indices))
         ref_el = dual.get_reference_element()
         nodes_old = dual.get_nodes()
-        dof_counter = 0
         entity_ids = {}
         nodes = []
         for d, entities in dual.get_entity_ids().items():
             entity_ids[d] = {}
             for entity, dofs in entities.items():
-                entity_ids[d][entity] = []
-                for dof in dofs:
-                    if dof not in indices:
-                        continue
-                    entity_ids[d][entity].append(dof_counter)
-                    dof_counter += 1
-                    nodes.append(nodes_old[dof])
-        assert dof_counter == len(indices)
+                entity_ids[d][entity] = [indices.index(dof)
+                                         for dof in dofs if dof in indices]
+        nodes = [nodes_old[i] for i in indices]
         self._dual = dual
         super().__init__(nodes, ref_el, entity_ids)
 
