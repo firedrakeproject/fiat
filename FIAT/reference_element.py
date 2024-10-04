@@ -568,6 +568,11 @@ class SimplicialComplex(Cell):
         out = numpy.dot(points, A.T)
         return numpy.add(out, b, out=out)
 
+    def compute_bubble(self, points, entity=None):
+        """Returns the lowest-order bubble on an entity evaluated at the given
+        points on the entity."""
+        return numpy.prod(self.compute_barycentric_coordinates(points, entity), axis=1)
+
     def distance_to_point_l1(self, points, entity=None, rescale=False):
         # noqa: D301
         """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear

@@ -54,8 +54,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             f_at_qpts = P.tabulate(Q.get_points())[(0,)*(sd-1)][-1]
         else:
             ref_facet = facet.get_parent() or facet
-            x = ref_facet.compute_barycentric_coordinates(Q.get_points())
-            f_at_qpts = numpy.prod(x, axis=1)
+            f_at_qpts = ref_facet.compute_bubble(Q.get_points())
 
         f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / facet.volume()
 
