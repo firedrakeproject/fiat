@@ -383,7 +383,7 @@ def test_AlfeldSorokinaSpace(cell, degree):
     assert numpy.allclose(residual, 0)
 
 
-@pytest.mark.parametrize("family", ("CH", "GN"))
+@pytest.mark.parametrize("family", ("AQ", "CH", "GN"))
 def test_minimal_stokes_space(cell, family):
     # Test that the C0 Stokes space is spanned by a C0 basis
     # Also test that its divergence is constant
@@ -396,12 +396,14 @@ def test_minimal_stokes_space(cell, family):
     if family == "GN":
         degree = sd
         space = ExtendedGuzmanNeilanSpace
-    elif sd == 2:
-        degree = 2
-        space = ArnoldQinSpace
-    elif sd == 3:
+    elif family == "CH":
         degree = 1
         space = ChristiansenHuSpace
+    elif family == "AQ":
+        if sd != 2:
+            return
+        degree = 2
+        space = ArnoldQinSpace
 
     W = space(cell, degree)
     V = space(cell, degree, reduced=True)

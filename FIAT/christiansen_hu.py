@@ -12,7 +12,6 @@
 from FIAT import finite_element, polynomial_set
 from FIAT.bernardi_raugel import BernardiRaugelDualSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import TETRAHEDRON
 from FIAT.macro import CkPolynomialSet, WorseyFarinSplit
 
 import numpy
@@ -70,8 +69,6 @@ class ChristiansenHu(finite_element.CiarletElement):
     """The Christiansen-Hu C^0(Worsey-Farin) linear macroelement with divergence in P0.
     This element belongs to a Stokes complex, and is paired with unsplit DG0."""
     def __init__(self, ref_el, degree=1):
-        if ref_el.get_shape() != TETRAHEDRON:
-            raise ValueError("Christiansen-Hu only defined on tetrahedra")
         if degree != 1:
             raise ValueError("Christiansen-Hu only defined for degree = 1")
         poly_set = ChristiansenHuSpace(ref_el, degree)
