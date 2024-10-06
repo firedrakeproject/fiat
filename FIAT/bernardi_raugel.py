@@ -38,6 +38,8 @@ class BernardiRaugelDualSet(dual_set.DualSet):
     def __init__(self, ref_complex, degree, subdegree=1, reduced=False):
         ref_el = ref_complex.get_parent() or ref_complex
         sd = ref_el.get_spatial_dimension()
+        if subdegree > sd:
+            raise ValueError("The Bernardi-Raugel dual is only defined for subdegree <= dim")
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
@@ -51,36 +53,37 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                              for pt in pts for comp in range(sd))
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-        # Face moments of normal/tangential components against mean-free bubbles
-        facet = ref_complex.construct_subcomplex(sd-1)
-        Q = create_quadrature(facet, 2*degree)
-        if degree == 1 and facet.is_macrocell():
-            P = polynomial_set.ONPolynomialSet(facet, degree, scale=1, variant="bubble")
-            f_at_qpts = P.tabulate(Q.get_points())[(0,)*(sd-1)][-1]
-        else:
-            ref_facet = facet.get_parent() or facet
-            f_at_qpts = ref_facet.compute_bubble(Q.get_points())
-        f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / facet.volume()
+        if subdegree < sd:
+            # Face moments of normal/tangential components against mean-free bubbles
+            facet = ref_complex.construct_subcomplex(sd-1)
+            Q = create_quadrature(facet, 2*degree)
+            if degree == 1 and facet.is_macrocell():
+                P = polynomial_set.ONPolynomialSet(facet, degree, scale=1, variant="bubble")
+                f_at_qpts = P.tabulate(Q.get_points())[(0,)*(sd-1)][-1]
+            else:
+                ref_facet = facet.get_parent() or facet
+                f_at_qpts = ref_facet.compute_bubble(Q.get_points())
+            f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / facet.volume()
 
-        Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q)
-              for f in sorted(top[sd-1])}
+            Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q)
+                  for f in sorted(top[sd-1])}
 
-        thats = {f: ref_el.compute_tangents(sd-1, f)
-                 for f in sorted(top[sd-1])}
+            thats = {f: ref_el.compute_tangents(sd-1, f)
+                     for f in sorted(top[sd-1])}
 
-        R = numpy.array([[0, 1], [-1, 0]])
-        ndir = 1 if reduced else sd
-        for i in range(ndir):
-            for f, Q_mapped in Qs.items():
-                cur = len(nodes)
-                if i == 0:
-                    udir = numpy.dot(R, *thats[f]) if sd == 2 else numpy.cross(*thats[f])
-                else:
-                    udir = thats[f][i-1]
-                detJ = Q_mapped.jacobian_determinant()
-                phi_at_qpts = udir[:, None] * f_at_qpts[None, :] / detJ
-                nodes.append(FrobeniusIntegralMoment(ref_el, Q_mapped, phi_at_qpts))
-                entity_ids[sd-1][f].extend(range(cur, len(nodes)))
+            R = numpy.array([[0, 1], [-1, 0]])
+            ndir = 1 if reduced else sd
+            for i in range(ndir):
+                for f, Q_mapped in Qs.items():
+                    cur = len(nodes)
+                    if i == 0:
+                        udir = numpy.dot(R, *thats[f]) if sd == 2 else numpy.cross(*thats[f])
+                    else:
+                        udir = thats[f][i-1]
+                    detJ = Q_mapped.jacobian_determinant()
+                    phi_at_qpts = udir[:, None] * f_at_qpts[None, :] / detJ
+                    nodes.append(FrobeniusIntegralMoment(ref_el, Q_mapped, phi_at_qpts))
+                    entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 

@@ -4,8 +4,7 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-from FIAT import finite_element, polynomial_set, dual_set
-from FIAT.functional import ComponentPointEvaluation
+from FIAT import finite_element, polynomial_set
 from FIAT.bernardi_raugel import BernardiRaugelDualSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import TRIANGLE
@@ -56,35 +55,17 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
                                         C0.get_expansion_set(), coeffs)
 
 
-class VectorLagrangeDualSet(dual_set.DualSet):
-
-    def __init__(self, ref_el, degree, variant=None):
-        sd = ref_el.get_spatial_dimension()
-        top = ref_el.get_topology()
-        entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
-
-        # Point evaluation at lattice points
-        nodes = []
-        for dim in sorted(top):
-            for entity in sorted(top[dim]):
-                cur = len(nodes)
-                pts = ref_el.make_points(dim, entity, degree, variant=variant)
-                nodes.extend(ComponentPointEvaluation(ref_el, comp, (sd,), pt)
-                             for pt in pts for comp in range(sd))
-                entity_ids[dim][entity].extend(range(cur, len(nodes)))
-        super().__init__(nodes, ref_el, entity_ids)
-
-
 class ArnoldQin(finite_element.CiarletElement):
     """The Arnold-Qin C^0(Alfeld) quadratic macroelement with divergence in P0.
     This element belongs to a Stokes complex, and is paired with unsplit DG0."""
     def __init__(self, ref_el, degree=2, reduced=False):
         poly_set = ArnoldQinSpace(ref_el, degree)
         if reduced:
-            dual = BernardiRaugelDualSet(ref_el, degree)
+            subdegree = 1
             mapping = "contravariant piola"
         else:
-            dual = VectorLagrangeDualSet(ref_el, degree)
+            subdegree = degree
             mapping = "affine"
+        dual = BernardiRaugelDualSet(ref_el, degree, subdegree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
