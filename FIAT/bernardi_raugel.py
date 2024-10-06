@@ -16,37 +16,42 @@ from FIAT.quadrature import FacetQuadratureRule
 import numpy
 
 
-def ExtendedBernardiRaugelSpace(ref_el, degree):
+def ExtendedBernardiRaugelSpace(ref_el, subdegree):
     r"""Return a basis for the extended Bernardi-Raugel space.
-    P_1^d + (P_{d} \ P_{d-1})^d"""
+    P_k^d + (P_{dim} \ P_{dim-1})^d"""
     sd = ref_el.get_spatial_dimension()
-    Pk = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), scale=1, variant="bubble")
-    dimPk = expansions.polynomial_dimension(ref_el, degree, continuity="C0")
-    entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
-    ids = [i + j * dimPk
-           for dim in (0, sd-1)
+    if subdegree >= sd:
+        raise ValueError("The Bernardi-Raugel space is only defined for subdegree < dim")
+    Pd = polynomial_set.ONPolynomialSet(ref_el, sd, shape=(sd,), scale=1, variant="bubble")
+    dimPd = expansions.polynomial_dimension(ref_el, sd, continuity="C0")
+    entity_ids = expansions.polynomial_entity_ids(ref_el, sd, continuity="C0")
+    ids = [i + j * dimPd
+           for dim in (*tuple(range(subdegree)), sd-1)
            for f in sorted(entity_ids[dim])
            for i in entity_ids[dim][f]
            for j in range(sd)]
-    return Pk.take(ids)
+    return Pd.take(ids)
 
 
 class BernardiRaugelDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, reduced=False):
-        ref_complex = ref_el
+    """The Bernardi-Raugel dual set."""
+    def __init__(self, ref_complex, degree, subdegree=1, reduced=False):
         ref_el = ref_complex.get_parent() or ref_complex
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
+        # Point evaluation at lattice points
         nodes = []
-        for v in sorted(top[0]):
-            cur = len(nodes)
-            pt, = ref_el.make_points(0, v, degree)
-            nodes.extend(ComponentPointEvaluation(ref_el, k, (sd,), pt)
-                         for k in range(sd))
-            entity_ids[0][v].extend(range(cur, len(nodes)))
+        for dim in range(subdegree):
+            for entity in sorted(top[dim]):
+                cur = len(nodes)
+                pts = ref_el.make_points(dim, entity, subdegree)
+                nodes.extend(ComponentPointEvaluation(ref_el, comp, (sd,), pt)
+                             for pt in pts for comp in range(sd))
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
+        # Face moments of normal/tangential components against mean-free bubbles
         facet = ref_complex.construct_subcomplex(sd-1)
         Q = create_quadrature(facet, 2*degree)
         if degree == 1 and facet.is_macrocell():
@@ -55,7 +60,6 @@ class BernardiRaugelDualSet(dual_set.DualSet):
         else:
             ref_facet = facet.get_parent() or facet
             f_at_qpts = ref_facet.compute_bubble(Q.get_points())
-
         f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / facet.volume()
 
         Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q)
@@ -83,13 +87,13 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 
 class BernardiRaugel(finite_element.CiarletElement):
     """The Bernardi-Raugel extended element."""
-    def __init__(self, ref_el, degree=None):
+    def __init__(self, ref_el, degree=None, subdegree=1):
         sd = ref_el.get_spatial_dimension()
         if degree is None:
             degree = sd
         if degree != sd:
             raise ValueError("Bernardi-Raugel only defined for degree = dim")
-        poly_set = ExtendedBernardiRaugelSpace(ref_el, degree)
-        dual = BernardiRaugelDualSet(ref_el, degree)
-        formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
+        poly_set = ExtendedBernardiRaugelSpace(ref_el, subdegree)
+        dual = BernardiRaugelDualSet(ref_el, degree, subdegree=subdegree)
+        formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

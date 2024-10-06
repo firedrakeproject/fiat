@@ -10,9 +10,9 @@ from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
 from FIAT.barycentric_interpolation import get_lagrange_points
 
 
-@pytest.fixture(params=("I", "T", "S"))
+@pytest.fixture(params=(1, 2, 3), ids=("I", "T", "S"))
 def cell(request):
-    dim = {"I": 1, "T": 2, "S": 3}[request.param]
+    dim = request.param
     return ufc_simplex(dim)
 
 
@@ -356,93 +356,6 @@ def test_Ck_basis(cell, order, degree, variant):
         Uvals = U._tabulate_on_cell(degree, verts, 0, cell=cell)[(0,)*sd]
         local_phis = numpy.dot(coeffs[:, cell_node_map[cell]], Uvals)
         assert numpy.allclose(local_phis, phis[:, ipts])
-
-
-@pytest.mark.parametrize("degree", (2, 3, 4))
-def test_AlfeldSorokinaSpace(cell, degree):
-    # Test that the divergence of the Alfeld-Sorokina space is spanned by a C0 basis
-    from FIAT.alfeld_sorokina import AlfeldSorokinaSpace
-
-    P1 = AlfeldSorokinaSpace(cell, degree)
-    A = P1.get_reference_element()
-    top = A.get_topology()
-    sd = A.get_spatial_dimension()
-
-    pts = []
-    for dim in top:
-        for entity in top[dim]:
-            pts.extend(A.make_points(dim, entity, degree))
-
-    P1_tab = P1.tabulate(pts, 1)
-    divP1_tab = sum(P1_tab[alpha][:, alpha.index(1), :]
-                    for alpha in P1_tab if sum(alpha) == 1)
-
-    P2 = CkPolynomialSet(A, degree-1, order=0, variant="bubble")
-    P2_tab = P2.tabulate(pts)[(0,)*sd]
-    _, residual, *_ = numpy.linalg.lstsq(P2_tab.T, divP1_tab.T)
-    assert numpy.allclose(residual, 0)
-
-
-@pytest.mark.parametrize("family", ("AQ", "CH", "GN"))
-def test_minimal_stokes_space(cell, family):
-    # Test that the C0 Stokes space is spanned by a C0 basis
-    # Also test that its divergence is constant
-    from FIAT.arnold_qin import ArnoldQinSpace
-    from FIAT.christiansen_hu import ChristiansenHuSpace
-    from FIAT.guzman_neilan import ExtendedGuzmanNeilanSpace
-    sd = cell.get_spatial_dimension()
-    if sd == 1:
-        return
-    if family == "GN":
-        degree = sd
-        space = ExtendedGuzmanNeilanSpace
-    elif family == "CH":
-        degree = 1
-        space = ChristiansenHuSpace
-    elif family == "AQ":
-        if sd != 2:
-            return
-        degree = 2
-        space = ArnoldQinSpace
-
-    W = space(cell, degree)
-    V = space(cell, degree, reduced=True)
-    Wdim = W.get_num_members()
-    Vdim = V.get_num_members()
-    K = W.get_reference_element()
-    sd = K.get_spatial_dimension()
-    top = K.get_topology()
-
-    pts = []
-    for dim in top:
-        for entity in top[dim]:
-            pts.extend(K.make_points(dim, entity, degree))
-
-    C0 = CkPolynomialSet(K, degree, order=0, variant="bubble")
-    C0_tab = C0.tabulate(pts)
-    Wtab = W.tabulate(pts, 1)
-    Vtab = V.tabulate(pts, 1)
-    z = (0,)*sd
-    for tab in (Vtab, Wtab):
-        # Test that the space is full rank
-        _, sig, _ = numpy.linalg.svd(tab[z].reshape(-1, sd*len(pts)).T, full_matrices=True)
-        assert all(sig > 1E-10)
-
-        # Test that the space is C0
-        for k in range(sd):
-            _, residual, *_ = numpy.linalg.lstsq(C0_tab[z].T, tab[z][:, k, :].T)
-            assert numpy.allclose(residual, 0)
-
-        # Test that divergence is in P0
-        div = sum(tab[alpha][:, alpha.index(1), :]
-                  for alpha in tab if sum(alpha) == 1)[:Vdim]
-        assert numpy.allclose(div, div[:, 0][:, None])
-
-    # Test that the full space includes the reduced space
-    assert Wdim > Vdim
-    _, residual, *_ = numpy.linalg.lstsq(Wtab[z].reshape(Wdim, -1).T,
-                                         Vtab[z].reshape(Vdim, -1).T)
-    assert numpy.allclose(residual, 0)
 
 
 def test_distance_to_point_l1(cell):

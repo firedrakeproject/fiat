@@ -20,33 +20,35 @@ import numpy
 import math
 
 
-def ExtendedGuzmanNeilanSpace(ref_el, degree, reduced=False):
+def ExtendedGuzmanNeilanSpace(ref_el, subdegree, reduced=False):
     """Return a basis for the extended Guzman-Neilan space."""
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
-    C0 = polynomial_set.ONPolynomialSet(ref_complex, degree, shape=(sd,), scale=1, variant="bubble")
+    C0 = polynomial_set.ONPolynomialSet(ref_complex, sd, shape=(sd,), scale=1, variant="bubble")
     B = take_interior_bubbles(C0)
     if sd > 2:
         B = modified_bubble_subspace(B)
-    if reduced:
-        BR = BernardiRaugel(ref_el, degree).get_nodal_basis().take(list(range((sd+1)**2)))
-    else:
-        BR = ExtendedBernardiRaugelSpace(ref_el, degree)
 
+    if reduced:
+        BR = BernardiRaugel(ref_el, sd, subdegree=subdegree).get_nodal_basis()
+        reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
+        BR = BR.take(list(range(reduced_dim)))
+    else:
+        BR = ExtendedBernardiRaugelSpace(ref_el, subdegree)
     GN = constant_div_projection(BR, C0, B)
     return GN
 
 
 class GuzmanNeilan(finite_element.CiarletElement):
     """The Guzman-Neilan extended element."""
-    def __init__(self, ref_el, degree=None):
+    def __init__(self, ref_el, degree=None, subdegree=1):
         sd = ref_el.get_spatial_dimension()
         if degree is None:
             degree = sd
         if degree != sd:
             raise ValueError("Guzman-Neilan only defined for degree = dim")
-        poly_set = ExtendedGuzmanNeilanSpace(ref_el, degree)
-        dual = BernardiRaugelDualSet(ref_el, degree)
+        poly_set = ExtendedGuzmanNeilanSpace(ref_el, subdegree)
+        dual = BernardiRaugelDualSet(ref_el, degree, subdegree=subdegree)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
