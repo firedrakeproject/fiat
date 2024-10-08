@@ -117,17 +117,15 @@ class ArnoldWintherDual(DualSet):
         # moments of normal . sigma against constants and linears.
         for entity_id in range(3):
             for order in (0, 1):
-                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
-                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
+                dofs.append(IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6))
+                dofs.append(IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6))
+            # NB, mom_deg should actually be k + degree <= 2 degree
             dof_ids[1][entity_id] = list(range(dof_cur, dof_cur+4))
             dof_cur += 4
 
         # internal dofs: constant moments of three unique components
         Q = make_quadrature(cell, 3)
 
-        e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
-        e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
-        basis = [(e1, e1), (e1, e2), (e2, e2)]    # basis for symmetric matrices
         for (v1, v2) in basis:
             v1v2t = numpy.outer(v1, v2)
             fatqp = numpy.zeros((2, 2, len(Q.pts)))
