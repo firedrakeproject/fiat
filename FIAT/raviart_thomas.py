@@ -15,7 +15,7 @@ from FIAT.quadrature import FacetQuadratureRule
 
 
 def RTSpace(ref_el, degree):
-    """Constructs a basis for the the Raviart-Thomas space
+    """Constructs a basis for the Raviart-Thomas space
     (P_{degree-1})^d + P_{degree-1} x"""
     sd = ref_el.get_spatial_dimension()
 
@@ -72,10 +72,10 @@ class RTDualSet(dual_set.DualSet):
 
         if variant == "integral":
             facet = ref_el.get_facet_element()
-            # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
-            # degree is q - 1
-            Q_ref = create_quadrature(facet, interpolant_deg + degree - 1)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree - 1)
+            # Facet nodes are \int_F v\cdot n p ds where p \in P_q
+            q = degree - 1
+            Q_ref = create_quadrature(facet, interpolant_deg + q)
+            Pq = polynomial_set.ONPolynomialSet(facet, q if sd > 1 else 0)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
                 cur = len(nodes)
@@ -87,15 +87,15 @@ class RTDualSet(dual_set.DualSet):
                              for phi in phis)
                 entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
 
-            # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-2}^d
-            if degree > 1:
+            # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-1}^d
+            if q > 0:
                 cur = len(nodes)
-                Q = create_quadrature(ref_el, interpolant_deg + degree - 2)
-                Pkm1 = polynomial_set.ONPolynomialSet(ref_el, degree - 2)
-                Pkm1_at_qpts = Pkm1.tabulate(Q.get_points())[(0,) * sd]
+                Q = create_quadrature(ref_el, interpolant_deg + q - 1)
+                Pqm1 = polynomial_set.ONPolynomialSet(ref_el, q - 1)
+                Pqm1_at_qpts = Pqm1.tabulate(Q.get_points())[(0,) * sd]
                 nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
                              for d in range(sd)
-                             for phi in Pkm1_at_qpts)
+                             for phi in Pqm1_at_qpts)
                 entity_ids[sd][0] = list(range(cur, len(nodes)))
 
         elif variant == "point":
@@ -116,7 +116,7 @@ class RTDualSet(dual_set.DualSet):
                              for pt in pts)
                 entity_ids[sd][0] = list(range(cur, len(nodes)))
 
-        super(RTDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class RaviartThomas(finite_element.CiarletElement):
@@ -146,5 +146,4 @@ class RaviartThomas(finite_element.CiarletElement):
         poly_set = RTSpace(ref_el, degree)
         dual = RTDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
-        super(RaviartThomas, self).__init__(poly_set, dual, degree, formdegree,
-                                            mapping="contravariant piola")
+        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

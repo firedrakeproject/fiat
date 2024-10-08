@@ -54,7 +54,6 @@ class PolynomialSet(object):
          empty) tuple giving the index for a vector- or tensor-valued
          function.
     """
-
     def __init__(self, ref_el, degree, embedded_degree, expansion_set, coeffs):
         self.ref_el = ref_el
         self.num_members = coeffs.shape[0]
@@ -62,7 +61,6 @@ class PolynomialSet(object):
         self.embedded_degree = embedded_degree
         self.expansion_set = expansion_set
         self.coeffs = coeffs
-        self.dmats = []
 
     def tabulate_new(self, pts):
         return numpy.dot(self.coeffs,
@@ -70,13 +68,8 @@ class PolynomialSet(object):
 
     def tabulate(self, pts, jet_order=0):
         """Returns the values of the polynomial set."""
-        base_vals = self.expansion_set._tabulate_jet(self.embedded_degree, pts, order=jet_order)
-        D = self.ref_el.get_spatial_dimension()
-        result = {}
-        for i in range(jet_order + 1):
-            alphas = mis(D, i)
-            for alpha in alphas:
-                result[alpha] = numpy.dot(self.coeffs, base_vals[alpha])
+        base_vals = self.expansion_set._tabulate(self.embedded_degree, pts, order=jet_order)
+        result = {alpha: numpy.dot(self.coeffs, base_vals[alpha]) for alpha in base_vals}
         return result
 
     def get_expansion_set(self):
@@ -94,10 +87,8 @@ class PolynomialSet(object):
     def get_embedded_degree(self):
         return self.embedded_degree
 
-    def get_dmats(self):
-        if len(self.dmats) == 0:
-            self.dmats = self.expansion_set.get_dmats(self.embedded_degree)
-        return self.dmats
+    def get_dmats(self, cell=0):
+        return self.expansion_set.get_dmats(self.embedded_degree, cell=cell)
 
     def get_reference_element(self):
         return self.ref_el
@@ -118,20 +109,17 @@ class ONPolynomialSet(PolynomialSet):
     """Constructs an orthonormal basis out of expansion set by having an
     identity matrix of coefficients.  Can be used to specify ON bases
     for vector- and tensor-valued sets as well.
-
     """
-
-    def __init__(self, ref_el, degree, shape=tuple(), scale=None, variant=None):
-
+    def __init__(self, ref_el, degree, shape=tuple(), **kwargs):
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         if shape == tuple():
             num_components = 1
         else:
             flat_shape = numpy.ravel(shape)
             num_components = numpy.prod(flat_shape)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el, scale=scale, variant=variant)
 
         # set up coefficients
         if shape == tuple():
@@ -142,7 +130,7 @@ class ONPolynomialSet(PolynomialSet):
             # use functional's index_iterator function
             cur_bf = 0
             for idx in index_iterator(shape):
-                n = expansions.polynomial_dimension(ref_el, embedded_degree)
+                n = expansion_set.get_num_members(embedded_degree)
                 for exp_bf in range(n):
                     cur_idx = (cur_bf, *idx, exp_bf)
                     coeffs[cur_idx] = 1.0
@@ -156,7 +144,6 @@ def project(f, U, Q):
     """Computes the expansion coefficients of f in terms of the members of
     a polynomial set U.  Numerical integration is performed by
     quadrature rule Q.
-
     """
     pts = Q.get_points()
     wts = Q.get_weights()
@@ -181,7 +168,6 @@ def polynomial_set_union_normalized(A, B):
     whose span is the same as that of span(A) union span(B).  It may
     not contain any of the same members of the set, as we construct a
     span via SVD.
-
     """
     new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
     func_shape = new_coeffs.shape[1:]
@@ -209,21 +195,19 @@ def polynomial_set_union_normalized(A, B):
 class ONSymTensorPolynomialSet(PolynomialSet):
     """Constructs an orthonormal basis for symmetric-tensor-valued
     polynomials on a reference element.
-
     """
-
-    def __init__(self, ref_el, degree, size=None, scale=None):
+    def __init__(self, ref_el, degree, size=None, **kwargs):
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
 
         sd = ref_el.get_spatial_dimension()
         if size is None:
             size = sd
 
         shape = (size, size)
-        num_exp_functions = expansions.polynomial_dimension(ref_el, degree)
+        num_exp_functions = expansion_set.get_num_members(degree)
         num_components = size * (size + 1) // 2
         num_members = num_components * num_exp_functions
         embedded_degree = degree
-        expansion_set = expansions.ExpansionSet(ref_el, scale=scale)
 
         # set up coefficients for symmetric tensors
         coeffs_shape = (num_members, *shape, num_exp_functions)
@@ -244,23 +228,22 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                                                        expansion_set, coeffs)
 
 
-def make_bubbles(ref_el, degree, shape=()):
-    """Construct a polynomial set with bubbles up to the given degree.
-
+def make_bubbles(ref_el, degree, codim=0, shape=()):
+    """Construct a polynomial set with codim bubbles up to the given degree.
     """
-    dim = ref_el.get_spatial_dimension()
-    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="integral")
-    degrees = chain(range(dim + 1, degree+1, 2), range(dim + 2, degree+1, 2))
-
+    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="bubble")
+    entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
+    sd = ref_el.get_spatial_dimension()
+    dim = sd - codim
     if dim == 1:
-        indices = list(degrees)
-    else:
-        idx = (expansions.morton_index2, expansions.morton_index3)[dim-2]
+        # Apply even / odd reordering on edge bubbles
         indices = []
-        for p in degrees:
-            for alpha in mis(dim, p):
-                if alpha[0] > 1 and min(alpha[1:]) > 0:
-                    indices.append(idx(*alpha))
+        for entity in entity_ids[dim]:
+            ids = entity_ids[dim][entity]
+            indices.extend(ids[::2])
+            indices.extend(ids[1::2])
+    else:
+        indices = list(chain(*entity_ids[dim].values()))
 
     if shape != ():
         ncomp = numpy.prod(shape)

@@ -5,7 +5,9 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import TRIANGLE
+from FIAT.reference_element import TRIANGLE, ufc_simplex
+from FIAT.quadrature_schemes import create_quadrature
+import numpy
 
 
 class MorleyDualSet(dual_set.DualSet):
@@ -34,11 +36,16 @@ class MorleyDualSet(dual_set.DualSet):
             entity_ids[0][v] = [cur]
             cur += 1
 
-        # edge dof -- normal at each edge midpoint
+        # edge dof -- average of normal derivative at each edge
+        rline = ufc_simplex(1)
+        degree = 2
+        Q = create_quadrature(rline, degree-1)
+        qwts = Q.get_weights()
+        scale = numpy.ones(qwts.shape)
+
         entity_ids[1] = {}
         for e in sorted(top[1]):
-            pt = ref_el.make_points(1, e, 2)[0]
-            n = functional.PointNormalDerivative(ref_el, e, pt)
+            n = functional.IntegralMomentOfNormalDerivative(ref_el, e, Q, scale)
             nodes.append(n)
             entity_ids[1][e] = [cur]
             cur += 1

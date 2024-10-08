@@ -13,6 +13,7 @@ from FIAT import polynomial_set, functional
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
+        nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
         self.nodes = nodes
         self.ref_el = ref_el
         self.entity_ids = entity_ids
@@ -30,6 +31,9 @@ class DualSet(object):
                     ids += self.entity_ids[d][se]
                 ids.sort()
                 self.entity_closure_ids[d][e] = ids
+
+    def __iter__(self):
+        return iter(self.nodes)
 
     def get_nodes(self):
         return self.nodes
@@ -178,6 +182,58 @@ class DualSet(object):
                 mat[ells] += numpy.dot(dwts[alpha], dexpansion_values[alpha].T)
         return mat
 
+    def get_indices(self, restriction_domain, take_closure=True):
+        """Returns the list of dofs with support on a given restriction domain.
+
+        :arg restriction_domain: can be 'interior', 'vertex', 'edge', 'face' or 'facet'
+        :kwarg take_closure: Are we taking the closure of the restriction domain?
+        """
+        entity_dofs = self.get_entity_ids()
+        if restriction_domain == "interior":
+            # Return dofs from interior, never taking the closure
+            indices = []
+            entities = entity_dofs[max(entity_dofs.keys())]
+            for (entity, ids) in sorted_by_key(entities):
+                indices.extend(ids)
+            return indices
+
+        # otherwise return dofs with d <= dim
+        if restriction_domain == "vertex":
+            dim = 0
+        elif restriction_domain == "edge":
+            dim = 1
+        elif restriction_domain == "face":
+            dim = 2
+        elif restriction_domain == "facet":
+            dim = self.get_reference_element().get_spatial_dimension() - 1
+        else:
+            raise RuntimeError("Invalid restriction domain")
+
+        is_prodcell = isinstance(max(entity_dofs.keys()), tuple)
+
+        ldim = 0 if take_closure else dim
+        indices = []
+        for d in range(ldim, dim + 1):
+            if is_prodcell:
+                for edim in entity_dofs:
+                    if sum(edim) == d:
+                        entities = entity_dofs[edim]
+                        for (entity, ids) in sorted_by_key(entities):
+                            indices.extend(ids)
+            else:
+                entities = entity_dofs[d]
+                for (entity, ids) in sorted_by_key(entities):
+                    indices.extend(ids)
+        return indices
+
+
+def sorted_by_key(mapping):
+    "Sort dict items by key, allowing different key types."
+    # Python3 doesn't allow comparing builtins of different type, therefore the typename trick here
+    def _key(x):
+        return (type(x[0]).__name__, x[0])
+    return sorted(mapping.items(), key=_key)
+
 
 def make_entity_closure_ids(ref_el, entity_ids):
     entity_closure_ids = {}
@@ -193,3 +249,38 @@ def make_entity_closure_ids(ref_el, entity_ids):
             entity_closure_ids[d][e] = ids
 
     return entity_closure_ids
+
+
+def lexsort_nodes(ref_el, nodes, entity=None, offset=0):
+    """Sort PointEvaluation nodes in lexicographical ordering."""
+    if len(nodes) > 1 and all(isinstance(node, functional.PointEvaluation) for node in nodes):
+        pts = []
+        for node in nodes:
+            pt, = node.get_point_dict()
+            pts.append(pt)
+        bary = ref_el.compute_barycentric_coordinates(pts)
+        order = list(offset + numpy.lexsort(bary.T))
+    else:
+        order = list(range(offset, offset + len(nodes)))
+    return order
+
+
+def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
+    """Collect DOFs from simplicial complex onto facets of parent cell."""
+    parent_cell = ref_el.get_parent()
+    if parent_cell is None:
+        return nodes, ref_el, entity_ids, entity_permutations
+    parent_nodes = []
+    parent_ids = {}
+    parent_permutations = None
+
+    parent_to_children = ref_el.get_parent_to_children()
+    for dim in sorted(parent_to_children):
+        parent_ids[dim] = {}
+        for entity in sorted(parent_to_children[dim]):
+            cur = len(parent_nodes)
+            for child_dim, child_entity in parent_to_children[dim][entity]:
+                parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
+            ids = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
+            parent_ids[dim][entity] = ids
+    return parent_nodes, parent_cell, parent_ids, parent_permutations

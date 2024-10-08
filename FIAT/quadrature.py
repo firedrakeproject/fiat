@@ -21,11 +21,17 @@ def pseudo_determinant(A):
 def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
     """Map quadrature points and weights defined on source_cell to target_cell.
     """
+    while source_cell.get_parent():
+        source_cell = source_cell.get_parent()
     A, b = reference_element.make_affine_mapping(source_cell.get_vertices(),
                                                  target_cell.get_vertices())
+    if len(pts_ref.shape) != 2:
+        pts_ref = pts_ref.reshape(-1, A.shape[1])
     scale = pseudo_determinant(A)
-    pts = numpy.dot(pts_ref.reshape((-1, A.shape[1])), A.T) + b[None, :]
+    pts = numpy.dot(pts_ref, A.T)
+    pts = numpy.add(pts, b, out=pts)
     wts = scale * wts_ref
+
     # return immutable types
     pts = tuple(map(tuple, pts))
     wts = tuple(wts.flat)
@@ -36,8 +42,8 @@ def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
 
 class QuadratureRule(object):
     """General class that models integration over a reference element
-    as the weighted sum of a function evaluated at a set of points."""
-
+    as the weighted sum of a function evaluated at a set of points.
+    """
     def __init__(self, ref_el, pts, wts):
         if len(wts) != len(pts):
             raise ValueError("Have %d weights, but %d points" % (len(wts), len(pts)))
@@ -88,7 +94,7 @@ class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m):
-        super(GaussLegendreQuadratureLineRule, self).__init__(ref_el, m)
+        super().__init__(ref_el, m)
 
 
 class RadauQuadratureLineRule(QuadratureRule):

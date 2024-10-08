@@ -18,7 +18,8 @@ def eval_jacobi(a, b, n, x):
     given in Karniadakis and Sherwin, Appendix B"""
 
     if 0 == n:
-        return 1.0
+        # Get zeros of the right shape
+        return 0.0 * x + 1.0
     elif 1 == n:
         return 0.5 * (a - b + (a + b + 2.0) * x)
     else:  # 2 <= n

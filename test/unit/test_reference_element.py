@@ -18,7 +18,6 @@
 import pytest
 import numpy as np
 import sys
-from math import isclose
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT.reference_element import Point, TensorProductCell, UFCQuadrilateral, UFCHexahedron
@@ -394,7 +393,7 @@ def test_contains_point(cell, point, epsilon, expected):
                           (quadrilateral_x_interval, [0.0, 0.0, -1e-12], 1e-12),
                           (quadrilateral_x_interval, [0.0, 0.0, 1+1e-12], 1e-12)])
 def test_distance_to_point_l1(cell, point, expected):
-    assert isclose(cell.distance_to_point_l1(point), expected, rel_tol=1e-3)
+    assert np.isclose(cell.distance_to_point_l1(point), expected, rtol=1e-3)
 
 
 if __name__ == '__main__':

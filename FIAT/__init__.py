@@ -7,9 +7,15 @@ import pkg_resources
 # Import finite element classes
 from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
 from FIAT.argyris import Argyris
+from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
-from FIAT.argyris import QuinticArgyris
+from FIAT.hct import HsiehCloughTocher
+from FIAT.alfeld_sorokina import AlfeldSorokina
+from FIAT.arnold_qin import ArnoldQin
+from FIAT.guzman_neilan import GuzmanNeilan
+from FIAT.christiansen_hu import ChristiansenHu
+from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
 from FIAT.Sminus import TrimmedSerendipityFace  # noqa: F401
@@ -30,6 +36,8 @@ from FIAT.gauss_radau import GaussRadau
 from FIAT.morley import Morley
 from FIAT.nedelec import Nedelec
 from FIAT.nedelec_second_kind import NedelecSecondKind
+from FIAT.powell_sabin import QuadraticPowellSabin6, QuadraticPowellSabin12
+from FIAT.hierarchical import Legendre, IntegratedLegendre
 from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.crouzeix_raviart import CrouzeixRaviart
@@ -49,7 +57,6 @@ from FIAT.mixed import MixedElement                       # noqa: F401
 from FIAT.restricted import RestrictedElement             # noqa: F401
 from FIAT.quadrature_element import QuadratureElement     # noqa: F401
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen  # noqa: F401
-from FIAT.hierarchical import Legendre, IntegratedLegendre  # noqa: F401
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 
 # Important functionality
@@ -63,6 +70,7 @@ __version__ = pkg_resources.get_distribution("fenics-fiat").version
 # List of supported elements and mapping to element classes
 supported_elements = {"Argyris": Argyris,
                       "Bell": Bell,
+                      "Bernardi-Raugel": BernardiRaugel,
                       "Bernstein": Bernstein,
                       "Brezzi-Douglas-Marini": BrezziDouglasMarini,
                       "Brezzi-Douglas-Fortin-Marini": BrezziDouglasFortinMarini,
@@ -77,11 +85,19 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
+                      "Hsieh-Clough-Tocher": HsiehCloughTocher,
+                      "Alfeld-Sorokina": AlfeldSorokina,
+                      "Arnold-Qin": ArnoldQin,
+                      "Christiansen-Hu": ChristiansenHu,
+                      "Guzman-Neilan": GuzmanNeilan,
+                      "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
                       "Gauss-Legendre": GaussLegendre,
                       "Gauss-Radau": GaussRadau,
+                      "Legendre": Legendre,
+                      "Integrated Legendre": IntegratedLegendre,
                       "Morley": Morley,
                       "Nedelec 1st kind H(curl)": Nedelec,
                       "Nedelec 2nd kind H(curl)": NedelecSecondKind,
@@ -89,6 +105,8 @@ supported_elements = {"Argyris": Argyris,
                       "Regge": Regge,
                       "EnrichedElement": EnrichedElement,
                       "NodalEnrichedElement": NodalEnrichedElement,
+                      "QuadraticPowellSabin6": QuadraticPowellSabin6,
+                      "QuadraticPowellSabin12": QuadraticPowellSabin12,
                       "TensorProductElement": TensorProductElement,
                       "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
@@ -99,5 +117,4 @@ supported_elements = {"Argyris": Argyris,
                       "Mardal-Tai-Winther": MardalTaiWinther}
 
 # List of extra elements
-extra_elements = {"P0": P0,
-                  "Quintic Argyris": QuinticArgyris}
+extra_elements = {"P0": P0}

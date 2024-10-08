@@ -84,7 +84,7 @@ def test_polynomials():
             ref_el=reference_element.DefaultTetrahedron(),
             degree=3
         )
-        return ps.dmats
+        return ps.get_dmats()
 
     # Try reading reference values
     filename = os.path.join(ref_path, "reference-polynomials.json")
@@ -102,7 +102,7 @@ def test_polynomials_1D():
             ref_el=reference_element.DefaultLine(),
             degree=3
         )
-        return ps.dmats
+        return ps.get_dmats()
 
     # Try reading reference values
     filename = os.path.join(ref_path, "reference-polynomials_1D.json")
