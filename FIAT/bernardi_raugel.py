@@ -18,7 +18,7 @@ import numpy
 
 def ExtendedBernardiRaugelSpace(ref_el, subdegree):
     r"""Return a basis for the extended Bernardi-Raugel space.
-    P_k^d + (P_{dim} \ P_{dim-1})^d"""
+    (P_k + FacetBubble)^d"""
     sd = ref_el.get_spatial_dimension()
     if subdegree >= sd:
         raise ValueError("The Bernardi-Raugel space is only defined for subdegree < dim")

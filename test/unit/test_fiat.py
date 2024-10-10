@@ -324,6 +324,7 @@ elements = [
     "ChristiansenHu(S)",
     "GuzmanNeilan(T)",
     "GuzmanNeilan(S)",
+    "NodalEnrichedElement(GuzmanNeilan(S, subdegree=0), AlfeldSorokina(S))",
 
     # MixedElement made of nodal elements should be nodal, but its API
     # is currently just broken.
