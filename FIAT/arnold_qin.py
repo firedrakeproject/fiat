@@ -61,11 +61,11 @@ class ArnoldQin(finite_element.CiarletElement):
     def __init__(self, ref_el, degree=2, reduced=False):
         poly_set = ArnoldQinSpace(ref_el, degree)
         if reduced:
-            subdegree = 1
+            order = 1
             mapping = "contravariant piola"
         else:
-            subdegree = degree
+            order = degree
             mapping = "affine"
-        dual = BernardiRaugelDualSet(ref_el, degree, subdegree)
+        dual = BernardiRaugelDualSet(ref_el, order, degree=degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)

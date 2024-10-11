@@ -20,7 +20,7 @@ import numpy
 import math
 
 
-def ExtendedGuzmanNeilanSpace(ref_el, subdegree, reduced=False):
+def ExtendedGuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     """Return a basis for the extended Guzman-Neilan space."""
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
@@ -30,25 +30,56 @@ def ExtendedGuzmanNeilanSpace(ref_el, subdegree, reduced=False):
         B = modified_bubble_subspace(B)
 
     if reduced:
-        BR = BernardiRaugel(ref_el, sd, subdegree=subdegree).get_nodal_basis()
+        BR = BernardiRaugel(ref_el, order).get_nodal_basis()
         reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
         BR = BR.take(list(range(reduced_dim)))
     else:
-        BR = ExtendedBernardiRaugelSpace(ref_el, subdegree)
+        BR = ExtendedBernardiRaugelSpace(ref_el, order)
+
     GN = constant_div_projection(BR, C0, B)
+    if kind == 2:
+        Bk = take_interior_bubbles(C0, order)
+        GN = polynomial_set.polynomial_set_union_normalized(GN, Bk)
     return GN
 
 
 class GuzmanNeilan(finite_element.CiarletElement):
-    """The Guzman-Neilan extended element."""
-    def __init__(self, ref_el, degree=None, subdegree=1):
+    """The Guzman-Neilan (extended) element of the first kind.
+
+    Reference element: a simplex of any dimension.
+    Function space: Pk^d + normal facet bubbles with div in P0, with 1 <= k < dim.
+    Degrees of freedom: evaluation at Pk lattice points, and normal moments on faces.
+
+    This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.
+    """
+    def __init__(self, ref_el, order=1):
         sd = ref_el.get_spatial_dimension()
-        if degree is None:
-            degree = sd
-        if degree != sd:
-            raise ValueError("Guzman-Neilan only defined for degree = dim")
-        poly_set = ExtendedGuzmanNeilanSpace(ref_el, subdegree)
-        dual = BernardiRaugelDualSet(ref_el, degree, subdegree=subdegree)
+        if order >= sd:
+            raise ValueError(f"{type(self).__name__} is only defined for order < dim")
+        degree = sd
+        poly_set = ExtendedGuzmanNeilanSpace(ref_el, order)
+        dual = BernardiRaugelDualSet(ref_el, order)
+        formdegree = sd - 1  # (n-1)-form
+        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+
+
+class GuzmanNeilanSecondKind(finite_element.CiarletElement):
+    """The Guzman-Neilan (extended) element of the second kind.
+
+    Reference element: a simplex of any dimension.
+    Function space: C0 Pk^d(Alfeld) + normal facet bubbles with div in P0, with 1 <= k < dim.
+    Degrees of freedom: evaluation at Pk(Alfeld) lattice points, and normal moments on faces.
+
+    This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).
+    """
+    def __init__(self, ref_el, order=1):
+        sd = ref_el.get_spatial_dimension()
+        if order >= sd:
+            raise ValueError(f"{type(self).__name__} is only defined for order < dim")
+        degree = sd
+        poly_set = ExtendedGuzmanNeilanSpace(ref_el, order, kind=2)
+        ref_complex = poly_set.get_reference_element()
+        dual = BernardiRaugelDualSet(ref_complex, order)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
@@ -64,16 +95,21 @@ def div(U):
     return sum(U[k][:, k.index(1), :] for k in U if sum(k) == 1)
 
 
-def take_interior_bubbles(C0):
+def take_interior_bubbles(C0, degree=None):
     """Take the interior bubbles from a vector-valued C0 PolynomialSet."""
     ref_complex = C0.get_reference_element()
     sd = ref_complex.get_spatial_dimension()
     dimC0 = C0.get_num_members() // sd
     entity_ids = expansions.polynomial_entity_ids(ref_complex, C0.degree, continuity="C0")
+    if degree is None or degree >= C0.degree:
+        slices = [slice(None)] * (sd+1)
+    else:
+        slices = [slice(math.comb(degree-1, dim)) for dim in range(sd+1)]
+
     ids = [i + j * dimC0
            for dim in range(sd+1)
            for f in sorted(ref_complex.get_interior_facets(dim))
-           for i in entity_ids[dim][f]
+           for i in entity_ids[dim][f][slices[dim]]
            for j in range(sd)]
     return C0.take(ids)
 
