@@ -21,7 +21,17 @@ import math
 
 
 def ExtendedGuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
-    """Return a basis for the extended Guzman-Neilan space."""
+    r"""Return a basis for the extended Guzman-Neilan space.
+
+    Project the extended Bernardi-Raugel space (Pk + FacetBubble)^d
+    into C0 Pk(Alfeld)^d with P_{k-1} divergence, preserving its trace.
+
+    :arg ref_el: a simplex
+    :arg order: the maximal polynomial degree
+    :kwarg kind: First kind gives Pk^d + GNBubble + GNBubble^\perp,
+                 second kind gives C0 Pk(Alfeld)^d + GNBubble + GNBubble^\perp.
+    :kwarg reduced: If True, then do not include tangential bubbles.
+    """
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
     C0 = polynomial_set.ONPolynomialSet(ref_complex, sd, shape=(sd,), scale=1, variant="bubble")
@@ -95,23 +105,26 @@ def div(U):
     return sum(U[k][:, k.index(1), :] for k in U if sum(k) == 1)
 
 
-def take_interior_bubbles(C0, degree=None):
-    """Take the interior bubbles from a vector-valued C0 PolynomialSet."""
-    ref_complex = C0.get_reference_element()
-    sd = ref_complex.get_spatial_dimension()
-    dimC0 = C0.get_num_members() // sd
-    entity_ids = expansions.polynomial_entity_ids(ref_complex, C0.degree, continuity="C0")
-    if degree is None or degree >= C0.degree:
-        slices = [slice(None)] * (sd+1)
+def take_interior_bubbles(P, degree=None):
+    """Extract the interior bubbles up to the given degree from a complete PolynomialSet."""
+    ref_complex = P.get_reference_element()
+    ncomp = numpy.prod(P.get_shape())
+    dimPk = P.expansion_set.get_num_members(P.degree)
+    assert ncomp * dimPk == P.get_num_members()
+    continuity = P.expansion_set.continuity
+    entity_ids = expansions.polynomial_entity_ids(ref_complex, P.degree,
+                                                  continuity=continuity)
+    if degree is None or degree >= P.degree:
+        slices = {dim: slice(None) for dim in entity_ids}
     else:
-        slices = [slice(math.comb(degree-1, dim)) for dim in range(sd+1)]
+        slices = {dim: slice(math.comb(degree-1, dim)) for dim in entity_ids}
 
-    ids = [i + j * dimC0
-           for dim in range(sd+1)
+    ids = [i + j * dimPk
+           for dim in slices
            for f in sorted(ref_complex.get_interior_facets(dim))
            for i in entity_ids[dim][f][slices[dim]]
-           for j in range(sd)]
-    return C0.take(ids)
+           for j in range(ncomp)]
+    return P.take(ids)
 
 
 def modified_bubble_subspace(B):

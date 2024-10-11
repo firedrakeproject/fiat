@@ -20,7 +20,7 @@ import math
 
 def ExtendedBernardiRaugelSpace(ref_el, order):
     r"""Return a basis for the extended Bernardi-Raugel space.
-    (P_k + FacetBubble)^d"""
+    (Pk + FacetBubble)^d"""
     sd = ref_el.get_spatial_dimension()
     if order > sd:
         raise ValueError("The Bernardi-Raugel space is only defined for order <= dim")
@@ -51,15 +51,16 @@ class BernardiRaugelDualSet(dual_set.DualSet):
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
-        # Point evaluation at lattice points
         nodes = []
-        for dim in range(order):
-            for entity in sorted(top[dim]):
-                cur = len(nodes)
-                pts = ref_el.make_points(dim, entity, order)
-                nodes.extend(ComponentPointEvaluation(ref_el, comp, (sd,), pt)
-                             for pt in pts for comp in range(sd))
-                entity_ids[dim][entity].extend(range(cur, len(nodes)))
+        if order > 0:
+            # Point evaluation at lattice points
+            for dim in sorted(top):
+                for entity in sorted(top[dim]):
+                    cur = len(nodes)
+                    pts = ref_el.make_points(dim, entity, order)
+                    nodes.extend(ComponentPointEvaluation(ref_el, comp, (sd,), pt)
+                                 for pt in pts for comp in range(sd))
+                    entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         if order < sd:
             # Face moments of normal/tangential components against mean-free bubbles

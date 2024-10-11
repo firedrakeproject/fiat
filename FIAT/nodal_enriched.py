@@ -18,8 +18,8 @@ __all__ = ['NodalEnrichedElement']
 
 class NodalEnrichedElement(CiarletElement):
     """NodalEnriched element is a direct sum of a sequence of
-    finite elements. Dual basis is reorthogonalized to the
-    primal basis for nodality.
+    finite elements. Primal basis is reorthogonalized to the
+    dual basis for nodality.
 
     The following is equivalent:
         * the constructor is well-defined,
