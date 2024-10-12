@@ -11,6 +11,7 @@ from FIAT.restricted import RestrictedElement
 from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.reference_element import ufc_simplex
 
+from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.macro import CkPolynomialSet
 from FIAT.alfeld_sorokina import AlfeldSorokinaSpace
 from FIAT.arnold_qin import ArnoldQinSpace
@@ -111,7 +112,7 @@ def test_hct_stokes_complex(cell, reduced):
 
 
 @pytest.mark.parametrize("cell", (T, S))
-@pytest.mark.parametrize("family", ("AQ", "CH", "GN"))
+@pytest.mark.parametrize("family", ("AQ", "CH", "GN", "GN2"))
 def test_minimal_stokes_space(cell, family):
     # Test that the C0 Stokes space is spanned by a C0 basis
     # Also test that its divergence is constant
@@ -119,6 +120,9 @@ def test_minimal_stokes_space(cell, family):
     if family == "GN":
         degree = 1
         space = ExtendedGuzmanNeilanSpace
+    elif family == "GN2":
+        degree = 1
+        space = lambda *args, **kwargs: ExtendedGuzmanNeilanSpace(*args, kind=2, **kwargs)
     elif family == "CH":
         degree = 1
         space = ChristiansenHuSpace
@@ -159,7 +163,16 @@ def test_minimal_stokes_space(cell, family):
         # Test that divergence is in P0
         div = sum(tab[alpha][:, alpha.index(1), :]
                   for alpha in tab if sum(alpha) == 1)[:Vdim]
-        assert numpy.allclose(div, div[:, 0][:, None])
+        if family == "GN2":
+            # Test that div(GN2) is in P0(Alfeld)
+            P0 = ONPolynomialSet(K, 0)
+            P0_tab = P0.tabulate(pts)[(0,)*sd]
+            _, residual, *_ = numpy.linalg.lstsq(P0_tab.T, div.T)
+            assert numpy.allclose(residual, 0)
+            _, residual, *_ = numpy.linalg.lstsq(div.T, P0_tab.T)
+            assert numpy.allclose(residual, 0)
+        else:
+            assert numpy.allclose(div, div[:, 0][:, None])
 
     # Test that the full space includes the reduced space
     assert Wdim > Vdim
