@@ -275,7 +275,8 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     parent_permutations = None
 
     parent_to_children = ref_el.get_parent_to_children()
-    for dim in sorted(parent_to_children):
+    # Do not sort dimensions, as some zany elements might need facets to be numbered last
+    for dim in entity_ids:
         parent_ids[dim] = {}
         for entity in sorted(parent_to_children[dim]):
             cur = len(parent_nodes)

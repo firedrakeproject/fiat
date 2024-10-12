@@ -51,6 +51,10 @@ class BernardiRaugelDualSet(dual_set.DualSet):
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
+        # Hack to ensure facet dofs are always numbered last
+        facet_ids = entity_ids.pop(sd-1)
+        entity_ids[sd-1] = facet_ids
+
         nodes = []
         if order > 0:
             # Point evaluation at lattice points
@@ -94,26 +98,6 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                     nodes.append(FrobeniusIntegralMoment(ref_el, Qs[f], phi_at_qpts))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
-
-        entity_ids = self.entity_ids
-        if len(entity_ids[sd][0]) > 0:
-            # Ugly hack to ensure facet dofs are always numbered last
-            perm = []
-            for dim in sorted(entity_ids):
-                if dim == sd-1:
-                    continue
-                for entity in entity_ids[dim]:
-                    perm.extend(entity_ids[dim][entity])
-            for entity in entity_ids[sd-1]:
-                perm.extend(entity_ids[sd-1][entity])
-
-            nodes = [self.nodes[i] for i in perm]
-            iperm = numpy.argsort(perm)
-            for dim in entity_ids:
-                for entity in entity_ids[dim]:
-                    entity_ids[dim][entity] = list(iperm[entity_ids[dim][entity]])
-            ref_el = ref_el.get_parent() or ref_el
-            super().__init__(nodes, ref_el, entity_ids)
 
 
 class BernardiRaugel(finite_element.CiarletElement):
