@@ -1,12 +1,14 @@
 import pytest
 import numpy
 
-from FIAT import HsiehCloughTocher as HCT
-from FIAT import AlfeldSorokina as AS
-from FIAT import ArnoldQin as AQ
-from FIAT import Lagrange as CG
-from FIAT import DiscontinuousLagrange as DG
+from FIAT import (HsiehCloughTocher as HCT,
+                  AlfeldSorokina as AS,
+                  GuzmanNeilan as GN,
+                  ArnoldQin as AQ,
+                  Lagrange as CG,
+                  DiscontinuousLagrange as DG)
 from FIAT.restricted import RestrictedElement
+from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.reference_element import ufc_simplex
 
 from FIAT.macro import CkPolynomialSet
@@ -20,11 +22,8 @@ T = ufc_simplex(2)
 S = ufc_simplex(3)
 
 
-@pytest.mark.parametrize("cell", (T, S))
-@pytest.mark.parametrize("degree", (2, 3, 4))
-def test_AlfeldSorokinaSpace(cell, degree):
-    # Test that the divergence of the Alfeld-Sorokina space is spanned by a C0 basis
-    V = AlfeldSorokinaSpace(cell, degree)
+def check_C0_divergence(V, degree):
+    # Test that the divergence of the polynomial space V is spanned by a C0 basis
     A = V.get_reference_element()
     top = A.get_topology()
     sd = A.get_spatial_dimension()
@@ -42,6 +41,31 @@ def test_AlfeldSorokinaSpace(cell, degree):
     C0_tab = C0.tabulate(pts)[(0,)*sd]
     _, residual, *_ = numpy.linalg.lstsq(C0_tab.T, V_div.T)
     assert numpy.allclose(residual, 0)
+    _, residual, *_ = numpy.linalg.lstsq(V_div.T, C0_tab.T)
+    assert numpy.allclose(residual, 0)
+
+
+@pytest.mark.parametrize("cell", (T, S))
+@pytest.mark.parametrize("degree", (2, 3, 4))
+def test_h1div_alfeld_sorokina(cell, degree):
+    # Test that the divergence of the Alfeld-Sorokina space is spanned by a C0 basis
+    V = AlfeldSorokinaSpace(cell, degree)
+    check_C0_divergence(V, degree)
+
+
+@pytest.mark.parametrize("cell", (S,))
+@pytest.mark.parametrize("reduced", (False, True), ids=("full", "reduced"))
+def test_h1div_guzman_neilan(cell, reduced):
+    # Test that the divergence of AS + GnBubble is spanned by a C0 basis
+    degree = 2
+    sd = cell.get_spatial_dimension()
+    e1 = AS(cell, degree)
+    if reduced:
+        e1 = RestrictedElement(e1, restriction_domain="vertex")
+    e2 = GN(cell, order=0)
+    fe = NodalEnrichedElement(e1, e2)
+    V = fe.get_nodal_basis().take(list(range(fe.space_dimension() - (sd-1)*(sd+1))))
+    check_C0_divergence(V, degree)
 
 
 @pytest.mark.parametrize("cell", (T,))

@@ -19,8 +19,7 @@ import math
 
 
 def ExtendedBernardiRaugelSpace(ref_el, order):
-    r"""Return a basis for the extended Bernardi-Raugel space.
-    (Pk + FacetBubble)^d"""
+    """Return a basis for the extended Bernardi-Raugel space: (Pk + FacetBubble)^d."""
     sd = ref_el.get_spatial_dimension()
     if order > sd:
         raise ValueError("The Bernardi-Raugel space is only defined for order <= dim")
