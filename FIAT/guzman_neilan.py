@@ -68,7 +68,7 @@ class GuzmanNeilan(finite_element.CiarletElement):
             raise ValueError(f"{type(self).__name__} is only defined for order < dim")
         degree = sd
         poly_set = ExtendedGuzmanNeilanSpace(ref_el, order)
-        dual = BernardiRaugelDualSet(ref_el, order)
+        dual = BernardiRaugelDualSet(ref_el, order, degree=degree)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
@@ -89,7 +89,7 @@ class GuzmanNeilanSecondKind(finite_element.CiarletElement):
         degree = sd
         poly_set = ExtendedGuzmanNeilanSpace(ref_el, order, kind=2)
         ref_complex = poly_set.get_reference_element()
-        dual = BernardiRaugelDualSet(ref_complex, order)
+        dual = BernardiRaugelDualSet(ref_complex, order, degree=degree)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
@@ -166,7 +166,8 @@ def modified_bubble_subspace(B):
 
 
 def constant_div_projection(BR, C0, M):
-    """Project the BR space into the space of C0 polynomials with constant divergence."""
+    """Project the BR space into C0 Pk(Alfeld)^d with P_{k-1} divergence.
+    """
     ref_complex = C0.get_reference_element()
     sd = ref_complex.get_spatial_dimension()
     degree = C0.degree

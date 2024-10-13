@@ -100,13 +100,17 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 
 
 class BernardiRaugel(finite_element.CiarletElement):
-    """The Bernardi-Raugel extended element."""
+    """The Bernardi-Raugel extended element.
+
+    This element does not belong to a Stokes complex, but can be
+    paired with DG_{k-1}. This pair is inf-sup stable, but only weakly
+    divergence-free.
+    """
     def __init__(self, ref_el, order=1):
-        sd = ref_el.get_spatial_dimension()
-        degree = sd
+        degree = ref_el.get_spatial_dimension()
         if order >= degree:
             raise ValueError(f"{type(self).__name__} only defined for order < dim")
         poly_set = ExtendedBernardiRaugelSpace(ref_el, order)
-        dual = BernardiRaugelDualSet(ref_el, order)
-        formdegree = sd - 1  # (n-1)-form
+        dual = BernardiRaugelDualSet(ref_el, order, degree=degree)
+        formdegree = 0
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
