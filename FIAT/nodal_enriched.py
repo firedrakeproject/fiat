@@ -38,26 +38,22 @@ class NodalEnrichedElement(CiarletElement):
                              "of NodalEnrichedElement are nodal")
 
         # Extract common data
-        degree = max(e.get_nodal_basis().get_degree() for e in elements)
-        embedded_degrees = [e.get_nodal_basis().get_embedded_degree()
-                            for e in elements]
+        embedded_degrees = [e.get_nodal_basis().get_embedded_degree() for e in elements]
         embedded_degree = max(embedded_degrees)
+        degree = max(e.degree() for e in elements)
         order = max(e.get_order() for e in elements)
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
-        # LagrangeExpansionSet has fixed degree, ensure we grab the embedding one
-        elem = next(e for e in elements
-                    if e.get_nodal_basis().get_embedded_degree() == embedded_degree)
+        # LagrangeExpansionSet has fixed degree, ensure we grab the highest one
+        elem = elements[embedded_degrees.index(embedded_degree)]
         ref_el = elem.get_reference_complex()
         expansion_set = elem.get_nodal_basis().get_expansion_set()
         mapping = elem.mapping()[0]
         value_shape = elem.value_shape()
 
         # Sanity check
-        assert all(e.get_nodal_basis().get_reference_element() ==
-                   ref_el for e in elements)
-        assert all(e_mapping == mapping for e in elements
-                   for e_mapping in e.mapping())
+        assert all(e.get_reference_complex() == ref_el for e in elements)
+        assert all(set(e.mapping()) == {mapping, } for e in elements)
         assert all(e.value_shape() == value_shape for e in elements)
 
         # Merge polynomial sets
@@ -69,8 +65,7 @@ class NodalEnrichedElement(CiarletElement):
             assert all(e.get_nodal_basis().get_expansion_set() == expansion_set
                        for e in elements)
             coeffs = [e.get_coeffs() for e in elements]
-            coeffs = _merge_coeffs(coeffs, ref_el, embedded_degrees,
-                                   continuity=expansion_set.continuity)
+            coeffs = _merge_coeffs(coeffs, ref_el, embedded_degrees, expansion_set.continuity)
         poly_set = PolynomialSet(ref_el,
                                  degree,
                                  embedded_degree,
@@ -89,11 +84,10 @@ class NodalEnrichedElement(CiarletElement):
 
         # CiarletElement constructor adjusts poly_set coefficients s.t.
         # dual_set is really dual to poly_set
-        super(NodalEnrichedElement, self).__init__(poly_set, dual_set, order,
-                                                   formdegree=formdegree, mapping=mapping)
+        super().__init__(poly_set, dual_set, order, formdegree=formdegree, mapping=mapping)
 
 
-def _merge_coeffs(coeffss, ref_el, degrees, continuity=None):
+def _merge_coeffs(coeffss, ref_el, degrees, continuity):
     # Indices of the hierachical expansion set on each facet
     entity_ids = polynomial_entity_ids(ref_el, max(degrees), continuity)
 
