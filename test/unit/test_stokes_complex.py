@@ -3,12 +3,9 @@ import numpy
 
 from FIAT import (HsiehCloughTocher as HCT,
                   AlfeldSorokina as AS,
-                  GuzmanNeilan as GN,
                   ArnoldQin as AQ,
                   Lagrange as CG,
                   DiscontinuousLagrange as DG)
-from FIAT.restricted import RestrictedElement
-from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.reference_element import ufc_simplex
 
 from FIAT.polynomial_set import ONPolynomialSet
@@ -16,18 +13,33 @@ from FIAT.macro import CkPolynomialSet
 from FIAT.alfeld_sorokina import AlfeldSorokinaSpace
 from FIAT.arnold_qin import ArnoldQinSpace
 from FIAT.christiansen_hu import ChristiansenHuSpace
-from FIAT.guzman_neilan import ExtendedGuzmanNeilanSpace
+from FIAT.guzman_neilan import ExtendedGuzmanNeilanSpace, GuzmanNeilanH1div
+from FIAT.restricted import RestrictedElement
 
 
 T = ufc_simplex(2)
 S = ufc_simplex(3)
 
 
-def check_C0_divergence(V, degree):
+def span_greater_equal(A, B):
+    # span(A) >= span(B)
+    dimA = A.shape[0]
+    dimB = B.shape[0]
+    _, residual, *_ = numpy.linalg.lstsq(A.reshape(dimA, -1).T, B.reshape(dimB, -1).T)
+    return numpy.allclose(residual, 0)
+
+
+def span_equal(A, B):
+    # span(A) == span(B)
+    return span_greater_equal(A, B) and span_greater_equal(B, A)
+
+
+def check_h1div_space(V, degree, reduced=False):
     # Test that the divergence of the polynomial space V is spanned by a C0 basis
     A = V.get_reference_element()
     top = A.get_topology()
     sd = A.get_spatial_dimension()
+    z = (0,)*sd
 
     pts = []
     for dim in top:
@@ -39,11 +51,15 @@ def check_C0_divergence(V, degree):
                 for alpha in V_tab if sum(alpha) == 1)
 
     C0 = CkPolynomialSet(A, degree-1, order=0, variant="bubble")
-    C0_tab = C0.tabulate(pts)[(0,)*sd]
-    _, residual, *_ = numpy.linalg.lstsq(C0_tab.T, V_div.T)
-    assert numpy.allclose(residual, 0)
-    _, residual, *_ = numpy.linalg.lstsq(V_div.T, C0_tab.T)
-    assert numpy.allclose(residual, 0)
+    C0_tab = C0.tabulate(pts)[z]
+    assert span_equal(V_div, C0_tab)
+
+    if not reduced:
+        # Test that V includes Pk
+        cell = A.get_parent() or A
+        Pk = ONPolynomialSet(cell, degree, shape=(sd,))
+        Pk_tab = Pk.tabulate(pts)[z]
+        assert span_greater_equal(V_tab[z], Pk_tab)
 
 
 @pytest.mark.parametrize("cell", (T, S))
@@ -51,22 +67,18 @@ def check_C0_divergence(V, degree):
 def test_h1div_alfeld_sorokina(cell, degree):
     # Test that the divergence of the Alfeld-Sorokina space is spanned by a C0 basis
     V = AlfeldSorokinaSpace(cell, degree)
-    check_C0_divergence(V, degree)
+    check_h1div_space(V, degree)
 
 
 @pytest.mark.parametrize("cell", (S,))
 @pytest.mark.parametrize("reduced", (False, True), ids=("full", "reduced"))
 def test_h1div_guzman_neilan(cell, reduced):
-    # Test that the divergence of AS + GnBubble is spanned by a C0 basis
-    degree = 2
+    # Test that the divergence of AS + GN Bubble is spanned by a C0 basis
     sd = cell.get_spatial_dimension()
-    e1 = AS(cell, degree)
-    if reduced:
-        e1 = RestrictedElement(e1, restriction_domain="vertex")
-    e2 = GN(cell, order=0)
-    fe = NodalEnrichedElement(e1, e2)
+    degree = 2
+    fe = GuzmanNeilanH1div(cell, degree, reduced=reduced)
     V = fe.get_nodal_basis().take(list(range(fe.space_dimension() - (sd-1)*(sd+1))))
-    check_C0_divergence(V, degree)
+    check_h1div_space(V, degree, reduced=reduced)
 
 
 @pytest.mark.parametrize("cell", (T,))
@@ -102,13 +114,8 @@ def test_hct_stokes_complex(cell, reduced):
     H1div = sum(H1tab[alpha][:, alpha.index(1), :] for alpha in H1tab if sum(alpha) == 1)
     H2curl = numpy.stack([H2tab[(0, 1)], -H2tab[(1, 0)]], axis=1)
 
-    H2dim = H2.space_dimension()
-    H1dim = H1.space_dimension()
-    _, residual, *_ = numpy.linalg.lstsq(H1val.reshape(H1dim, -1).T, H2curl.reshape(H2dim, -1).T)
-    assert numpy.allclose(residual, 0)
-
-    _, residual, *_ = numpy.linalg.lstsq(L2val.T, H1div.T)
-    assert numpy.allclose(residual, 0)
+    assert span_greater_equal(H1val, H2curl)
+    assert span_greater_equal(L2val, H1div)
 
 
 @pytest.mark.parametrize("cell", (T, S))
@@ -167,15 +174,10 @@ def test_minimal_stokes_space(cell, family):
             # Test that div(GN2) is in P0(Alfeld)
             P0 = ONPolynomialSet(K, 0)
             P0_tab = P0.tabulate(pts)[(0,)*sd]
-            _, residual, *_ = numpy.linalg.lstsq(P0_tab.T, div.T)
-            assert numpy.allclose(residual, 0)
-            _, residual, *_ = numpy.linalg.lstsq(div.T, P0_tab.T)
-            assert numpy.allclose(residual, 0)
+            assert span_equal(div, P0_tab)
         else:
             assert numpy.allclose(div, div[:, 0][:, None])
 
     # Test that the full space includes the reduced space
     assert Wdim > Vdim
-    _, residual, *_ = numpy.linalg.lstsq(Wtab[z].reshape(Wdim, -1).T,
-                                         Vtab[z].reshape(Vdim, -1).T)
-    assert numpy.allclose(residual, 0)
+    assert span_greater_equal(Wtab[z], Vtab[z])

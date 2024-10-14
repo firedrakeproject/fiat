@@ -11,9 +11,12 @@
 
 from FIAT import finite_element, polynomial_set, expansions
 from FIAT.bernardi_raugel import ExtendedBernardiRaugelSpace, BernardiRaugelDualSet, BernardiRaugel
+from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.restricted import RestrictedElement
+from FIAT.nodal_enriched import NodalEnrichedElement
 from itertools import chain
 
 import numpy
@@ -92,6 +95,14 @@ class GuzmanNeilanSecondKind(finite_element.CiarletElement):
         dual = BernardiRaugelDualSet(ref_complex, order, degree=degree)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+
+
+def GuzmanNeilanH1div(ref_el, degree=2, reduced=False):
+    AS = AlfeldSorokina(ref_el, 2)
+    if reduced:
+        AS = RestrictedElement(AS, restriction_domain="vertex")
+    GN = GuzmanNeilan(ref_el, order=0)
+    return NodalEnrichedElement(AS, GN)
 
 
 def inner(v, u, qwts):

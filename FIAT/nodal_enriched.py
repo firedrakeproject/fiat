@@ -66,8 +66,8 @@ class NodalEnrichedElement(CiarletElement):
             points = expansion_set.get_points()
             coeffs = np.vstack([e.tabulate(0, points)[(0,)] for e in elements])
         else:
-            assert all(type(e.get_nodal_basis().get_expansion_set()) ==
-                       type(expansion_set) for e in elements)
+            assert all(e.get_nodal_basis().get_expansion_set() == expansion_set
+                       for e in elements)
             coeffs = [e.get_coeffs() for e in elements]
             coeffs = _merge_coeffs(coeffs, ref_el, embedded_degrees,
                                    continuity=expansion_set.continuity)

@@ -13,7 +13,7 @@ from FIAT.bell import Bell
 from FIAT.hct import HsiehCloughTocher
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
-from FIAT.guzman_neilan import GuzmanNeilan, GuzmanNeilanSecondKind
+from FIAT.guzman_neilan import GuzmanNeilan, GuzmanNeilanSecondKind, GuzmanNeilanH1div
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
@@ -90,6 +90,7 @@ supported_elements = {"Argyris": Argyris,
                       "Christiansen-Hu": ChristiansenHu,
                       "Guzman-Neilan": GuzmanNeilan,
                       "Guzman-Neilan Second Kind": GuzmanNeilanSecondKind,
+                      "Guzman-Neilan H1(div)": GuzmanNeilanH1div,
                       "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
