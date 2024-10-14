@@ -40,7 +40,7 @@ def ChristiansenHuSpace(ref_el, degree, reduced=False):
 
     if not reduced:
         # Compute the primal basis via Vandermonde and extract the facet bubbles
-        dual = BernardiRaugelDualSet(ref_el, degree, degree=degree, reduced=True, ref_complex=ref_complex)
+        dual = BernardiRaugelDualSet(ref_el, degree, degree=degree, ref_complex=ref_complex, reduced=True)
         dualmat = dual.to_riesz(C0)
         V = numpy.tensordot(dualmat, coeffs, axes=((1, 2), (1, 2)))
         coeffs = numpy.tensordot(numpy.linalg.inv(V.T), coeffs, axes=(-1, 0))

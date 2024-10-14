@@ -39,9 +39,8 @@ def ExtendedBernardiRaugelSpace(ref_el, order):
 
 class BernardiRaugelDualSet(dual_set.DualSet):
     """The Bernardi-Raugel dual set."""
-    def __init__(self, ref_el, order=1, degree=None, reduced=False, ref_complex=None):
-        if ref_complex is None:
-            ref_complex = ref_el
+    def __init__(self, ref_el, order=1, degree=None, ref_complex=None, reduced=False):
+        ref_complex = ref_complex or ref_el
         sd = ref_el.get_spatial_dimension()
         if degree is None:
             degree = sd
@@ -49,10 +48,6 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             raise ValueError(f"{type(self).__name__} is only defined for order <= dim")
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
-
-        # Hack to ensure facet dofs are always numbered last
-        facet_ids = entity_ids.pop(sd-1)
-        entity_ids[sd-1] = facet_ids
 
         nodes = []
         if order > 0:
