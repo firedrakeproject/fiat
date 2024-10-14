@@ -101,7 +101,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
             B = polynomial_set.make_bubbles(ref_el, degree)
             B_table = B.expansion_set.tabulate(degree, qpts)
-            P = polynomial_set.ONPolynomialSet(ref_el, degree)
+            P = polynomial_set.ONPolynomialSet(ref_el, degree, scale="orthonormal")
             P_table = P.tabulate(qpts, 0)[(0,) * sd]
 
             V = inner(P_table, B_table)

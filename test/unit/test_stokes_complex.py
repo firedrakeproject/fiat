@@ -34,7 +34,7 @@ def span_equal(A, B):
     return span_greater_equal(A, B) and span_greater_equal(B, A)
 
 
-def check_h1div_space(V, degree, reduced=False):
+def check_h1div_space(V, degree, reduced=False, bubble=False):
     # Test that the divergence of the polynomial space V is spanned by a C0 basis
     A = V.get_reference_element()
     top = A.get_topology()
@@ -44,7 +44,7 @@ def check_h1div_space(V, degree, reduced=False):
     pts = []
     for dim in top:
         for entity in top[dim]:
-            pts.extend(A.make_points(dim, entity, degree))
+            pts.extend(A.make_points(dim, entity, degree+2))
 
     V_tab = V.tabulate(pts, 1)
     V_div = sum(V_tab[alpha][:, alpha.index(1), :]
@@ -53,6 +53,10 @@ def check_h1div_space(V, degree, reduced=False):
     C0 = CkPolynomialSet(A, degree-1, order=0, variant="bubble")
     C0_tab = C0.tabulate(pts)[z]
     assert span_equal(V_div, C0_tab)
+
+    if bubble:
+        # Test that div(Bubbles) = C0 int H^1_0
+        assert span_equal(V_div[-(sd+1):], C0_tab[-1:])
 
     if not reduced:
         # Test that V includes Pk
@@ -77,8 +81,9 @@ def test_h1div_guzman_neilan(cell, reduced):
     sd = cell.get_spatial_dimension()
     degree = 2
     fe = GuzmanNeilanH1div(cell, degree, reduced=reduced)
-    V = fe.get_nodal_basis().take(list(range(fe.space_dimension() - (sd-1)*(sd+1))))
-    check_h1div_space(V, degree, reduced=reduced)
+    reduced_dim = fe.space_dimension() - (sd-1)*(sd+1)
+    V = fe.get_nodal_basis().take(list(range(reduced_dim)))
+    check_h1div_space(V, degree, reduced=reduced, bubble=True)
 
 
 @pytest.mark.parametrize("cell", (T,))
