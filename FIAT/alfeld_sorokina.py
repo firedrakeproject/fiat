@@ -15,9 +15,8 @@ import numpy
 
 
 def AlfeldSorokinaSpace(ref_el, degree):
-    """Return a vector-valued C^0 PolynomialSet on an Alfeld split whose
-    divergence is also C^0.  This works on any simplex and for all
-    polynomial degrees."""
+    """Return a vector-valued C0 PolynomialSet on an Alfeld split with C0
+    divergence. This works on any simplex and for all polynomial degrees."""
     ref_complex = AlfeldSplit(ref_el)
     sd = ref_complex.get_spatial_dimension()
     C0 = CkPolynomialSet(ref_complex, degree, order=0, shape=(sd,), variant="bubble")
@@ -52,7 +51,7 @@ def AlfeldSorokinaSpace(ref_el, degree):
 class AlfeldSorokinaDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree):
         if degree != 2:
-            raise NotImplementedError("Alfeld-Sorokina only defined for degree = 2")
+            raise NotImplementedError(f"{type(self).__name__} only defined for degree = 2")
 
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
@@ -75,8 +74,9 @@ class AlfeldSorokinaDualSet(dual_set.DualSet):
 
 
 class AlfeldSorokina(finite_element.CiarletElement):
-    """The Alfeld-Sorokina C^0 quadratic macroelement with C^0 divergence.
-    This element belongs to a Stokes complex, and is paired with CG_1(Alfeld).
+    """The Alfeld-Sorokina C0 quadratic macroelement with C0 divergence.
+
+    This element belongs to a Stokes complex, and is paired with CG1(Alfeld).
     """
     def __init__(self, ref_el, degree=2):
         dual = AlfeldSorokinaDualSet(ref_el, degree)
