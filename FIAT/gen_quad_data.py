@@ -1,3 +1,6 @@
+# GENERATED, DO NOT EDIT
+# Slobodkins-Tausch quadratures
+# https://doi.org/10.1016/j.camwa.2023.06.001
 import numpy
 
 points = "points"
