@@ -119,7 +119,7 @@ def test_create_quadrature_triangle(triangle, degree, scheme):
     assert numpy.allclose(q.integrate(lambda x: sum(x)**degree), 1/(degree + 2))
 
 
-@pytest.mark.parametrize("degree", range(16))
+@pytest.mark.parametrize("degree", range(23))
 def test_create_quadrature_tetrahedron(tetrahedron, degree, scheme):
     q = FIAT.create_quadrature(tetrahedron, degree, scheme)
     assert numpy.allclose(q.integrate(lambda x: sum(x)**degree), 1/(2*degree + 6))
