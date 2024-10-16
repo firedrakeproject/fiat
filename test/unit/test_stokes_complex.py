@@ -13,7 +13,7 @@ from FIAT.macro import CkPolynomialSet
 from FIAT.alfeld_sorokina import AlfeldSorokinaSpace
 from FIAT.arnold_qin import ArnoldQinSpace
 from FIAT.christiansen_hu import ChristiansenHuSpace
-from FIAT.guzman_neilan import ExtendedGuzmanNeilanSpace, GuzmanNeilanH1div
+from FIAT.guzman_neilan import GuzmanNeilanSpace, GuzmanNeilanH1div
 from FIAT.restricted import RestrictedElement
 
 
@@ -131,10 +131,10 @@ def test_minimal_stokes_space(cell, family):
     sd = cell.get_spatial_dimension()
     if family == "GN":
         degree = 1
-        space = ExtendedGuzmanNeilanSpace
+        space = GuzmanNeilanSpace
     elif family == "GN2":
         degree = 1
-        space = lambda *args, **kwargs: ExtendedGuzmanNeilanSpace(*args, kind=2, **kwargs)
+        space = lambda *args, **kwargs: GuzmanNeilanSpace(*args, kind=2, **kwargs)
     elif family == "CH":
         degree = 1
         space = ChristiansenHuSpace

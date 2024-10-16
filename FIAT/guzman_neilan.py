@@ -10,7 +10,7 @@
 # transformation theory.
 
 from FIAT import finite_element, polynomial_set, expansions
-from FIAT.bernardi_raugel import ExtendedBernardiRaugelSpace, BernardiRaugelDualSet, BernardiRaugel
+from FIAT.bernardi_raugel import BernardiRaugelSpace, BernardiRaugelDualSet, BernardiRaugel
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.macro import AlfeldSplit
@@ -23,17 +23,19 @@ import numpy
 import math
 
 
-def ExtendedGuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
-    r"""Return a basis for the extended Guzman-Neilan space.
+def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
+    r"""Return a basis for the (extended) Guzman-Neilan H1 space.
 
     Project the extended Bernardi-Raugel space (Pk + FacetBubble)^d
     into C0 Pk(Alfeld)^d with P_{k-1} divergence, preserving its trace.
 
     :arg ref_el: a simplex
     :arg order: the maximal polynomial degree
-    :kwarg kind: First kind gives Pk^d + GNBubble + GNBubble^\perp,
-                 second kind gives C0 Pk(Alfeld)^d + GNBubble + GNBubble^\perp.
-    :kwarg reduced: If True, then do not include tangential bubbles.
+    :kwarg kind: kind = 1 gives Pk^d + GN bubbles,
+                 kind = 2 gives C0 Pk(Alfeld)^d + GN bubbles.
+    :kwarg reduced: Include tangential bubbles if reduced = False.
+
+    :returns: a PolynomialSet basis for the Guzman-Neilan H1 space.
     """
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
@@ -47,7 +49,7 @@ def ExtendedGuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
         reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
         BR = BR.take(list(range(reduced_dim)))
     else:
-        BR = ExtendedBernardiRaugelSpace(ref_el, order)
+        BR = BernardiRaugelSpace(ref_el, order)
 
     GN = constant_div_projection(BR, C0, B)
     if kind == 2:
@@ -56,8 +58,22 @@ def ExtendedGuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     return GN
 
 
-class GuzmanNeilan(finite_element.CiarletElement):
-    """The Guzman-Neilan (extended) element of the first kind.
+class GuzmanNeilanH1(finite_element.CiarletElement):
+    """The Guzman-Neilan H1-conforming (extended) macroelement."""
+    def __init__(self, ref_el, order=1, kind=1):
+        sd = ref_el.get_spatial_dimension()
+        if order >= sd:
+            raise ValueError(f"{type(self).__name__} is only defined for order < dim")
+        degree = sd
+        poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
+        ref_complex = poly_set.get_reference_element() if kind == 2 else ref_el
+        dual = BernardiRaugelDualSet(ref_complex, order, degree=degree)
+        formdegree = sd - 1  # (n-1)-form
+        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+
+
+class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):
+    """The Guzman-Neilan H1-conforming (extended) macroelement of the first kind.
 
     Reference element: a simplex of any dimension.
     Function space: Pk^d + normal facet bubbles with div in P0, with 1 <= k < dim.
@@ -66,18 +82,11 @@ class GuzmanNeilan(finite_element.CiarletElement):
     This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.
     """
     def __init__(self, ref_el, order=1):
-        sd = ref_el.get_spatial_dimension()
-        if order >= sd:
-            raise ValueError(f"{type(self).__name__} is only defined for order < dim")
-        degree = sd
-        poly_set = ExtendedGuzmanNeilanSpace(ref_el, order)
-        dual = BernardiRaugelDualSet(ref_el, order, degree=degree)
-        formdegree = sd - 1  # (n-1)-form
-        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+        super().__init__(ref_el, order=order, kind=1)
 
 
-class GuzmanNeilanSecondKind(finite_element.CiarletElement):
-    """The Guzman-Neilan (extended) element of the second kind.
+class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
+    """The Guzman-Neilan H1-conforming (extended) macroelement of the second kind.
 
     Reference element: a simplex of any dimension.
     Function space: C0 Pk^d(Alfeld) + normal facet bubbles with div in P0, with 1 <= k < dim.
@@ -86,22 +95,26 @@ class GuzmanNeilanSecondKind(finite_element.CiarletElement):
     This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).
     """
     def __init__(self, ref_el, order=1):
-        sd = ref_el.get_spatial_dimension()
-        if order >= sd:
-            raise ValueError(f"{type(self).__name__} is only defined for order < dim")
-        degree = sd
-        poly_set = ExtendedGuzmanNeilanSpace(ref_el, order, kind=2)
-        ref_complex = poly_set.get_reference_element()
-        dual = BernardiRaugelDualSet(ref_complex, order, degree=degree)
-        formdegree = sd - 1  # (n-1)-form
-        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+        super().__init__(ref_el, order=order, kind=2)
 
 
 def GuzmanNeilanH1div(ref_el, degree=2, reduced=False):
+    """The Guzman-Neilan H1(div)-conforming (extended) macroelement.
+
+    Reference element: a simplex of any dimension.
+    Function space: C0 P2^d(Alfeld) with C0 P1 divergence + normal facet bubbles with div in P0.
+    Degrees of freedom: evaluation at P2(Alfeld) lattice points, divergence at P1 lattice points,
+                        and normal moments on faces.
+
+    This element belongs to a Stokes complex, and is paired with CG1(Alfeld).
+    """
     AS = AlfeldSorokina(ref_el, 2)
     if reduced:
         AS = RestrictedElement(AS, restriction_domain="vertex")
-    GN = GuzmanNeilan(ref_el, order=0)
+    elif ref_el.get_spatial_dimension() <= 2:
+        # Quadratic bubbles are already included in 2D
+        return AS
+    GN = GuzmanNeilanH1(ref_el, order=0)
     return NodalEnrichedElement(AS, GN)
 
 

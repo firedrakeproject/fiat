@@ -11,14 +11,14 @@
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
-from FIAT.quadrature_schemes import create_quadrature
+from FIAT.hierarchical import make_dual_bubbles
 from FIAT.quadrature import FacetQuadratureRule
 
 import numpy
 import math
 
 
-def ExtendedBernardiRaugelSpace(ref_el, order):
+def BernardiRaugelSpace(ref_el, order):
     """Return a basis for the extended Bernardi-Raugel space: (Pk + FacetBubble)^d."""
     sd = ref_el.get_spatial_dimension()
     if order > sd:
@@ -63,9 +63,12 @@ class BernardiRaugelDualSet(dual_set.DualSet):
 
         if order < sd:
             # Face moments of normal/tangential components against dual bubbles
-            facet = ref_complex.construct_subcomplex(sd-1)
-            Q, phis = self.make_dual_bubbles(facet, degree)
+            ref_facet = ref_complex.construct_subcomplex(sd-1)
+            codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
+            Q, phis = make_dual_bubbles(ref_facet, degree, codim=codim)
             f_at_qpts = phis[-1]
+            if codim != 0:
+                f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / ref_facet.volume()
 
             interior_facets = ref_el.get_interior_facets(sd-1) or ()
             facets = list(set(top[sd-1]) - set(interior_facets))
@@ -88,40 +91,18 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
-    def make_dual_bubbles(self, ref_el, degree):
-        # Get the L2-duals of the hierarchical C0 basis
-        sd = ref_el.get_spatial_dimension()
-        Q = create_quadrature(ref_el, 2*degree)
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        if degree == 1 and ref_el.is_macrocell():
-            P = polynomial_set.ONPolynomialSet(ref_el, degree, scale=1, variant="bubble")
-            phis = P.tabulate(qpts)[(0,)*sd]
-            phis -= numpy.dot(phis, qwts)[:, None] / sum(qwts)
-        else:
-            inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-            B = polynomial_set.make_bubbles(ref_el, degree)
-            B_table = B.expansion_set.tabulate(degree, qpts)
-            P = polynomial_set.ONPolynomialSet(ref_el, degree, scale="orthonormal")
-            P_table = P.tabulate(qpts, 0)[(0,) * sd]
-
-            V = inner(P_table, B_table)
-            phis = numpy.linalg.solve(V, P_table)
-            phis = numpy.dot(B.get_coeffs(), phis)
-        return Q, phis
-
 
 class BernardiRaugel(finite_element.CiarletElement):
-    """The Bernardi-Raugel extended element.
+    """The Bernardi-Raugel (extended) element.
 
-    This element does not belong to a Stokes complex, but can be
-    paired with DG_{k-1}. This pair is inf-sup stable, but only weakly
-    divergence-free.
+    This element does not belong to a Stokes complex, but can be paired with
+    DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.
     """
     def __init__(self, ref_el, order=1):
         degree = ref_el.get_spatial_dimension()
         if order >= degree:
             raise ValueError(f"{type(self).__name__} only defined for order < dim")
-        poly_set = ExtendedBernardiRaugelSpace(ref_el, order)
+        poly_set = BernardiRaugelSpace(ref_el, order)
         dual = BernardiRaugelDualSet(ref_el, order, degree=degree)
         formdegree = 0
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
