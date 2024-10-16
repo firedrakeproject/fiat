@@ -132,7 +132,7 @@ class CiarletElement(FiniteElement):
     def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_complex=None):
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
-        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
 
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()

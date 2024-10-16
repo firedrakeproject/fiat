@@ -253,7 +253,7 @@ def make_entity_closure_ids(ref_el, entity_ids):
 
 def lexsort_nodes(ref_el, nodes, entity=None, offset=0):
     """Sort PointEvaluation nodes in lexicographical ordering."""
-    if len(nodes) > 1 and all(isinstance(node, functional.PointEvaluation) for node in nodes):
+    if len(nodes) > 1:
         pts = []
         for node in nodes:
             pt, = node.get_point_dict()
@@ -270,17 +270,29 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
         return nodes, ref_el, entity_ids, entity_permutations
-    parent_nodes = []
     parent_ids = {}
     parent_permutations = None
-
     parent_to_children = ref_el.get_parent_to_children()
-    for dim in sorted(parent_to_children):
-        parent_ids[dim] = {}
-        for entity in sorted(parent_to_children[dim]):
-            cur = len(parent_nodes)
-            for child_dim, child_entity in parent_to_children[dim][entity]:
-                parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
-            ids = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
-            parent_ids[dim][entity] = ids
+
+    if all(isinstance(node, functional.PointEvaluation) for node in nodes):
+        # Merge Lagrange dual with lexicographical reordering
+        parent_nodes = []
+        for dim in sorted(parent_to_children):
+            parent_ids[dim] = {}
+            for entity in sorted(parent_to_children[dim]):
+                cur = len(parent_nodes)
+                for child_dim, child_entity in parent_to_children[dim][entity]:
+                    parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
+                ids = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
+                parent_ids[dim][entity] = ids
+    else:
+        # Merge everything else with the same node ordering
+        parent_nodes = nodes
+        for dim in sorted(parent_to_children):
+            parent_ids[dim] = {}
+            for entity in sorted(parent_to_children[dim]):
+                parent_ids[dim][entity] = []
+                for child_dim, child_entity in parent_to_children[dim][entity]:
+                    parent_ids[dim][entity].extend(entity_ids[child_dim][child_entity])
+
     return parent_nodes, parent_cell, parent_ids, parent_permutations

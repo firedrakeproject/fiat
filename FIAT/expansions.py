@@ -512,6 +512,11 @@ class ExpansionSet(object):
             data.append(vr.transpose((r, r+1) + tuple(range(r))))
         return data
 
+    def __eq__(self, other):
+        return (type(self) is type(other) and
+                self.ref_el == other.ref_el and
+                self.continuity == other.continuity)
+
 
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
