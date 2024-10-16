@@ -7,7 +7,6 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2022
 
 import numpy
-import scipy
 
 from FIAT import finite_element, dual_set, functional, P0
 from FIAT.reference_element import symmetric_simplex
@@ -16,6 +15,18 @@ from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import parse_lagrange_variant
+
+
+def make_dual_bubbles(ref_el, degree, codim=0):
+    """Tabulate the L2-duals of the hierarchical C0 basis."""
+    Q = create_quadrature(ref_el, 2 * degree)
+    B = make_bubbles(ref_el, degree, codim=codim, scale="orthonormal")
+    P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
+
+    M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)
+    phis = numpy.linalg.solve(M, P_at_qpts)
+    phis = numpy.dot(B.get_coeffs(), phis)
+    return Q, phis
 
 
 class LegendreDual(dual_set.DualSet):
@@ -94,7 +105,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
                 continue
 
             ref_facet = symmetric_simplex(dim)
-            Q_ref, phis = self.make_reference_duals(ref_facet, degree)
+            Q_ref, phis = make_dual_bubbles(ref_facet, degree)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
@@ -108,25 +119,6 @@ class IntegratedLegendreDual(dual_set.DualSet):
                 entity_permutations[dim][entity] = perms
 
         super().__init__(nodes, ref_el, entity_ids, entity_permutations)
-
-    def make_reference_duals(self, ref_el, degree):
-        Q = create_quadrature(ref_el, 2 * degree)
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        inner = lambda v, u: numpy.dot(numpy.multiply(v, qwts), u.T)
-        dim = ref_el.get_spatial_dimension()
-
-        B = make_bubbles(ref_el, degree)
-        B_table = B.expansion_set.tabulate(degree, qpts)
-
-        P = ONPolynomialSet(ref_el, degree)
-        P_table = P.tabulate(qpts, 0)[(0,) * dim]
-
-        # TODO sparse LU
-        V = inner(P_table, B_table)
-        PLU = scipy.linalg.lu_factor(V)
-        phis = scipy.linalg.lu_solve(PLU, P_table)
-        phis = numpy.dot(B.get_coeffs(), phis)
-        return Q, phis
 
 
 class IntegratedLegendre(finite_element.CiarletElement):

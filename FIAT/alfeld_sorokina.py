@@ -7,18 +7,16 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
 from FIAT import finite_element, dual_set, polynomial_set
-from FIAT.functional import ComponentPointEvaluation, PointDivergence, IntegralMoment
+from FIAT.functional import ComponentPointEvaluation, PointDivergence
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
 from FIAT.macro import CkPolynomialSet, AlfeldSplit
 
 import numpy
 
 
 def AlfeldSorokinaSpace(ref_el, degree):
-    """Return a vector-valued C^0 PolynomialSet on an Alfeld split whose
-    divergence is also C^0.  This works on any simplex and for all
-    polynomial degrees."""
+    """Return a vector-valued C0 PolynomialSet on an Alfeld split with C0
+    divergence. This works on any simplex and for all polynomial degrees."""
     ref_complex = AlfeldSplit(ref_el)
     sd = ref_complex.get_spatial_dimension()
     C0 = CkPolynomialSet(ref_complex, degree, order=0, shape=(sd,), variant="bubble")
@@ -51,53 +49,35 @@ def AlfeldSorokinaSpace(ref_el, degree):
 
 
 class AlfeldSorokinaDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree):
         if degree != 2:
-            raise NotImplementedError("Alfeld-Sorokina only defined for degree = 2")
-        if variant is None:
-            variant = "integral"
-        if variant not in {"integral", "point"}:
-            raise ValueError(f"Invalid variant {variant}")
+            raise NotImplementedError(f"{type(self).__name__} only defined for degree = 2")
 
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
         nodes = []
-        dims = (0, 1) if variant == "point" else (0,)
-        for dim in dims:
+        for dim in sorted(top):
             for entity in sorted(top[dim]):
                 cur = len(nodes)
+
+                dpts = ref_el.make_points(dim, entity, degree-1)
+                nodes.extend(PointDivergence(ref_el, pt) for pt in dpts)
+
                 pts = ref_el.make_points(dim, entity, degree)
-                if dim == 0:
-                    pt, = pts
-                    nodes.append(PointDivergence(ref_el, pt))
                 nodes.extend(ComponentPointEvaluation(ref_el, k, (sd,), pt)
                              for pt in pts for k in range(sd))
-                entity_ids[dim][entity].extend(range(cur, len(nodes)))
-
-        if variant == "integral":
-            # Edge moments against quadratic Legendre (mean-free bubble)
-            dim = 1
-            facet = ref_el.construct_subelement(dim)
-            Q = create_quadrature(facet, degree+dim+1)
-            f_at_qpts = facet.compute_bubble(Q.get_points())
-            f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / facet.volume()
-            for entity in sorted(top[dim]):
-                cur = len(nodes)
-                Q_mapped = FacetQuadratureRule(ref_el, dim, entity, Q)
-                detJ = Q_mapped.jacobian_determinant()
-                phi = f_at_qpts / detJ
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, phi, comp=k, shp=(sd,))
-                             for k in range(sd))
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
 
 class AlfeldSorokina(finite_element.CiarletElement):
-    """The Alfeld-Sorokina C^0 quadratic macroelement with C^0 divergence. This element
-    belongs to a Stokes complex, and is paired with Lagrange(ref_el, 1, variant="alfeld")."""
+    """The Alfeld-Sorokina C0 quadratic macroelement with C0 divergence.
+
+    This element belongs to a Stokes complex, and is paired with CG1(Alfeld).
+    """
     def __init__(self, ref_el, degree=2):
         dual = AlfeldSorokinaDualSet(ref_el, degree)
         poly_set = AlfeldSorokinaSpace(ref_el, degree)

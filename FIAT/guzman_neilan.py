@@ -10,18 +10,33 @@
 # transformation theory.
 
 from FIAT import finite_element, polynomial_set, expansions
-from FIAT.bernardi_raugel import ExtendedBernardiRaugelSpace, BernardiRaugelDualSet, BernardiRaugel
+from FIAT.bernardi_raugel import BernardiRaugelSpace, BernardiRaugelDualSet, BernardiRaugel
+from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.restricted import RestrictedElement
+from FIAT.nodal_enriched import NodalEnrichedElement
 from itertools import chain
 
 import numpy
 import math
 
 
-def ExtendedGuzmanNeilanSpace(ref_el, subdegree, reduced=False):
-    """Return a basis for the extended Guzman-Neilan space."""
+def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
+    r"""Return a basis for the (extended) Guzman-Neilan H1 space.
+
+    Project the extended Bernardi-Raugel space (Pk + FacetBubble)^d
+    into C0 Pk(Alfeld)^d with P_{k-1} divergence, preserving its trace.
+
+    :arg ref_el: a simplex
+    :arg order: the maximal polynomial degree
+    :kwarg kind: kind = 1 gives Pk^d + GN bubbles,
+                 kind = 2 gives C0 Pk(Alfeld)^d + GN bubbles.
+    :kwarg reduced: Include tangential bubbles if reduced = False.
+
+    :returns: a PolynomialSet basis for the Guzman-Neilan H1 space.
+    """
     sd = ref_el.get_spatial_dimension()
     ref_complex = AlfeldSplit(ref_el)
     C0 = polynomial_set.ONPolynomialSet(ref_complex, sd, shape=(sd,), scale=1, variant="bubble")
@@ -30,27 +45,77 @@ def ExtendedGuzmanNeilanSpace(ref_el, subdegree, reduced=False):
         B = modified_bubble_subspace(B)
 
     if reduced:
-        BR = BernardiRaugel(ref_el, sd, subdegree=subdegree).get_nodal_basis()
+        BR = BernardiRaugel(ref_el, order).get_nodal_basis()
         reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
         BR = BR.take(list(range(reduced_dim)))
     else:
-        BR = ExtendedBernardiRaugelSpace(ref_el, subdegree)
+        BR = BernardiRaugelSpace(ref_el, order)
+
     GN = constant_div_projection(BR, C0, B)
+    if kind == 2:
+        Bk = take_interior_bubbles(C0, order)
+        GN = polynomial_set.polynomial_set_union_normalized(GN, Bk)
     return GN
 
 
-class GuzmanNeilan(finite_element.CiarletElement):
-    """The Guzman-Neilan extended element."""
-    def __init__(self, ref_el, degree=None, subdegree=1):
+class GuzmanNeilanH1(finite_element.CiarletElement):
+    """The Guzman-Neilan H1-conforming (extended) macroelement."""
+    def __init__(self, ref_el, order=1, kind=1):
         sd = ref_el.get_spatial_dimension()
-        if degree is None:
-            degree = sd
-        if degree != sd:
-            raise ValueError("Guzman-Neilan only defined for degree = dim")
-        poly_set = ExtendedGuzmanNeilanSpace(ref_el, subdegree)
-        dual = BernardiRaugelDualSet(ref_el, degree, subdegree=subdegree)
+        if order >= sd:
+            raise ValueError(f"{type(self).__name__} is only defined for order < dim")
+        degree = sd
+        poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
+        ref_complex = poly_set.get_reference_element() if kind == 2 else ref_el
+        dual = BernardiRaugelDualSet(ref_complex, order, degree=degree)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
+
+
+class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):
+    """The Guzman-Neilan H1-conforming (extended) macroelement of the first kind.
+
+    Reference element: a simplex of any dimension.
+    Function space: Pk^d + normal facet bubbles with div in P0, with 1 <= k < dim.
+    Degrees of freedom: evaluation at Pk lattice points, and normal moments on faces.
+
+    This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.
+    """
+    def __init__(self, ref_el, order=1):
+        super().__init__(ref_el, order=order, kind=1)
+
+
+class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
+    """The Guzman-Neilan H1-conforming (extended) macroelement of the second kind.
+
+    Reference element: a simplex of any dimension.
+    Function space: C0 Pk^d(Alfeld) + normal facet bubbles with div in P0, with 1 <= k < dim.
+    Degrees of freedom: evaluation at Pk(Alfeld) lattice points, and normal moments on faces.
+
+    This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).
+    """
+    def __init__(self, ref_el, order=1):
+        super().__init__(ref_el, order=order, kind=2)
+
+
+def GuzmanNeilanH1div(ref_el, degree=2, reduced=False):
+    """The Guzman-Neilan H1(div)-conforming (extended) macroelement.
+
+    Reference element: a simplex of any dimension.
+    Function space: C0 P2^d(Alfeld) with C0 P1 divergence + normal facet bubbles with div in P0.
+    Degrees of freedom: evaluation at P2(Alfeld) lattice points, divergence at P1 lattice points,
+                        and normal moments on faces.
+
+    This element belongs to a Stokes complex, and is paired with CG1(Alfeld).
+    """
+    AS = AlfeldSorokina(ref_el, 2)
+    if reduced:
+        AS = RestrictedElement(AS, restriction_domain="vertex")
+    elif ref_el.get_spatial_dimension() <= 2:
+        # Quadratic bubbles are already included in 2D
+        return AS
+    GN = GuzmanNeilanH1(ref_el, order=0)
+    return NodalEnrichedElement(AS, GN)
 
 
 def inner(v, u, qwts):
@@ -64,18 +129,26 @@ def div(U):
     return sum(U[k][:, k.index(1), :] for k in U if sum(k) == 1)
 
 
-def take_interior_bubbles(C0):
-    """Take the interior bubbles from a vector-valued C0 PolynomialSet."""
-    ref_complex = C0.get_reference_element()
-    sd = ref_complex.get_spatial_dimension()
-    dimC0 = C0.get_num_members() // sd
-    entity_ids = expansions.polynomial_entity_ids(ref_complex, C0.degree, continuity="C0")
-    ids = [i + j * dimC0
-           for dim in range(sd+1)
+def take_interior_bubbles(P, degree=None):
+    """Extract the interior bubbles up to the given degree from a complete PolynomialSet."""
+    ref_complex = P.get_reference_element()
+    ncomp = numpy.prod(P.get_shape())
+    dimPk = P.expansion_set.get_num_members(P.degree)
+    assert ncomp * dimPk == P.get_num_members()
+    continuity = P.expansion_set.continuity
+    entity_ids = expansions.polynomial_entity_ids(ref_complex, P.degree,
+                                                  continuity=continuity)
+    if degree is None or degree >= P.degree:
+        slices = {dim: slice(None) for dim in entity_ids}
+    else:
+        slices = {dim: slice(math.comb(degree-1, dim)) for dim in entity_ids}
+
+    ids = [i + j * dimPk
+           for dim in slices
            for f in sorted(ref_complex.get_interior_facets(dim))
-           for i in entity_ids[dim][f]
-           for j in range(sd)]
-    return C0.take(ids)
+           for i in entity_ids[dim][f][slices[dim]]
+           for j in range(ncomp)]
+    return P.take(ids)
 
 
 def modified_bubble_subspace(B):
@@ -117,7 +190,8 @@ def modified_bubble_subspace(B):
 
 
 def constant_div_projection(BR, C0, M):
-    """Project the BR space into the space of C0 polynomials with constant divergence."""
+    """Project the BR space into C0 Pk(Alfeld)^d with P_{k-1} divergence.
+    """
     ref_complex = C0.get_reference_element()
     sd = ref_complex.get_spatial_dimension()
     degree = C0.degree

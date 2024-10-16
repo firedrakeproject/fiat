@@ -136,8 +136,7 @@ class ONPolynomialSet(PolynomialSet):
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
-        super(ONPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                              expansion_set, coeffs)
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
 
 def project(f, U, Q):
@@ -224,14 +223,13 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                     coeffs[cur_bf, j, i, exp_bf] = 1.0
                     cur_bf += 1
 
-        super(ONSymTensorPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                                       expansion_set, coeffs)
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
 
-def make_bubbles(ref_el, degree, codim=0, shape=()):
+def make_bubbles(ref_el, degree, codim=0, shape=(), scale="L2 piola"):
     """Construct a polynomial set with codim bubbles up to the given degree.
     """
-    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="bubble")
+    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale=scale, variant="bubble")
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
     sd = ref_el.get_spatial_dimension()
     dim = sd - codim
