@@ -84,4 +84,5 @@ class HsiehCloughTocher(finite_element.CiarletElement):
         ref_complex = macro.AlfeldSplit(ref_el)
         dual = HCTDualSet(ref_complex, degree, reduced=reduced)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
-        super().__init__(poly_set, dual, degree)
+        formdegree = 0
+        super().__init__(poly_set, dual, degree, formdegree=formdegree)

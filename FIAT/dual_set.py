@@ -115,18 +115,22 @@ class DualSet(object):
         dpts = set()
         Qs_to_ells = dict()
         for i, ell in enumerate(self.nodes):
+            if len(ell.deriv_dict) > 0:
+                dpts.update(ell.deriv_dict.keys())
+                continue
             if isinstance(ell, functional.IntegralMoment):
                 Q = ell.Q
             else:
                 Q = None
                 pts.update(ell.pt_dict.keys())
-                dpts.update(ell.deriv_dict.keys())
             if Q in Qs_to_ells:
                 Qs_to_ells[Q].append(i)
             else:
                 Qs_to_ells[Q] = [i]
 
-        Qs_to_pts = {None: tuple(sorted(pts))}
+        Qs_to_pts = {}
+        if len(pts) > 0:
+            Qs_to_pts[None] = tuple(sorted(pts))
         for Q in Qs_to_ells:
             if Q is not None:
                 cur_pts = tuple(map(tuple, Q.pts))
