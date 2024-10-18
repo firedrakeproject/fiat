@@ -120,7 +120,7 @@ def check_stokes_complex(spaces, degree):
     sd = A.get_spatial_dimension()
     z = (0,) * sd
 
-    pts = make_points(A, 4)
+    pts = make_points(A, degree+2)
     tab = [V.tabulate(1, pts) for V in spaces]
     if len(tab) > 2:
         # check rot(V0) in V1
@@ -228,9 +228,10 @@ def test_minimal_stokes_space(cell, family):
 
         # Test that divergence is in P0
         divX = div(Xtab)[:Vdim]
-        if family == "GN2":
+        if family in {"GN", "GN2"}:
             # Test that div(GN2) is in P0(Alfeld)
-            P0 = ONPolynomialSet(K, 0)
+            ref_el = K if family == "GN2" else K.get_parent()
+            P0 = ONPolynomialSet(ref_el, degree-1)
             P0_tab = P0.tabulate(pts)[z]
             assert span_equal(divX, P0_tab)
         else:
