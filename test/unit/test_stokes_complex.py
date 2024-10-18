@@ -126,8 +126,8 @@ def check_stokes_complex(spaces, degree):
         # check rot(V0) in V1
         assert span_greater_equal(tab[1][z], rot(tab[0]))
 
-    # check div(V1) in V2
-    assert span_greater_equal(tab[-1][z], div(tab[-2]))
+    # check div(V1) = V2
+    assert span_equal(tab[-1][z], div(tab[-2]))
 
     # Test that V1 includes Pk
     cell = A.get_parent() or A
