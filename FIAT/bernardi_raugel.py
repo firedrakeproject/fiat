@@ -28,12 +28,19 @@ def BernardiRaugelSpace(ref_el, order):
     entity_ids = expansions.polynomial_entity_ids(ref_el, sd, continuity="C0")
 
     slices = {dim: slice(math.comb(order-1, dim)) for dim in range(order)}
-    slices[sd-1] = slice(None)
+    slices.pop(sd-1, None)
     ids = [i + j * dimPd
            for dim in slices
            for f in sorted(entity_ids[dim])
            for i in entity_ids[dim][f][slices[dim]]
            for j in range(sd)]
+
+    interior_facets = ref_el.get_interior_facets(sd-1) or ()
+    facets = list(set(entity_ids[sd-1]) - set(interior_facets))
+    ids.extend(i + j*dimPd
+               for f in sorted(facets)
+               for i in entity_ids[sd-1][f]
+               for j in range(sd))
     return Pd.take(ids)
 
 

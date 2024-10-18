@@ -165,7 +165,6 @@ def test_hct_stokes_complex(cell, sobolev, reduced):
 @pytest.mark.parametrize("kind", (1, 2, "H1div", "H1div-red"))
 def test_gn_stokes_pairs(cell, kind):
     order = cell.get_spatial_dimension() - 1
-    #order = 1
     if kind == 1:
         spaces = [GuzmanNeilanFirstKindH1(cell, order), DG(cell, order-1)]
         degree = order

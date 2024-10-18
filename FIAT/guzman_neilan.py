@@ -44,17 +44,17 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     if sd > 2:
         B = modified_bubble_subspace(B)
 
+    K = ref_complex if kind == 2 else ref_el
+    num_bubbles = sd + 1
     if reduced:
-        BR = BernardiRaugel(ref_el, order).get_nodal_basis()
+        BR = BernardiRaugel(K, order).get_nodal_basis()
         reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
         BR = BR.take(list(range(reduced_dim)))
     else:
-        BR = BernardiRaugelSpace(ref_el, order)
+        num_bubbles *= sd
+        BR = BernardiRaugelSpace(K, order)
 
-    GN = constant_div_projection(BR, C0, B)
-    if kind == 2:
-        Bk = take_interior_bubbles(C0, order)
-        GN = polynomial_set.polynomial_set_union_normalized(GN, Bk)
+    GN = constant_div_projection(BR, C0, B, num_bubbles)
     return GN
 
 
@@ -194,9 +194,8 @@ def modified_bubble_subspace(B):
     return M
 
 
-def constant_div_projection(BR, C0, M):
-    """Project the BR space into C0 Pk(Alfeld)^d with P_{k-1} divergence.
-    """
+def constant_div_projection(BR, C0, M, num_bubbles):
+    """Project the BR space into C0 Pk(Alfeld)^d with P_{k-1} divergence."""
     ref_complex = C0.get_reference_element()
     sd = ref_complex.get_spatial_dimension()
     degree = C0.degree
@@ -213,14 +212,14 @@ def constant_div_projection(BR, C0, M):
     X = BR.tabulate(qpts, 1)
     # Invert the divergence
     B = inner(P, div(U), qwts)
-    g = inner(P, div(X), qwts)
+    g = inner(P, div(X)[-num_bubbles:], qwts)
     w = numpy.linalg.solve(B, g)
 
     # Add correction to BR bubbles
     v = C0.tabulate(qpts)[(0,)*sd]
     coeffs = numpy.linalg.solve(inner(v, v, qwts), inner(v, X[(0,)*sd], qwts))
     coeffs = coeffs.T.reshape(BR.get_num_members(), sd, -1)
-    coeffs -= numpy.tensordot(w, M.get_coeffs(), axes=(0, 0))
+    coeffs[-num_bubbles:] -= numpy.tensordot(w, M.get_coeffs(), axes=(0, 0))
     GN = polynomial_set.PolynomialSet(ref_complex, degree, degree,
                                       C0.get_expansion_set(), coeffs)
     return GN
