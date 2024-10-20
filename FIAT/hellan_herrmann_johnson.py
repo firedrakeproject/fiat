@@ -7,90 +7,75 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from FIAT.finite_element import CiarletElement
-from FIAT.dual_set import DualSet
-from FIAT.polynomial_set import ONSymTensorPolynomialSet
-from FIAT.functional import PointwiseInnerProductEvaluation as InnerProduct
-import numpy
+from FIAT import dual_set, finite_element, polynomial_set
+from FIAT.functional import ComponentPointEvaluation, PointwiseInnerProductEvaluation as InnerProduct
 
 
-class HellanHerrmannJohnsonDual(DualSet):
+class HellanHerrmannJohnsonDual(dual_set.DualSet):
     """Degrees of freedom for Hellan-Herrmann-Johnson elements."""
-    def __init__(self, cell, degree):
-        dim = cell.get_spatial_dimension()
-        if not dim == 2:
-            raise ValueError("Hellan_Herrmann-Johnson elements are only"
+    def __init__(self, ref_el, degree):
+        sd = ref_el.get_spatial_dimension()
+        if sd != 2:
+            raise ValueError("Hellan-Herrmann-Johnson elements are only"
                              "defined in dimension 2.")
 
-        # construct the degrees of freedoms
-        dofs = []               # list of functionals
-        # dof_ids[i][j] contains the indices of dofs that are associated with
-        # entity j in dim i
-        dof_ids = {}
+        top = ref_el.get_topology()
+        entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
+        nodes = []
 
-        # no vertex dof
-        dof_ids[0] = {i: [] for i in range(dim + 1)}
-        # edge dofs
-        (_dofs, _dof_ids) = self._generate_edge_dofs(cell, degree, 0)
-        dofs.extend(_dofs)
-        dof_ids[1] = _dof_ids
-        # cell dofs
-        (_dofs, _dof_ids) = self._generate_trig_dofs(cell, degree, len(dofs))
-        dofs.extend(_dofs)
-        dof_ids[dim] = _dof_ids
+        # no vertex dofs
+        edge_dofs, entity_ids[1] = self._generate_edge_dofs(ref_el, degree, 0)
+        nodes.extend(edge_dofs)
+        cell_nodes, entity_ids[sd] = self._generate_cell_dofs(ref_el, degree, len(nodes))
+        nodes.extend(cell_nodes)
 
-        super().__init__(dofs, cell, dof_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
     @staticmethod
-    def _generate_edge_dofs(cell, degree, offset):
+    def _generate_edge_dofs(ref_el, degree, offset):
         """Generate dofs on edges.
         On each edge, let n be its normal. For degree=r, the scalar function
               n^T u n
-        is evaluated at points enough to control P(r).
+        is evaluated at enough points to control P(r).
         """
-        dofs = []
-        dof_ids = {}
-        for entity_id in range(3):                  # a triangle has 3 edges
-            pts = cell.make_points(1, entity_id, degree + 2)  # edges are 1D
-            normal = cell.compute_scaled_normal(entity_id)
-            dofs += [InnerProduct(cell, normal, normal, pt) for pt in pts]
-            num_new_dofs = len(pts)                 # 1 dof per point on edge
-            dof_ids[entity_id] = list(range(offset, offset + num_new_dofs))
-            offset += num_new_dofs
-        return (dofs, dof_ids)
+        dim = 1
+        top = ref_el.get_topology()
+        nodes = []
+        entity_ids = {}
+        for entity_id in sorted(top[dim]):
+            pts = ref_el.make_points(dim, entity_id, degree + 2)
+            normal = ref_el.compute_scaled_normal(entity_id)
+            nodes.extend(InnerProduct(ref_el, normal, normal, pt) for pt in pts)
+            num_new_nodes = len(pts)
+            entity_ids[entity_id] = list(range(offset, offset + num_new_nodes))
+            offset += num_new_nodes
+        return nodes, entity_ids
 
     @staticmethod
-    def _generate_trig_dofs(cell, degree, offset):
-        """Generate dofs on edges.
+    def _generate_cell_dofs(ref_el, degree, offset):
+        """Generate dofs on the cell interior.
         On each triangle, for degree=r, the three components
               u11, u12, u22
-        are evaluated at points enough to control P(r-1).
+        are evaluated at enough points to control P(r-1).
         """
-        dofs = []
-        dof_ids = {}
-        pts = cell.make_points(2, 0, degree + 2)  # 2D trig #0
-        e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
-        e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
-        basis = [(e1, e1), (e1, e2), (e2, e2)]    # basis for symmetric matrix
-        for (v1, v2) in basis:
-            dofs += [InnerProduct(cell, v1, v2, pt) for pt in pts]
-        num_dofs = 3 * len(pts)                   # 3 dofs per trig
-        dof_ids[0] = list(range(offset, offset + num_dofs))
-        return (dofs, dof_ids)
+        sd = ref_el.get_spatial_dimension()
+        shp = (sd, sd)
+        basis = [(i, j) for i in range(sd) for j in range(i, sd)]
+        pts = ref_el.make_points(sd, 0, degree + 2)
+        nodes = [ComponentPointEvaluation(ref_el, comp, shp, pt)
+                 for comp in basis for pt in pts]
+        entity_ids = {0: list(range(offset, offset + len(nodes)))}
+        return nodes, entity_ids
 
 
-class HellanHerrmannJohnson(CiarletElement):
+class HellanHerrmannJohnson(finite_element.CiarletElement):
     """The definition of Hellan-Herrmann-Johnson element. It is defined only in
        dimension 2. It consists of piecewise polynomial symmetric-matrix-valued
        functions of degree r or less with normal-normal continuity.
     """
-    def __init__(self, cell, degree):
+    def __init__(self, ref_el, degree):
         assert degree >= 0, "Hellan-Herrmann-Johnson starts at degree 0!"
-        # shape functions
-        Ps = ONSymTensorPolynomialSet(cell, degree)
-        # degrees of freedom
-        Ls = HellanHerrmannJohnsonDual(cell, degree)
-        # mapping under affine transformation
+        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        dual = HellanHerrmannJohnsonDual(ref_el, degree)
         mapping = "double contravariant piola"
-
-        super().__init__(Ps, Ls, degree, mapping=mapping)
+        super().__init__(poly_set, dual, degree, mapping=mapping)

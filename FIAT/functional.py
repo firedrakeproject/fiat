@@ -170,7 +170,7 @@ class PointEvaluation(Functional):
 
     def __init__(self, ref_el, x):
         pt_dict = {x: [(1.0, tuple())]}
-        Functional.__init__(self, ref_el, tuple(), pt_dict, {}, "PointEval")
+        super().__init__(ref_el, tuple(), pt_dict, {}, "PointEval")
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""
@@ -183,17 +183,18 @@ class PointEvaluation(Functional):
 
 class ComponentPointEvaluation(Functional):
     """Class representing point evaluation of a particular component
-    of a vector function at a particular point x."""
+    of a vector/tensor function at a particular point x."""
 
     def __init__(self, ref_el, comp, shp, x):
-        if len(shp) != 1:
-            raise Exception("Illegal shape")
-        if comp < 0 or comp >= shp[0]:
-            raise Exception("Illegal component")
+        if not isinstance(comp, tuple):
+            comp = (comp,)
+        if len(shp) != len(comp):
+            raise ValueError("Component and shape are incompatible")
+        if any(i < 0 or i >= n for i, n in zip(comp, shp)):
+            raise ValueError("Illegal component")
         self.comp = comp
-        pt_dict = {x: [(1.0, (comp,))]}
-        Functional.__init__(self, ref_el, shp, pt_dict, {},
-                            "ComponentPointEval")
+        pt_dict = {x: [(1.0, comp)]}
+        super().__init__(ref_el, shp, pt_dict, {}, "ComponentPointEval")
 
     def tostr(self):
         x = list(map(str, list(self.pt_dict.keys())[0]))
@@ -209,7 +210,7 @@ class PointDerivative(Functional):
         self.alpha = tuple(alpha)
         self.order = sum(self.alpha)
 
-        Functional.__init__(self, ref_el, tuple(), {}, dpt_dict, "PointDeriv")
+        super().__init__(ref_el, tuple(), {}, dpt_dict, "PointDeriv")
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn. Note that this depends
@@ -239,7 +240,7 @@ class PointNormalDerivative(Functional):
             alphas.append(alpha)
         dpt_dict = {pt: [(n[i], tuple(alphas[i]), tuple()) for i in range(sd)]}
 
-        Functional.__init__(self, ref_el, tuple(), {}, dpt_dict, "PointNormalDeriv")
+        super().__init__(ref_el, tuple(), {}, dpt_dict, "PointNormalDeriv")
 
 
 class PointNormalSecondDerivative(Functional):
@@ -265,7 +266,7 @@ class PointNormalSecondDerivative(Functional):
         self.alphas = alphas
         dpt_dict = {pt: [(n[i], alphas[i], tuple()) for i in range(sd)]}
 
-        Functional.__init__(self, ref_el, tuple(), {}, dpt_dict, "PointNormalDeriv")
+        super().__init__(ref_el, tuple(), {}, dpt_dict, "PointNormalDeriv")
 
 
 class PointDivergence(Functional):
@@ -273,9 +274,11 @@ class PointDivergence(Functional):
     functions at a particular point x."""
 
     def __init__(self, ref_el, x):
-        dpt_dict = {x: [(1.0, alpha, (alpha.index(1),)) for alpha in polynomial_set.mis(len(x), 1)]}
+        sd = ref_el.get_spatial_dimension()
+        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
+        dpt_dict = {x: [(1.0, alpha, (alpha.index(1),)) for alpha in alphas]}
 
-        Functional.__init__(self, ref_el, (len(x),), {}, dpt_dict, "PointDiv")
+        super().__init__(ref_el, (len(x),), {}, dpt_dict, "PointDiv")
 
 
 class IntegralMoment(Functional):
@@ -297,7 +300,7 @@ class IntegralMoment(Functional):
         self.comp = comp
         weights = numpy.multiply(f_at_qpts, qwts)
         pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(qpts, weights)}
-        Functional.__init__(self, ref_el, shp, pt_dict, {}, "IntegralMoment")
+        super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
 
     def __call__(self, fn):
         """Evaluate the functional on the function fn."""
@@ -331,8 +334,8 @@ class IntegralMomentOfNormalDerivative(Functional):
         dpt_dict = {tuple(pt): [(wt*n[i], alphas[i], tuple()) for i in range(sd)]
                     for pt, wt in zip(points, weights)}
 
-        Functional.__init__(self, ref_el, tuple(),
-                            {}, dpt_dict, "IntegralMomentOfNormalDerivative")
+        super().__init__(ref_el, tuple(),
+                         {}, dpt_dict, "IntegralMomentOfNormalDerivative")
 
 
 class IntegralLegendreDirectionalMoment(Functional):
