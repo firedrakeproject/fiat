@@ -282,8 +282,8 @@ class PointDivergence(Functional):
 
 
 class ComponentPointCurl(Functional):
-    """Class representing a particular component of point evaluation of the
-    curl (skew-symmetric gradient) of vector functions at a particular point x."""
+    """Class representing a particular component of the curl (skew-symmetric
+    gradient) of vector functions at a particular point x."""
 
     def __init__(self, ref_el, comp, x):
         sd = ref_el.get_spatial_dimension()
