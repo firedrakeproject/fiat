@@ -10,13 +10,10 @@ def traceless_matrices(ref_el):
     """Returns a basis for traceless matrices on a reference element."""
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
-    verts = ref_el.get_vertices()
-    v0 = numpy.array(verts[0])
-    rts = [numpy.array(v1) - v0 for v1 in verts[1:]]
-    rts.insert(0, -sum(rts))
-
-    normalize = lambda u: u / numpy.linalg.norm(u)
-    rts = list(map(normalize, rts))
+    verts = numpy.array(ref_el.get_vertices())
+    rts = verts[1:] - verts[None, 0, :]
+    rts = numpy.vstack((-sum(rts), rts))
+    rts /= numpy.linalg.norm(rts, axis=1)[:, None]
 
     dev = lambda S: S - (numpy.trace(S) / S.shape[0]) * numpy.eye(*S.shape)
     basis = numpy.zeros((len(top[sd-1]), sd-1, sd, sd), "d")
@@ -36,7 +33,7 @@ def traceless_matrices(ref_el):
                     i1, i2, i3 = i2, i3, i1
                 basis[i, j] = dev(numpy.outer(rts[i1], numpy.cross(rts[i2], rts[i3])))
     else:
-        raise NotImplementedError("TODO")
+        raise NotImplementedError("The traceless basis is not implemented in higher dimensions")
     return basis
 
 
@@ -71,7 +68,8 @@ class TracelessTensorPolynomialSet(polynomial_set.PolynomialSet):
 
 
 def GLSSpace(ref_el, degree):
-    """build constrained space with normal-tangential component in P_{k-1}"""
+    """Return the subspace of trace-free Pk tensors with normal-tangential
+    component in P_{k-1}"""
     sd = ref_el.get_spatial_dimension()
     P = TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
     expansion_set = P.get_expansion_set()
@@ -150,9 +148,14 @@ class GLSDual(dual_set.DualSet):
 
 
 class GopalakrishnanLedererSchoberl(finite_element.CiarletElement):
-
+    """The GLS element, also known as MCS (Mass-Conserving mixed Stress).
+    GLS(r) is the space of trace-free polynomials of degree r with
+    continuous normal-tangential components of degree r-1.
+    """
     def __init__(self, ref_el, degree):
         poly_set = GLSSpace(ref_el, degree)
         dual = GLSDual(ref_el, degree)
+        sd = ref_el.get_spatial_dimension()
+        formdegree = (1, sd-1)
         mapping = "covariant contravariant piola"
-        super().__init__(poly_set, dual, degree, mapping=mapping)
+        super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
