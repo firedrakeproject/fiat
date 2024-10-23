@@ -269,6 +269,7 @@ elements = [
     "GopalakrishnanLedererSchoberl(T, 3)",
     "GopalakrishnanLedererSchoberl(S, 1)",
     "GopalakrishnanLedererSchoberl(S, 2)",
+    "GopalakrishnanLedererSchoberl(S, 3)",
     "BrezziDouglasFortinMarini(T, 2)",
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",

@@ -75,15 +75,14 @@ def GLSSpace(ref_el, degree):
     expansion_set = P.get_expansion_set()
     if degree == 1:
         dimP1 = expansion_set.get_num_members(degree)
-        coeffs = numpy.zeros((2*(sd+1)*(sd-1), sd+1, sd-1, dimP1))
-        cur = 0
-        for i, j in numpy.ndindex(coeffs.shape[1:3]):
-            coeffs[cur, i, j, :] = 1
-            cur += 1
-            coeffs[cur, i, j, i] = 1
-            cur += 1
+        coeffs = numpy.zeros((sd+1, sd-1, 2, sd+1, sd-1, dimP1))
+        for i, j in numpy.ndindex(coeffs.shape[0:2]):
+            # Constant times traceless matrix
+            coeffs[i, j, 0, i, j, :] = 1
+            # Barycentric coordinate times traceless matrix
+            coeffs[i, j, 1, i, j, i] = 1
         coeffs = coeffs.reshape(-1, P.get_num_members())
-        coeffs = numpy.tensordot(coeffs, P.get_coeffs(), (1, 0))
+        coeffs = numpy.tensordot(coeffs, P.get_coeffs(), axes=(1, 0))
         return polynomial_set.PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
     else:
         entity_ids = polynomial_entity_ids(ref_el, degree, continuity=expansion_set.continuity)
