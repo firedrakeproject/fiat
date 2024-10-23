@@ -71,12 +71,12 @@ class TracelessTensorPolynomialSet(polynomial_set.PolynomialSet):
 
 
 def GLSSpace(ref_el, degree):
-    # build constrained space with normal-tangential component in P_{k-1}
+    """build constrained space with normal-tangential component in P_{k-1}"""
     sd = ref_el.get_spatial_dimension()
     P = TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
     expansion_set = P.get_expansion_set()
     if degree == 1:
-        dimP1 = sd+1
+        dimP1 = expansion_set.get_num_members(degree)
         coeffs = numpy.zeros((2*(sd+1)*(sd-1), sd+1, sd-1, dimP1))
         cur = 0
         for i, j in numpy.ndindex(coeffs.shape[1:3]):
@@ -109,7 +109,6 @@ def GLSSpace(ref_el, degree):
 
 
 class GLSDual(dual_set.DualSet):
-
     def __init__(self, ref_el, degree):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
