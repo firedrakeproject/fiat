@@ -35,6 +35,7 @@ from FIAT.nedelec_second_kind import NedelecSecondKind          # noqa: F401
 from FIAT.regge import Regge                                    # noqa: F401
 from FIAT.hdiv_trace import HDivTrace, map_to_reference_facet   # noqa: F401
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson  # noqa: F401
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberl  # noqa: F401
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini  # noqa: F401
 from FIAT.gauss_legendre import GaussLegendre                   # noqa: F401
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre    # noqa: F401
@@ -263,6 +264,11 @@ elements = [
     "HellanHerrmannJohnson(T, 0)",
     "HellanHerrmannJohnson(T, 1)",
     "HellanHerrmannJohnson(T, 2)",
+    "GopalakrishnanLedererSchoberl(T, 1)",
+    "GopalakrishnanLedererSchoberl(T, 2)",
+    "GopalakrishnanLedererSchoberl(T, 3)",
+    "GopalakrishnanLedererSchoberl(S, 1)",
+    "GopalakrishnanLedererSchoberl(S, 2)",
     "BrezziDouglasFortinMarini(T, 2)",
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",
