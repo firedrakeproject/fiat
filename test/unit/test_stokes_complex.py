@@ -35,10 +35,8 @@ def rAQ(cell):
 
 def span_greater_equal(A, B):
     # span(A) >= span(B)
-    dimA = A.shape[0]
-    dimB = B.shape[0]
-    _, residual, *_ = numpy.linalg.lstsq(A.reshape(dimA, -1).T,
-                                         B.reshape(dimB, -1).T)
+    _, residual, *_ = numpy.linalg.lstsq(A.reshape(A.shape[0], -1).T,
+                                         B.reshape(B.shape[0], -1).T)
     return numpy.allclose(residual, 0)
 
 
