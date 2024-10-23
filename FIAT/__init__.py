@@ -113,6 +113,7 @@ supported_elements = {"Argyris": Argyris,
                       "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
                       "Hellan-Herrmann-Johnson": HellanHerrmannJohnson,
+                      "Gopalakrishnan-Lederer-Schroberl": GopalakrishnanLedererSchoberl,
                       "Conforming Arnold-Winther": ArnoldWinther,
                       "Nonconforming Arnold-Winther": ArnoldWintherNC,
                       "Mardal-Tai-Winther": MardalTaiWinther}
