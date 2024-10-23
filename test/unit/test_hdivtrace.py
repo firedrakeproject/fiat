@@ -46,7 +46,7 @@ def test_basis_values(dim, degree):
     for facet_id in range(dim + 1):
         # Tabulate without an entity pair given --- need to map to cell coordinates
         cell_transform = ref_el.get_entity_transform(dim - 1, facet_id)
-        cell_points = np.array(list(map(cell_transform, quadrule.pts)))
+        cell_points = cell_transform(quadrule.get_points())
         ctab = fiat_element.tabulate(0, cell_points)[(0,) * dim][nf*facet_id:nf*(facet_id + 1)]
 
         # Tabulate with entity pair provided

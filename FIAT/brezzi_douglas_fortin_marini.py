@@ -58,7 +58,7 @@ class BDFMDualSet(dual_set.DualSet):
         entity_ids[sd] = {0: list(range(cur, cur + tangent_count))}
         cur += tangent_count
 
-        super(BDFMDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 def BDFMSpace(ref_el, order):
@@ -112,5 +112,5 @@ class BrezziDouglasFortinMarini(finite_element.CiarletElement):
         poly_set = BDFMSpace(ref_el, degree)
         dual = BDFMDualSet(ref_el, degree - 1)
         formdegree = ref_el.get_spatial_dimension() - 1
-        super(BrezziDouglasFortinMarini, self).__init__(poly_set, dual, degree, formdegree,
-                                                        mapping="contravariant piola")
+        super().__init__(poly_set, dual, degree, formdegree,
+                         mapping="contravariant piola")

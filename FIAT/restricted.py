@@ -8,17 +8,45 @@ from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
 
 
-class RestrictedElement(CiarletElement):
-    """Restrict given element to specified list of dofs."""
+class RestrictedDualSet(DualSet):
+    """Restrict the given DualSet to the specified list of dofs."""
 
-    def __init__(self, element, indices=None, restriction_domain=None):
+    def __init__(self, dual, indices):
+        indices = list(sorted(indices))
+        ref_el = dual.get_reference_element()
+        nodes_old = dual.get_nodes()
+        entity_ids = {}
+        nodes = []
+        for d, entities in dual.get_entity_ids().items():
+            entity_ids[d] = {}
+            for entity, dofs in entities.items():
+                entity_ids[d][entity] = [indices.index(dof)
+                                         for dof in dofs if dof in indices]
+        nodes = [nodes_old[i] for i in indices]
+        self._dual = dual
+        super().__init__(nodes, ref_el, entity_ids)
+
+    def get_indices(self, restriction_domain, take_closure=True):
+        """Return the list of dofs with support on a given restriction domain.
+
+        :arg restriction_domain: can be 'interior', 'vertex', 'edge', 'face' or 'facet'
+        :kwarg take_closure: Are we taking the closure of the restriction domain?
+        """
+        # Call get_indices on the parent class to support multiple restriction domains
+        return type(self._dual).get_indices(self, restriction_domain, take_closure=take_closure)
+
+
+class RestrictedElement(CiarletElement):
+    """Restrict the given element to the specified list of dofs."""
+
+    def __init__(self, element, indices=None, restriction_domain=None, take_closure=True):
         '''For sake of argument, indices overrides restriction_domain'''
 
         if not (indices or restriction_domain):
             raise RuntimeError("Either indices or restriction_domain must be passed in")
 
         if not indices:
-            indices = _get_indices(element, restriction_domain)
+            indices = element.dual.get_indices(restriction_domain, take_closure=take_closure)
 
         if isinstance(indices, str):
             raise RuntimeError("variable 'indices' was a string; did you forget to use a keyword?")
@@ -29,29 +57,11 @@ class RestrictedElement(CiarletElement):
         self._element = element
         self._indices = indices
 
-        # Fetch reference element
-        ref_el = element.get_reference_element()
-
         # Restrict primal set
         poly_set = element.get_nodal_basis().take(indices)
 
         # Restrict dual set
-        dof_counter = 0
-        entity_ids = {}
-        nodes = []
-        nodes_old = element.dual_basis()
-        for d, entities in element.entity_dofs().items():
-            entity_ids[d] = {}
-            for entity, dofs in entities.items():
-                entity_ids[d][entity] = []
-                for dof in dofs:
-                    if dof not in indices:
-                        continue
-                    entity_ids[d][entity].append(dof_counter)
-                    dof_counter += 1
-                    nodes.append(nodes_old[dof])
-        assert dof_counter == len(indices)
-        dual = DualSet(nodes, ref_el, entity_ids)
+        dual = RestrictedDualSet(element.get_dual_set(), indices)
 
         # Restrict mapping
         mapping_old = element.mapping()
@@ -59,52 +69,4 @@ class RestrictedElement(CiarletElement):
         assert all(e_mapping == mapping_new[0] for e_mapping in mapping_new)
 
         # Call constructor of CiarletElement
-        super(RestrictedElement, self).__init__(poly_set, dual, 0, element.get_formdegree(), mapping_new[0])
-
-
-def sorted_by_key(mapping):
-    "Sort dict items by key, allowing different key types."
-    # Python3 doesn't allow comparing builtins of different type, therefore the typename trick here
-    def _key(x):
-        return (type(x[0]).__name__, x[0])
-    return sorted(mapping.items(), key=_key)
-
-
-def _get_indices(element, restriction_domain):
-    "Restriction domain can be 'interior', 'vertex', 'edge', 'face' or 'facet'"
-
-    if restriction_domain == "interior":
-        # Return dofs from interior
-        return element.entity_dofs()[max(element.entity_dofs().keys())][0]
-
-    # otherwise return dofs with d <= dim
-    if restriction_domain == "vertex":
-        dim = 0
-    elif restriction_domain == "edge":
-        dim = 1
-    elif restriction_domain == "face":
-        dim = 2
-    elif restriction_domain == "facet":
-        dim = element.get_reference_element().get_spatial_dimension() - 1
-    else:
-        raise RuntimeError("Invalid restriction domain")
-
-    is_prodcell = isinstance(max(element.entity_dofs().keys()), tuple)
-
-    entity_dofs = element.entity_dofs()
-    indices = []
-    for d in range(dim + 1):
-        if is_prodcell:
-            for a in range(d + 1):
-                b = d - a
-                try:
-                    entities = entity_dofs[(a, b)]
-                    for (entity, index) in sorted_by_key(entities):
-                        indices += index
-                except KeyError:
-                    pass
-        else:
-            entities = entity_dofs[d]
-            for (entity, index) in sorted_by_key(entities):
-                indices += index
-    return indices
+        super().__init__(poly_set, dual, 0, element.get_formdegree(), mapping_new[0])

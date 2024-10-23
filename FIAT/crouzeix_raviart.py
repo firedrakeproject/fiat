@@ -46,7 +46,7 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
             entity_ids[d - 1][i] += [i]
 
         # Initialize super-class
-        super(CrouzeixRaviartDualSet, self).__init__(nodes, cell, entity_ids)
+        super().__init__(nodes, cell, entity_ids)
 
 
 class CrouzeixRaviart(finite_element.CiarletElement):
@@ -67,4 +67,4 @@ class CrouzeixRaviart(finite_element.CiarletElement):
         # FiniteElement
         space = polynomial_set.ONPolynomialSet(cell, 1)
         dual = CrouzeixRaviartDualSet(cell, 1)
-        super(CrouzeixRaviart, self).__init__(space, dual, 1)
+        super().__init__(space, dual, 1)

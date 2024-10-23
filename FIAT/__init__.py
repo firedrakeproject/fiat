@@ -7,10 +7,15 @@ import pkg_resources
 # Import finite element classes
 from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
 from FIAT.argyris import Argyris
-from FIAT.hct import HsiehCloughTocher
+from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
-from FIAT.argyris import QuinticArgyris
+from FIAT.hct import HsiehCloughTocher
+from FIAT.alfeld_sorokina import AlfeldSorokina
+from FIAT.arnold_qin import ArnoldQin
+from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
+from FIAT.christiansen_hu import ChristiansenHu
+from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
 from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
 from FIAT.Sminus import TrimmedSerendipityFace  # noqa: F401
@@ -31,6 +36,7 @@ from FIAT.gauss_radau import GaussRadau
 from FIAT.morley import Morley
 from FIAT.nedelec import Nedelec
 from FIAT.nedelec_second_kind import NedelecSecondKind
+from FIAT.powell_sabin import QuadraticPowellSabin6, QuadraticPowellSabin12
 from FIAT.hierarchical import Legendre, IntegratedLegendre
 from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
@@ -63,8 +69,8 @@ __version__ = pkg_resources.get_distribution("fenics-fiat").version
 
 # List of supported elements and mapping to element classes
 supported_elements = {"Argyris": Argyris,
-                      "HsiehCloughTocher": HsiehCloughTocher,
                       "Bell": Bell,
+                      "Bernardi-Raugel": BernardiRaugel,
                       "Bernstein": Bernstein,
                       "Brezzi-Douglas-Marini": BrezziDouglasMarini,
                       "Brezzi-Douglas-Fortin-Marini": BrezziDouglasFortinMarini,
@@ -79,6 +85,14 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
+                      "Hsieh-Clough-Tocher": HsiehCloughTocher,
+                      "Alfeld-Sorokina": AlfeldSorokina,
+                      "Arnold-Qin": ArnoldQin,
+                      "Christiansen-Hu": ChristiansenHu,
+                      "Guzman-Neilan 1st kind H1": GuzmanNeilanFirstKindH1,
+                      "Guzman-Neilan 2nd kind H1": GuzmanNeilanSecondKindH1,
+                      "Guzman-Neilan H1(div)": GuzmanNeilanH1div,
+                      "Johnson-Mercier": JohnsonMercier,
                       "Lagrange": Lagrange,
                       "Kong-Mulder-Veldhuizen": KongMulderVeldhuizen,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
@@ -93,6 +107,8 @@ supported_elements = {"Argyris": Argyris,
                       "Regge": Regge,
                       "EnrichedElement": EnrichedElement,
                       "NodalEnrichedElement": NodalEnrichedElement,
+                      "QuadraticPowellSabin6": QuadraticPowellSabin6,
+                      "QuadraticPowellSabin12": QuadraticPowellSabin12,
                       "TensorProductElement": TensorProductElement,
                       "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
@@ -102,5 +118,4 @@ supported_elements = {"Argyris": Argyris,
                       "Mardal-Tai-Winther": MardalTaiWinther}
 
 # List of extra elements
-extra_elements = {"P0": P0,
-                  "Quintic Argyris": QuinticArgyris}
+extra_elements = {"P0": P0}

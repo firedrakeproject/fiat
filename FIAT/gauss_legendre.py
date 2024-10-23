@@ -14,4 +14,4 @@ from FIAT import discontinuous_lagrange
 class GaussLegendre(discontinuous_lagrange.DiscontinuousLagrange):
     """Simplicial discontinuous element with nodes at the (recursive) Gauss-Legendre points."""
     def __init__(self, ref_el, degree):
-        super(GaussLegendre, self).__init__(ref_el, degree, variant="gl")
+        super().__init__(ref_el, degree, variant="gl")

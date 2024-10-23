@@ -39,11 +39,11 @@ class DPC0(finite_element.CiarletElement):
         dual.entity_permutations = None
         degree = 0
         formdegree = ref_el.get_spatial_dimension()  # n-form
-        super(DPC0, self).__init__(poly_set=poly_set,
-                                   dual=dual,
-                                   order=degree,
-                                   ref_complex=ref_el,
-                                   formdegree=formdegree)
+        super().__init__(poly_set=poly_set,
+                         dual=dual,
+                         order=degree,
+                         ref_complex=ref_el,
+                         formdegree=formdegree)
 
 
 class DPCDualSet(dual_set.DualSet):
@@ -94,7 +94,7 @@ class DPCDualSet(dual_set.DualSet):
                 entity_ids[dim][entity] = []
 
         entity_ids[dim][0] = list(range(len(nodes)))
-        super(DPCDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class HigherOrderDPC(finite_element.CiarletElement):
@@ -105,11 +105,11 @@ class HigherOrderDPC(finite_element.CiarletElement):
         poly_set = polynomial_set.ONPolynomialSet(hypercube_simplex_map[flat_el], degree)
         dual = DPCDualSet(ref_el, flat_el, degree)
         formdegree = flat_el.get_spatial_dimension()  # n-form
-        super(HigherOrderDPC, self).__init__(poly_set=poly_set,
-                                             dual=dual,
-                                             order=degree,
-                                             ref_complex=ref_el,
-                                             formdegree=formdegree)
+        super().__init__(poly_set=poly_set,
+                         dual=dual,
+                         order=degree,
+                         ref_complex=ref_el,
+                         formdegree=formdegree)
 
 
 def DPC(ref_el, degree):
