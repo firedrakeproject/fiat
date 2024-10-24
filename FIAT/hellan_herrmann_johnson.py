@@ -41,9 +41,10 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
             phis = P.tabulate(Q.get_points())[(0,)*(sd-1)]
             for entity in sorted(top[sd-1]):
                 cur = len(nodes)
-                n = ref_el.compute_scaled_normal(entity)
-                comp = n[:, None] * n[None, :]
                 Q_mapped = FacetQuadratureRule(ref_el, sd-1, entity, Q)
+                detJ = Q_mapped.jacobian_determinant()
+                n = ref_el.compute_scaled_normal(entity)
+                comp = (n[:, None] * n[None, :]) / detJ
                 nodes.extend(FrobeniusIntegralMoment(ref_el, Q_mapped,
                              comp[:, :, None] * phi[None, None, :])
                              for phi in phis)

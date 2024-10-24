@@ -45,8 +45,9 @@ class ReggeDual(dual_set.DualSet):
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
                     tangents = ref_el.compute_face_edge_tangents(dim, entity)
-                    basis = [t[:, None] * t[None, :] for t in tangents]
                     Q_mapped = FacetQuadratureRule(ref_el, dim, entity, Q)
+                    detJ = Q_mapped.jacobian_determinant()
+                    basis = [(t[:, None] * t[None, :]) / detJ for t in tangents]
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q_mapped,
                                  comp[:, :, None] * phi[None, None, :])
                                  for phi in phis for comp in basis)
