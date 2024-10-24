@@ -97,8 +97,10 @@ class HellanHerrmannJohnson(finite_element.CiarletElement):
        HHJ(r) is the space of symmetric-matrix-valued polynomials of degree r
        or less with normal-normal continuity.
     """
-    def __init__(self, ref_el, degree, variant="integral"):
+    def __init__(self, ref_el, degree, variant=None):
         assert degree >= 0, "Hellan-Herrmann-Johnson starts at degree 0!"
+        if variant is None:
+            variant = "integral"
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
         dual = HellanHerrmannJohnsonDual(ref_el, degree, variant)
         sd = ref_el.get_spatial_dimension()

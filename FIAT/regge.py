@@ -62,8 +62,10 @@ class Regge(finite_element.CiarletElement):
        REG(r) is the space of symmetric-matrix-valued polynomials of degree r
        or less with tangential-tangential continuity.
     """
-    def __init__(self, ref_el, degree, variant="integral"):
+    def __init__(self, ref_el, degree, variant=None):
         assert degree >= 0, "Regge start at degree 0!"
+        if variant is None:
+            variant = "integral"
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
         dual = ReggeDual(ref_el, degree, variant)
         formdegree = (1, 1)
