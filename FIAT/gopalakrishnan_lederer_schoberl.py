@@ -11,7 +11,7 @@ def traceless_matrices(ref_el):
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     verts = numpy.array(ref_el.get_vertices())
-    rts = verts[1:] - verts[None, 0, :]
+    rts = verts[1:] - verts[:1]
     rts = numpy.vstack((-sum(rts), rts))
     rts /= numpy.linalg.norm(rts, axis=1)[:, None]
 
@@ -19,19 +19,16 @@ def traceless_matrices(ref_el):
     basis = numpy.zeros((len(top[sd-1]), sd-1, sd, sd), "d")
     if sd == 2:
         R = numpy.array([[0, 1], [-1, 0]])
-        for i in top[sd-1]:
-            i1 = (i + 1) % (sd+1)
-            i2 = (i + 2) % (sd+1)
-            basis[i, 0] = dev(numpy.outer(rts[i1], R @ rts[i2]))
+        for i in sorted(top[sd-1]):
+            ids = [(i + s + 1) % (sd+1) for s in range(sd)]
+            basis[i, 0] = dev(numpy.outer(rts[ids[0]], numpy.dot(R, rts[ids[1]])))
+
     elif sd == 3:
-        for i in top[sd-1]:
-            i1 = (i + 1) % (sd+1)
-            i2 = (i + 2) % (sd+1)
-            i3 = (i + 3) % (sd+1)
+        for i in sorted(top[sd-1]):
+            ids = [(i + s + 1) % (sd+1) for s in range(sd)]
             for j in range(sd-1):
-                if j > 0:
-                    i1, i2, i3 = i2, i3, i1
-                basis[i, j] = dev(numpy.outer(rts[i1], numpy.cross(rts[i2], rts[i3])))
+                basis[i, j] = dev(numpy.outer(rts[ids[0]], numpy.cross(*rts[ids[1:]])))
+                ids.append(ids.pop(0))
     else:
         raise NotImplementedError("The traceless basis is not implemented in higher dimensions")
     return basis
