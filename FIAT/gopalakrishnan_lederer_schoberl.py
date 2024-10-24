@@ -122,10 +122,9 @@ class GLSDual(dual_set.DualSet):
             cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, sd-1, f, Qref)
             Jdet = Q.jacobian_determinant()
-            tangents = ref_el.compute_normalized_tangents(sd-1, f)
+            tangents = ref_el.compute_tangents(sd-1, f)
             normal = ref_el.compute_scaled_normal(f)
-            normal /= Jdet
-            comps = [numpy.outer(that, normal) for that in tangents]
+            comps = [numpy.outer(that, normal) / Jdet for that in tangents]
             nodes.extend(FIM(ref_el, Q, comp[:, :, None] * phi[None, None, :])
                          for phi in phis for comp in comps)
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
