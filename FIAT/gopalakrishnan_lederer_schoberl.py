@@ -23,14 +23,12 @@ def traceless_matrices(ref_el):
             ids = [(i + s + 1) % (sd+1) for s in range(sd)]
             basis[i, 0] = dev(numpy.outer(rts[ids[0]], numpy.dot(R, rts[ids[1]])))
 
-    elif sd == 3:
+    else:
         for i in sorted(top[sd-1]):
             ids = [(i + s + 1) % (sd+1) for s in range(sd)]
             for j in range(sd-1):
                 basis[i, j] = dev(numpy.outer(rts[ids[0]], numpy.cross(*rts[ids[1:]])))
                 ids.append(ids.pop(0))
-    else:
-        raise NotImplementedError("The traceless basis is not implemented in higher dimensions")
     return basis
 
 
