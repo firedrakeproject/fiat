@@ -17,7 +17,6 @@ from FIAT.macro import AlfeldSplit
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.restricted import RestrictedElement
 from FIAT.nodal_enriched import NodalEnrichedElement
-from itertools import chain
 
 import numpy
 import math
@@ -168,21 +167,17 @@ def modified_bubble_subspace(B):
     hat = B.take([0])
     hat_at_qpts = hat.tabulate(qpts)[(0,)*sd][0, 0]
 
-    # tabulate the BDM facet functions
-    ref_el = ref_complex.get_parent()
-    BDM = BrezziDouglasMarini(ref_el, degree-1)
-    entity_dofs = BDM.entity_dofs()
-    facet_dofs = list(range(BDM.space_dimension() - len(entity_dofs[sd][0])))
-    BDM_facet = BDM.get_nodal_basis().take(facet_dofs)
-    phis = BDM_facet.tabulate(qpts)[(0,)*sd]
-
     # tabulate the bubbles = hat ** (degree - k) * BDMk_facet
+    ref_el = ref_complex.get_parent()
     bubbles = [numpy.eye(sd)[:, :, None] * hat_at_qpts[None, None, :] ** degree]
     for k in range(1, degree):
-        dimPk = math.comb(k + sd-1, sd-1)
-        idsPk = list(chain.from_iterable(entity_dofs[sd-1][f][:dimPk]
-                     for f in entity_dofs[sd-1]))
-        bubbles.append(numpy.multiply(phis[idsPk], hat_at_qpts ** (degree-k)))
+        # tabulate the BDM facet functions
+        BDM = BrezziDouglasMarini(ref_el, k)
+        BDM_facet = BDM.get_nodal_basis().take(BDM.dual.get_indices("facet"))
+        phis = BDM_facet.tabulate(qpts)[(0,)*sd]
+
+        bubbles.append(numpy.multiply(phis, hat_at_qpts ** (degree-k)))
+
     bubbles = numpy.concatenate(bubbles, axis=0)
 
     # store the bubbles into a PolynomialSet via L2 projection
