@@ -278,7 +278,22 @@ class PointDivergence(Functional):
         alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
         dpt_dict = {x: [(1.0, alpha, (alpha.index(1),)) for alpha in alphas]}
 
-        super().__init__(ref_el, (len(x),), {}, dpt_dict, "PointDiv")
+        super().__init__(ref_el, (sd,), {}, dpt_dict, "PointDiv")
+
+
+class ComponentPointCurl(Functional):
+    """Class representing a particular component of the curl (skew-symmetric
+    gradient) of vector functions at a particular point x."""
+
+    def __init__(self, ref_el, comp, x):
+        sd = ref_el.get_spatial_dimension()
+        indices = [(i, j) for i in reversed(range(sd)) for j in reversed(range(i+1, sd))]
+        alphas = numpy.eye(sd, dtype=int)
+        alpha, beta = tuple(tuple(alphas[i]) for i in indices[comp])
+        sgn = (-1.0) ** comp
+        dpt_dict = {x: [(sgn, alpha, (beta.index(1),)), (-sgn, beta, (alpha.index(1),))]}
+
+        super().__init__(ref_el, (sd,), {}, dpt_dict, "PointCurl")
 
 
 class IntegralMoment(Functional):
