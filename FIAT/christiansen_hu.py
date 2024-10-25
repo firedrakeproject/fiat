@@ -40,7 +40,7 @@ def ChristiansenHuSpace(ref_el, degree, reduced=False):
 
     if not reduced:
         # Compute the primal basis via Vandermonde and extract the facet bubbles
-        dual = BernardiRaugelDualSet(ref_complex, degree, reduced=True)
+        dual = BernardiRaugelDualSet(ref_el, degree, degree=degree, ref_complex=ref_complex, reduced=True)
         dualmat = dual.to_riesz(C0)
         V = numpy.tensordot(dualmat, coeffs, axes=((1, 2), (1, 2)))
         coeffs = numpy.tensordot(numpy.linalg.inv(V.T), coeffs, axes=(-1, 0))
@@ -73,6 +73,6 @@ class ChristiansenHu(finite_element.CiarletElement):
             raise ValueError("Christiansen-Hu only defined for degree = 1")
         poly_set = ChristiansenHuSpace(ref_el, degree)
         ref_complex = poly_set.get_reference_element()
-        dual = BernardiRaugelDualSet(ref_complex, degree)
+        dual = BernardiRaugelDualSet(ref_el, degree, degree=degree, ref_complex=ref_complex)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

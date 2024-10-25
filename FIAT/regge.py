@@ -6,90 +6,48 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-from FIAT.finite_element import CiarletElement
-from FIAT.dual_set import DualSet
-from FIAT.polynomial_set import ONSymTensorPolynomialSet
+from FIAT import dual_set, finite_element, polynomial_set
 from FIAT.functional import PointwiseInnerProductEvaluation as InnerProduct
 
 
-class ReggeDual(DualSet):
-    """Degrees of freedom for generalized Regge finite elements."""
-    def __init__(self, cell, degree):
-        dim = cell.get_spatial_dimension()
-        if (dim < 2) or (dim > 3):
-            raise ValueError("Generalized Regge elements are implemented only "
-                             "for dimension 2--3. For 1D, it is just DG(r).")
+class ReggeDual(dual_set.DualSet):
+    """Degrees of freedom for generalized Regge finite elements.
 
-        # construct the degrees of freedoms
-        dofs = []               # list of functionals
-        # dof_ids[i][j] contains the indices of dofs that are associated with
-        # entity j in dim i
-        dof_ids = {}
+    On a k-face for degree r, the dofs are given by the value of
+       t^T u t
+    evaluated at enough points to control P(r-k+1) for all the edge
+    tangents of the face.
+    `ref_el.make_points(dim, entity, degree + 2)` happens to
+    generate exactly those points needed.
+    """
+    def __init__(self, ref_el, degree):
+        top = ref_el.get_topology()
+        entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
+        nodes = []
+        for dim in sorted(top):
+            if dim == 0:
+                # no vertex dofs
+                continue
+            for entity in sorted(top[dim]):
+                cur = len(nodes)
+                tangents = ref_el.compute_face_edge_tangents(dim, entity)
+                pts = ref_el.make_points(dim, entity, degree + 2)
+                nodes.extend(InnerProduct(ref_el, t, t, pt)
+                             for pt in pts
+                             for t in tangents)
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-        # no vertex dof
-        dof_ids[0] = {i: [] for i in range(dim + 1)}
-        # edge dofs
-        (_dofs, _dof_ids) = self._generate_dofs(cell, 1, degree, 0)
-        dofs.extend(_dofs)
-        dof_ids[1] = _dof_ids
-        # facet dofs for 3D
-        if dim == 3:
-            (_dofs, _dof_ids) = self._generate_dofs(cell, 2, degree, len(dofs))
-            dofs.extend(_dofs)
-            dof_ids[2] = _dof_ids
-        # cell dofs
-        (_dofs, _dof_ids) = self._generate_dofs(cell, dim, degree, len(dofs))
-        dofs.extend(_dofs)
-        dof_ids[dim] = _dof_ids
-
-        super().__init__(dofs, cell, dof_ids)
-
-    @staticmethod
-    def _generate_dofs(cell, entity_dim, degree, offset):
-        """Generate degrees of freedom for enetities of dimension entity_dim
-
-        Input: all obvious except
-           offset  -- the current first available dof id.
-
-        Output:
-           dofs    -- an array of dofs associated to entities in that dim
-           dof_ids -- a dict mapping entity_id to the range of indices of dofs
-                      associated to it.
-
-        On a k-face for degree r, the dofs are given by the value of
-           t^T u t
-        evaluated at points enough to control P(r-k+1) for all the edge
-        tangents of the face.
-        `cell.make_points(entity_dim, entity_id, degree + 2)` happens to
-        generate exactly those points needed.
-        """
-        dofs = []
-        dof_ids = {}
-        num_entities = len(cell.get_topology()[entity_dim])
-        for entity_id in range(num_entities):
-            pts = cell.make_points(entity_dim, entity_id, degree + 2)
-            tangents = cell.compute_face_edge_tangents(entity_dim, entity_id)
-            dofs += [InnerProduct(cell, t, t, pt)
-                     for pt in pts
-                     for t in tangents]
-            num_new_dofs = len(pts) * len(tangents)
-            dof_ids[entity_id] = list(range(offset, offset + num_new_dofs))
-            offset += num_new_dofs
-        return (dofs, dof_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
-class Regge(CiarletElement):
+class Regge(finite_element.CiarletElement):
     """The generalized Regge elements for symmetric-matrix-valued functions.
        REG(r) in dimension n is the space of polynomial symmetric-matrix-valued
        functions of degree r or less with tangential-tangential continuity.
     """
-    def __init__(self, cell, degree):
+    def __init__(self, ref_el, degree):
         assert degree >= 0, "Regge start at degree 0!"
-        # shape functions
-        Ps = ONSymTensorPolynomialSet(cell, degree)
-        # degrees of freedom
-        Ls = ReggeDual(cell, degree)
-        # mapping under affine transformation
+        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        dual = ReggeDual(ref_el, degree)
         mapping = "double covariant piola"
-
-        super().__init__(Ps, Ls, degree, mapping=mapping)
+        super().__init__(poly_set, dual, degree, mapping=mapping)

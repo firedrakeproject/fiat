@@ -16,8 +16,8 @@ import numpy
 
 def ArnoldQinSpace(ref_el, degree, reduced=False):
     """Return a basis for the Arnold-Qin space
-    curl(HCT-red) + P_0 x if reduced = True, and
-    curl(HCT) + P_0 x if reduced = False."""
+    curl(HCT-red) + P0 x if reduced = True, and
+    curl(HCT) + P0 x if reduced = False."""
     if ref_el.get_shape() != TRIANGLE:
         raise ValueError("Arnold-Qin only defined on triangles")
     if degree != 2:
@@ -56,16 +56,16 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
 
 
 class ArnoldQin(finite_element.CiarletElement):
-    """The Arnold-Qin C^0(Alfeld) quadratic macroelement with divergence in P0.
+    """The Arnold-Qin C0(Alfeld) quadratic macroelement with divergence in P0.
     This element belongs to a Stokes complex, and is paired with unsplit DG0."""
     def __init__(self, ref_el, degree=2, reduced=False):
         poly_set = ArnoldQinSpace(ref_el, degree)
         if reduced:
-            subdegree = 1
+            order = 1
             mapping = "contravariant piola"
         else:
-            subdegree = degree
+            order = degree
             mapping = "affine"
-        dual = BernardiRaugelDualSet(ref_el, degree, subdegree)
+        dual = BernardiRaugelDualSet(ref_el, order, degree=degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
