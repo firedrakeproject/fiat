@@ -9,22 +9,22 @@
 
 
 from FIAT import finite_element, polynomial_set, dual_set
+from FIAT.check_format_variant import check_format_variant
 from FIAT.reference_element import TRIANGLE
-from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.functional import (PointwiseInnerProductEvaluation as InnerProduct,
                              FrobeniusIntegralMoment as FIM,
-                             IntegralMomentOfTensorDivergence,
                              IntegralLegendreNormalNormalMoment,
                              IntegralLegendreNormalTangentialMoment,
-                             IntegralLegendreTangentialTangentialMoment,
                              )
 
 import numpy
 
 
 class HuZhangDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant):
+    def __init__(self, ref_el, degree, variant, qdegree):
+        if qdegree is None:
+            qdegree = degree
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
@@ -44,46 +44,33 @@ class HuZhangDual(dual_set.DualSet):
         for entity_id in sorted(top[1]):
             cur = len(nodes)
             for k in range(degree-1):
-                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity_id, k, k + degree))
-                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity_id, k, k + degree))
-            # NB, mom_deg should actually be k + degree <= 2 degree, but in AW have 6 = 2 degree
+                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity_id, k, qdegree))
+                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity_id, k, qdegree))
             entity_ids[1][entity_id].extend(range(cur, len(nodes)))
 
         # internal dofs
         cur = len(nodes)
-        if variant == "integral":
-            Q = create_quadrature(ref_el, 2*degree-sd-1)
-            # Moments against P_{degree-3} for each component
-            phi = polynomial_set.ONPolynomialSet(ref_el, degree-sd-1)
-            phi_at_qpts = phi.tabulate(Q.get_points())[(0,) * sd]
-            for (v1, v2) in basis:
-                Phi_at_qpts = numpy.outer(v1, v2)[None, :, :, None] * phi_at_qpts[:, None, None, :]
-                nodes.extend(FIM(ref_el, Q, Phi) for Phi in Phi_at_qpts)
-
-            # More internal dofs: tangential-tangential moments against bubbles for each edge
-            # Note these are evaluated on the edge, but not shared between cells (hence internal).
-            facet = ref_el.get_facet_element()
-            Q = create_quadrature(facet, 2*degree-sd)
-            phi = polynomial_set.ONPolynomialSet(facet, degree-sd)
-            phi_at_qpts = phi.tabulate(Q.get_points())[(0,) * (sd-1)]
-            for entity_id in sorted(top[1]):
-                Q_mapped = FacetQuadratureRule(ref_el, sd-1, entity_id, Q)
-                t = ref_el.compute_edge_tangent(entity_id)
-                Phi_at_qpts = numpy.outer(t, t)[None, :, :, None] * phi_at_qpts[:, None, None, :]
-                nodes.extend(FIM(ref_el, Q_mapped, Phi) for Phi in Phi_at_qpts)
-
-        elif variant == "point":
+        if variant == "point":
             # Evaluation at interior points for each component
-            interior_points = ref_el.make_points(sd, 0, degree)
+            interior_points = ref_el.make_points(sd, 0, degree+1)
             nodes.extend(InnerProduct(ref_el, v1, v2, pt)
                          for pt in interior_points for (v1, v2) in basis)
 
-            # More internal dofs: tangential-tangential point evaluations.
-            # Note these are evaluated on the edge, but not shared between cells (hence internal).
-            for entity_id in sorted(top[1]):
-                t = ref_el.compute_edge_tangent(entity_id)
-                pts = ref_el.make_points(sd-1, entity_id, degree)
-                nodes.extend(InnerProduct(ref_el, t, t, pt) for pt in pts)
+        elif variant == "integral":
+            Q = create_quadrature(ref_el, degree + qdegree)
+            qpts = Q.get_points()
+            P = polynomial_set.ONPolynomialSet(ref_el, degree-2)
+            Phis = P.tabulate(qpts)[(0,)*sd]
+            v = numpy.array(ref_el.vertices)
+            x = numpy.transpose(ref_el.compute_barycentric_coordinates(qpts))
+            for k in sorted(top[1]):
+                i = (k+1) % (sd+1)
+                j = (k+2) % (sd+1)
+                t = v[i] - v[j]
+                phis = numpy.outer(t, t)[None, :, :, None] * Phis[:, None, None, :]
+                phis = numpy.multiply(phis, x[i] * x[j], out=phis)
+                nodes.extend(FIM(ref_el, Q, phi) for phi in phis)
+
         else:
             raise ValueError(f"Unsupported variant {variant}")
 
@@ -94,12 +81,13 @@ class HuZhangDual(dual_set.DualSet):
 class HuZhang(finite_element.CiarletElement):
     """The definition of the Hu-Zhang element.
     """
-    def __init__(self, ref_el, degree=3, variant="integral"):
+    def __init__(self, ref_el, degree=3, variant="point"):
         if degree < 3:
             raise ValueError("Hu-Zhang only defined for degree >= 3")
         if ref_el.shape != TRIANGLE:
             raise ValueError("Hu-Zhang only defined on triangles")
+        variant, qdegree = check_format_variant(variant, degree)
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
-        dual = HuZhangDual(ref_el, degree, variant)
+        dual = HuZhangDual(ref_el, degree, variant, qdegree)
         formdegree = ref_el.get_spatial_dimension() - 1
         super().__init__(poly_set, dual, degree, formdegree=formdegree, mapping="double contravariant piola")

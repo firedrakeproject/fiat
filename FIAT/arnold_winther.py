@@ -41,8 +41,8 @@ class ArnoldWintherNCDual(DualSet):
         # moments of normal . sigma against constants and linears.
         for entity_id in range(3):                  # a triangle has 3 edges
             for order in (0, 1):
-                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
-                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
+                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, degree),
+                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, degree)]
             dof_ids[1][entity_id] = list(range(dof_cur, dof_cur+4))
             dof_cur += 4
 
@@ -117,9 +117,8 @@ class ArnoldWintherDual(DualSet):
         # moments of normal . sigma against constants and linears.
         for entity_id in range(3):
             for order in (0, 1):
-                dofs.append(IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6))
-                dofs.append(IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6))
-            # NB, mom_deg should actually be k + degree <= 2 degree
+                dofs.append(IntegralLegendreNormalNormalMoment(cell, entity_id, order, degree))
+                dofs.append(IntegralLegendreNormalTangentialMoment(cell, entity_id, order, degree))
             dof_ids[1][entity_id] = list(range(dof_cur, dof_cur+4))
             dof_cur += 4
 
