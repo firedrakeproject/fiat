@@ -9,6 +9,7 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 from FIAT import dual_set, finite_element, polynomial_set, expansions
+from FIAT.check_format_variant import check_format_variant
 from FIAT.functional import (PointwiseInnerProductEvaluation,
                              ComponentPointEvaluation,
                              FrobeniusIntegralMoment)
@@ -18,13 +19,15 @@ import numpy
 
 
 class HellanHerrmannJohnsonDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant):
+    def __init__(self, ref_el, degree, variant, qdegree):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
+
+        # Face dofs
         if variant == "point":
-            # On each codim=1 facet, n^T u n is evaluated on a Pk lattice, where k = degree.
+            # n^T u n evaluated on a Pk lattice
             for entity in sorted(top[sd-1]):
                 cur = len(nodes)
                 normal = ref_el.compute_scaled_normal(entity)
@@ -34,58 +37,55 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
                 entity_ids[sd-1][entity].extend(range(cur, len(nodes)))
 
         elif variant == "integral":
-            # On each codim=1 facet, n^T u n is integrated against a basis for Pk, where k = degree.
+            # n^T u n integrated against a basis for Pk
             facet = ref_el.construct_subelement(sd-1)
-            Q = create_quadrature(facet, 2*degree)
+            Q = create_quadrature(facet, qdegree + degree)
             P = polynomial_set.ONPolynomialSet(facet, degree)
-            phis = P.tabulate(Q.get_points())[(0,)*(sd-1)]
+            Phis = P.tabulate(Q.get_points())[(0,)*(sd-1)]
             for entity in sorted(top[sd-1]):
                 cur = len(nodes)
                 Q_mapped = FacetQuadratureRule(ref_el, sd-1, entity, Q)
                 detJ = Q_mapped.jacobian_determinant()
                 n = ref_el.compute_scaled_normal(entity)
                 comp = (n[:, None] * n[None, :]) / detJ
-                nodes.extend(FrobeniusIntegralMoment(ref_el, Q_mapped,
-                             comp[:, :, None] * phi[None, None, :])
-                             for phi in phis)
+                phis = comp[None, :, :, None] * Phis[:, None, None, :]
+                nodes.extend(FrobeniusIntegralMoment(ref_el, Q_mapped, phi) for phi in phis)
                 entity_ids[sd-1][entity].extend(range(cur, len(nodes)))
-        else:
-            raise ValueError(f"Invalid variant {variant}")
 
+        # Interior dofs
         cur = len(nodes)
         if variant == "point":
             if sd != 2:
                 raise NotImplementedError("Pointwise dofs only implemented in 2D")
-            # On the interior, the independent components uij, i <= j,
-            # are evaluated at a Pk lattice, where k = degree - 1.
+            # independent components evaluated at a P_{k-1} lattice
             shp = (sd, sd)
             basis = [(i, j) for i in range(sd) for j in range(i, sd)]
             pts = ref_el.make_points(sd, 0, degree + sd)
             nodes.extend(ComponentPointEvaluation(ref_el, comp, shp, pt)
                          for comp in basis for pt in pts)
         else:
-            # On the interior, u is integrated against a basis of nn bubbles
-            Q = create_quadrature(ref_el, 2*degree)
+            # u integrated against a P_k basis of nn bubbles
+            Q = create_quadrature(ref_el, qdegree + degree)
             P = polynomial_set.ONPolynomialSet(ref_el, degree)
             Phis = P.tabulate(Q.get_points())[(0,)*sd]
-            sym = lambda A: 0.5*(A + A.T)
+
             v = numpy.array(ref_el.get_vertices())
+            sym_outer = lambda u, v: 0.5*(u[:, None]*v[None, :] + v[:, None]*u[None, :])
+            tt = lambda i, j, k, l: sym_outer(v[i % (sd+1)] - v[j % (sd+1)],
+                                              v[k % (sd+1)] - v[l % (sd+1)])
 
-            if sd == 3:
-                basis = [sym(numpy.outer(v[i] - v[j], v[m] - v[n]))
-                         for i, j, m, n in [(0, 1, 2, 3), (0, 2, 1, 3)]]
-                for comp in basis:
-                    phis = comp[None, :, :, None] * Phis[:, None, None, :]
-                    nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
-            elif sd > 3:
-                raise NotImplementedError(f"HHJ is not implemented in {sd} dimensions")
+            basis = [tt(i, i+1, i+2, i+3) for i in range((sd-2)*(sd-1))]
+            for comp in basis:
+                phis = comp[None, :, :, None] * Phis[:, None, None, :]
+                nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
 
-            if degree > 0:
-                dimPkm1 = expansions.polynomial_dimension(ref_el, degree-1)
-                x = ref_el.compute_barycentric_coordinates(Q.get_points())
+            dimPkm1 = expansions.polynomial_dimension(ref_el, degree-1)
+            if dimPkm1 > 0:
+                x = numpy.transpose(ref_el.compute_barycentric_coordinates(Q.get_points()))
                 for i in sorted(top[0]):
-                    comp = sym(numpy.outer(v[(i+1) % (sd+1)] - v[i], v[(i-1) % (sd+1)] - v[i]))
-                    phis = comp[None, :, :, None] * x[None, None, None, :, i] * Phis[:dimPkm1, None, None, :]
+                    comp = tt(i, i+1, i+2, i)
+                    phis = comp[None, :, :, None] * Phis[:dimPkm1, None, None, :]
+                    phis = numpy.multiply(phis, x[i], out=phis)
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
 
         entity_ids[sd][0].extend(range(cur, len(nodes)))
@@ -95,15 +95,16 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
 
 class HellanHerrmannJohnson(finite_element.CiarletElement):
     """The definition of Hellan-Herrmann-Johnson element.
-       HHJ(r) is the space of symmetric-matrix-valued polynomials of degree r
+       HHJ(k) is the space of symmetric-matrix-valued polynomials of degree k
        or less with normal-normal continuity.
     """
-    def __init__(self, ref_el, degree, variant=None):
-        assert degree >= 0, "Hellan-Herrmann-Johnson starts at degree 0!"
-        if variant is None:
-            variant = "integral"
+    def __init__(self, ref_el, degree=0, variant=None):
+        if degree < 0:
+            raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
+
+        variant, qdegree = check_format_variant(variant, degree)
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
-        dual = HellanHerrmannJohnsonDual(ref_el, degree, variant)
+        dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree)
         sd = ref_el.get_spatial_dimension()
         formdegree = (sd-1, sd-1)
         mapping = "double contravariant piola"

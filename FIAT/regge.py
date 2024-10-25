@@ -9,13 +9,14 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 from FIAT import dual_set, finite_element, polynomial_set
+from FIAT.check_format_variant import check_format_variant
 from FIAT.functional import PointwiseInnerProductEvaluation, FrobeniusIntegralMoment
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 
 
 class ReggeDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant):
+    def __init__(self, ref_el, degree, variant, qdegree):
         top = ref_el.get_topology()
         entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
@@ -39,7 +40,7 @@ class ReggeDual(dual_set.DualSet):
                 if dim == 0 or k < 0:
                     continue
                 facet = ref_el.construct_subelement(dim)
-                Q = create_quadrature(facet, degree + k)
+                Q = create_quadrature(facet, qdegree + k)
                 P = polynomial_set.ONPolynomialSet(facet, k)
                 phis = P.tabulate(Q.get_points())[(0,)*dim]
                 for entity in sorted(top[dim]):
@@ -52,23 +53,22 @@ class ReggeDual(dual_set.DualSet):
                                  comp[:, :, None] * phi[None, None, :])
                                  for phi in phis for comp in basis)
                     entity_ids[dim][entity].extend(range(cur, len(nodes)))
-        else:
-            raise ValueError(f"Invalid variant {variant}")
 
         super().__init__(nodes, ref_el, entity_ids)
 
 
 class Regge(finite_element.CiarletElement):
     """The generalized Regge elements for symmetric-matrix-valued functions.
-       REG(r) is the space of symmetric-matrix-valued polynomials of degree r
+       REG(k) is the space of symmetric-matrix-valued polynomials of degree k
        or less with tangential-tangential continuity.
     """
-    def __init__(self, ref_el, degree, variant=None):
-        assert degree >= 0, "Regge start at degree 0!"
-        if variant is None:
-            variant = "integral"
+    def __init__(self, ref_el, degree=0, variant=None):
+        if degree < 0:
+            raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
+
+        variant, qdegree = check_format_variant(variant, degree)
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
-        dual = ReggeDual(ref_el, degree, variant)
+        dual = ReggeDual(ref_el, degree, variant, qdegree)
         formdegree = (1, 1)
         mapping = "double covariant piola"
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
