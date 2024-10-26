@@ -310,6 +310,7 @@ elements = [
     "Morley(T)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
+    "ArnoldWintherNC(T, 2)",
     "ArnoldWinther(T, 3)",
     "HuZhang(T, 3)",
     "HuZhang(T, 4)",
