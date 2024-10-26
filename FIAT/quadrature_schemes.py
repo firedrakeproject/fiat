@@ -29,17 +29,18 @@ Background on the schemes:
 
 # NumPy
 import numpy
+import functools
 
-from FIAT.macro import MacroQuadratureRule
-from FIAT.quadrature import (QuadratureRule, make_quadrature,
+from FIAT.quadrature import (QuadratureRule, FacetQuadratureRule, make_quadrature,
                              make_tensor_product_quadrature, map_quadrature)
-# FIAT
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, UFCTetrahedron,
                                     UFCTriangle, symmetric_simplex)
+from FIAT.macro import MacroQuadratureRule
 
 
-def create_quadrature(ref_el, degree, scheme="default"):
+@functools.lru_cache
+def create_quadrature(ref_el, degree, scheme="default", entity=None):
     """
     Generate quadrature rule for given reference element
     that will integrate an polynomial of order 'degree' exactly.
@@ -53,6 +54,12 @@ def create_quadrature(ref_el, degree, scheme="default"):
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
     """
+    if entity is not None:
+        dim, entity_id = entity
+        sub_el = ref_el.construct_subelement(dim)
+        Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
+        return FacetQuadratureRule(ref_el, dim, entity_id, Q_ref)
+
     if ref_el.is_macrocell():
         dimension = ref_el.get_dimension()
         sub_el = ref_el.construct_subelement(dimension)
