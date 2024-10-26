@@ -42,6 +42,7 @@ from FIAT.restricted import RestrictedElement                   # noqa: F401
 from FIAT.tensor_product import TensorProductElement            # noqa: F401
 from FIAT.tensor_product import FlattenedDimensions             # noqa: F401
 from FIAT.hdivcurl import Hdiv, Hcurl                           # noqa: F401
+from FIAT.mardal_tai_winther import MardalTaiWinther            # noqa: F401
 from FIAT.arnold_winther import ArnoldWinther, ArnoldWintherNC  # noqa: F401
 from FIAT.hu_zhang import HuZhang                               # noqa: F401
 from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
@@ -310,6 +311,7 @@ elements = [
     "Morley(T)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
+    "MardalTaiWinther(T, 3)",
     "ArnoldWintherNC(T, 2)",
     "ArnoldWinther(T, 3)",
     "HuZhang(T, 3)",

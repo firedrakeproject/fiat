@@ -8,34 +8,28 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 
-from FIAT.finite_element import CiarletElement
-from FIAT.dual_set import DualSet
-from FIAT.polynomial_set import ONPolynomialSet
+from FIAT import dual_set, expansions, finite_element, polynomial_set
 from FIAT.functional import (IntegralMomentOfNormalEvaluation,
                              IntegralMomentOfTangentialEvaluation,
                              IntegralLegendreNormalMoment,
                              IntegralMomentOfDivergence)
 
-from FIAT.quadrature import make_quadrature
+from FIAT.quadrature_schemes import create_quadrature
 
 
 def DivergenceDubinerMoments(cell, start_deg, stop_deg, comp_deg):
-    onp = ONPolynomialSet(cell, stop_deg)
-    Q = make_quadrature(cell, comp_deg)
+    sd = cell.get_spatial_dimension()
+    P = polynomial_set.ONPolynomialSet(cell, stop_deg)
+    Q = create_quadrature(cell, comp_deg + stop_deg)
 
-    pts = Q.get_points()
-    onp = onp.tabulate(pts, 0)[0, 0]
-
-    ells = []
-
-    for ii in range((start_deg)*(start_deg+1)//2,
-                    (stop_deg+1)*(stop_deg+2)//2):
-        ells.append(IntegralMomentOfDivergence(cell, Q, onp[ii, :]))
-
-    return ells
+    dim0 = expansions.polynomial_dimension(cell, start_deg-1)
+    dim1 = expansions.polynomial_dimension(cell, stop_deg)
+    indices = list(range(dim0, dim1))
+    phis = P.take(indices).tabulate(Q.get_points())[(0,)*sd]
+    return [IntegralMomentOfDivergence(cell, Q, phi) for phi in phis]
 
 
-class MardalTaiWintherDual(DualSet):
+class MardalTaiWintherDual(dual_set.DualSet):
     """Degrees of freedom for Mardal-Tai-Winther elements."""
     def __init__(self, cell, degree):
         dim = cell.get_spatial_dimension()
@@ -93,15 +87,13 @@ class MardalTaiWintherDual(DualSet):
         facet = cell.get_facet_element()
         # Facet nodes are \int_F v\cdot n p ds where p \in P_{q-1}
         # degree is q - 1
-        Q = make_quadrature(facet, 6)
-        Pq = ONPolynomialSet(facet, 1)
-        Pq_at_qpts = Pq.tabulate(Q.get_points())[tuple([0]*(sd - 1))]
+        Q = create_quadrature(facet, degree+1)
+        Pq = polynomial_set.ONPolynomialSet(facet, 1)
+        phis = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
         for f in range(3):
-            phi0 = Pq_at_qpts[0, :]
-            dofs.append(IntegralMomentOfNormalEvaluation(cell, Q, phi0, f))
-            dofs.append(IntegralMomentOfTangentialEvaluation(cell, Q, phi0, f))
-            phi1 = Pq_at_qpts[1, :]
-            dofs.append(IntegralMomentOfNormalEvaluation(cell, Q, phi1, f))
+            dofs.append(IntegralMomentOfNormalEvaluation(cell, Q, phis[0], f))
+            dofs.append(IntegralMomentOfTangentialEvaluation(cell, Q, phis[0], f))
+            dofs.append(IntegralMomentOfNormalEvaluation(cell, Q, phis[1], f))
 
             num_new_dofs = 3
             dof_ids[f] = list(range(offset, offset + num_new_dofs))
@@ -129,8 +121,8 @@ class MardalTaiWintherDual(DualSet):
 
         edge_dof_ids = {}
         for entity_id in range(3):
-            dofs += [IntegralLegendreNormalMoment(cell, entity_id, 2, 6),
-                     IntegralLegendreNormalMoment(cell, entity_id, 3, 6)]
+            dofs.append(IntegralLegendreNormalMoment(cell, entity_id, 2, degree+3))
+            dofs.append(IntegralLegendreNormalMoment(cell, entity_id, 3, degree+3))
 
             edge_dof_ids[entity_id] = [offset, offset+1]
             offset += 2
@@ -142,14 +134,14 @@ class MardalTaiWintherDual(DualSet):
         return (dofs, edge_dof_ids, cell_dof_ids)
 
 
-class MardalTaiWinther(CiarletElement):
+class MardalTaiWinther(finite_element.CiarletElement):
     """The definition of the Mardal-Tai-Winther element.
     """
     def __init__(self, cell, degree=3):
         assert degree == 3, "Only defined for degree 3"
         assert cell.get_spatial_dimension() == 2, "Only defined for dimension 2"
         # polynomial space
-        Ps = ONPolynomialSet(cell, degree, (2,))
+        Ps = polynomial_set.ONPolynomialSet(cell, degree, (2,))
 
         # degrees of freedom
         Ls = MardalTaiWintherDual(cell, degree)

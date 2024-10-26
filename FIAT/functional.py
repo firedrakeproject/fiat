@@ -294,10 +294,10 @@ class IntegralMoment(Functional):
     def __init__(self, ref_el, Q, f_at_qpts, comp=tuple(), shp=tuple()):
         self.Q = Q
         self.f_at_qpts = f_at_qpts
-        qpts, qwts = Q.get_points(), Q.get_weights()
         self.comp = comp
-        weights = numpy.multiply(f_at_qpts, qwts)
-        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(qpts, weights)}
+        points = Q.get_points()
+        weights = numpy.multiply(f_at_qpts, Q.get_weights())
+        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
         super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
 
     def __call__(self, fn):
@@ -357,13 +357,13 @@ class FrobeniusIntegralMoment(IntegralMoment):
 
 class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
     """Moment of v.s against a Legendre polynomial over an edge"""
-    def __init__(self, cell, s, entity, mom_deg, comp_deg, nm=""):
-        # mom_deg is degree of moment, comp_deg is the total degree of
+    def __init__(self, cell, s, entity, mom_deg, quad_deg, nm=""):
+        # mom_deg is degree of moment, quad_deg is the total degree of
         # polynomial you might need to integrate (or something like that)
         assert cell.get_spatial_dimension() == 2
         entity = (1, entity)
 
-        Q = quadrature_schemes.create_quadrature(cell, 2*comp_deg, entity=entity)
+        Q = quadrature_schemes.create_quadrature(cell, quad_deg, entity=entity)
         x = cell.compute_barycentric_coordinates(Q.get_points(), entity=entity)
 
         f_at_qpts = jacobi.eval_jacobi(0, 0, mom_deg, x[:, 1] - x[:, 0])
@@ -565,39 +565,17 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
                          "IntegralMomentOfFaceTangentEvaluation")
 
 
-class MonkIntegralMoment(Functional):
-    r"""
-    face nodes are \int_F v\cdot p dA where p \in P_{q-2}(f)^3 with p \cdot n = 0
-    (cmp. Peter Monk - Finite Element Methods for Maxwell's equations p. 129)
-    Note that we don't scale by the area of the facet
-
-    :arg ref_el: reference element for which F is a codim-1 entity
-    :arg Q: quadrature rule on the face
-    :arg P_at_qpts: polynomials evaluated at quad points
-    :arg facet: which facet.
-    """
-
-    def __init__(self, ref_el, Q, P_at_qpts, facet):
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = transform(Q.get_points())
-        weights = Q.get_weights() * P_at_qpts
-        pt_dict = {tuple(pt): [(wt[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(pts, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
-
-
 class PointScaledNormalEvaluation(Functional):
     """Implements the evaluation of the normal component of a vector at a
     point on a facet of codimension 1, where the normal is scaled by
     the volume of that facet."""
 
     def __init__(self, ref_el, facet_no, pt):
-        self.n = ref_el.compute_scaled_normal(facet_no)
+        n = ref_el.compute_scaled_normal(facet_no)
         sd = ref_el.get_spatial_dimension()
         shp = (sd,)
 
-        pt_dict = {pt: [(self.n[i], (i,)) for i in range(sd)]}
+        pt_dict = {pt: [(n[i], (i,)) for i in range(sd)]}
         super().__init__(ref_el, shp, pt_dict, {}, "PointScaledNormalEval")
 
     def tostr(self):

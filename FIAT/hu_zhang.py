@@ -13,6 +13,7 @@ from FIAT.check_format_variant import check_format_variant
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.functional import (ComponentPointEvaluation,
+                             PointwiseInnerProductEvaluation,
                              IntegralMoment,
                              IntegralLegendreNormalNormalMoment,
                              IntegralLegendreNormalTangentialMoment)
@@ -20,8 +21,6 @@ from FIAT.functional import (ComponentPointEvaluation,
 
 class HuZhangDual(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, qdegree):
-        if qdegree is None:
-            qdegree = degree
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         shp = (sd, sd)
@@ -36,12 +35,22 @@ class HuZhangDual(dual_set.DualSet):
                          for i in range(sd) for j in range(i, sd))
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        # edge dofs: bidirectional nn and nt moments against P_{k-2}.
+        # edge dofs
         for entity in sorted(top[1]):
             cur = len(nodes)
-            for order in range(degree-1):
-                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, order, qdegree))
-                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity, order, qdegree))
+            if variant == "point":
+                # nn and nt components evaluated at edge points
+                n = ref_el.compute_scaled_normal(entity)
+                t = ref_el.compute_edge_tangent(entity)
+                pts = ref_el.make_points(1, entity, degree)
+                nodes.extend(PointwiseInnerProductEvaluation(ref_el, n, s, pt)
+                             for pt in pts for s in (n, t))
+
+            elif variant == "integral":
+                # bidirectional nn and nt moments against P_{k-2}
+                moments = (IntegralLegendreNormalNormalMoment, IntegralLegendreNormalTangentialMoment)
+                nodes.extend(mu(ref_el, entity, order, qdegree + degree-2)
+                             for order in range(degree-1) for mu in moments)
             entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # interior dofs

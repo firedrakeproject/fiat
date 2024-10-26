@@ -35,11 +35,12 @@ class ArnoldWintherNCDual(dual_set.DualSet):
         # no vertex dofs
         # proper edge dofs now (not the contraints)
         # edge dofs: bidirectional nn and nt moments against P1.
+        qdegree = degree + 2
         for entity in sorted(top[1]):
             cur = len(nodes)
             for order in range(2):
-                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, order, degree))
-                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity, order, degree))
+                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, order, qdegree))
+                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity, order, qdegree))
             entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # internal dofs: constant moments of three unique components
@@ -53,7 +54,7 @@ class ArnoldWintherNCDual(dual_set.DualSet):
         # put the constraint dofs last.
         for entity in sorted(top[1]):
             cur = len(nodes)
-            nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, 2, degree))
+            nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, 2, qdegree))
             entity_ids[1][entity].append(cur)
 
         super().__init__(nodes, ref_el, entity_ids)
@@ -91,11 +92,13 @@ class ArnoldWintherDual(dual_set.DualSet):
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
         # edge dofs: bidirectional nn and nt moments against P_{k-2}
+        max_order = degree - 2
+        qdegree = degree + max_order
         for entity in sorted(top[1]):
             cur = len(nodes)
-            for order in range(degree-1):
-                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, order, degree))
-                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity, order, degree))
+            for order in range(max_order+1):
+                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, order, qdegree))
+                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity, order, qdegree))
             entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # internal dofs: moments of unique components against P_{k-3}
@@ -105,7 +108,7 @@ class ArnoldWintherDual(dual_set.DualSet):
         nodes.extend(IntegralMoment(ref_el, Q, phi, (i, j), shp)
                      for phi in phis for i in range(sd) for j in range(i, sd))
 
-        # constraint dofs: moments of divergence against P_{k-1}^\perp P_{k-2}
+        # constraint dofs: moments of divergence against P_{k-1} \ P_{k-2}
         dimPkm1 = expansions.polynomial_dimension(ref_el, degree-1)
         dimPkm2 = expansions.polynomial_dimension(ref_el, degree-2)
         P = polynomial_set.ONPolynomialSet(ref_el, degree-1, shape=(sd,))
