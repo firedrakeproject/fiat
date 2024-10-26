@@ -191,7 +191,7 @@ class ComponentPointEvaluation(Functional):
         if any(i < 0 or i >= n for i, n in zip(comp, shp)):
             raise ValueError("Illegal component")
         self.comp = comp
-        pt_dict = {x: [(1.0, comp)]}
+        pt_dict = {tuple(x): [(1.0, comp)]}
         super().__init__(ref_el, shp, pt_dict, {}, "ComponentPointEval")
 
     def tostr(self):
@@ -338,7 +338,7 @@ class IntegralMomentOfNormalDerivative(Functional):
 
 class FrobeniusIntegralMoment(IntegralMoment):
 
-    def __init__(self, ref_el, Q, f_at_qpts):
+    def __init__(self, ref_el, Q, f_at_qpts, nm=None):
         # f_at_qpts is (some shape) x num_qpts
         shp = tuple(f_at_qpts.shape[:-1])
         if len(Q.pts) != f_at_qpts.shape[-1]:
@@ -352,12 +352,14 @@ class FrobeniusIntegralMoment(IntegralMoment):
         alphas = list(index_iterator(shp))
 
         pt_dict = {tuple(pt): [(wt[alpha], alpha) for alpha in alphas] for pt, wt in zip(qpts, weights)}
-        Functional.__init__(self, ref_el, shp, pt_dict, {}, "FrobeniusIntegralMoment")
+        Functional.__init__(self, ref_el, shp, pt_dict, {}, nm or "FrobeniusIntegralMoment")
 
 
 class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
     """Moment of v.s against a Legendre polynomial over an edge"""
     def __init__(self, cell, s, entity, mom_deg, comp_deg, nm=""):
+        # mom_deg is degree of moment, comp_deg is the total degree of
+        # polynomial you might need to integrate (or something like that)
         assert cell.get_spatial_dimension() == 2
         entity = (1, entity)
 
@@ -368,7 +370,7 @@ class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
         f_at_qpts /= Q.jacobian_determinant()
 
         f_at_qpts = numpy.multiply(s[..., None], f_at_qpts)
-        super().__init__(cell, Q, f_at_qpts)
+        super().__init__(cell, Q, f_at_qpts, nm=nm)
 
 
 class IntegralLegendreNormalMoment(IntegralLegendreDirectionalMoment):
@@ -390,8 +392,6 @@ class IntegralLegendreTangentialMoment(IntegralLegendreDirectionalMoment):
 class IntegralLegendreBidirectionalMoment(IntegralLegendreDirectionalMoment):
     """Moment of dot(s1, dot(tau, s2)) against Legendre on entity, multiplied by the size of the reference facet"""
     def __init__(self, cell, s1, s2, entity, mom_deg, comp_deg, nm=""):
-        # mom_deg is degree of moment, comp_deg is the total degree of
-        # polynomial you might need to integrate (or something like that)
         s1s2T = numpy.outer(s1, s2)
         super().__init__(cell, s1s2T, entity, mom_deg, comp_deg, nm=nm)
 
