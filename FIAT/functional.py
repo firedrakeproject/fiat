@@ -625,30 +625,6 @@ class PointwiseInnerProductEvaluation(Functional):
         super().__init__(ref_el, shp, pt_dict, {}, "PointwiseInnerProductEval")
 
 
-class TensorBidirectionalMomentInnerProductEvaluation(Functional):
-    r"""
-    This is a functional on symmetric 2-tensor fields. Let u be such a
-    field, f a function tabulated at points, and v,w be vectors. This implements the evaluation
-    \int v^T u(x) w f(x).
-
-    Clearly v^iu_{ij}w^j = u_{ij}v^iw^j. Thus the value can be computed
-    from the Frobenius inner product of u with wv^T. This gives the
-    correct weights.
-    """
-
-    def __init__(self, ref_el, v, w, Q, f_at_qpts, comp_deg):
-        wvT = numpy.outer(w, v)
-        shp = wvT.shp
-
-        points = Q.get_points()
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-
-        pt_dict = {tuple(pt): [(wt * wvT[idx], idx) for idx in index_iterator(shp)]
-                   for pt, wt in zip(points, weights)}
-
-        super().__init__(ref_el, shp, pt_dict, {}, "TensorBidirectionalMomentInnerProductEvaluation")
-
-
 class IntegralMomentOfNormalEvaluation(Functional):
     r"""
     \int_F v\cdot n p ds
@@ -692,27 +668,3 @@ class IntegralMomentOfTangentialEvaluation(Functional):
         pt_dict = {tuple(pt): [(wt*t[i], (i, )) for i in range(sd)]
                    for pt, wt in zip(points, weights)}
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledTangentialEvaluation")
-
-
-class IntegralMomentOfNormalNormalEvaluation(Functional):
-    r"""
-    \int_F (n^T tau n) p ds
-    p \in Polynomials
-    :arg ref_el: reference element for which F is a codim-1 entity
-    :arg Q: quadrature rule on the face
-    :arg P_at_qpts: polynomials evaluated at quad points
-    :arg facet: which facet.
-    """
-    def __init__(self, ref_el, Q, P_at_qpts, facet):
-        # scaling on the normal is ok because edge length then weights
-        # the reference element quadrature appropriately
-        n = ref_el.compute_scaled_normal(facet)
-        nnT = numpy.outer(n, n)/numpy.linalg.norm(n)
-        shp = nnT.shape
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*nnT[idx], idx) for idx in index_iterator(shp)]
-                   for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, shp, pt_dict, {}, "IntegralMomentOfNormalNormalEvaluation")
