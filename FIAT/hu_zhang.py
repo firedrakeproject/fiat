@@ -84,4 +84,5 @@ class HuZhang(finite_element.CiarletElement):
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
         dual = HuZhangDual(ref_el, degree, variant, qdegree)
         formdegree = ref_el.get_spatial_dimension() - 1
-        super().__init__(poly_set, dual, degree, formdegree=formdegree, mapping="double contravariant piola")
+        mapping = "double contravariant piola"
+        super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)

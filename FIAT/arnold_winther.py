@@ -9,7 +9,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 
-from FIAT import finite_element, dual_set, expansions, polynomial_set
+from FIAT import finite_element, dual_set, polynomial_set
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.functional import (ComponentPointEvaluation,
@@ -109,9 +109,9 @@ class ArnoldWintherDual(dual_set.DualSet):
                      for phi in phis for i in range(sd) for j in range(i, sd))
 
         # constraint dofs: moments of divergence against P_{k-1} \ P_{k-2}
-        dimPkm1 = expansions.polynomial_dimension(ref_el, degree-1)
-        dimPkm2 = expansions.polynomial_dimension(ref_el, degree-2)
         P = polynomial_set.ONPolynomialSet(ref_el, degree-1, shape=(sd,))
+        dimPkm1 = P.expansion_set.get_num_members(degree-1)
+        dimPkm2 = P.expansion_set.get_num_members(degree-2)
         PH = P.take([i + j * dimPkm1 for j in range(sd) for i in range(dimPkm2, dimPkm1)])
         phis = PH.tabulate(Q.get_points())[(0,)*sd]
         nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
