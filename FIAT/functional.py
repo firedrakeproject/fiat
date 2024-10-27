@@ -399,7 +399,7 @@ class IntegralLegendreBidirectionalMoment(IntegralLegendreDirectionalMoment):
 class IntegralLegendreNormalNormalMoment(IntegralLegendreBidirectionalMoment):
     """Moment of dot(n, dot(tau, n)) against Legendre on entity."""
     def __init__(self, cell, entity, mom_deg, comp_deg):
-        n = cell.compute_normal(entity)
+        n = cell.compute_scaled_normal(entity)
         super().__init__(cell, n, n, entity, mom_deg, comp_deg,
                          "IntegralNormalNormalLegendreMoment")
 
@@ -407,8 +407,8 @@ class IntegralLegendreNormalNormalMoment(IntegralLegendreBidirectionalMoment):
 class IntegralLegendreNormalTangentialMoment(IntegralLegendreBidirectionalMoment):
     """Moment of dot(n, dot(tau, t)) against Legendre on entity."""
     def __init__(self, cell, entity, mom_deg, comp_deg):
-        n = cell.compute_normal(entity)
-        t = cell.compute_normalized_edge_tangent(entity)
+        n = cell.compute_scaled_normal(entity)
+        t = cell.compute_edge_tangent(entity)
         super().__init__(cell, n, t, entity, mom_deg, comp_deg,
                          "IntegralNormalTangentialLegendreMoment")
 
@@ -416,7 +416,7 @@ class IntegralLegendreNormalTangentialMoment(IntegralLegendreBidirectionalMoment
 class IntegralLegendreTangentialTangentialMoment(IntegralLegendreBidirectionalMoment):
     """Moment of dot(t, dot(tau, t)) against Legendre on entity."""
     def __init__(self, cell, entity, mom_deg, comp_deg):
-        t = cell.compute_normalized_edge_tangent(entity)
+        t = cell.compute_edge_tangent(entity)
         super().__init__(cell, t, t, entity, mom_deg, comp_deg,
                          "IntegralTangentialTangentialLegendreMoment")
 

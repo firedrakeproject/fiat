@@ -62,14 +62,14 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
         integration domain. If not provided, the domain is the entire cell.
     """
     if entity is not None:
-        dim, entity_id = entity
-        sub_el = ref_el.construct_subelement(dim)
+        dimension, entity_id = entity
+        sub_el = ref_el.construct_subelement(dimension)
         Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
-        return FacetQuadratureRule(ref_el, dim, entity_id, Q_ref)
+        return FacetQuadratureRule(ref_el, dimension, entity_id, Q_ref)
 
     if ref_el.is_macrocell():
-        dim = ref_el.get_dimension()
-        sub_el = ref_el.construct_subelement(dim)
+        dimension = ref_el.get_dimension()
+        sub_el = ref_el.construct_subelement(dimension)
         Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
         return MacroQuadratureRule(ref_el, Q_ref)
 
