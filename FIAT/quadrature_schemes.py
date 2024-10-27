@@ -15,6 +15,11 @@ Background on the schemes:
     Keast, P. Moderate-degree tetrahedral quadrature formulas, Computer
     Methods in Applied Mechanics and Engineering 55(3):339-348, 1986.
     http://dx.doi.org/10.1016/0045-7825(86)90059-9
+
+  Xiao-Gimbutas rules for simplices:
+    Xiao, H., and Gimbutas, Z. A numerical algorithm for the construction of
+    efficient quadrature rules in two and higher dimensions, Computers &
+    mathematics with applications 59(2): 663-676, 2010.
 """
 
 # Copyright (C) 2011 Garth N. Wells
@@ -28,7 +33,6 @@ Background on the schemes:
 # Last changed: 2011-04-19
 
 import numpy
-import functools
 
 from FIAT.quadrature import (QuadratureRule, FacetQuadratureRule, make_quadrature,
                              make_tensor_product_quadrature, map_quadrature)
@@ -38,10 +42,9 @@ from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
 from FIAT.macro import MacroQuadratureRule
 
 
-@functools.lru_cache
 def create_quadrature(ref_el, degree, scheme="default", entity=None):
     """
-    Generate quadrature rule for given reference element that will integrate an
+    Generate quadrature rule for given reference element that will integrate a
     polynomial of order 'degree' exactly.
 
     For low-degree polynomials on triangles (<=50) and tetrahedra (<=15), this uses
@@ -52,8 +55,7 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
     :arg ref_el: The FIAT cell to create the quadrature for.
     :arg degree: The degree of polynomial that the rule should integrate exactly.
     :kwarg scheme: The quadrature scheme, can be choosen from ["default", "canonical", "KMV"]
-        "default" -> optimized Xiao-Gimbutas scheme for low degree and
-        collapsed Gauss scheme for higher degree,
+        "default" -> hard-coded scheme for low degree and collapsed Gauss scheme for high degree,
         "canonical" -> collapsed Gauss scheme,
         "KMV" -> spectral lumped scheme for low degree (<=5 on triangles, <=3 on tetrahedra).
     :kwarg entity: A tuple of entity dimension and entity id specifying the
@@ -66,8 +68,8 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
         return FacetQuadratureRule(ref_el, dim, entity_id, Q_ref)
 
     if ref_el.is_macrocell():
-        dimension = ref_el.get_dimension()
-        sub_el = ref_el.construct_subelement(dimension)
+        dim = ref_el.get_dimension()
+        sub_el = ref_el.construct_subelement(dim)
         Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
         return MacroQuadratureRule(ref_el, Q_ref)
 

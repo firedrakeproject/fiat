@@ -625,6 +625,22 @@ class PointwiseInnerProductEvaluation(Functional):
         super().__init__(ref_el, shp, pt_dict, {}, "PointwiseInnerProductEval")
 
 
+class TensorBidirectionalMomentInnerProductEvaluation(FrobeniusIntegralMoment):
+    r"""
+    This is a functional on symmetric 2-tensor fields. Let u be such a
+    field, f a function tabulated at points, and v,w be vectors. This implements the evaluation
+    \int v^T u(x) w f(x).
+    Clearly v^iu_{ij}w^j = u_{ij}v^iw^j. Thus the value can be computed
+    from the Frobenius inner product of u with wv^T. This gives the
+    correct weights.
+    """
+
+    def __init__(self, ref_el, v, w, Q, f_at_qpts):
+        wvT = numpy.outer(w, v)
+        F_at_qpts = numpy.multiply(wvT[..., None], f_at_qpts)
+        super().__init__(ref_el, Q, F_at_qpts, "TensorBidirectionalMomentInnerProductEvaluation")
+
+
 class IntegralMomentOfNormalEvaluation(Functional):
     r"""
     \int_F v\cdot n p ds
