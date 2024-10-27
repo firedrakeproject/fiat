@@ -625,7 +625,7 @@ class PointwiseInnerProductEvaluation(Functional):
         super().__init__(ref_el, shp, pt_dict, {}, "PointwiseInnerProductEval")
 
 
-class TensorBidirectionalMomentInnerProductEvaluation(FrobeniusIntegralMoment):
+class TensorBidirectionalIntegralMoment(FrobeniusIntegralMoment):
     r"""
     This is a functional on symmetric 2-tensor fields. Let u be such a
     field, f a function tabulated at points, and v,w be vectors. This implements the evaluation
