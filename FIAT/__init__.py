@@ -52,6 +52,7 @@ from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberl
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson
 from FIAT.arnold_winther import ArnoldWinther
 from FIAT.arnold_winther import ArnoldWintherNC
+from FIAT.hu_zhang import HuZhang
 from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.tensor_product import TensorProductElement
@@ -111,6 +112,7 @@ supported_elements = {"Argyris": Argyris,
                       "Gopalakrishnan-Lederer-Schroberl": GopalakrishnanLedererSchoberl,
                       "Conforming Arnold-Winther": ArnoldWinther,
                       "Nonconforming Arnold-Winther": ArnoldWintherNC,
+                      "Hu-Zhang": HuZhang,
                       "Mardal-Tai-Winther": MardalTaiWinther}
 
 # List of extra elements
