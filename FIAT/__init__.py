@@ -2,10 +2,17 @@
 evaluating arbitrary order Lagrange and many other elements.
 Simplices in one, two, and three dimensions are supported."""
 
-import pkg_resources
+# Important functionality
+from FIAT.reference_element import ufc_cell, ufc_simplex  # noqa: F401
+from FIAT.quadrature import make_quadrature               # noqa: F401
+from FIAT.quadrature_schemes import create_quadrature     # noqa: F401
+from FIAT.hdivcurl import Hdiv, Hcurl                     # noqa: F401
+from FIAT.mixed import MixedElement                       # noqa: F401
+from FIAT.restricted import RestrictedElement             # noqa: F401
+from FIAT.quadrature_element import QuadratureElement     # noqa: F401
+from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
 
 # Import finite element classes
-from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
 from FIAT.argyris import Argyris
 from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.bernstein import Bernstein
@@ -17,8 +24,7 @@ from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
-from FIAT.Sminus import TrimmedSerendipityEdge  # noqa: F401
-from FIAT.Sminus import TrimmedSerendipityFace  # noqa: F401
+from FIAT.Sminus import TrimmedSerendipityEdge, TrimmedSerendipityFace  # noqa: F401
 from FIAT.SminusDiv import TrimmedSerendipityDiv  # noqa: F401
 from FIAT.SminusCurl import TrimmedSerendipityCurl  # noqa: F401
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini
@@ -53,19 +59,8 @@ from FIAT.enriched import EnrichedElement
 from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.discontinuous import DiscontinuousElement
 from FIAT.hdiv_trace import HDivTrace
-from FIAT.mixed import MixedElement                       # noqa: F401
-from FIAT.restricted import RestrictedElement             # noqa: F401
-from FIAT.quadrature_element import QuadratureElement     # noqa: F401
-from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen  # noqa: F401
+from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
-
-# Important functionality
-from FIAT.quadrature import make_quadrature               # noqa: F401
-from FIAT.quadrature_schemes import create_quadrature     # noqa: F401
-from FIAT.reference_element import ufc_cell, ufc_simplex  # noqa: F401
-from FIAT.hdivcurl import Hdiv, Hcurl                     # noqa: F401
-
-__version__ = pkg_resources.get_distribution("fenics-fiat").version
 
 # List of supported elements and mapping to element classes
 supported_elements = {"Argyris": Argyris,
