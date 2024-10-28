@@ -10,7 +10,8 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 from FIAT import dual_set, finite_element, polynomial_set
 from FIAT.check_format_variant import check_format_variant
-from FIAT.functional import PointwiseInnerProductEvaluation, FrobeniusIntegralMoment
+from FIAT.functional import (PointwiseInnerProductEvaluation,
+                             TensorBidirectionalIntegralMoment as BidirectionalMoment)
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 
@@ -48,10 +49,8 @@ class ReggeDual(dual_set.DualSet):
                     tangents = ref_el.compute_face_edge_tangents(dim, entity)
                     Q_mapped = FacetQuadratureRule(ref_el, dim, entity, Q)
                     detJ = Q_mapped.jacobian_determinant()
-                    basis = [(t[:, None] * t[None, :]) / detJ for t in tangents]
-                    nodes.extend(FrobeniusIntegralMoment(ref_el, Q_mapped,
-                                 comp[:, :, None] * phi[None, None, :])
-                                 for phi in phis for comp in basis)
+                    nodes.extend(BidirectionalMoment(ref_el, t, t/detJ, Q_mapped, phi)
+                                 for phi in phis for t in tangents)
                     entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
