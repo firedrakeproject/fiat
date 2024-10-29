@@ -3,14 +3,14 @@ evaluating arbitrary order Lagrange and many other elements.
 Simplices in one, two, and three dimensions are supported."""
 
 # Important functionality
-from FIAT.reference_element import ufc_cell, ufc_simplex  # noqa: F401
-from FIAT.quadrature import make_quadrature               # noqa: F401
-from FIAT.quadrature_schemes import create_quadrature     # noqa: F401
-from FIAT.hdivcurl import Hdiv, Hcurl                     # noqa: F401
-from FIAT.mixed import MixedElement                       # noqa: F401
-from FIAT.restricted import RestrictedElement             # noqa: F401
-from FIAT.quadrature_element import QuadratureElement     # noqa: F401
+from FIAT.reference_element import ufc_cell, ufc_simplex       # noqa: F401
+from FIAT.quadrature import make_quadrature                    # noqa: F401
+from FIAT.quadrature_schemes import create_quadrature          # noqa: F401
 from FIAT.finite_element import FiniteElement, CiarletElement  # noqa: F401
+from FIAT.hdivcurl import Hdiv, Hcurl                          # noqa: F401
+from FIAT.mixed import MixedElement                            # noqa: F401
+from FIAT.restricted import RestrictedElement                  # noqa: F401
+from FIAT.quadrature_element import QuadratureElement          # noqa: F401
 
 # Import finite element classes
 from FIAT.argyris import Argyris
