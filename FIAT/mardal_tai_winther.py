@@ -66,9 +66,9 @@ class MardalTaiWintherDual(dual_set.DualSet):
         dofs.extend(_dofs)
 
         for entity_id in range(3):
-            dof_ids[1][entity_id] = dof_ids[1][entity_id] + _edge_dof_ids[entity_id]
+            dof_ids[1][entity_id].extend(_edge_dof_ids[entity_id])
 
-        dof_ids[2][0] = dof_ids[2][0] + _cell_dof_ids
+        dof_ids[2][0].extend(_cell_dof_ids)
 
         super(MardalTaiWintherDual, self).__init__(dofs, cell, dof_ids)
 
@@ -130,9 +130,9 @@ class MardalTaiWintherDual(dual_set.DualSet):
 
             edge_dof_ids[entity_id] = list(range(offset+cur, offset+len(dofs)))
 
-        cell_dofs = DivergenceDubinerMoments(cell, start_order-1, stop_order-1, degree)
-        dofs.extend(cell_dofs)
-        cell_dof_ids = list(range(offset, offset+len(cell_dofs)))
+        cur = len(dofs)
+        dofs.extend(DivergenceDubinerMoments(cell, start_order-1, stop_order-1, degree))
+        cell_dof_ids = list(range(offset+cur, offset+len(dofs)))
 
         return (dofs, edge_dof_ids, cell_dof_ids)
 
