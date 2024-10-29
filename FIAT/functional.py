@@ -636,7 +636,7 @@ class TensorBidirectionalIntegralMoment(FrobeniusIntegralMoment):
     """
 
     def __init__(self, ref_el, v, w, Q, f_at_qpts):
-        wvT = numpy.outer(w, v)
+        wvT = numpy.outer(v, w)
         F_at_qpts = numpy.multiply(wvT[..., None], f_at_qpts)
         super().__init__(ref_el, Q, F_at_qpts, "TensorBidirectionalMomentInnerProductEvaluation")
 

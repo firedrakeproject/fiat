@@ -41,8 +41,8 @@ def test_gls_bubbles(cell, degree):
     PkH_at_qpts = PkH.tabulate(Qref.get_points())[(0,)*(sd-1)]
     weights = numpy.transpose(numpy.multiply(PkH_at_qpts, Qref.get_weights()))
     for facet in top[sd-1]:
-        n = cell.compute_normal(facet)
-        rts = cell.compute_normalized_tangents(sd-1, facet)
+        n = cell.compute_scaled_normal(facet)
+        rts = cell.compute_tangents(sd-1, facet)
         Q = FacetQuadratureRule(cell, sd-1, facet, Qref)
         qpts, qwts = Q.get_points(), Q.get_weights()
 
