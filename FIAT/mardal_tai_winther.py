@@ -118,16 +118,19 @@ class MardalTaiWintherDual(dual_set.DualSet):
         as described in the FIAT paper.
         """
         dofs = []
-
         edge_dof_ids = {}
+
+        start_order = 2
+        stop_order = 3
+        qdegree = degree + stop_order
         for entity_id in range(3):
-            dofs.append(IntegralLegendreNormalMoment(cell, entity_id, 2, degree+3))
-            dofs.append(IntegralLegendreNormalMoment(cell, entity_id, 3, degree+3))
+            cur = len(dofs)
+            dofs.extend(IntegralLegendreNormalMoment(cell, entity_id, order, qdegree)
+                        for order in range(start_order, stop_order+1))
 
-            edge_dof_ids[entity_id] = [offset, offset+1]
-            offset += 2
+            edge_dof_ids[entity_id] = list(range(offset+cur, offset+len(dofs)))
 
-        cell_dofs = DivergenceDubinerMoments(cell, 1, 2, 6)
+        cell_dofs = DivergenceDubinerMoments(cell, start_order-1, stop_order-1, degree)
         dofs.extend(cell_dofs)
         cell_dof_ids = list(range(offset, offset+len(cell_dofs)))
 
