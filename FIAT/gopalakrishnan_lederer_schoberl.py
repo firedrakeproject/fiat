@@ -1,7 +1,8 @@
 from FIAT import finite_element, dual_set, polynomial_set, expansions
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.functional import TensorBidirectionalIntegralMoment as BIM
+from FIAT.functional import TensorBidirectionalIntegralMoment as BidirectionalMoment
+from FIAT.restricted import RestrictedElement
 import numpy
 
 
@@ -9,11 +10,9 @@ def TracelessTensorBasis(ref_el):
     """Return a basis for traceless tensors aligned with nt on each face of a reference element."""
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
-    R = numpy.array([[0, 1], [-1, 0]])
     dev = lambda S: S - (numpy.trace(S) / S.shape[0]) * numpy.eye(*S.shape)
 
     basis = numpy.zeros((len(top[sd-1]), sd-1, sd, sd))
-
     rts = ref_el.compute_tangents(sd, 0)
     rts = numpy.vstack((-sum(rts), rts))
     if sd == 2:
@@ -55,43 +54,6 @@ class TracelessTensorPolynomialSet(polynomial_set.PolynomialSet):
         super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
 
-def GLSSpace(ref_el, degree):
-    """Return the subspace of trace-free Pk tensors with normal-tangential
-    component in P_{k-1}"""
-    sd = ref_el.get_spatial_dimension()
-    P = TracelessTensorPolynomialSet(ref_el, degree, variant="bubble")
-    expansion_set = P.get_expansion_set()
-    if degree == 1:
-        dimP1 = expansion_set.get_num_members(degree)
-        coeffs = numpy.zeros((sd+1, sd-1, 2, sd+1, sd-1, dimP1))
-        for i, j in numpy.ndindex(coeffs.shape[0:2]):
-            # Constant times traceless matrix
-            coeffs[i, j, 0, i, j, :] = 1
-            # Barycentric coordinate times traceless matrix
-            coeffs[i, j, 1, i, j, i] = 1
-        coeffs = coeffs.reshape(-1, P.get_num_members())
-        coeffs = numpy.tensordot(coeffs, P.get_coeffs(), axes=(-1, 0))
-        return polynomial_set.PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
-
-    # Constrain the nt component to P_{k-1}
-    # First compute the ids of Pk \ P_{k-1} on each facet
-    entity_ids = expansions.polynomial_entity_ids(ref_el, degree, expansion_set.continuity)
-    constrained_ids = {dim: {entity: [] for entity in entity_ids[dim]} for dim in entity_ids}
-    for dim in range(1, sd):
-        dimPkm1 = len(ref_el.make_points(dim, 0, degree-1))
-        for entity in entity_ids[dim]:
-            constrained_ids[dim][entity] = entity_ids[dim][entity][dimPkm1:]
-    # Next collect the ids of Pk \ P_{k-1} on the closure of faces
-    closure_ids = dual_set.make_entity_closure_ids(ref_el, constrained_ids)
-
-    # For each member of the nt basis, we drop the high-order ids of its corresponding face
-    mask = numpy.ones((P.get_num_members(),), int).reshape(sd+1, sd-1, -1)
-    for facet in sorted(closure_ids[sd-1]):
-        mask[facet, ..., closure_ids[sd-1][facet]] = 0
-    indices = numpy.flatnonzero(mask)
-    return P.take(indices)
-
-
 class GLSDual(dual_set.DualSet):
     def __init__(self, ref_el, degree):
         sd = ref_el.get_spatial_dimension()
@@ -99,10 +61,10 @@ class GLSDual(dual_set.DualSet):
         nodes = []
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
 
-        # Face dofs: moments of nt components against a basis for P_{k-1}
+        # Face dofs: moments of nt components against a basis for Pk
         ref_facet = ref_el.construct_subelement(sd-1)
-        Qref = create_quadrature(ref_facet, 2*degree-1)
-        P = polynomial_set.ONPolynomialSet(ref_facet, degree-1)
+        Qref = create_quadrature(ref_facet, 2*degree)
+        P = polynomial_set.ONPolynomialSet(ref_facet, degree)
         phis = P.tabulate(Qref.get_points())[(0,) * (sd-1)]
         for f in sorted(top[sd-1]):
             cur = len(nodes)
@@ -111,9 +73,8 @@ class GLSDual(dual_set.DualSet):
             normal = ref_el.compute_scaled_normal(f)
             tangents = ref_el.compute_tangents(sd-1, f)
             n = normal / Jdet
-            nodes.extend(BIM(ref_el, t, n, Q, phi)
+            nodes.extend(BidirectionalMoment(ref_el, t, n, Q, phi)
                          for phi in phis for t in tangents)
-
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
         # Interior dofs: moments of nt components against a basis for P_{k-1}
@@ -124,22 +85,36 @@ class GLSDual(dual_set.DualSet):
         for f in sorted(top[sd-1]):
             n = ref_el.compute_scaled_normal(f)
             tangents = ref_el.compute_tangents(sd-1, f)
-            nodes.extend(BIM(ref_el, t, n, Q, phi)
+            nodes.extend(BidirectionalMoment(ref_el, t, n, Q, phi)
                          for phi in phis for t in tangents)
         entity_ids[sd][0].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
 
-class GopalakrishnanLedererSchoberl(finite_element.CiarletElement):
-    """The GLS element used for the MCS (Mass-Conserving mixed Stress) scheme.
-    GLS(r) is the space of trace-free polynomials of degree r with
-    continuous normal-tangential components of degree r-1.
+class ExtendedGopalakrishnanLedererSchoberl(finite_element.CiarletElement):
+    """The GLS element on the full space of trace-free polynomials.
     """
     def __init__(self, ref_el, degree):
-        poly_set = GLSSpace(ref_el, degree)
+        poly_set = TracelessTensorPolynomialSet(ref_el, degree)
         dual = GLSDual(ref_el, degree)
         sd = ref_el.get_spatial_dimension()
         formdegree = (1, sd-1)
         mapping = "covariant contravariant piola"
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
+
+
+def GopalakrishnanLedererSchoberl(ref_el, degree):
+    """The GLS element used for the MCS (Mass-Conserving mixed Stress) scheme.
+    GLS(r) is the space of trace-free polynomials of degree r with
+    continuous normal-tangential components of degree r-1.
+    """
+    fe = ExtendedGopalakrishnanLedererSchoberl(ref_el, degree)
+    entity_dofs = fe.entity_dofs()
+    sd = ref_el.get_spatial_dimension()
+    dimPkm1 = (sd-1)*expansions.polynomial_dimension(ref_el.construct_subelement(sd-1), degree-1)
+    indices = []
+    for f in entity_dofs[sd-1]:
+        indices.extend(entity_dofs[sd-1][f][:dimPkm1])
+    indices.extend(entity_dofs[sd][0])
+    return RestrictedElement(fe, indices=indices)

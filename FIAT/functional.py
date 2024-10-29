@@ -631,13 +631,13 @@ class TensorBidirectionalIntegralMoment(FrobeniusIntegralMoment):
     field, f a function tabulated at points, and v,w be vectors. This implements the evaluation
     \int v^T u(x) w f(x).
     Clearly v^iu_{ij}w^j = u_{ij}v^iw^j. Thus the value can be computed
-    from the Frobenius inner product of u with wv^T. This gives the
+    from the Frobenius inner product of u with vw^T. This gives the
     correct weights.
     """
 
     def __init__(self, ref_el, v, w, Q, f_at_qpts):
-        wvT = numpy.outer(v, w)
-        F_at_qpts = numpy.multiply(wvT[..., None], f_at_qpts)
+        vwT = numpy.outer(v, w)
+        F_at_qpts = numpy.multiply(vwT[..., None], f_at_qpts)
         super().__init__(ref_el, Q, F_at_qpts, "TensorBidirectionalMomentInnerProductEvaluation")
 
 
