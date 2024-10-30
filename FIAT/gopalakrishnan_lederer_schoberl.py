@@ -29,22 +29,33 @@ class GLSDual(dual_set.DualSet):
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
         # Interior dofs: moments of normal-tangential components against a basis for P_{k-1}
-        cur = len(nodes)
-        Q = create_quadrature(ref_el, 2*degree-1)
-        P = polynomial_set.ONPolynomialSet(ref_el, degree-1, scale="L2 piola")
-        phis = P.tabulate(Q.get_points())[(0,) * sd]
-        for f in sorted(top[sd-1]):
-            n = ref_el.compute_scaled_normal(f)
-            tangents = ref_el.compute_tangents(sd-1, f)
-            nodes.extend(BidirectionalMoment(ref_el, t, n, Q, phi)
-                         for phi in phis for t in tangents)
-        entity_ids[sd][0].extend(range(cur, len(nodes)))
+        if degree > 0:
+            cur = len(nodes)
+            Q = create_quadrature(ref_el, 2*degree-1)
+            P = polynomial_set.ONPolynomialSet(ref_el, degree-1, scale="L2 piola")
+            phis = P.tabulate(Q.get_points())[(0,) * sd]
+            for f in sorted(top[sd-1]):
+                n = ref_el.compute_scaled_normal(f)
+                tangents = ref_el.compute_tangents(sd-1, f)
+                nodes.extend(BidirectionalMoment(ref_el, t, n, Q, phi)
+                             for phi in phis for t in tangents)
+            entity_ids[sd][0].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
 
-class ExtendedGopalakrishnanLedererSchoberl(finite_element.CiarletElement):
-    """The GLS element on the full space of trace-free polynomials.
+class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
+    """The GLS element used for the Mass-Conserving mixed Stress (MCS)
+    formulation for Stokes flow with weakly imposed stress symmetry.
+
+    GLS^2(k) is the space of trace-free polynomials of degree k with
+    continuous normal-tangential components.
+
+    Reference: https://doi.org/10.1137/19M1248960
+
+    Notes:
+    For weakly imposed symmetry, this element must be enriched with bubbles
+    to be inf-sup stable.
     """
     def __init__(self, ref_el, degree):
         poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
@@ -55,12 +66,16 @@ class ExtendedGopalakrishnanLedererSchoberl(finite_element.CiarletElement):
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
 
 
-def GopalakrishnanLedererSchoberl(ref_el, degree):
-    """The GLS element used for the MCS (Mass-Conserving mixed Stress) scheme.
-    GLS(r) is the space of trace-free polynomials of degree r with
-    continuous normal-tangential components of degree r-1.
+def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree):
+    """The GLS element used for the Mass-Conserving mixed Stress (MCS)
+    formulation for Stokes flow.
+
+    GLS^1(k) is the space of trace-free polynomials of degree k with
+    continuous normal-tangential components of degree k-1.
+
+    Reference: https://doi.org/10.1093/imanum/drz022
     """
-    fe = ExtendedGopalakrishnanLedererSchoberl(ref_el, degree)
+    fe = GopalakrishnanLedererSchoberlSecondKind(ref_el, degree)
     entity_dofs = fe.entity_dofs()
     sd = ref_el.get_spatial_dimension()
     dimPkm1 = (sd-1)*expansions.polynomial_dimension(ref_el.construct_subelement(sd-1), degree-1)

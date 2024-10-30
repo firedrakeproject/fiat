@@ -35,7 +35,8 @@ from FIAT.nedelec_second_kind import NedelecSecondKind          # noqa: F401
 from FIAT.regge import Regge                                    # noqa: F401
 from FIAT.hdiv_trace import HDivTrace, map_to_reference_facet   # noqa: F401
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson  # noqa: F401
-from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberl  # noqa: F401
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlFirstKind  # noqa: F401
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlSecondKind  # noqa: F401
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini  # noqa: F401
 from FIAT.gauss_legendre import GaussLegendre                   # noqa: F401
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre    # noqa: F401
@@ -274,12 +275,18 @@ elements = [
     "HellanHerrmannJohnson(S, 2)",
     "HellanHerrmannJohnson(T, 1, variant='point')",
     "HellanHerrmannJohnson(S, 1, variant='point')",
-    "GopalakrishnanLedererSchoberl(T, 1)",
-    "GopalakrishnanLedererSchoberl(T, 2)",
-    "GopalakrishnanLedererSchoberl(T, 3)",
-    "GopalakrishnanLedererSchoberl(S, 1)",
-    "GopalakrishnanLedererSchoberl(S, 2)",
-    "GopalakrishnanLedererSchoberl(S, 3)",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 1)",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 2)",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 3)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 1)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 2)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 3)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 0)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 1)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 2)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 0)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 1)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 2)",
     "BrezziDouglasFortinMarini(T, 2)",
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",

@@ -1,7 +1,8 @@
 import pytest
 import numpy
 
-from FIAT import GopalakrishnanLedererSchoberl as GLS
+from FIAT import (GopalakrishnanLedererSchoberlFirstKind,
+                  GopalakrishnanLedererSchoberlSecondKind)
 from FIAT.reference_element import ufc_simplex
 from FIAT.expansions import polynomial_dimension
 from FIAT.polynomial_set import ONPolynomialSet
@@ -16,16 +17,26 @@ def cell(request):
 
 
 @pytest.mark.parametrize("degree", (1, 2, 3))
-def test_gls_bubbles(cell, degree):
-    fe = GLS(cell, degree)
+@pytest.mark.parametrize("kind", (1, 2))
+def test_gls_bubbles(kind, cell, degree):
+    if kind == 1:
+        element = GopalakrishnanLedererSchoberlFirstKind
+    else:
+        element = GopalakrishnanLedererSchoberlSecondKind
+    fe = element(cell, degree)
     sd = cell.get_spatial_dimension()
     facet_el = cell.construct_subelement(sd-1)
     poly_set = fe.get_nodal_basis()
 
     # test dimension of constrained space
     dimPkm1 = polynomial_dimension(facet_el, degree-1)
+    dimPkp1 = polynomial_dimension(facet_el, degree+1)
     dimPk = polynomial_dimension(facet_el, degree)
-    expected = (sd**2-1)*(polynomial_dimension(cell, degree) - (dimPk - dimPkm1))
+    if kind == 1:
+        constraints = dimPk - dimPkm1
+    else:
+        constraints = 0
+    expected = (sd**2-1)*(polynomial_dimension(cell, degree) - constraints)
     assert poly_set.get_num_members() == expected
 
     # test dimension of the bubbles
@@ -35,9 +46,13 @@ def test_gls_bubbles(cell, degree):
     assert bubbles.get_num_members() == expected
 
     top = cell.get_topology()
-    Qref = create_quadrature(facet_el, 2*degree)
-    Pk = ONPolynomialSet(facet_el, degree)
-    PkH = Pk.take(list(range(dimPkm1, dimPk)))
+    Qref = create_quadrature(facet_el, 2*degree+1)
+    Pk = ONPolynomialSet(facet_el, degree+1)
+    if kind == 1:
+        start, stop = dimPkm1, dimPkp1
+    else:
+        start, stop = dimPk, dimPkp1
+    PkH = Pk.take(list(range(start, stop)))
     PkH_at_qpts = PkH.tabulate(Qref.get_points())[(0,)*(sd-1)]
     weights = numpy.transpose(numpy.multiply(PkH_at_qpts, Qref.get_weights()))
     for facet in top[sd-1]:
