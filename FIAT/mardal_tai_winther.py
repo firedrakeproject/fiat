@@ -26,7 +26,8 @@ def DivergenceDubinerMoments(ref_el, start_deg, stop_deg, comp_deg):
     dim1 = expansions.polynomial_dimension(ref_el, stop_deg)
     indices = list(range(dim0, dim1))
     phis = P.take(indices).tabulate(Q.get_points())[(0,)*sd]
-    return [IntegralMomentOfDivergence(ref_el, Q, phi) for phi in phis]
+    for phi in phis:
+        yield IntegralMomentOfDivergence(ref_el, Q, phi)
 
 
 class MardalTaiWintherDual(dual_set.DualSet):
