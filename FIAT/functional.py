@@ -756,38 +756,62 @@ class IntegralMomentOfNormalNormalEvaluation(Functional):
         super().__init__(ref_el, shp, pt_dict, {}, "IntegralMomentOfNormalNormalEvaluation")
 
 
-def IntegralMoments(ref_el, Q, P, **kwargs):
-    sd = ref_el.get_spatial_dimension()
-    phis = P.tabulate(Q.get_points())[(0,)*sd]
-    for phi in phis:
-        yield IntegralMoment(ref_el, Q, phi, **kwargs)
+class FunctionalGenerator():
+    def __init__(self, ref_el):
+        self.ref_el = ref_el
+
+    def generate(self, dim, entity):
+        raise NotImplementedError
 
 
-def FrobeniusIntegralMoments(ref_el, Q, P, **kwargs):
-    sd = ref_el.get_spatial_dimension()
-    phis = P.tabulate(Q.get_points())[(0,)*sd]
-    for phi in phis:
-        yield FrobeniusIntegralMoment(ref_el, Q, phi, **kwargs)
+class IntegralMoments(FunctionalGenerator):
+    def __init__(self, ref_el, Q, P, comp=tuple(), shp=None):
+        if shp is None:
+            shp = P.get_shape()
+        sd = P.ref_el.get_spatial_dimension()
+        self.phis = P.tabulate(Q.get_points())[(0,)*sd]
+        self.Q = Q
+        self.comp = comp
+        self.shape = shp
+        super().__init__(ref_el)
+
+    def generate(self, dim, entity):
+        if dim == self.ref_el.get_spatial_dimension():
+            assert entity == 0
+            for phi in self.phis:
+                yield IntegralMoment(self.ref_el, self.Q, phi, comp=self.comp, shp=self.shape)
 
 
-def FacetIntegralMoments(ref_el, Q, P, dim, entity_id, transform=None):
-    if transform is None:
-        transform = lambda f: f
-    phis = P.tabulate(Q.get_points())[(0,)*dim]
-    Q_mapped = quadrature.FacetQuadratureRule(ref_el, dim, entity_id, Q)
-    phis /= Q_mapped.jacobian_determinant()
-    for phi in phis:
-        yield FrobeniusIntegralMoment(ref_el, Q_mapped, transform(phi))
+class FrobeniusIntegralMoments(IntegralMoments):
+    def __init__(self, ref_el, Q, P):
+        super().__init__(ref_el, Q, P, comp=slice(None))
+
+    def generate(self, dim, entity):
+        if dim == self.ref_el.get_spatial_dimension():
+            assert entity == 0
+            for phi in self.phis:
+                yield FrobeniusIntegralMoment(self.ref_el, self.Q, phi)
 
 
-def NormalMoments(ref_el, Q, P, face_id):
-    dim = ref_el.get_spatial_dimension() - 1
-    n = ref_el.compute_scaled_normal(face_id)
-    transform = lambda f: numpy.multiply(n[..., None], f)
-    yield from FacetIntegralMoments(ref_el, Q, P, dim, face_id, transform)
+class FacetIntegralMoments(FrobeniusIntegralMoments):
+    def get_entity_transform(self, dim, entity):
+        return lambda f: f
+
+    def generate(self, dim, entity):
+        transform = self.get_entity_transform(dim, entity)
+        Q_mapped = quadrature.FacetQuadratureRule(self.ref_el, dim, entity, self.Q)
+        Jdet = Q_mapped.jacobian_determinant()
+        for phi in self.phis:
+            yield FrobeniusIntegralMoment(self.ref_el, Q_mapped, transform(phi)/Jdet)
 
 
-def TangentialMoments(ref_el, Q, P, dim, entity_id):
-    ts = ref_el.compute_tangents(dim, entity_id)
-    transform = lambda f: numpy.dot(ts.T, f)
-    yield from FacetIntegralMoments(ref_el, Q, P, dim, entity_id, transform)
+class NormalMoments(FacetIntegralMoments):
+    def get_entity_transform(self, dim, entity):
+        n = self.ref_el.compute_scaled_normal(entity)
+        return lambda f: numpy.multiply(n[..., None], f)
+
+
+class TangentialMoments(FacetIntegralMoments):
+    def get_entity_transform(self, dim, entity):
+        ts = self.ref_el.compute_tangents(dim, entity)
+        return lambda f: numpy.dot(ts.T, f)

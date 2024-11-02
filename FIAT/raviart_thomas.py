@@ -70,9 +70,10 @@ class RTDualSet(dual_set.DualSet):
             q = degree - 1
             Q = create_quadrature(facet, interpolant_deg + q)
             Pq = polynomial_set.ONPolynomialSet(facet, q if sd > 1 else 0)
+            ells = functional.NormalMoments(ref_el, Q, Pq)
             for f in top[sd - 1]:
                 cur = len(nodes)
-                nodes.extend(functional.NormalMoments(ref_el, Q, Pq, f))
+                nodes.extend(ells.generate(sd-1, f))
                 entity_ids[sd - 1][f].extend(range(cur, len(nodes)))
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-1}^d
@@ -80,7 +81,8 @@ class RTDualSet(dual_set.DualSet):
                 cur = len(nodes)
                 Q = create_quadrature(ref_el, interpolant_deg + q - 1)
                 Pqm1 = polynomial_set.ONPolynomialSet(ref_el, q - 1, shape=(sd,))
-                nodes.extend(functional.FrobeniusIntegralMoments(ref_el, Q, Pqm1))
+                ells = functional.FrobeniusIntegralMoments(ref_el, Q, Pqm1)
+                nodes.extend(ells.generate(sd, 0))
                 entity_ids[sd][0].extend(range(cur, len(nodes)))
 
         elif variant == "point":

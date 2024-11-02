@@ -25,9 +25,10 @@ class BDMDualSet(dual_set.DualSet):
             # degree is q
             Q = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
+            ells = functional.NormalMoments(ref_el, Q, Pq)
             for f in top[sd - 1]:
                 cur = len(nodes)
-                nodes.extend(functional.NormalMoments(ref_el, Q, Pq, f))
+                nodes.extend(ells.generate(sd-1, f))
                 entity_ids[sd - 1][f].extend(range(cur, len(nodes)))
 
         elif variant == "point":
@@ -48,7 +49,8 @@ class BDMDualSet(dual_set.DualSet):
             Q = create_quadrature(ref_el, interpolant_deg + degree - 1)
             Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
             Nedfs = Nedel.get_nodal_basis()
-            nodes.extend(functional.FrobeniusIntegralMoments(ref_el, Q, Nedfs))
+            ells = functional.FrobeniusIntegralMoments(ref_el, Q, Nedfs)
+            nodes.extend(ells.generate(sd, 0))
             entity_ids[sd][0].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)

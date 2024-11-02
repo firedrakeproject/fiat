@@ -132,12 +132,13 @@ class NedelecSecondKindDual(DualSet):
             RT = RaviartThomas(facet, rt_degree, variant)
             P = RT.get_nodal_basis()
 
+        ells = TangentialMoments(cell, Q, P)
         for entity in sorted(top[dim]):
             cur = len(dofs)
             # Construct degrees of freedom as integral moments on this cell,
             # using the face quadrature weighted against the values
             # of the (physical) Raviart--Thomas'es on the face
-            dofs.extend(TangentialMoments(cell, Q, P, dim, entity))
+            dofs.extend(ells.generate(dim, entity))
 
             # Assign identifiers (num RTs per face + previous edge dofs)
             ids[entity].extend(range(cur, len(dofs)))

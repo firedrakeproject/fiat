@@ -123,9 +123,10 @@ class NedelecDual(dual_set.DualSet):
                     facet = ref_el.construct_subelement(dim)
                     Q = create_quadrature(facet, interpolant_deg + phi_deg)
                     Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
+                    ells = functional.TangentialMoments(ref_el, Q, Pqmd)
                     for entity in top[dim]:
                         cur = len(nodes)
-                        nodes.extend(functional.TangentialMoments(ref_el, Q, Pqmd, dim, entity))
+                        nodes.extend(ells.generate(dim, entity))
                         entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         elif variant == "point":
@@ -155,7 +156,8 @@ class NedelecDual(dual_set.DualSet):
             cur = len(nodes)
             Q = create_quadrature(ref_el, interpolant_deg + phi_deg)
             Pqmd = polynomial_set.ONPolynomialSet(ref_el, phi_deg, shape=(sd,))
-            nodes.extend(functional.FrobeniusIntegralMoments(ref_el, Q, Pqmd))
+            ells = functional.FrobeniusIntegralMoments(ref_el, Q, Pqmd)
+            nodes.extend(ells.generate(sd, 0))
             entity_ids[sd][0].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
