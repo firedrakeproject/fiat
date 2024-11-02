@@ -16,7 +16,7 @@ from itertools import chain
 import numpy
 import sympy
 
-from FIAT import polynomial_set, jacobi
+from FIAT import polynomial_set, quadrature, jacobi
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.reference_element import UFCInterval as interval
 
@@ -754,3 +754,40 @@ class IntegralMomentOfNormalNormalEvaluation(Functional):
         pt_dict = {tuple(pt): [(wt*nnT[idx], idx) for idx in index_iterator(shp)]
                    for pt, wt in zip(points, weights)}
         super().__init__(ref_el, shp, pt_dict, {}, "IntegralMomentOfNormalNormalEvaluation")
+
+
+def IntegralMoments(ref_el, Q, P, **kwargs):
+    sd = ref_el.get_spatial_dimension()
+    phis = P.tabulate(Q.get_points())[(0,)*sd]
+    for phi in phis:
+        yield IntegralMoment(ref_el, Q, phi, **kwargs)
+
+
+def FrobeniusIntegralMoments(ref_el, Q, P, **kwargs):
+    sd = ref_el.get_spatial_dimension()
+    phis = P.tabulate(Q.get_points())[(0,)*sd]
+    for phi in phis:
+        yield FrobeniusIntegralMoment(ref_el, Q, phi, **kwargs)
+
+
+def FacetIntegralMoments(ref_el, Q, P, dim, entity_id, transform=None):
+    if transform is None:
+        transform = lambda f: f
+    phis = P.tabulate(Q.get_points())[(0,)*dim]
+    Q_mapped = quadrature.FacetQuadratureRule(ref_el, dim, entity_id, Q)
+    phis /= Q_mapped.jacobian_determinant()
+    for phi in phis:
+        yield FrobeniusIntegralMoment(ref_el, Q_mapped, transform(phi))
+
+
+def NormalMoments(ref_el, Q, P, face_id):
+    dim = ref_el.get_spatial_dimension() - 1
+    n = ref_el.compute_scaled_normal(face_id)
+    transform = lambda f: numpy.multiply(n[..., None], f)
+    yield from FacetIntegralMoments(ref_el, Q, P, dim, face_id, transform)
+
+
+def TangentialMoments(ref_el, Q, P, dim, entity_id):
+    ts = ref_el.compute_tangents(dim, entity_id)
+    transform = lambda f: numpy.dot(ts.T, f)
+    yield from FacetIntegralMoments(ref_el, Q, P, dim, entity_id, transform)

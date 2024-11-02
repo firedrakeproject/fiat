@@ -9,38 +9,26 @@ from FIAT import (finite_element, functional, dual_set,
                   polynomial_set, nedelec)
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
 
 
 class BDMDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, interpolant_deg):
-        nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
 
-        entity_ids = {}
-        # set to empty
-        for dim in top:
-            entity_ids[dim] = {}
-            for entity in top[dim]:
-                entity_ids[dim][entity] = []
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
 
         if variant == "integral":
             facet = ref_el.get_facet_element()
-            # Facet nodes are \int_F v\cdot n p ds where p \in P_{q}
+            # Facet nodes are \int_F v.n p ds where p \in P_{q}
             # degree is q
-            Q_ref = create_quadrature(facet, interpolant_deg + degree)
+            Q = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
-            Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
-                phis = n[None, :, None] * Pq_at_qpts[:, None, :]
-                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                             for phi in phis)
-                entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
+                nodes.extend(functional.NormalMoments(ref_el, Q, Pq, f))
+                entity_ids[sd - 1][f].extend(range(cur, len(nodes)))
 
         elif variant == "point":
             # Define each functional for the dual set
@@ -50,7 +38,7 @@ class BDMDualSet(dual_set.DualSet):
                 pts_cur = ref_el.make_points(sd - 1, f, sd + degree)
                 nodes.extend(functional.PointScaledNormalEvaluation(ref_el, f, pt)
                              for pt in pts_cur)
-                entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
+                entity_ids[sd - 1][f].extend(range(cur, len(nodes)))
 
         # internal nodes
         if degree > 1:
@@ -60,10 +48,8 @@ class BDMDualSet(dual_set.DualSet):
             Q = create_quadrature(ref_el, interpolant_deg + degree - 1)
             Nedel = nedelec.Nedelec(ref_el, degree - 1, variant)
             Nedfs = Nedel.get_nodal_basis()
-            Ned_at_qpts = Nedfs.tabulate(Q.get_points())[(0,) * sd]
-            nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                         for phi in Ned_at_qpts)
-            entity_ids[sd][0] = list(range(cur, len(nodes)))
+            nodes.extend(functional.FrobeniusIntegralMoments(ref_el, Q, Nedfs))
+            entity_ids[sd][0].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 

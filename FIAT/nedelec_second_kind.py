@@ -5,15 +5,12 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-import numpy
-
 from FIAT.finite_element import CiarletElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.functional import PointEdgeTangentEvaluation as Tangent
-from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
+from FIAT.functional import TangentialMoments
 from FIAT.raviart_thomas import RaviartThomas
-from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
 
@@ -109,16 +106,16 @@ class NedelecSecondKindDual(DualSet):
 
         return (dofs, ids)
 
-    def _generate_facet_dofs(self, codim, cell, degree, offset, variant, interpolant_deg):
+    def _generate_facet_dofs(self, dim, cell, degree, offset, variant, interpolant_deg):
         """Generate degrees of freedom (dofs) for facets."""
 
         # Initialize empty dofs and identifiers (ids)
-        num_facets = len(cell.get_topology()[codim])
+        top = cell.get_topology()
         dofs = []
-        ids = {i: [] for i in range(num_facets)}
+        ids = {i: [] for i in top[dim]}
 
         # Return empty info if not applicable
-        rt_degree = degree - codim + 1
+        rt_degree = degree - dim + 1
         if rt_degree < 1:
             return (dofs, ids)
 
@@ -126,44 +123,24 @@ class NedelecSecondKindDual(DualSet):
             interpolant_deg = degree
 
         # Construct quadrature scheme for the reference facet
-        ref_facet = cell.construct_subelement(codim)
-        Q_ref = create_quadrature(ref_facet, interpolant_deg + rt_degree)
-        if codim == 1:
-            Phi = ONPolynomialSet(ref_facet, rt_degree, (codim,))
+        facet = cell.construct_subelement(dim)
+        Q = create_quadrature(facet, interpolant_deg + rt_degree)
+        if dim == 1:
+            P = ONPolynomialSet(facet, rt_degree, (dim,))
         else:
             # Construct Raviart-Thomas on the reference facet
-            RT = RaviartThomas(ref_facet, rt_degree, variant)
-            Phi = RT.get_nodal_basis()
+            RT = RaviartThomas(facet, rt_degree, variant)
+            P = RT.get_nodal_basis()
 
-        # Evaluate basis functions at reference quadrature points
-        Phis = Phi.tabulate(Q_ref.get_points())[(0,) * codim]
-        # Note: Phis has dimensions:
-        # num_basis_functions x num_components x num_quad_points
-        Phis = numpy.transpose(Phis, (0, 2, 1))
-        # Note: Phis has dimensions:
-        # num_basis_functions x num_quad_points x num_components
-
-        # Iterate over the facets
-        cur = offset
-        for facet in range(num_facets):
-            # Get the quadrature and Jacobian on this facet
-            Q_facet = FacetQuadratureRule(cell, codim, facet, Q_ref)
-            J = Q_facet.jacobian()
-            detJ = Q_facet.jacobian_determinant()
-
-            # Map Phis -> phis (reference values to physical values)
-            piola_map = J / detJ
-            phis = numpy.dot(Phis, piola_map.T)
-            phis = numpy.transpose(phis, (0, 2, 1))
-
+        for entity in sorted(top[dim]):
+            cur = len(dofs)
             # Construct degrees of freedom as integral moments on this cell,
             # using the face quadrature weighted against the values
             # of the (physical) Raviart--Thomas'es on the face
-            dofs.extend(IntegralMoment(cell, Q_facet, phi) for phi in phis)
+            dofs.extend(TangentialMoments(cell, Q, P, dim, entity))
 
             # Assign identifiers (num RTs per face + previous edge dofs)
-            ids[facet].extend(range(cur, cur + len(phis)))
-            cur += len(phis)
+            ids[entity].extend(range(cur, len(dofs)))
 
         return (dofs, ids)
 
