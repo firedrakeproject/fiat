@@ -53,9 +53,10 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
 
     Reference: https://doi.org/10.1137/19M1248960
 
-    Notes:
-    For weakly imposed symmetry, this element must be enriched with bubbles
-    to be inf-sup stable.
+    Notes
+    -----
+    This element does not include the bubbles required for inf-sup stability of
+    the weak symmetry constraint.
     """
     def __init__(self, ref_el, degree):
         poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
