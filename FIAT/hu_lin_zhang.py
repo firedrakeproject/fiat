@@ -103,8 +103,11 @@ class HLZDual(dual_set.DualSet):
 
 class HuLinZhang(finite_element.CiarletElement):
     """
-    HLZ^2(k) is the space of trace-free polynomials of degree k with
-    continuous normal-tangential components.
+    HLZ(k) is the space of trace-free polynomials of degree k-1 + symeteric
+    polynomials of degree k-1 cross x with continuous normal-tangential
+    components.
+
+    Reference: https://arxiv.org/abs/2311.15482
     """
     def __init__(self, ref_el, degree=1):
         poly_set = HLZSpace(ref_el, degree)
