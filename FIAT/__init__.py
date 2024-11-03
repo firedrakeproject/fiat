@@ -48,6 +48,7 @@ from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.crouzeix_raviart import CrouzeixRaviart
 from FIAT.regge import Regge
+from FIAT.hu_lin_zhang import HuLinZhang
 from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlFirstKind
 from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlSecondKind
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson
@@ -110,6 +111,7 @@ supported_elements = {"Argyris": Argyris,
                       "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
                       "Hellan-Herrmann-Johnson": HellanHerrmannJohnson,
+                      "Hu-Lin-Zhang": HuLinZhang,
                       "Gopalakrishnan-Lederer-Schoberl 1st kind": GopalakrishnanLedererSchoberlFirstKind,
                       "Gopalakrishnan-Lederer-Schoberl 2nd kind": GopalakrishnanLedererSchoberlSecondKind,
                       "Conforming Arnold-Winther": ArnoldWinther,
