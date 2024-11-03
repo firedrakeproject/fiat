@@ -493,6 +493,18 @@ class SimplicialComplex(Cell):
         n = SimplicialComplex.compute_normal(self, facet_i)  # skip UFC overrides
         return n / numpy.linalg.norm(n, numpy.inf)
 
+    def compute_edge_normals(self, edge_i):
+        """Returns the canonical axes of the plane normal to edge_i."""
+        I = numpy.eye(self.get_spatial_dimension())
+        zhat = I[-1]
+        that = self.compute_normalized_edge_tangent(edge_i)
+        a = numpy.cross(zhat, that)
+        c = numpy.dot(zhat, that)
+        A = numpy.cross(I, a)
+        beta = 1 / (1 + c)
+        R = I + A + beta * numpy.dot(A, A)
+        return R.T[:-1]
+
     def get_entity_transform(self, dim, entity):
         """Returns a mapping of point coordinates from the
         `entity`-th subentity of dimension `dim` to the cell.

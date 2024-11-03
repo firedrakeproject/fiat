@@ -33,6 +33,7 @@ from FIAT.mixed import MixedElement
 from FIAT.nedelec import Nedelec                                # noqa: F401
 from FIAT.nedelec_second_kind import NedelecSecondKind          # noqa: F401
 from FIAT.regge import Regge                                    # noqa: F401
+from FIAT.hu_lin_zhang import HuLinZhang                        # noqa: F401
 from FIAT.hdiv_trace import HDivTrace, map_to_reference_facet   # noqa: F401
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson  # noqa: F401
 from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlFirstKind  # noqa: F401
@@ -287,6 +288,7 @@ elements = [
     "GopalakrishnanLedererSchoberlSecondKind(S, 0)",
     "GopalakrishnanLedererSchoberlSecondKind(S, 1)",
     "GopalakrishnanLedererSchoberlSecondKind(S, 2)",
+    "HuLinZhang(S)",
     "BrezziDouglasFortinMarini(T, 2)",
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",
