@@ -57,6 +57,7 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
     -----
     This element does not include the bubbles required for inf-sup stability of
     the weak symmetry constraint.
+
     """
     def __init__(self, ref_el, degree):
         poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
