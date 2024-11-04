@@ -329,6 +329,133 @@ def _kmv_lump_scheme(ref_el, degree):
         else:
             raise ValueError("Dimension not supported")
 
+    elif degree == 6:
+        if sd == 2:
+            x = list(ref_el.vertices)
+            alphas = [
+                5.00000000000000e-1,
+                8.29411811106452e-2,
+                2.68649695592714e-1,
+            ]
+            betas = [
+                4.68059729056814e-1,
+                7.93088545089875e-2,
+                3.92931636618867e-1,
+            ]
+            gammas = [
+                2.48172758709406e-1,
+                1.56582066033687e-1,
+            ]
+            deltas = [
+                6.99812197147049e-1,
+                2.43089592364562e-1,
+            ]
+            weights = [
+                5.35113520281665e-4,
+                4.29435346026293e-3,
+                3.02990950926060e-3,
+                3.16396316646563e-3,
+                2.43035184285235e-2,
+                1.66312091329395e-2,
+                3.42178857644876e-2,
+                1.73480160090330e-2,
+                1.98004044953264e-2,
+            ]
+
+            alpha = alphas[0]
+            x.extend(
+                [
+                    (alpha, alpha),
+                    (0.0, alpha),
+                    (alpha, 0.0),
+                ]
+            )  # edge midpoints (class 2 points)
+            alpha = alphas[1]
+            x.extend(
+                [
+                    (1 - alpha, alpha),
+                    (alpha, 1 - alpha),
+                    (0.0, 1 - alpha),
+                    (0.0, alpha),
+                    (alpha, 0.0),
+                    (1 - alpha, 0.0),
+                ]  # edge points (1st set of class 3 points)
+            )
+            alpha = alphas[2]
+            x.extend(
+                [
+                    (1 - alpha, alpha),
+                    (alpha, 1 - alpha),
+                    (0.0, 1 - alpha),
+                    (0.0, alpha),
+                    (alpha, 0.0),
+                    (1 - alpha, 0.0),
+                ]  # edge points (2nd set of class 3 points)
+            )
+
+            beta = betas[0]
+            x.extend(
+                [
+                    (beta, beta),
+                    (1 - 2 * beta, beta),
+                    (beta, 1 - 2 * beta)
+                ]  # interior points on bisector (1st set of class 5 points)
+            )
+            beta = betas[1]
+            x.extend(
+                [
+                    (beta, beta),
+                    (1 - 2 * beta, beta),
+                    (beta, 1 - 2 * beta)
+                ]  # interior points on bisector (2nd set of class 5 points)
+            )
+            beta = betas[2]
+            x.extend(
+                [
+                    (beta, beta),
+                    (1 - 2 * beta, beta),
+                    (beta, 1 - 2 * beta)
+                ]  # interior points on bisector (3rd set of class 5 points)
+            )
+
+            gamma = gammas[0]
+            delta = deltas[0]
+            x.extend(
+                [
+                    (gamma, delta),
+                    (1 - gamma - delta, delta),
+                    (gamma, 1 - gamma - delta),
+                    (delta, gamma),
+                    (1 - gamma - delta, gamma),
+                    (delta, 1 - gamma - delta),
+                ]  # interior points (1st set of class 6 points)
+            )
+            gamma = gammas[1]
+            delta = deltas[1]
+            x.extend(
+                [
+                    (gamma, delta),
+                    (1 - gamma - delta, delta),
+                    (gamma, 1 - gamma - delta),
+                    (delta, gamma),
+                    (1 - gamma - delta, gamma),
+                    (delta, 1 - gamma - delta),
+                ]  # interior points (2st set of class 6 points)
+            )
+
+            w = numpy.arange(39, dtype=numpy.float64)
+            w[0:3] = weights[0]  # class 1 points (vertices)
+            w[3:6] = weights[1]  # class 2 points
+            w[6:12] = weights[2]  # class 3 points
+            w[12:18] = weights[3]
+            w[18:21] = weights[4]  # class 5 points
+            w[21:24] = weights[5]
+            w[24:27] = weights[6]
+            w[27:33] = weights[7]  # class 6 points
+            w[33:39] = weights[8]
+
+        else:
+            raise ValueError("Dimension not supported")
     # Return scheme
     return QuadratureRule(T, x, w)
 
