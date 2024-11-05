@@ -436,13 +436,14 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         else:
             coeffs = numpy.eye(expansion_set.get_num_members(degree))
 
-        if vorder > order + 1:
-            # Impose C^vorder super-smoothness at interior vertices
-            # C^order automatically gives C^{order+1} at the interior vertex
+        # Impose C^vorder super-smoothness at interior vertices
+        # C^order automatically gives C^{order+dim-1} at the interior vertex
+        sorder = order + sd - 1
+        if vorder > sorder:
             verts = ref_el.get_vertices()
             points = [verts[i] for i in ref_el.get_interior_facets(0)]
             jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
-            for r in range(order+2, vorder+1):
+            for r in range(sorder+1, vorder+1):
                 dual_mat = numpy.dot(numpy.vstack(jumps[r].T), coeffs.T)
                 _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
                 tol = sig[0] * 1E-10
