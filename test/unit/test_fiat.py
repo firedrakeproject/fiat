@@ -35,6 +35,8 @@ from FIAT.nedelec_second_kind import NedelecSecondKind          # noqa: F401
 from FIAT.regge import Regge                                    # noqa: F401
 from FIAT.hdiv_trace import HDivTrace, map_to_reference_facet   # noqa: F401
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson  # noqa: F401
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlFirstKind  # noqa: F401
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlSecondKind  # noqa: F401
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini  # noqa: F401
 from FIAT.gauss_legendre import GaussLegendre                   # noqa: F401
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre    # noqa: F401
@@ -42,6 +44,9 @@ from FIAT.restricted import RestrictedElement                   # noqa: F401
 from FIAT.tensor_product import TensorProductElement            # noqa: F401
 from FIAT.tensor_product import FlattenedDimensions             # noqa: F401
 from FIAT.hdivcurl import Hdiv, Hcurl                           # noqa: F401
+from FIAT.mardal_tai_winther import MardalTaiWinther            # noqa: F401
+from FIAT.arnold_winther import ArnoldWinther, ArnoldWintherNC  # noqa: F401
+from FIAT.hu_zhang import HuZhang                               # noqa: F401
 from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
@@ -270,6 +275,18 @@ elements = [
     "HellanHerrmannJohnson(S, 2)",
     "HellanHerrmannJohnson(T, 1, variant='point')",
     "HellanHerrmannJohnson(S, 1, variant='point')",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 1)",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 2)",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 3)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 1)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 2)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 3)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 0)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 1)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 2)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 0)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 1)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 2)",
     "BrezziDouglasFortinMarini(T, 2)",
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",
@@ -315,6 +332,13 @@ elements = [
     "Morley(T)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
+    "MardalTaiWinther(T, 3)",
+    "ArnoldWintherNC(T, 2)",
+    "ArnoldWinther(T, 3)",
+    "HuZhang(T, 3)",
+    "HuZhang(T, 4)",
+    "HuZhang(T, 3, 'point')",
+    "HuZhang(T, 4, 'point')",
 
     # Macroelements
     "Lagrange(T, 1, 'iso')",

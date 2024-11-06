@@ -109,15 +109,12 @@ def GuzmanNeilanH1div(ref_el, degree=2, reduced=False):
     """
     order = 0
     AS = AlfeldSorokina(ref_el, 2)
-    if reduced:
+    if reduced or ref_el.get_spatial_dimension() <= 2:
         order = 1
         # Only extract the div bubbles
         div_nodes = [i for i, node in enumerate(AS.dual_basis())
                      if len(node.deriv_dict) > 0]
         AS = RestrictedElement(AS, indices=div_nodes)
-    elif ref_el.get_spatial_dimension() <= 2:
-        # Quadratic bubbles are already included in 2D
-        return AS
     GN = GuzmanNeilanH1(ref_el, order=order)
     return NodalEnrichedElement(AS, GN)
 

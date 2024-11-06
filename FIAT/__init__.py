@@ -48,9 +48,12 @@ from FIAT.P0 import P0
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.crouzeix_raviart import CrouzeixRaviart
 from FIAT.regge import Regge
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlFirstKind
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlSecondKind
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson
 from FIAT.arnold_winther import ArnoldWinther
 from FIAT.arnold_winther import ArnoldWintherNC
+from FIAT.hu_zhang import HuZhang
 from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.tensor_product import TensorProductElement
@@ -107,8 +110,11 @@ supported_elements = {"Argyris": Argyris,
                       "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
                       "Hellan-Herrmann-Johnson": HellanHerrmannJohnson,
+                      "Gopalakrishnan-Lederer-Schoberl 1st kind": GopalakrishnanLedererSchoberlFirstKind,
+                      "Gopalakrishnan-Lederer-Schoberl 2nd kind": GopalakrishnanLedererSchoberlSecondKind,
                       "Conforming Arnold-Winther": ArnoldWinther,
                       "Nonconforming Arnold-Winther": ArnoldWintherNC,
+                      "Hu-Zhang": HuZhang,
                       "Mardal-Tai-Winther": MardalTaiWinther}
 
 # List of extra elements
