@@ -28,10 +28,8 @@ def ChristiansenHuSpace(ref_el, degree, reduced=False):
     tab = C0.tabulate(Q.get_points(), 1)
     divC0 = sum(tab[alpha][:, alpha.index(1), :] for alpha in tab if sum(alpha) == 1)
 
-    _, sig, vt = numpy.linalg.svd(divC0.T, full_matrices=True)
-    tol = sig[0] * 1E-10
-    num_sv = len([s for s in sig if abs(s) > tol])
-    coeffs = numpy.tensordot(vt[num_sv:], C0.get_coeffs(), axes=(-1, 0))
+    nsp = polynomial_set.spanning_basis(divC0.T, nullspace=True)
+    coeffs = numpy.tensordot(nsp, C0.get_coeffs(), axes=(-1, 0))
 
     verts = numpy.array(ref_complex.get_vertices())
     WT = verts[-1]
