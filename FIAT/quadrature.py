@@ -8,10 +8,12 @@
 # Modified by David A. Ham (david.ham@imperial.ac.uk), 2015
 
 import itertools
+from math import factorial
 import numpy
 from recursivenodes.quadrature import gaussjacobi, lobattogaussjacobi, simplexgausslegendre
 
 from FIAT import reference_element
+from FIAT.orientation_utils import make_entity_permutations_simplex
 
 
 def pseudo_determinant(A):
@@ -51,6 +53,7 @@ class QuadratureRule(object):
         self.ref_el = ref_el
         self.pts = pts
         self.wts = wts
+        self._intrinsic_orientation_permutation_map_tuple = (None, )
 
     def get_points(self):
         return numpy.array(self.pts)
@@ -60,6 +63,32 @@ class QuadratureRule(object):
 
     def integrate(self, f):
         return sum(w * f(x) for x, w in zip(self.pts, self.wts))
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        return self.ref_el.extrinsic_orientation_permutation_map
+
+    @property
+    def intrinsic_orientation_permutation_map_tuple(self):
+        """A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.
+
+        Notes
+        -----
+        result[axis][io] gives the physical point-reference point permutation array corresponding to
+        io (intrinsic orientation) on ``axis``.
+
+        """
+        if any(m is None for m in self._intrinsic_orientation_permutation_map_tuple):
+            raise ValueError("Must set _intrinsic_orientation_permutation_map_tuple")
+        return self._intrinsic_orientation_permutation_map_tuple
 
 
 class GaussJacobiQuadratureLineRule(QuadratureRule):
@@ -71,6 +100,12 @@ class GaussJacobiQuadratureLineRule(QuadratureRule):
         pts_ref, wts_ref = gaussjacobi(m, a, b)
         pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
         QuadratureRule.__init__(self, ref_el, pts, wts)
+        # Set _intrinsic_orientation_permutation_map_tuple.
+        dim = 1
+        a = numpy.zeros((factorial(dim + 1), m), dtype=int)
+        for io, perm in make_entity_permutations_simplex(dim, m).items():
+            a[io, perm] = range(m)
+        self._intrinsic_orientation_permutation_map_tuple = (a, )
 
 
 class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):

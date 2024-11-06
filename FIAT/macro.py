@@ -429,25 +429,21 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
 
         if len(rows) > 0:
             dual_mat = numpy.vstack(rows)
-            _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-            tol = sig[0] * 1E-10
-            num_sv = len([s for s in sig if abs(s) > tol])
-            coeffs = vt[num_sv:]
+            coeffs = polynomial_set.spanning_basis(dual_mat, nullspace=True)
         else:
             coeffs = numpy.eye(expansion_set.get_num_members(degree))
 
-        if vorder > order + 1:
-            # Impose C^vorder super-smoothness at interior vertices
-            # C^order automatically gives C^{order+1} at the interior vertex
+        # Impose C^vorder super-smoothness at interior vertices
+        # C^order automatically gives C^{order+dim-1} at the interior vertex
+        sorder = order + sd - 1
+        if vorder > sorder:
             verts = ref_el.get_vertices()
             points = [verts[i] for i in ref_el.get_interior_facets(0)]
             jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
-            for r in range(order+2, vorder+1):
+            for r in range(sorder+1, vorder+1):
                 dual_mat = numpy.dot(numpy.vstack(jumps[r].T), coeffs.T)
-                _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-                tol = sig[0] * 1E-10
-                num_sv = len([s for s in sig if abs(s) > tol])
-                coeffs = numpy.dot(vt[num_sv:], coeffs)
+                nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+                coeffs = numpy.dot(nsp, coeffs)
 
         if shape != ():
             m, n = coeffs.shape
@@ -498,8 +494,7 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
 
         if len(rows) > 0:
             dual_mat = numpy.vstack(rows)
-            _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-            num_sv = len([s for s in sig if abs(s) > 1.e-10])
-            coeffs = numpy.tensordot(vt[num_sv:], coeffs, axes=(1, 0))
+            nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+            coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
 
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)

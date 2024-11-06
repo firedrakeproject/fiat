@@ -41,10 +41,8 @@ def AlfeldSorokinaSpace(ref_el, degree):
 
     if len(rows) > 0:
         dual_mat = numpy.vstack(rows)
-        _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-        tol = sig[0] * 1E-10
-        num_sv = len([s for s in sig if abs(s) > tol])
-        coeffs = numpy.tensordot(vt[num_sv:], coeffs, axes=(-1, 0))
+        nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+        coeffs = numpy.tensordot(nsp, coeffs, axes=(-1, 0))
     return polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set, coeffs)
 
 

@@ -29,8 +29,11 @@ import numpy
 from recursivenodes.nodes import _decode_family, _recursive
 
 from FIAT.orientation_utils import (
+    Orientation,
     make_cell_orientation_reflection_map_simplex,
-    make_cell_orientation_reflection_map_tensorproduct)
+    make_cell_orientation_reflection_map_tensorproduct,
+    make_entity_permutations_simplex,
+)
 
 POINT = 0
 LINE = 1
@@ -126,7 +129,7 @@ def linalg_subspace_intersection(A, B):
 class Cell(object):
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
-    vertices that make up edges, facecs, etc."""
+    vertices that make up edges, faces, etc."""
     def __init__(self, shape, vertices, topology):
         """The constructor takes a shape code, the physical vertices expressed
         as a list of tuples of numbers, and the topology of a cell.
@@ -157,20 +160,26 @@ class Cell(object):
                 # Sort for the sake of determinism and by UFC conventions
                 self.sub_entities[dim][e] = sorted(sub_entities)
 
+        # Build super-entity dictionary by inverting the sub-entity dictionary
+        self.super_entities = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
+        for dim0 in topology:
+            for e0 in topology[dim0]:
+                for dim1, e1 in self.sub_entities[dim0][e0]:
+                    self.super_entities[dim1][e1].append((dim0, e0))
+
         # Build connectivity dictionary for easier queries
         self.connectivity = {}
-        for dim0, sub_entities in self.sub_entities.items():
+        for dim0 in sorted(topology):
+            for dim1 in sorted(topology):
+                self.connectivity[(dim0, dim1)] = []
 
-            # Skip tensor product entities
-            # TODO: Can we do something better?
-            if isinstance(dim0, tuple):
-                continue
-
-            for entity, sub_sub_entities in sorted(sub_entities.items()):
-                for dim1 in range(dim0+1):
-                    d01_entities = filter(lambda x: x[0] == dim1, sub_sub_entities)
-                    d01_entities = tuple(x[1] for x in d01_entities)
-                    self.connectivity.setdefault((dim0, dim1), []).append(d01_entities)
+            for entity in sorted(topology[dim0]):
+                children = self.sub_entities[dim0][entity]
+                parents = self.super_entities[dim0][entity]
+                for dim1 in sorted(topology):
+                    neighbors = children if dim1 < dim0 else parents
+                    d01_entities = tuple(e for d, e in neighbors if d == dim1)
+                    self.connectivity[(dim0, dim1)].append(d01_entities)
 
     def _key(self):
         """Hashable object key data (excluding type)."""
@@ -254,6 +263,52 @@ class Cell(object):
 
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
         raise NotImplementedError("Should be implemented in a subclass.")
 
     def is_simplex(self):
@@ -540,26 +595,27 @@ class SimplicialComplex(Cell):
         return self.get_spatial_dimension()
 
     def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
-        """Returns the barycentric coordinates of a list of points on an
-        entity."""
+        """Returns the barycentric coordinates of a list of points on the complex."""
         if len(points) == 0:
             return points
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         entity_dim, entity_id = entity
         top = self.get_topology()
-        verts = self.get_vertices_of_subcomplex(top[entity_dim][entity_id])
-        if entity_dim == self.get_spatial_dimension():
-            ref_verts = numpy.eye(entity_dim + 1)
-            A, b = make_affine_mapping(verts, ref_verts)
-        else:
-            v = numpy.transpose(verts)
-            v = v[:, 1:] - v[:, :1]
-            A = numpy.linalg.solve(numpy.dot(v.T, v), v.T)
-            b = -numpy.dot(A, verts[0])
-            A = numpy.vstack((-numpy.sum(A, axis=0), A))
-            b = numpy.hstack((1 - numpy.sum(b, axis=0), b))
+        sd = self.get_spatial_dimension()
 
+        # get a subcell containing the entity and the restriction indices of the entity
+        indices = slice(None)
+        subcomplex = top[entity_dim][entity_id]
+        if entity_dim != sd:
+            cell_id = self.connectivity[(entity_dim, sd)][0][0]
+            indices = [i for i, v in enumerate(top[sd][cell_id]) if v in subcomplex]
+            subcomplex = top[sd][cell_id]
+
+        cell_verts = self.get_vertices_of_subcomplex(subcomplex)
+        ref_verts = numpy.eye(sd + 1)
+        A, b = make_affine_mapping(cell_verts, ref_verts)
+        A, b = A[indices], b[indices]
         if rescale:
             # rescale barycentric coordinates by the height wrt. to the facet
             h = 1 / numpy.linalg.norm(A, axis=1)
@@ -724,6 +780,58 @@ class SimplicialComplex(Cell):
 
         """
         return self.distance_to_point_l1(point, entity=entity) <= epsilon
+
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        return 0
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        if axis != 0:
+            raise ValueError(f"axis ({axis}) != 0")
+        return o
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        return numpy.diag((1, )).astype(int).reshape((1, 1, 1))
 
 
 class Simplex(SimplicialComplex):
@@ -1161,6 +1269,75 @@ class TensorProductCell(Cell):
 
     def __le__(self, other):
         return self.compare(operator.le, other)
+
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        Notes
+        -----
+        The difinition of orientations used here must be consistent with
+        that used in make_entity_permutations_tensorproduct.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        dim = len(self.cells)
+        size_io = 2  # Number of possible intrinsic orientations along each axis.
+        return o // size_io**dim
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation. ``//`` and ``%`` must be overloaded in type(o).
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        Notes
+        -----
+        Must be consistent with make_entity_permutations_tensorproduct.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        dim = len(self.cells)
+        if axis >= dim:
+            raise ValueError(f"Must give 0 <= axis < {dim} : got {axis}")
+        size_io = 2  # Number of possible intrinsic orientations along each axis.
+        return o % size_io**dim // size_io**(dim - 1 - axis) % size_io
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        dim = len(self.cells)
+        a = numpy.zeros((factorial(dim), dim, dim), dtype=int)
+        ai = numpy.array(list(make_entity_permutations_simplex(dim - 1, 2).values()), dtype=int).reshape((factorial(dim), dim, 1))
+        numpy.put_along_axis(a, ai, 1, axis=2)
+        return a
 
 
 class UFCQuadrilateral(Cell):
