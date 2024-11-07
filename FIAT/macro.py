@@ -1,4 +1,3 @@
-import copy
 from itertools import chain, combinations
 
 import numpy
@@ -74,8 +73,9 @@ def make_topology(sd, num_verts, edges):
             facet = topology[dim][entity]
             facet_verts = set(facet)
             for v in range(min(facet)):
-                if facet_verts < adjacency[v]:
+                if (facet_verts < adjacency[v]):
                     entities.append((v, *facet))
+
         topology[dim+1] = dict(enumerate(sorted(entities)))
     return topology
 
@@ -88,7 +88,10 @@ class SplitSimplicialComplex(SimplicialComplex):
     :arg topology: The topology of the simplicial complex.
     """
     def __init__(self, parent, vertices, topology):
-        self._parent = parent
+        self._parent_complex = parent
+        while parent.get_parent():
+            parent = parent.get_parent()
+        self._parent_simplex = parent
 
         bary = xy_to_bary(parent.get_vertices(), vertices)
         parent_top = parent.get_topology()
@@ -147,7 +150,7 @@ class SplitSimplicialComplex(SimplicialComplex):
                            for dim in sorted(child_to_parent)}
         self._interior_facets = interior_facets
 
-        super(SplitSimplicialComplex, self).__init__(parent.shape, vertices, topology)
+        super().__init__(parent.shape, vertices, topology)
 
     def get_child_to_parent(self):
         """Maps split complex facet tuple to its parent entity tuple."""
@@ -180,53 +183,16 @@ class SplitSimplicialComplex(SimplicialComplex):
 
         :arg dimension: subentity dimension (integer)
         """
-        return self._parent.construct_subelement(dimension)
+        return self.get_parent().construct_subelement(dimension)
 
     def is_macrocell(self):
         return True
 
     def get_parent(self):
-        return self._parent
+        return self._parent_simplex
 
-
-class AlfeldSplit(SplitSimplicialComplex):
-    """Splits a simplicial complex by connecting subcell vertices to their
-    barycenter.
-    """
-    def __init__(self, ref_el):
-        sd = ref_el.get_spatial_dimension()
-        top = ref_el.get_topology()
-        # Keep old facets, respecting the old numbering
-        new_topology = copy.deepcopy(top)
-        # Discard the cell interiors
-        new_topology[sd] = {}
-        new_verts = list(ref_el.get_vertices())
-
-        for cell in top[sd]:
-            # Append the barycenter as the new vertex
-            new_verts.extend(ref_el.make_points(sd, cell, sd+1))
-            new_vert_id = len(new_topology[0])
-            new_topology[0][new_vert_id] = (new_vert_id,)
-
-            # Append new facets by adding the barycenter to old facets
-            for dim in range(1, sd + 1):
-                cur = len(new_topology[dim])
-                for entity, ids in top[dim-1].items():
-                    if set(ids) < set(top[sd][cell]):
-                        new_topology[dim][cur] = ids + (new_vert_id,)
-                        cur = cur + 1
-
-        parent = ref_el.get_parent() or ref_el
-        super(AlfeldSplit, self).__init__(parent, tuple(new_verts), new_topology)
-
-    def construct_subcomplex(self, dimension):
-        """Constructs the reference subcomplex of the parent cell subentity
-        specified by subcomplex dimension.
-        """
-        if dimension == self.get_dimension():
-            return self
-        # Alfeld on facets is just the parent subcomplex
-        return self._parent.construct_subcomplex(dimension)
+    def get_parent_complex(self):
+        return self._parent_complex
 
 
 class IsoSplit(SplitSimplicialComplex):
@@ -264,11 +230,10 @@ class IsoSplit(SplitSimplicialComplex):
             edges.append(tuple(sorted((v0, v1))))
 
         new_topology = make_topology(sd, len(new_verts), edges)
-        parent = ref_el.get_parent() or ref_el
-        super(IsoSplit, self).__init__(parent, tuple(new_verts), new_topology)
+        super().__init__(ref_el, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
-        """Constructs the reference subcomplex of the parent cell subentity
+        """Constructs the reference subcomplex of the parent complex
         specified by subcomplex dimension.
         """
         if dimension == self.get_dimension():
@@ -282,43 +247,75 @@ class IsoSplit(SplitSimplicialComplex):
 
 
 class PowellSabinSplit(SplitSimplicialComplex):
-    """Splits a simplicial complex by connecting barycenters of subentities to
-    the barycenter of the superentity.
+    """Splits a simplicial complex by connecting barycenters of subentities
+    to the barycenter of the superentities of the given dimension or higher.
     """
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, dimension=1):
+        self.split_dimension = dimension
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-        inv_top = invert_cell_topology(top)
+        connectivity = ref_el.get_connectivity()
         new_verts = list(ref_el.get_vertices())
-        edges = []
-        offset = {0: 0}
-        for dim in range(1, sd+1):
-            offset[dim] = len(new_verts)
+        dim = dimension - 1
+        simplices = {dim: {entity: [top[dim][entity]] for entity in top[dim]}}
+
+        for dim in range(dimension, sd+1):
+            simplices[dim] = {}
             for entity in top[dim]:
-                bary_id = entity + offset[dim]
+                bary_id = len(new_verts)
                 new_verts.extend(ref_el.make_points(dim, entity, dim+1))
 
-                # Connect subentity barycenter to the entity barycenter
-                for subdim in range(dim):
-                    edges.extend((inv_top[subdim][subverts] + offset[subdim], bary_id)
-                                 for subverts in combinations(top[dim][entity], subdim+1))
+                # Connect entity barycenter to every subsimplex on the entity
+                simplices[dim][entity] = [(*s, bary_id)
+                                          for child in connectivity[(dim, dim-1)][entity]
+                                          for s in simplices[dim-1][child]]
 
-        new_topology = make_topology(sd, len(new_verts), edges)
-        parent = ref_el.get_parent() or ref_el
-        super(PowellSabinSplit, self).__init__(parent, tuple(new_verts), new_topology)
+        simplices = list(chain.from_iterable(simplices[sd].values()))
+        new_topology = {}
+        new_topology[0] = {i: (i,) for i in range(len(new_verts))}
+        for dim in range(1, sd):
+            facets = chain.from_iterable((combinations(s, dim+1) for s in simplices))
+            if dim < self.split_dimension:
+                # Preserve the numbering of the unsplit entities
+                facets = chain(top[dim].values(), facets)
+            unique_facets = dict.fromkeys(facets)
+            new_topology[dim] = dict(enumerate(unique_facets))
+        new_topology[sd] = dict(enumerate(simplices))
+
+        parent = ref_el if dimension == sd else PowellSabinSplit(ref_el, dimension=dimension+1)
+        super().__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
-        """Constructs the reference subcomplex of the parent cell subentity
+        """Constructs the reference subcomplex of the parent complex
         specified by subcomplex dimension.
         """
         if dimension == self.get_dimension():
             return self
-        ref_el = self.construct_subelement(dimension)
-        if dimension == 0:
-            return ref_el
+        parent = self.get_parent_complex()
+        subcomplex = parent.construct_subcomplex(dimension)
+        if dimension < self.split_dimension:
+            return subcomplex
         else:
             # Powell-Sabin on facets is Powell-Sabin
-            return PowellSabinSplit(ref_el)
+            return PowellSabinSplit(subcomplex, dimension=self.split_dimension)
+
+
+class AlfeldSplit(PowellSabinSplit):
+    """Splits a simplicial complex by connecting cell vertices to their
+    barycenter.
+    """
+    def __init__(self, ref_el):
+        sd = ref_el.get_spatial_dimension()
+        super().__init__(ref_el, dimension=sd)
+
+
+class WorseyFarinSplit(PowellSabinSplit):
+    """Splits a simplicial complex by connecting cell and facet vertices to their
+    barycenter. This reduces to Powell-Sabin on the triangle, and Alfeld on the interval.
+    """
+    def __init__(self, ref_el):
+        sd = ref_el.get_spatial_dimension()
+        super().__init__(ref_el, dimension=sd-1)
 
 
 class PowellSabin12Split(SplitSimplicialComplex):
@@ -345,8 +342,9 @@ class PowellSabin12Split(SplitSimplicialComplex):
                  (3, 4), (3, 5), (3, 6), (3, 7), (3, 8), (3, 9),
                  (4, 7), (4, 8), (5, 7), (5, 9), (6, 8), (6, 9)]
 
-        super(PowellSabin12Split, self).__init__(
-            ref_el, tuple(new_verts), make_topology(2, len(new_verts), edges))
+        parent = PowellSabinSplit(ref_el)
+        new_topology = make_topology(2, len(new_verts), edges)
+        super().__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -375,8 +373,7 @@ class MacroQuadratureRule(QuadratureRule):
     def __init__(self, ref_el, Q_ref, parent_facets=None):
         parent_dim = Q_ref.ref_el.get_spatial_dimension()
         if parent_facets is not None:
-            parent_cell = ref_el.get_parent()
-            parent_to_children = parent_cell.get_parent_to_children()
+            parent_to_children = ref_el.get_parent_to_children()
             facets = []
             for parent_entity in parent_facets:
                 children = parent_to_children[parent_dim][parent_entity]
@@ -393,7 +390,7 @@ class MacroQuadratureRule(QuadratureRule):
             wts.extend(Q_cur.wts)
         pts = tuple(pts)
         wts = tuple(wts)
-        super(MacroQuadratureRule, self).__init__(ref_el, pts, wts)
+        super().__init__(ref_el, pts, wts)
 
 
 class CkPolynomialSet(polynomial_set.PolynomialSet):
@@ -432,32 +429,29 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
 
         if len(rows) > 0:
             dual_mat = numpy.vstack(rows)
-            _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-            tol = sig[0] * 1E-10
-            num_sv = len([s for s in sig if abs(s) > tol])
-            coeffs = vt[num_sv:]
+            coeffs = polynomial_set.spanning_basis(dual_mat, nullspace=True)
         else:
             coeffs = numpy.eye(expansion_set.get_num_members(degree))
 
-        if vorder > order + 1:
-            # Impose C^vorder super-smoothness at interior vertices
-            # C^order automatically gives C^{order+1} at the interior vertex
+        # Impose C^vorder super-smoothness at interior vertices
+        # C^order automatically gives C^{order+dim-1} at the interior vertex
+        sorder = order + sd - 1
+        if vorder > sorder:
             verts = ref_el.get_vertices()
             points = [verts[i] for i in ref_el.get_interior_facets(0)]
             jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
-            for r in range(order+2, vorder+1):
+            for r in range(sorder+1, vorder+1):
                 dual_mat = numpy.dot(numpy.vstack(jumps[r].T), coeffs.T)
-                _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-                tol = sig[0] * 1E-10
-                num_sv = len([s for s in sig if abs(s) > tol])
-                coeffs = numpy.dot(vt[num_sv:], coeffs)
+                nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+                coeffs = numpy.dot(nsp, coeffs)
 
-        if shape != tuple():
+        if shape != ():
             m, n = coeffs.shape
-            coeffs = coeffs.reshape((m,) + (1,)*len(shape) + (n,))
-            coeffs = numpy.tile(coeffs, (1,) + shape + (1,))
+            ncomp = numpy.prod(shape)
+            coeffs = numpy.kron(coeffs, numpy.eye(ncomp))
+            coeffs = coeffs.reshape(m*ncomp, *shape, n)
 
-        super(CkPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
+        super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
 class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
@@ -499,9 +493,8 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
                 rows.append(numpy.tensordot(wn, jump, axes=(ax, ax)))
 
         if len(rows) > 0:
-            dual_mat = numpy.row_stack(rows)
-            _, sig, vt = numpy.linalg.svd(dual_mat, full_matrices=True)
-            num_sv = len([s for s in sig if abs(s) > 1.e-10])
-            coeffs = numpy.tensordot(vt[num_sv:], coeffs, axes=(1, 0))
+            dual_mat = numpy.vstack(rows)
+            nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+            coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
 
-        super(HDivSymPolynomialSet, self).__init__(ref_el, degree, degree, expansion_set, coeffs)
+        super().__init__(ref_el, degree, degree, expansion_set, coeffs)

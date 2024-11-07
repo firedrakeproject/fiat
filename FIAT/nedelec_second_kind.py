@@ -53,7 +53,7 @@ class NedelecSecondKindDual(DualSet):
         # Define degrees of freedom
         (dofs, ids) = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg)
         # Call init of super-class
-        super(NedelecSecondKindDual, self).__init__(dofs, cell, ids)
+        super().__init__(dofs, cell, ids)
 
     def generate_degrees_of_freedom(self, cell, degree, variant, interpolant_deg):
         "Generate dofs and geometry-to-dof maps (ids)."
@@ -206,4 +206,4 @@ class NedelecSecondKind(CiarletElement):
             variant, interpolant_deg = check_format_variant(variant, degree)
             dual = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg)
         formdegree = 1  # 1-form
-        super(NedelecSecondKind, self).__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")
+        super().__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")

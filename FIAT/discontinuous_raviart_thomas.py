@@ -49,7 +49,7 @@ class DRTDualSet(dual_set.DualSet):
         # cell dofs
         entity_ids[sd] = {0: list(range(len(nodes)))}
 
-        super(DRTDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class DiscontinuousRaviartThomas(finite_element.CiarletElement):
@@ -59,5 +59,4 @@ class DiscontinuousRaviartThomas(finite_element.CiarletElement):
 
         poly_set = RTSpace(ref_el, degree)
         dual = DRTDualSet(ref_el, degree)
-        super(DiscontinuousRaviartThomas, self).__init__(poly_set, dual, degree,
-                                                         mapping="contravariant piola")
+        super().__init__(poly_set, dual, degree, mapping="contravariant piola")

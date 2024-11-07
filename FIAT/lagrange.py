@@ -50,7 +50,7 @@ class LagrangeDualSet(dual_set.DualSet):
             pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
             nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts_cur)
             entity_ids[dim][entity] = list(range(cur, len(nodes)))
-        super(LagrangeDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class Lagrange(finite_element.CiarletElement):
@@ -86,4 +86,4 @@ class Lagrange(finite_element.CiarletElement):
             poly_variant = "bubble" if ref_el.is_macrocell() else None
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant=poly_variant)
         formdegree = 0  # 0-form
-        super(Lagrange, self).__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree)

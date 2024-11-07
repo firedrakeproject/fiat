@@ -29,8 +29,11 @@ import numpy
 from recursivenodes.nodes import _decode_family, _recursive
 
 from FIAT.orientation_utils import (
+    Orientation,
     make_cell_orientation_reflection_map_simplex,
-    make_cell_orientation_reflection_map_tensorproduct)
+    make_cell_orientation_reflection_map_tensorproduct,
+    make_entity_permutations_simplex,
+)
 
 POINT = 0
 LINE = 1
@@ -126,7 +129,7 @@ def linalg_subspace_intersection(A, B):
 class Cell(object):
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
-    vertices that make up edges, facecs, etc."""
+    vertices that make up edges, faces, etc."""
     def __init__(self, shape, vertices, topology):
         """The constructor takes a shape code, the physical vertices expressed
         as a list of tuples of numbers, and the topology of a cell.
@@ -157,31 +160,31 @@ class Cell(object):
                 # Sort for the sake of determinism and by UFC conventions
                 self.sub_entities[dim][e] = sorted(sub_entities)
 
+        # Build super-entity dictionary by inverting the sub-entity dictionary
+        self.super_entities = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
+        for dim0 in topology:
+            for e0 in topology[dim0]:
+                for dim1, e1 in self.sub_entities[dim0][e0]:
+                    self.super_entities[dim1][e1].append((dim0, e0))
+
         # Build connectivity dictionary for easier queries
         self.connectivity = {}
-        for dim0, sub_entities in self.sub_entities.items():
+        for dim0 in sorted(topology):
+            for dim1 in sorted(topology):
+                self.connectivity[(dim0, dim1)] = []
 
-            # Skip tensor product entities
-            # TODO: Can we do something better?
-            if isinstance(dim0, tuple):
-                continue
-
-            for entity, sub_sub_entities in sorted(sub_entities.items()):
-                for dim1 in range(dim0+1):
-                    d01_entities = filter(lambda x: x[0] == dim1, sub_sub_entities)
-                    d01_entities = tuple(x[1] for x in d01_entities)
-                    self.connectivity.setdefault((dim0, dim1), []).append(d01_entities)
+            for entity in sorted(topology[dim0]):
+                children = self.sub_entities[dim0][entity]
+                parents = self.super_entities[dim0][entity]
+                for dim1 in sorted(topology):
+                    neighbors = children if dim1 < dim0 else parents
+                    d01_entities = tuple(e for d, e in neighbors if d == dim1)
+                    self.connectivity[(dim0, dim1)].append(d01_entities)
 
     def _key(self):
         """Hashable object key data (excluding type)."""
         # Default: only type matters
         return None
-
-    def __eq__(self, other):
-        return type(self) is type(other) and self._key() == other._key()
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
 
     def __hash__(self):
         return hash((type(self), self._key()))
@@ -262,27 +265,108 @@ class Cell(object):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        raise NotImplementedError("Should be implemented in a subclass.")
+
     def is_simplex(self):
         return False
 
     def is_macrocell(self):
         return False
 
+    def get_interior_facets(self, dim):
+        """Return the interior facets this cell is a split and () otherwise."""
+        return ()
+
     def get_parent(self):
         """Return the parent cell if this cell is a split and None otherwise."""
         return None
 
+    def get_parent_complex(self):
+        """Return the parent complex if this cell is a split and None otherwise."""
+        return None
+
+    def is_parent(self, other, strict=False):
+        """Return whether this cell is the parent of the other cell."""
+        parent = other
+        if strict:
+            parent = parent.get_parent_complex()
+        while parent is not None:
+            if self == parent:
+                return True
+            parent = parent.get_parent_complex()
+        return False
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        A, B = self.get_vertices(), other.get_vertices()
+        if not (len(A) == len(B) and numpy.allclose(A, B)):
+            return False
+        atop = self.get_topology()
+        btop = other.get_topology()
+        for dim in atop:
+            if set(atop[dim].values()) != set(btop[dim].values()):
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     def __gt__(self, other):
-        return self.get_parent() == other
+        return other.is_parent(self, strict=True)
 
     def __lt__(self, other):
-        return self == other.get_parent()
+        return self.is_parent(other, strict=True)
 
     def __ge__(self, other):
-        return self > other or self == other
+        return other.is_parent(self, strict=False)
 
     def __le__(self, other):
-        return self < other or self == other
+        return self.is_parent(other, strict=False)
 
 
 class SimplicialComplex(Cell):
@@ -297,7 +381,7 @@ class SimplicialComplex(Cell):
             for entity in topology[dim]:
                 assert len(topology[dim][entity]) == dim + 1
 
-        super(SimplicialComplex, self).__init__(shape, vertices, topology)
+        super().__init__(shape, vertices, topology)
 
     def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
@@ -386,7 +470,7 @@ class SimplicialComplex(Cell):
         of dimension dim.  Returns a (possibly empty) list.
         These tangents are normalized to have unit length."""
         ts = self.compute_tangents(dim, i)
-        ts /= numpy.linalg.norm(ts, axis=0)[None, :]
+        ts /= numpy.linalg.norm(ts, axis=1)[:, None]
         return ts
 
     def compute_edge_tangent(self, edge_i):
@@ -511,26 +595,27 @@ class SimplicialComplex(Cell):
         return self.get_spatial_dimension()
 
     def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
-        """Returns the barycentric coordinates of a list of points on an
-        entity."""
+        """Returns the barycentric coordinates of a list of points on the complex."""
         if len(points) == 0:
             return points
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         entity_dim, entity_id = entity
         top = self.get_topology()
-        verts = self.get_vertices_of_subcomplex(top[entity_dim][entity_id])
-        if entity_dim == self.get_spatial_dimension():
-            ref_verts = numpy.eye(entity_dim + 1)
-            A, b = make_affine_mapping(verts, ref_verts)
-        else:
-            v = numpy.transpose(verts)
-            v = v[:, 1:] - v[:, :1]
-            A = numpy.linalg.solve(numpy.dot(v.T, v), v.T)
-            b = -numpy.dot(A, verts[0])
-            A = numpy.vstack((-numpy.sum(A, axis=0), A))
-            b = numpy.hstack((1 - numpy.sum(b, axis=0), b))
+        sd = self.get_spatial_dimension()
 
+        # get a subcell containing the entity and the restriction indices of the entity
+        indices = slice(None)
+        subcomplex = top[entity_dim][entity_id]
+        if entity_dim != sd:
+            cell_id = self.connectivity[(entity_dim, sd)][0][0]
+            indices = [i for i, v in enumerate(top[sd][cell_id]) if v in subcomplex]
+            subcomplex = top[sd][cell_id]
+
+        cell_verts = self.get_vertices_of_subcomplex(subcomplex)
+        ref_verts = numpy.eye(sd + 1)
+        A, b = make_affine_mapping(cell_verts, ref_verts)
+        A, b = A[indices], b[indices]
         if rescale:
             # rescale barycentric coordinates by the height wrt. to the facet
             h = 1 / numpy.linalg.norm(A, axis=1)
@@ -538,6 +623,11 @@ class SimplicialComplex(Cell):
             A *= h[:, None]
         out = numpy.dot(points, A.T)
         return numpy.add(out, b, out=out)
+
+    def compute_bubble(self, points, entity=None):
+        """Returns the lowest-order bubble on an entity evaluated at the given
+        points on the entity."""
+        return numpy.prod(self.compute_barycentric_coordinates(points, entity), axis=1)
 
     def distance_to_point_l1(self, points, entity=None, rescale=False):
         # noqa: D301
@@ -691,6 +781,58 @@ class SimplicialComplex(Cell):
         """
         return self.distance_to_point_l1(point, entity=entity) <= epsilon
 
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        return 0
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        if axis != 0:
+            raise ValueError(f"axis ({axis}) != 0")
+        return o
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        return numpy.diag((1, )).astype(int).reshape((1, 1, 1))
+
 
 class Simplex(SimplicialComplex):
     r"""Abstract class for a reference simplex.
@@ -784,7 +926,7 @@ class Point(Simplex):
     def __init__(self):
         verts = ((),)
         topology = {0: {0: (0,)}}
-        super(Point, self).__init__(POINT, verts, topology)
+        super().__init__(POINT, verts, topology)
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -804,7 +946,7 @@ class DefaultLine(DefaultSimplex):
         edges = {0: (0, 1)}
         topology = {0: {0: (0,), 1: (1,)},
                     1: edges}
-        super(DefaultLine, self).__init__(LINE, verts, topology)
+        super().__init__(LINE, verts, topology)
 
 
 class UFCInterval(UFCSimplex):
@@ -815,7 +957,7 @@ class UFCInterval(UFCSimplex):
         edges = {0: (0, 1)}
         topology = {0: {0: (0,), 1: (1,)},
                     1: edges}
-        super(UFCInterval, self).__init__(LINE, verts, topology)
+        super().__init__(LINE, verts, topology)
 
 
 class DefaultTriangle(DefaultSimplex):
@@ -830,7 +972,7 @@ class DefaultTriangle(DefaultSimplex):
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
                     1: edges, 2: faces}
-        super(DefaultTriangle, self).__init__(TRIANGLE, verts, topology)
+        super().__init__(TRIANGLE, verts, topology)
 
 
 class UFCTriangle(UFCSimplex):
@@ -843,7 +985,7 @@ class UFCTriangle(UFCSimplex):
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
                     1: edges, 2: faces}
-        super(UFCTriangle, self).__init__(TRIANGLE, verts, topology)
+        super().__init__(TRIANGLE, verts, topology)
 
     def compute_normal(self, i):
         "UFC consistent normal"
@@ -863,7 +1005,7 @@ class IntrepidTriangle(Simplex):
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
                     1: edges, 2: faces}
-        super(IntrepidTriangle, self).__init__(TRIANGLE, verts, topology)
+        super().__init__(TRIANGLE, verts, topology)
 
     def get_facet_element(self):
         # I think the UFC interval is equivalent to what the
@@ -894,7 +1036,7 @@ class DefaultTetrahedron(DefaultSimplex):
                  3: (0, 1, 2)}
         tets = {0: (0, 1, 2, 3)}
         topology = {0: vs, 1: edges, 2: faces, 3: tets}
-        super(DefaultTetrahedron, self).__init__(TETRAHEDRON, verts, topology)
+        super().__init__(TETRAHEDRON, verts, topology)
 
 
 class IntrepidTetrahedron(Simplex):
@@ -919,7 +1061,7 @@ class IntrepidTetrahedron(Simplex):
                  3: (0, 2, 1)}
         tets = {0: (0, 1, 2, 3)}
         topology = {0: vs, 1: edges, 2: faces, 3: tets}
-        super(IntrepidTetrahedron, self).__init__(TETRAHEDRON, verts, topology)
+        super().__init__(TETRAHEDRON, verts, topology)
 
     def get_facet_element(self):
         return IntrepidTriangle()
@@ -947,7 +1089,7 @@ class UFCTetrahedron(UFCSimplex):
                  3: (0, 1, 2)}
         tets = {0: (0, 1, 2, 3)}
         topology = {0: vs, 1: edges, 2: faces, 3: tets}
-        super(UFCTetrahedron, self).__init__(TETRAHEDRON, verts, topology)
+        super().__init__(TETRAHEDRON, verts, topology)
 
     def compute_normal(self, i):
         "UFC consistent normals."
@@ -982,7 +1124,7 @@ class TensorProductCell(Cell):
             topology[dim] = dict(enumerate(topology[dim][key]
                                            for key in sorted(topology[dim])))
 
-        super(TensorProductCell, self).__init__(TENSORPRODUCT, vertices, topology)
+        super().__init__(TENSORPRODUCT, vertices, topology)
         self.cells = tuple(cells)
 
     def _key(self):
@@ -1128,6 +1270,75 @@ class TensorProductCell(Cell):
     def __le__(self, other):
         return self.compare(operator.le, other)
 
+    def extract_extrinsic_orientation(self, o):
+        """Extract extrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation.
+
+        Returns
+        -------
+        Orientation
+            Extrinsic orientation.
+
+        Notes
+        -----
+        The difinition of orientations used here must be consistent with
+        that used in make_entity_permutations_tensorproduct.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        dim = len(self.cells)
+        size_io = 2  # Number of possible intrinsic orientations along each axis.
+        return o // size_io**dim
+
+    def extract_intrinsic_orientation(self, o, axis):
+        """Extract intrinsic orientation.
+
+        Parameters
+        ----------
+        o : Orientation
+            Total orientation. ``//`` and ``%`` must be overloaded in type(o).
+        axis : int
+            Reference cell axis for which intrinsic orientation is computed.
+
+        Returns
+        -------
+        Orientation
+            Intrinsic orientation.
+
+        Notes
+        -----
+        Must be consistent with make_entity_permutations_tensorproduct.
+
+        """
+        if not isinstance(o, Orientation):
+            raise TypeError(f"Expecting an instance of Orientation : got {o}")
+        dim = len(self.cells)
+        if axis >= dim:
+            raise ValueError(f"Must give 0 <= axis < {dim} : got {axis}")
+        size_io = 2  # Number of possible intrinsic orientations along each axis.
+        return o % size_io**dim // size_io**(dim - 1 - axis) % size_io
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        dim = len(self.cells)
+        a = numpy.zeros((factorial(dim), dim, dim), dtype=int)
+        ai = numpy.array(list(make_entity_permutations_simplex(dim - 1, 2).values()), dtype=int).reshape((factorial(dim), dim, 1))
+        numpy.put_along_axis(a, ai, 1, axis=2)
+        return a
+
 
 class UFCQuadrilateral(Cell):
     r"""This is the reference quadrilateral with vertices
@@ -1181,7 +1392,7 @@ class UFCQuadrilateral(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super(UFCQuadrilateral, self).__init__(QUADRILATERAL, verts, topology)
+        super().__init__(QUADRILATERAL, verts, topology)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
@@ -1284,7 +1495,7 @@ class UFCHexahedron(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super(UFCHexahedron, self).__init__(HEXAHEDRON, verts, topology)
+        super().__init__(HEXAHEDRON, verts, topology)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)

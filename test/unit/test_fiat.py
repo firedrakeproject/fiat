@@ -42,9 +42,17 @@ from FIAT.restricted import RestrictedElement                   # noqa: F401
 from FIAT.tensor_product import TensorProductElement            # noqa: F401
 from FIAT.tensor_product import FlattenedDimensions             # noqa: F401
 from FIAT.hdivcurl import Hdiv, Hcurl                           # noqa: F401
+from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
+from FIAT.hct import HsiehCloughTocher                          # noqa: F401
+from FIAT.alfeld_sorokina import AlfeldSorokina                 # noqa: F401
+from FIAT.arnold_qin import ArnoldQin                           # noqa: F401
+from FIAT.christiansen_hu import ChristiansenHu                 # noqa: F401
+from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1          # noqa: F401
+from FIAT.guzman_neilan import GuzmanNeilanSecondKindH1         # noqa: F401
+from FIAT.johnson_mercier import JohnsonMercier                 # noqa: F401
 from FIAT.bubble import Bubble
 from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
@@ -298,6 +306,30 @@ elements = [
     "CubicHermite(T)",
     "CubicHermite(S)",
     "Morley(T)",
+    "BernardiRaugel(T)",
+    "BernardiRaugel(S)",
+
+    # Macroelements
+    "Lagrange(T, 1, 'iso')",
+    "Lagrange(T, 1, 'alfeld')",
+    "Lagrange(T, 2, 'alfeld')",
+    "DiscontinuousLagrange(T, 1, 'alfeld')",
+    "HsiehCloughTocher(T)",
+    "JohnsonMercier(T)",
+    "JohnsonMercier(S)",
+    "AlfeldSorokina(T)",
+    "AlfeldSorokina(S)",
+    "ArnoldQin(T, reduced=False)",
+    "ArnoldQin(T, reduced=True)",
+    "ChristiansenHu(T)",
+    "ChristiansenHu(S)",
+    "GuzmanNeilanFirstKindH1(T, 1)",
+    "GuzmanNeilanFirstKindH1(S, 1)",
+    "GuzmanNeilanFirstKindH1(S, 2)",
+    "GuzmanNeilanSecondKindH1(T, 1)",
+    "GuzmanNeilanSecondKindH1(S, 1)",
+    "GuzmanNeilanSecondKindH1(S, 2)",
+    "NodalEnrichedElement(GuzmanNeilanFirstKindH1(S, 0), AlfeldSorokina(S))",
 
     # MixedElement made of nodal elements should be nodal, but its API
     # is currently just broken.
@@ -351,7 +383,7 @@ def test_nodality(element):
     # Fetch primal and dual basis
     poly_set = element.get_nodal_basis()
     dual_set = element.get_dual_set()
-    assert poly_set.get_reference_element() == dual_set.get_reference_element()
+    assert poly_set.get_reference_element() >= dual_set.get_reference_element()
 
     # Get coeffs of primal and dual bases w.r.t. expansion set
     coeffs_poly = poly_set.get_coeffs()

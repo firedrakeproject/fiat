@@ -140,7 +140,7 @@ class FDMDual(dual_set.DualSet):
             entity_permutations = {}
             entity_permutations[0] = {0: {0: []}, 1: {0: []}}
             entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree + 1)}
-        super(FDMDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
@@ -171,7 +171,7 @@ class FDMFiniteElement(finite_element.CiarletElement):
         else:
             lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
             poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
-        super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
+        super().__init__(poly_set, dual, degree, self._formdegree)
 
 
 class FDMLagrange(FDMFiniteElement):

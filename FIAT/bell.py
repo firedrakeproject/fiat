@@ -53,7 +53,7 @@ class BellDualSet(dual_set.DualSet):
         from FIAT.jacobi import eval_jacobi
         rline = ufc_simplex(1)
         q1d = create_quadrature(rline, 8)
-        q1dpts = q1d.get_points()
+        q1dpts = q1d.get_points()[:, 0]
         leg4_at_qpts = eval_jacobi(0, 0, 4, 2.0*q1dpts - 1)
 
         imond = functional.IntegralMomentOfNormalDerivative
@@ -64,7 +64,7 @@ class BellDualSet(dual_set.DualSet):
 
         entity_ids[2] = {0: []}
 
-        super(BellDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Bell(finite_element.CiarletElement):
@@ -73,4 +73,4 @@ class Bell(finite_element.CiarletElement):
     def __init__(self, ref_el):
         poly_set = polynomial_set.ONPolynomialSet(ref_el, 5)
         dual = BellDualSet(ref_el)
-        super(Bell, self).__init__(poly_set, dual, 5)
+        super().__init__(poly_set, dual, 5)

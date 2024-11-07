@@ -25,7 +25,7 @@ import numpy
 
 
 class ArnoldWintherNCDual(DualSet):
-    def __init__(self, cell, degree):
+    def __init__(self, cell, degree=2):
         if not degree == 2:
             raise ValueError("Nonconforming Arnold-Winther elements are"
                              "only defined for degree 2.")
@@ -70,24 +70,23 @@ class ArnoldWintherNCDual(DualSet):
             dof_ids[1][entity_id].append(dof_cur)
             dof_cur += 1
 
-        super(ArnoldWintherNCDual, self).__init__(dofs, cell, dof_ids)
+        super().__init__(dofs, cell, dof_ids)
 
 
 class ArnoldWintherNC(CiarletElement):
     """The definition of the nonconforming Arnold-Winther element.
     """
-    def __init__(self, cell, degree):
+    def __init__(self, cell, degree=2):
         assert degree == 2, "Only defined for degree 2"
         Ps = ONSymTensorPolynomialSet(cell, degree)
         Ls = ArnoldWintherNCDual(cell, degree)
         mapping = "double contravariant piola"
 
-        super(ArnoldWintherNC, self).__init__(Ps, Ls, degree,
-                                              mapping=mapping)
+        super().__init__(Ps, Ls, degree, mapping=mapping)
 
 
 class ArnoldWintherDual(DualSet):
-    def __init__(self, cell, degree):
+    def __init__(self, cell, degree=3):
         if not degree == 3:
             raise ValueError("Arnold-Winther elements are"
                              "only defined for degree 3.")
@@ -152,15 +151,15 @@ class ArnoldWintherDual(DualSet):
 
         dof_ids[2][0] += list(range(dof_cur, dof_cur+6))
 
-        super(ArnoldWintherDual, self).__init__(dofs, cell, dof_ids)
+        super().__init__(dofs, cell, dof_ids)
 
 
 class ArnoldWinther(CiarletElement):
     """The definition of the conforming Arnold-Winther element.
     """
-    def __init__(self, cell, degree):
+    def __init__(self, cell, degree=3):
         assert degree == 3, "Only defined for degree 3"
         Ps = ONSymTensorPolynomialSet(cell, degree)
         Ls = ArnoldWintherDual(cell, degree)
         mapping = "double contravariant piola"
-        super(ArnoldWinther, self).__init__(Ps, Ls, degree, mapping=mapping)
+        super().__init__(Ps, Ls, degree, mapping=mapping)

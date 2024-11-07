@@ -169,7 +169,7 @@ class BrokenLagrangeDualSet(dual_set.DualSet):
                 entity_permutations[dim][entity] = perms
         entity_ids[dim][0] = list(range(len(nodes)))
 
-        super(BrokenLagrangeDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class DiscontinuousLagrangeDualSet(dual_set.DualSet):
@@ -196,7 +196,7 @@ class DiscontinuousLagrangeDualSet(dual_set.DualSet):
                                degree, variant=point_variant)
             nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts)
             entity_ids[dim][entity] = list(range(cur, len(nodes)))
-        super(DiscontinuousLagrangeDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class DiscontinuousLagrange(finite_element.CiarletElement):
@@ -220,7 +220,7 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
             if splitting is None and not ref_el.is_macrocell():
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0.P0(ref_el)
-        return super(DiscontinuousLagrange, cls).__new__(cls)
+        return super().__new__(cls)
 
     def __init__(self, ref_el, degree, variant="equispaced"):
         splitting, point_variant = parse_lagrange_variant(variant, discontinuous=True)
@@ -238,4 +238,4 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
         else:
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
-        super(DiscontinuousLagrange, self).__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree)

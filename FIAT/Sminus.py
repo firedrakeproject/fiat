@@ -497,7 +497,7 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
             self.basis = {(0, 0): Array(Sminus_list)}
         else:
             self.basis = {(0, 0, 0): Array(Sminus_list)}
-        super(TrimmedSerendipityEdge, self).__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
+        super().__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
 class TrimmedSerendipityFace(TrimmedSerendipity):
@@ -526,4 +526,4 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
         Sminus_list = EL + FL
         Sminus_list = [[-a[1], a[0]] for a in Sminus_list]
         self.basis = {(0, 0): Array(Sminus_list)}
-        super(TrimmedSerendipityFace, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
+        super().__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")

@@ -76,9 +76,9 @@ class BrezziDouglasMariniCube(FiniteElement):
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
         # Set up FiniteElement
-        super(BrezziDouglasMariniCube, self).__init__(ref_el=ref_el, dual=None,
-                                                      order=degree, formdegree=1,
-                                                      mapping=mapping)
+        super().__init__(ref_el=ref_el, dual=None,
+                         order=degree, formdegree=1,
+                         mapping=mapping)
 
         # Store unflattened entity ID dictionaries
         topology = ref_el.get_topology()
@@ -272,8 +272,7 @@ class BrezziDouglasMariniCubeEdge(BrezziDouglasMariniCube):
         bdmce_list = construct_bdmce_basis(ref_el, degree)
         self.basis = {(0, 0): Array(bdmce_list)}
 
-        super(BrezziDouglasMariniCubeEdge, self).__init__(ref_el=ref_el, degree=degree,
-                                                          mapping="covariant piola")
+        super().__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
 class BrezziDouglasMariniCubeFace(BrezziDouglasMariniCube):
@@ -292,8 +291,7 @@ class BrezziDouglasMariniCubeFace(BrezziDouglasMariniCube):
         bdmcf_list = [[-a[1], a[0]] for a in bdmce_list]
         self.basis = {(0, 0): Array(bdmcf_list)}
 
-        super(BrezziDouglasMariniCubeFace, self).__init__(ref_el=ref_el, degree=degree,
-                                                          mapping="contravariant piola")
+        super().__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
 
 
 def construct_bdmce_basis(ref_el, degree):

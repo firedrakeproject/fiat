@@ -4,6 +4,27 @@ from collections.abc import Sequence
 import numpy as np
 
 
+class Orientation(object):
+    """Base class representing unsigned integer orientations.
+
+    Orientations represented by this class are to be consistent with those used in
+    `make_entity_permutations_simplex` and `make_entity_permutations_tensorproduct`.
+
+    """
+
+    def __floordiv__(self, other):
+        raise NotImplementedError("Subclass must implement __floordiv__")
+
+    def __rfloordiv__(self, other):
+        raise NotImplementedError("Subclass must implement __rfloordiv__")
+
+    def __mod__(self, other):
+        raise NotImplementedError("Subclass must implement __mod__")
+
+    def __rmod__(self, other):
+        raise NotImplementedError("Subclass must implement __rmod__")
+
+
 def make_entity_permutations_simplex(dim, npoints):
     r"""Make orientation-permutation map for the given
     simplex dimension, dim, and the number of points along

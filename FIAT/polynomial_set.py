@@ -136,8 +136,7 @@ class ONPolynomialSet(PolynomialSet):
                     coeffs[cur_idx] = 1.0
                     cur_bf += 1
 
-        super(ONPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                              expansion_set, coeffs)
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
 
 def project(f, U, Q):
@@ -163,28 +162,25 @@ def form_matrix_product(mats, alpha):
     return result
 
 
+def spanning_basis(A, nullspace=False, rtol=1e-10):
+    """Construct a basis that spans the rows of A via SVD.
+    """
+    Aflat = A.reshape(A.shape[0], -1)
+    u, sig, vt = numpy.linalg.svd(Aflat, full_matrices=True)
+    atol = rtol * (sig[0] + 1)
+    num_sv = len([s for s in sig if abs(s) > atol])
+    basis = vt[num_sv:] if nullspace else vt[:num_sv]
+    return numpy.reshape(basis, (-1, *A.shape[1:]))
+
+
 def polynomial_set_union_normalized(A, B):
     """Given polynomial sets A and B, constructs a new polynomial set
     whose span is the same as that of span(A) union span(B).  It may
     not contain any of the same members of the set, as we construct a
     span via SVD.
     """
-    new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
-    func_shape = new_coeffs.shape[1:]
-    if len(func_shape) == 1:
-        (u, sig, vt) = numpy.linalg.svd(new_coeffs)
-        num_sv = len([s for s in sig if abs(s) > 1.e-10])
-        coeffs = vt[:num_sv]
-    else:
-        new_shape0 = new_coeffs.shape[0]
-        new_shape1 = numpy.prod(func_shape)
-        newshape = (new_shape0, new_shape1)
-        nc = numpy.reshape(new_coeffs, newshape)
-        (u, sig, vt) = numpy.linalg.svd(nc, 1)
-        num_sv = len([s for s in sig if abs(s) > 1.e-10])
-
-        coeffs = numpy.reshape(vt[:num_sv], (num_sv,) + func_shape)
-
+    new_coeffs = numpy.concatenate((A.coeffs, B.coeffs), axis=0)
+    coeffs = spanning_basis(new_coeffs)
     return PolynomialSet(A.get_reference_element(),
                          A.get_degree(),
                          A.get_embedded_degree(),
@@ -224,14 +220,13 @@ class ONSymTensorPolynomialSet(PolynomialSet):
                     coeffs[cur_bf, j, i, exp_bf] = 1.0
                     cur_bf += 1
 
-        super(ONSymTensorPolynomialSet, self).__init__(ref_el, degree, embedded_degree,
-                                                       expansion_set, coeffs)
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
 
-def make_bubbles(ref_el, degree, codim=0, shape=()):
+def make_bubbles(ref_el, degree, codim=0, shape=(), scale="L2 piola"):
     """Construct a polynomial set with codim bubbles up to the given degree.
     """
-    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale="L2 piola", variant="bubble")
+    poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale=scale, variant="bubble")
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
     sd = ref_el.get_spatial_dimension()
     dim = sd - codim

@@ -43,7 +43,7 @@ class BernsteinDualSet(DualSet):
             # Leave nodes unimplemented for now
             nodes.append(None)
 
-        super(BernsteinDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Bernstein(FiniteElement):
@@ -52,7 +52,7 @@ class Bernstein(FiniteElement):
     def __init__(self, ref_el, degree):
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
-        super(Bernstein, self).__init__(ref_el, dual, degree, k)
+        super().__init__(ref_el, dual, degree, k)
 
     def degree(self):
         """The degree of the polynomial space."""
