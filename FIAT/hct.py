@@ -41,20 +41,19 @@ class HCTDualSet(dual_set.DualSet):
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
         k = 2 if reduced else degree - 3
-        rline = ufc_simplex(1)
-        Q = create_quadrature(rline, degree-1+k)
+        facet = ufc_simplex(1)
+        Q = create_quadrature(facet, degree-1+k)
         qpts = Q.get_points()
+        xref = 2.0 * qpts - 1.0
         if reduced:
-            x, = qpts.T
-            f_at_qpts = eval_jacobi(0, 0, k, 2.0*x - 1)
+            f_at_qpts = eval_jacobi(0, 0, k, xref[:, 0])
             for e in sorted(top[1]):
                 cur = len(nodes)
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
                 entity_ids[1][e].extend(range(cur, len(nodes)))
         else:
-            x = 2.0*qpts - 1
-            phis = eval_jacobi_batch(1, 1, k, x)
-            dphis = eval_jacobi_deriv_batch(1, 1, k, x)
+            phis = eval_jacobi_batch(1, 1, k, xref)
+            dphis = eval_jacobi_deriv_batch(1, 1, k, xref)
             for e in sorted(top[1]):
                 Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
                 scale = 2 / Q_mapped.jacobian_determinant()
@@ -73,7 +72,7 @@ class HCTDualSet(dual_set.DualSet):
                 nodes.extend(IntegralMoment(ref_el, Q, phi * scale) for phi in phis)
                 entity_ids[sd][0] = list(range(cur, len(nodes)))
 
-        super(HCTDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class HsiehCloughTocher(finite_element.CiarletElement):
@@ -85,4 +84,5 @@ class HsiehCloughTocher(finite_element.CiarletElement):
         ref_complex = macro.AlfeldSplit(ref_el)
         dual = HCTDualSet(ref_complex, degree, reduced=reduced)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
-        super(HsiehCloughTocher, self).__init__(poly_set, dual, degree)
+        formdegree = 0
+        super().__init__(poly_set, dual, degree, formdegree=formdegree)

@@ -52,7 +52,7 @@ class NedelecSecondKindDual(DualSet):
         # Define degrees of freedom
         (dofs, ids) = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg)
         # Call init of super-class
-        super(NedelecSecondKindDual, self).__init__(dofs, cell, ids)
+        super().__init__(dofs, cell, ids)
 
     def generate_degrees_of_freedom(self, cell, degree, variant, interpolant_deg):
         "Generate dofs and geometry-to-dof maps (ids)."
@@ -214,4 +214,4 @@ class NedelecSecondKind(CiarletElement):
         mapping = "covariant piola"
 
         # Call init of super-class
-        super(NedelecSecondKind, self).__init__(Ps, Ls, degree, formdegree, mapping=mapping)
+        super().__init__(Ps, Ls, degree, formdegree, mapping=mapping)

@@ -37,8 +37,7 @@ class QuadraticPowellSabin6DualSet(dual_set.DualSet):
             nodes.extend(PointDerivative(ref_el, pt, alpha) for alpha in alphas)
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        super(QuadraticPowellSabin6DualSet, self).__init__(
-            nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class QuadraticPowellSabin6(finite_element.CiarletElement):
@@ -52,7 +51,7 @@ class QuadraticPowellSabin6(finite_element.CiarletElement):
         dual = QuadraticPowellSabin6DualSet(ref_complex, degree)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1)
 
-        super(QuadraticPowellSabin6, self).__init__(poly_set, dual, degree)
+        super().__init__(poly_set, dual, degree)
 
 
 class QuadraticPowellSabin12DualSet(dual_set.DualSet):
@@ -90,8 +89,7 @@ class QuadraticPowellSabin12DualSet(dual_set.DualSet):
             nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
-        super(QuadraticPowellSabin12DualSet, self).__init__(
-            nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class QuadraticPowellSabin12(finite_element.CiarletElement):
@@ -105,4 +103,4 @@ class QuadraticPowellSabin12(finite_element.CiarletElement):
         dual = QuadraticPowellSabin12DualSet(ref_complex, degree)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1)
 
-        super(QuadraticPowellSabin12, self).__init__(poly_set, dual, degree)
+        super().__init__(poly_set, dual, degree)

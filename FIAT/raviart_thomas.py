@@ -15,7 +15,7 @@ from FIAT.quadrature import FacetQuadratureRule
 
 
 def RTSpace(ref_el, degree):
-    """Constructs a basis for the the Raviart-Thomas space
+    """Constructs a basis for the Raviart-Thomas space
     (P_{degree-1})^d + P_{degree-1} x"""
     sd = ref_el.get_spatial_dimension()
 
@@ -116,7 +116,7 @@ class RTDualSet(dual_set.DualSet):
                              for pt in pts)
                 entity_ids[sd][0] = list(range(cur, len(nodes)))
 
-        super(RTDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class RaviartThomas(finite_element.CiarletElement):
@@ -146,5 +146,4 @@ class RaviartThomas(finite_element.CiarletElement):
         poly_set = RTSpace(ref_el, degree)
         dual = RTDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
-        super(RaviartThomas, self).__init__(poly_set, dual, degree, formdegree,
-                                            mapping="contravariant piola")
+        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

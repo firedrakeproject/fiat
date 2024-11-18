@@ -2,7 +2,7 @@ import math
 import numpy
 import pytest
 from FIAT import DiscontinuousLagrange, Lagrange, Legendre, P0
-from FIAT.macro import AlfeldSplit, IsoSplit, CkPolynomialSet
+from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
@@ -10,9 +10,9 @@ from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
 from FIAT.barycentric_interpolation import get_lagrange_points
 
 
-@pytest.fixture(params=("I", "T", "S"))
+@pytest.fixture(params=(1, 2, 3), ids=("I", "T", "S"))
 def cell(request):
-    dim = {"I": 1, "T": 2, "S": 3}[request.param]
+    dim = request.param
     return ufc_simplex(dim)
 
 
@@ -43,7 +43,7 @@ def test_split_make_points(split, cell, degree, variant):
         for entity in top[i]:
             pts_entity = split_cell.make_points(i, entity, degree, variant=variant)
             mapping = split_cell.get_entity_transform(i, entity)
-            mapped_pts = list(map(mapping, pts_ref))
+            mapped_pts = mapping(pts_ref)
             assert numpy.allclose(mapped_pts, pts_entity)
 
 
@@ -127,6 +127,21 @@ def test_macro_lagrange(variant, degree, split, cell):
     U = poly_set.get_expansion_set()
     V = U.tabulate(degree, pts).T
     assert numpy.allclose(fe.V, V)
+
+
+def test_powell_sabin(cell):
+    dim = cell.get_spatial_dimension()
+    A = AlfeldSplit(cell)
+    assert A > cell
+
+    PS = PowellSabinSplit(cell, dim)
+    assert PS == A
+
+    for split_dim in range(1, dim):
+        PS = PowellSabinSplit(cell, split_dim)
+        assert PS > A
+        assert PS > cell
+        assert len(PS.get_topology()[dim]) == math.factorial(dim+1) // math.factorial(split_dim)
 
 
 def make_mass_matrix(fe, order=0):
@@ -341,6 +356,37 @@ def test_Ck_basis(cell, order, degree, variant):
         Uvals = U._tabulate_on_cell(degree, verts, 0, cell=cell)[(0,)*sd]
         local_phis = numpy.dot(coeffs[:, cell_node_map[cell]], Uvals)
         assert numpy.allclose(local_phis, phis[:, ipts])
+
+
+def test_distance_to_point_l1(cell):
+    A = AlfeldSplit(cell)
+    dim = A.get_spatial_dimension()
+    top = A.get_topology()
+    p0, = cell.make_points(dim, 0, dim+1)
+
+    # construct one point in front of each facet
+    pts = []
+    expected = []
+    parent_top = cell.get_topology()
+    for i in parent_top[dim-1]:
+        Fi, = numpy.asarray(cell.make_points(dim-1, i, dim))
+        n = cell.compute_normal(i)
+        n *= numpy.dot(n, Fi - p0)
+        n /= numpy.linalg.norm(n)
+        d = 0.222 + i/10
+        pts.append(Fi + d * n)
+        expected.append(d)
+
+    # the computed L1 distance agrees with the L2 distance for points in front of facets
+    parent_distance = cell.distance_to_point_l1(pts, rescale=True)
+    assert numpy.allclose(parent_distance, expected)
+
+    # assert that the subcell measures the same distance as the parent
+    for i in top[dim]:
+        subcell_distance = A.distance_to_point_l1(pts, entity=(dim, i), rescale=True)
+        assert numpy.isclose(subcell_distance[i], expected[i])
+        assert all(subcell_distance[:i] > expected[:i])
+        assert all(subcell_distance[i+1:] > expected[i+1:])
 
 
 @pytest.mark.parametrize("element", (DiscontinuousLagrange, Lagrange))

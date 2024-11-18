@@ -18,13 +18,17 @@ tarball = None
 if 'dev' not in version:
     tarball = url + "downloads/fenics-fiat-%s.tar.gz" % version
 
-setup(name="fenics-fiat",
-      description="FInite element Automatic Tabulator",
-      version=version,
-      author="Robert C. Kirby et al.",
-      author_email="fenics-dev@googlegroups.com",
-      url=url,
-      download_url=tarball,
-      license="LGPL v3 or later",
-      packages=["FIAT"],
-      install_requires=["numpy", "recursivenodes", "scipy", "sympy"])
+setup(
+    name="fenics-fiat",
+    description="FInite element Automatic Tabulator",
+    version=version,
+    author="Robert C. Kirby et al.",
+    author_email="fenics-dev@googlegroups.com",
+    url=url,
+    download_url=tarball,
+    license="LGPL v3 or later",
+    packages=["FIAT"],
+    install_requires=[
+        "setuptools", "numpy", "recursivenodes", "scipy", "sympy"
+    ]
+)

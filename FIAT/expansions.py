@@ -242,27 +242,12 @@ def xi_tetrahedron(eta):
     return xi1, xi2, xi3
 
 
-def apply_mapping(A, b, pts, transpose=False):
-    """Apply an affine mapping to a column-stacked array of points."""
-    if len(pts) == 0:
-        return pts
-    if transpose:
-        Ax = numpy.dot(pts, A.T)
-        for _ in Ax.shape[:-1]:
-            b = b[None, ...]
-    else:
-        Ax = numpy.dot(A, pts)
-        for _ in Ax.shape[1:]:
-            b = b[..., None]
-    return Ax + b
-
-
 class ExpansionSet(object):
     def __new__(cls, *args, **kwargs):
         """Returns an ExpansionSet instance appropriate for the given
         reference element."""
         if cls is not ExpansionSet:
-            return super(ExpansionSet, cls).__new__(cls)
+            return super().__new__(cls)
         try:
             ref_el = args[0]
             expansion_set = {
@@ -322,7 +307,7 @@ class ExpansionSet(object):
         from FIAT.polynomial_set import mis
         lorder = min(order, self.recurrence_order)
         A, b = self.affine_mappings[cell]
-        ref_pts = apply_mapping(A, b, numpy.transpose(pts))
+        ref_pts = numpy.add(numpy.dot(pts, A.T), b).T
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
 
@@ -411,7 +396,7 @@ class ExpansionSet(object):
         """
         sd = self.ref_el.get_spatial_dimension()
         transform = self.ref_el.get_entity_transform(sd-1, facet)
-        pts = numpy.array(list(map(transform, ref_pts)))
+        pts = transform(ref_pts)
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
         cell_node_map = self.get_cell_node_map(n)
 
@@ -527,13 +512,18 @@ class ExpansionSet(object):
             data.append(vr.transpose((r, r+1) + tuple(range(r))))
         return data
 
+    def __eq__(self, other):
+        return (type(self) is type(other) and
+                self.ref_el == other.ref_el and
+                self.continuity == other.continuity)
+
 
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 0:
             raise ValueError("Must have a point")
-        super(PointExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a dict of tabulations such that
@@ -547,17 +537,17 @@ class LineExpansionSet(ExpansionSet):
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 1:
             raise Exception("Must have a line")
-        super(LineExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a dict of tabulations such that
         tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
         if self.variant is not None:
-            return super(LineExpansionSet, self)._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
+            return super()._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
 
         A, b = self.affine_mappings[cell]
         Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
-        xs = apply_mapping(A, b, numpy.transpose(pts)).T
+        xs = numpy.add(numpy.dot(pts, A.T), b)
         results = {}
         scale = self.get_scale(cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
@@ -577,7 +567,7 @@ class TriangleExpansionSet(ExpansionSet):
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 2:
             raise Exception("Must have a triangle")
-        super(TriangleExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
 
 class TetrahedronExpansionSet(ExpansionSet):
@@ -585,7 +575,7 @@ class TetrahedronExpansionSet(ExpansionSet):
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_spatial_dimension() != 3:
             raise Exception("Must be a tetrahedron")
-        super(TetrahedronExpansionSet, self).__init__(ref_el, **kwargs)
+        super().__init__(ref_el, **kwargs)
 
 
 def polynomial_dimension(ref_el, n, continuity=None):
@@ -656,39 +646,15 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
     return cell_node_map
 
 
-def compute_l1_distance(ref_el, points, entity=None):
-    """Computes the l1 distances from a simplex entity to a set of points.
-
-    :arg ref_el: a SimplicialComplex.
-    :arg points: an iterable of points.
-    :arg entity: a tuple of the entity dimension and id.
-    :returns: a numpy array with the l1 distance from the entity to each point.
-    """
-    if entity is None:
-        entity = (ref_el.get_spatial_dimension(), 0)
-    dim, entity_id = entity
-    ref_verts = numpy.zeros((dim + 1, dim))
-    ref_verts[range(1, dim + 1), range(dim)] = 1.0
-
-    top = ref_el.get_topology()
-    verts = ref_el.get_vertices_of_subcomplex(top[dim][entity_id])
-    A, b = reference_element.make_affine_mapping(verts, ref_verts)
-    A = numpy.vstack((A, -numpy.sum(A, axis=0)))
-    b = numpy.hstack((b, 1-numpy.sum(b, axis=0)))
-    bary = apply_mapping(A, b, points, transpose=True)
-
-    dist = 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
-    return dist
-
-
 def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     """Maps cells on a simplicial complex to points.
+    Points outside the complex are binned to the nearest cell.
 
     :arg ref_el: a SimplicialComplex.
     :arg pts: an iterable of physical points on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
     :kwarg tol: the absolute tolerance.
-    :returns: a dict mapping cell id to points located on that cell.
+    :returns: a dict mapping cell id to the point ids nearest to that cell.
     """
     top = ref_el.get_topology()
     sd = ref_el.get_spatial_dimension()
@@ -699,21 +665,25 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     if pts.dtype == object:
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
+    # The distance to the nearest cell is equal to the distance to the parent cell
+    best = ref_el.get_parent().distance_to_point_l1(pts, rescale=True)
+    tol = best + tol
+
     cell_point_map = {}
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
-        pts_on_cell = compute_l1_distance(ref_el, pts, entity=(sd, cell)) < tol
-        if len(pts_on_cell.shape) == 0:
+        pts_near_cell = ref_el.distance_to_point_l1(pts, entity=(sd, cell), rescale=True) < tol
+        if len(pts_near_cell.shape) == 0:
             # singleton case
-            if pts_on_cell:
+            if pts_near_cell:
                 cell_point_map[cell] = Ellipsis
                 if unique:
                     break
         else:
             if unique:
                 for other in cell_point_map.values():
-                    pts_on_cell[other] = False
-            ipts = numpy.where(pts_on_cell)[0]
+                    pts_near_cell[other] = False
+            ipts = numpy.where(pts_near_cell)[0]
             if len(ipts) > 0:
                 cell_point_map[cell] = ipts
     return cell_point_map
@@ -734,14 +704,19 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     # assert singleton point
     pt = pt.reshape((sd,))
 
-    # Compute characteristic function of each cell
+    # The distance to the nearest cell is equal to the distance to the parent cell
+    best = ref_el.get_parent().distance_to_point_l1(pt, rescale=True)
+    tol = best + tol
+
+    # Compute characteristic function of each subcell
     otherwise = []
     masks = []
     for cell in sorted(top[sd]):
-        inside = compute_l1_distance(ref_el, pt, entity=(sd, cell)) < tol
-        masks.append(Piecewise(*otherwise, (1.0, inside), (0.0, True)))
+        # Bin points based on l1 distance
+        pt_near_cell = ref_el.distance_to_point_l1(pt, entity=(sd, cell), rescale=True) < tol
+        masks.append(Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
         if unique:
-            otherwise.append((0.0, inside))
+            otherwise.append((0.0, pt_near_cell))
     # If the point is on a facet, divide the characteristic function by the facet multiplicity
     if not unique:
         mult = sum(masks)

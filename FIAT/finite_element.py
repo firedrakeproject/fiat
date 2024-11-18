@@ -132,7 +132,7 @@ class CiarletElement(FiniteElement):
     def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_complex=None):
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
-        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
 
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()
@@ -191,7 +191,7 @@ class CiarletElement(FiniteElement):
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        return self.poly_set.tabulate(list(map(transform, points)), order)
+        return self.poly_set.tabulate(transform(points), order)
 
     def value_shape(self):
         "Return the value shape of the finite element functions."
@@ -243,7 +243,7 @@ def entity_support_dofs(elem, entity_dim):
     result = {}
     for f in elem.entity_dofs()[entity_dim].keys():
         entity_transform = ref_el.get_entity_transform(entity_dim, f)
-        points = list(map(entity_transform, quad.get_points()))
+        points = entity_transform(quad.get_points())
 
         # Integrate the square of the basis functions on the facet.
         vals = elem.tabulate(0, points)[(0,) * dim]
