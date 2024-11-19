@@ -125,16 +125,13 @@ class ONPolynomialSet(PolynomialSet):
         if shape == tuple():
             coeffs = numpy.eye(num_members)
         else:
-            coeffs_shape = (num_members, *shape, num_exp_functions)
-            coeffs = numpy.zeros(coeffs_shape, "d")
-            # use functional's index_iterator function
-            cur_bf = 0
+            coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
+            cur = 0
+            exp_bf = range(num_exp_functions)
             for idx in index_iterator(shape):
-                n = expansion_set.get_num_members(embedded_degree)
-                for exp_bf in range(n):
-                    cur_idx = (cur_bf, *idx, exp_bf)
-                    coeffs[cur_idx] = 1.0
-                    cur_bf += 1
+                cur_bf = range(cur, cur+num_exp_functions)
+                coeffs[(cur_bf, *idx, exp_bf)] = 1.0
+                cur += num_exp_functions
 
         super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
@@ -206,19 +203,49 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         embedded_degree = degree
 
         # set up coefficients for symmetric tensors
-        coeffs_shape = (num_members, *shape, num_exp_functions)
-        coeffs = numpy.zeros(coeffs_shape, "d")
-        cur_bf = 0
+        coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
+        cur = 0
+        exp_bf = range(num_exp_functions)
         for i, j in index_iterator(shape):
+            if i > j:
+                continue
+            cur_bf = range(cur, cur+num_exp_functions)
+            coeffs[cur_bf, i, j, exp_bf] = 1.0
+            coeffs[cur_bf, j, i, exp_bf] = 1.0
+            cur += num_exp_functions
+
+        super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
+
+
+class TracelessTensorPolynomialSet(PolynomialSet):
+    """Constructs an orthonormal basis for traceless-tensor-valued
+    polynomials on a reference element.
+    """
+    def __init__(self, ref_el, degree, size=None, **kwargs):
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
+
+        sd = ref_el.get_spatial_dimension()
+        if size is None:
+            size = sd
+
+        shape = (size, size)
+        num_exp_functions = expansion_set.get_num_members(degree)
+        num_components = size * size - 1
+        num_members = num_components * num_exp_functions
+        embedded_degree = degree
+
+        # set up coefficients for traceless tensors
+        coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
+        cur = 0
+        exp_bf = range(num_exp_functions)
+        for i, j in index_iterator(shape):
+            if i == size-1 and j == size-1:
+                continue
+            cur_bf = range(cur, cur+num_exp_functions)
+            coeffs[cur_bf, i, j, exp_bf] = 1.0
             if i == j:
-                for exp_bf in range(num_exp_functions):
-                    coeffs[cur_bf, i, j, exp_bf] = 1.0
-                    cur_bf += 1
-            elif i < j:
-                for exp_bf in range(num_exp_functions):
-                    coeffs[cur_bf, i, j, exp_bf] = 1.0
-                    coeffs[cur_bf, j, i, exp_bf] = 1.0
-                    cur_bf += 1
+                coeffs[cur_bf, -1, -1, exp_bf] = -1.0
+            cur += num_exp_functions
 
         super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 

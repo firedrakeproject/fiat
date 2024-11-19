@@ -35,6 +35,8 @@ from FIAT.nedelec_second_kind import NedelecSecondKind          # noqa: F401
 from FIAT.regge import Regge                                    # noqa: F401
 from FIAT.hdiv_trace import HDivTrace, map_to_reference_facet   # noqa: F401
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson  # noqa: F401
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlFirstKind  # noqa: F401
+from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlSecondKind  # noqa: F401
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini  # noqa: F401
 from FIAT.gauss_legendre import GaussLegendre                   # noqa: F401
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre    # noqa: F401
@@ -42,6 +44,9 @@ from FIAT.restricted import RestrictedElement                   # noqa: F401
 from FIAT.tensor_product import TensorProductElement            # noqa: F401
 from FIAT.tensor_product import FlattenedDimensions             # noqa: F401
 from FIAT.hdivcurl import Hdiv, Hcurl                           # noqa: F401
+from FIAT.mardal_tai_winther import MardalTaiWinther            # noqa: F401
+from FIAT.arnold_winther import ArnoldWinther, ArnoldWintherNC  # noqa: F401
+from FIAT.hu_zhang import HuZhang                               # noqa: F401
 from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
@@ -261,9 +266,28 @@ elements = [
     "Regge(S, 0)",
     "Regge(S, 1)",
     "Regge(S, 2)",
+    "Regge(T, 1, variant='point')",
+    "Regge(S, 1, variant='point')",
     "HellanHerrmannJohnson(T, 0)",
     "HellanHerrmannJohnson(T, 1)",
     "HellanHerrmannJohnson(T, 2)",
+    "HellanHerrmannJohnson(S, 0)",
+    "HellanHerrmannJohnson(S, 1)",
+    "HellanHerrmannJohnson(S, 2)",
+    "HellanHerrmannJohnson(T, 1, variant='point')",
+    "HellanHerrmannJohnson(S, 1, variant='point')",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 1)",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 2)",
+    "GopalakrishnanLedererSchoberlFirstKind(T, 3)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 1)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 2)",
+    "GopalakrishnanLedererSchoberlFirstKind(S, 3)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 0)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 1)",
+    "GopalakrishnanLedererSchoberlSecondKind(T, 2)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 0)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 1)",
+    "GopalakrishnanLedererSchoberlSecondKind(S, 2)",
     "BrezziDouglasFortinMarini(T, 2)",
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",
@@ -309,6 +333,13 @@ elements = [
     "Morley(T)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
+    "MardalTaiWinther(T, 3)",
+    "ArnoldWintherNC(T, 2)",
+    "ArnoldWinther(T, 3)",
+    "HuZhang(T, 3)",
+    "HuZhang(T, 4)",
+    "HuZhang(T, 3, 'point')",
+    "HuZhang(T, 4, 'point')",
     "KongMulderVeldhuizen(T,1)",
     "KongMulderVeldhuizen(T,2)",
     "KongMulderVeldhuizen(T,3)",
@@ -580,98 +611,6 @@ def test_error_quadrature_degree(element):
 def test_error_point_high_order(element):
     with pytest.raises(ValueError):
         eval(element)
-
-
-@pytest.mark.parametrize('cell', [I, T, S])
-def test_expansion_orthonormality(cell):
-    from FIAT import expansions
-    from FIAT.quadrature_schemes import create_quadrature
-    U = expansions.ExpansionSet(cell)
-    degree = 10
-    rule = create_quadrature(cell, 2*degree)
-    phi = U.tabulate(degree, rule.pts)
-    qwts = rule.get_weights()
-    scale = 2 ** cell.get_spatial_dimension()
-    results = scale * np.dot(np.multiply(phi, qwts), phi.T)
-
-    assert np.allclose(results, np.diag(np.diag(results)))
-    assert np.allclose(np.diag(results), 1.0)
-
-
-@pytest.mark.parametrize('dim', range(1, 4))
-def test_expansion_values(dim):
-    import sympy
-    from FIAT import expansions, polynomial_set, reference_element
-    cell = reference_element.default_simplex(dim)
-    U = expansions.ExpansionSet(cell)
-    dpoints = []
-    rpoints = []
-
-    npoints = 4
-    interior = 1
-    for alpha in reference_element.lattice_iter(interior, npoints+1-interior, dim):
-        dpoints.append(tuple(2*np.array(alpha, dtype="d")/npoints-1))
-        rpoints.append(tuple(2*sympy.Rational(a, npoints)-1 for a in alpha))
-
-    n = 16
-    Uvals = U.tabulate(n, dpoints)
-    idx = (lambda p: p, expansions.morton_index2, expansions.morton_index3)[dim-1]
-    eta = sympy.DeferredVector("eta")
-    half = sympy.Rational(1, 2)
-
-    def duffy_coords(pt):
-        if len(pt) == 1:
-            return pt
-        elif len(pt) == 2:
-            eta0 = 2 * (1 + pt[0]) / (1 - pt[1]) - 1
-            eta1 = pt[1]
-            return eta0, eta1
-        else:
-            eta0 = 2 * (1 + pt[0]) / (-pt[1] - pt[2]) - 1
-            eta1 = 2 * (1 + pt[1]) / (1 - pt[2]) - 1
-            eta2 = pt[2]
-            return eta0, eta1, eta2
-
-    def basis(dim, p, q=0, r=0):
-        if dim >= 1:
-            f = sympy.jacobi(p, 0, 0, eta[0])
-            f *= sympy.sqrt(half + p)
-        if dim >= 2:
-            f *= sympy.jacobi(q, 2*p+1, 0, eta[1]) * ((1 - eta[1])/2) ** p
-            f *= sympy.sqrt(1 + p + q)
-        if dim >= 3:
-            f *= sympy.jacobi(r, 2*p+2*q+2, 0, eta[2]) * ((1 - eta[2])/2) ** (p+q)
-            f *= sympy.sqrt(1 + half + p + q + r)
-        return f
-
-    def eval_basis(f, pt):
-        return float(f.subs(dict(zip(eta, duffy_coords(pt)))))
-
-    for i in range(n + 1):
-        for indices in polynomial_set.mis(dim, i):
-            phi = basis(dim, *indices)
-            exact = np.array([eval_basis(phi, r) for r in rpoints])
-            uh = Uvals[idx(*indices)]
-            assert np.allclose(uh, exact, atol=1E-14)
-
-
-@pytest.mark.parametrize('cell', [I, T, S])
-def test_bubble_duality(cell):
-    from FIAT.polynomial_set import make_bubbles
-    from FIAT.quadrature_schemes import create_quadrature
-    degree = 10
-    sd = cell.get_spatial_dimension()
-    B = make_bubbles(cell, degree)
-
-    Q = create_quadrature(cell, 2*B.degree - sd - 1)
-    qpts, qwts = Q.get_points(), Q.get_weights()
-    phi = B.tabulate(qpts)[(0,) * sd]
-    phi_dual = phi / abs(phi[0])
-    scale = 2 ** sd
-    results = scale * np.dot(np.multiply(phi_dual, qwts), phi.T)
-
-    assert np.allclose(results, np.diag(np.diag(results)))
-    assert np.allclose(np.diag(results), 1.0)
 
 
 if __name__ == '__main__':

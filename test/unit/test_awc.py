@@ -1,11 +1,11 @@
 import numpy as np
-from FIAT import ufc_simplex, ArnoldWinther, make_quadrature, expansions
+from FIAT import ufc_simplex, ArnoldWinther, create_quadrature, expansions
 
 
 def test_dofs():
     line = ufc_simplex(1)
     T = ufc_simplex(2)
-    T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.25), (-0.75, 1.1)])
+    T.vertices = ((0.0, 0.0), (1.0, 0.25), (-0.75, 1.1))
     AW = ArnoldWinther(T, 3)
 
     # check Kronecker property at vertices
@@ -20,7 +20,7 @@ def test_dofs():
                 assert np.allclose(vert_vals[3*i+j, :, :, (i+k) % 3], np.zeros((2, 2)))
 
     # check edge moments
-    Qline = make_quadrature(line, 6)
+    Qline = create_quadrature(line, 6)
 
     linebfs = expansions.LineExpansionSet(line)
     linevals = linebfs.tabulate(1, Qline.pts)
@@ -73,15 +73,21 @@ def test_dofs():
                 assert np.allclose(ntmoments[bf, :], np.zeros(2))
 
     # check internal dofs
-    Q = make_quadrature(T, 6)
+    ns = list(map(T.compute_scaled_normal, range(3)))
+    Q = create_quadrature(T, 3)
     qpvals = AW.tabulate(0, Q.pts)[(0, 0)]
-    const_moms = qpvals @ Q.wts
-    assert np.allclose(const_moms[:21], np.zeros((21, 2, 2)))
-    assert np.allclose(const_moms[24:], np.zeros((6, 2, 2)))
-    assert np.allclose(const_moms[21:24, 0, 0], np.asarray([1, 0, 0]))
-    assert np.allclose(const_moms[21:24, 0, 1], np.asarray([0, 1, 0]))
-    assert np.allclose(const_moms[21:24, 1, 0], np.asarray([0, 1, 0]))
-    assert np.allclose(const_moms[21:24, 1, 1], np.asarray([0, 0, 1]))
+    const_moms = qpvals @ Q.wts / T.volume()
+    nn_moms = const_moms.copy()
+    for j in range(2):
+        for i in range(2):
+            comp = np.outer(ns[i+1], ns[j+1])
+            nn_moms[:, i, j] = np.tensordot(const_moms, comp, ((1, 2), (0, 1)))
+    assert np.allclose(nn_moms[:21], np.zeros((21, 2, 2)))
+    assert np.allclose(nn_moms[24:], np.zeros((6, 2, 2)))
+    assert np.allclose(nn_moms[21:24, 0, 0], np.asarray([1, 0, 0]))
+    assert np.allclose(nn_moms[21:24, 0, 1], np.asarray([0, 1, 0]))
+    assert np.allclose(nn_moms[21:24, 1, 0], np.asarray([0, 1, 0]))
+    assert np.allclose(nn_moms[21:24, 1, 1], np.asarray([0, 0, 1]))
 
 
 def frob(a, b):
@@ -90,11 +96,11 @@ def frob(a, b):
 
 def test_projection():
     T = ufc_simplex(2)
-    T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.0), (0.5, 2.1)])
+    T.vertices = ((0.0, 0.0), (1.0, 0.0), (0.5, 2.1))
 
     AW = ArnoldWinther(T, 3)
 
-    Q = make_quadrature(T, 4)
+    Q = create_quadrature(T, 6)
     qpts = np.asarray(Q.pts)
     qwts = np.asarray(Q.wts)
     nqp = len(Q.wts)

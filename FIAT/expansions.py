@@ -279,16 +279,19 @@ class ExpansionSet(object):
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
 
-    def get_scale(self, cell=0):
+    def get_scale(self, n, cell=0):
         scale = self.scale
+        sd = self.ref_el.get_spatial_dimension()
         if isinstance(scale, str):
-            sd = self.ref_el.get_spatial_dimension()
             vol = self.ref_el.volume_of_subcomplex(sd, cell)
             scale = scale.lower()
             if scale == "orthonormal":
                 scale = math.sqrt(1.0 / vol)
             elif scale == "l2 piola":
                 scale = 1.0 / vol
+        elif n == 0 and sd > 1 and len(self.affine_mappings) == 1:
+            # return 1 for n=0 to make regression tests pass
+            scale = 1
         return scale
 
     def get_num_members(self, n):
@@ -310,9 +313,7 @@ class ExpansionSet(object):
         ref_pts = numpy.add(numpy.dot(pts, A.T), b).T
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
         sd = self.ref_el.get_spatial_dimension()
-
-        # Always return 1 for n=0 to make regression tests pass
-        scale = 1.0 if n == 0 and len(self.affine_mappings) == 1 else self.get_scale(cell=cell)
+        scale = self.get_scale(n, cell=cell)
         phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
                                  scale, variant=self.variant)
         if self.continuity == "C0":
@@ -549,7 +550,7 @@ class LineExpansionSet(ExpansionSet):
         Jinv = A[0, 0] if direction is None else numpy.dot(A, direction)
         xs = numpy.add(numpy.dot(pts, A.T), b)
         results = {}
-        scale = self.get_scale(cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
+        scale = self.get_scale(n, cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
             v = numpy.zeros((n + 1, len(xs)), xs.dtype)
             if n >= k:
