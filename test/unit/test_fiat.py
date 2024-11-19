@@ -61,6 +61,7 @@ from FIAT.johnson_mercier import JohnsonMercier                 # noqa: F401
 from FIAT.bubble import Bubble
 from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
+from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
 
 P = Point()
 I = UFCInterval()  # noqa: E741
@@ -339,6 +340,12 @@ elements = [
     "HuZhang(T, 4)",
     "HuZhang(T, 3, 'point')",
     "HuZhang(T, 4, 'point')",
+    "KongMulderVeldhuizen(T,1)",
+    "KongMulderVeldhuizen(T,2)",
+    "KongMulderVeldhuizen(T,3)",
+    "KongMulderVeldhuizen(T,4)",
+    "KongMulderVeldhuizen(T,5)",
+    "KongMulderVeldhuizen(T,6)",
 
     # Macroelements
     "Lagrange(T, 1, 'iso')",
