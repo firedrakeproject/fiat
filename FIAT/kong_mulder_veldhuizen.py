@@ -1,6 +1,7 @@
 # Copyright (C) 2020 Robert C. Kirby (Baylor University)
 #
 # contributions by Keith Roberts (University of São Paulo)
+# and Alexandre Olender (University of São Paulo)
 #
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
@@ -77,6 +78,14 @@ def _get_entity_ids(ref_el, degree):
                 1: dict((i, etop[i]) for i in range(3)),
                 2: {0: [i for i in range(15, 30)]},
             }
+    elif degree == 6:
+        if sd == 2:
+            etop = [[6, 12, 3, 13, 7], [9, 15, 4, 14, 8], [10, 16, 5, 17, 11]]
+            entity_ids = {
+                0: dict((i, [i]) for i in range(3)),
+                1: dict((i, etop[i]) for i in range(3)),
+                2: {0: [i for i in range(18, 39)]},
+            }
     return entity_ids
 
 
@@ -89,7 +98,7 @@ def bump(T, deg):
         if sd == 2:
             if deg < 5:
                 return (1, 1)
-            elif deg == 5:
+            elif deg == 5 or deg == 6:
                 return (2, 2)
             else:
                 raise ValueError("Degree not supported")
@@ -160,13 +169,16 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
     NEW HIGHER-ORDER MASS-LUMPED TETRAHEDRAL ELEMENTS
     S. GEEVERS, W.A. MULDER, AND J.J.W. VAN DER VEGT
 
-     """
+    More Continuous Mass-Lumped Triangular Finite Elements
+    W. A. MULDER
+
+    """
 
     def __init__(self, ref_el, degree):
         if ref_el != TRIANGLE and ref_el != TETRAHEDRON:
             raise ValueError("KMV is only valid for triangles and tetrahedrals")
-        if degree > 5 and ref_el == TRIANGLE:
-            raise NotImplementedError("Only P < 6 for triangles are implemented.")
+        if degree > 6 and ref_el == TRIANGLE:
+            raise NotImplementedError("Only P < 7 for triangles are implemented.")
         if degree > 3 and ref_el == TETRAHEDRON:
             raise NotImplementedError("Only P < 4 for tetrahedrals are implemented.")
         S = KongMulderVeldhuizenSpace(ref_el, degree)
