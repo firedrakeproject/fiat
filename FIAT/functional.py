@@ -16,9 +16,7 @@ from itertools import chain
 import numpy
 import sympy
 
-from FIAT import polynomial_set, jacobi
-from FIAT.quadrature import GaussLegendreQuadratureLineRule
-from FIAT.reference_element import UFCInterval as interval
+from FIAT import polynomial_set, jacobi, quadrature_schemes
 
 
 def index_iterator(shp):
@@ -169,7 +167,7 @@ class PointEvaluation(Functional):
     particular point x."""
 
     def __init__(self, ref_el, x):
-        pt_dict = {x: [(1.0, tuple())]}
+        pt_dict = {tuple(x): [(1.0, tuple())]}
         super().__init__(ref_el, tuple(), pt_dict, {}, "PointEval")
 
     def __call__(self, fn):
@@ -193,7 +191,7 @@ class ComponentPointEvaluation(Functional):
         if any(i < 0 or i >= n for i, n in zip(comp, shp)):
             raise ValueError("Illegal component")
         self.comp = comp
-        pt_dict = {x: [(1.0, comp)]}
+        pt_dict = {tuple(x): [(1.0, comp)]}
         super().__init__(ref_el, shp, pt_dict, {}, "ComponentPointEval")
 
     def tostr(self):
@@ -296,10 +294,10 @@ class IntegralMoment(Functional):
     def __init__(self, ref_el, Q, f_at_qpts, comp=tuple(), shp=tuple()):
         self.Q = Q
         self.f_at_qpts = f_at_qpts
-        qpts, qwts = Q.get_points(), Q.get_weights()
         self.comp = comp
-        weights = numpy.multiply(f_at_qpts, qwts)
-        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(qpts, weights)}
+        points = Q.get_points()
+        weights = numpy.multiply(f_at_qpts, Q.get_weights())
+        pt_dict = {tuple(pt): [(wt, comp)] for pt, wt in zip(points, weights)}
         super().__init__(ref_el, shp, pt_dict, {}, "IntegralMoment")
 
     def __call__(self, fn):
@@ -338,23 +336,41 @@ class IntegralMomentOfNormalDerivative(Functional):
                          {}, dpt_dict, "IntegralMomentOfNormalDerivative")
 
 
-class IntegralLegendreDirectionalMoment(Functional):
-    """Moment of v.s against a Legendre polynomial over an edge"""
-    def __init__(self, cell, s, entity, mom_deg, comp_deg, nm=""):
-        sd = cell.get_spatial_dimension()
-        assert sd == 2
-        shp = (sd,)
-        quadpoints = comp_deg + 1
-        Q = GaussLegendreQuadratureLineRule(interval(), quadpoints)
-        x = 2*Q.get_points()[:, 0]-1
-        f_at_qpts = jacobi.eval_jacobi(0, 0, mom_deg, x)
-        transform = cell.get_entity_transform(sd-1, entity)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*s[i], (i,)) for i in range(sd)]
-                   for pt, wt in zip(points, weights)}
+class FrobeniusIntegralMoment(IntegralMoment):
 
-        super().__init__(cell, shp, pt_dict, {}, nm)
+    def __init__(self, ref_el, Q, f_at_qpts, nm=None):
+        # f_at_qpts is (some shape) x num_qpts
+        shp = tuple(f_at_qpts.shape[:-1])
+        if len(Q.pts) != f_at_qpts.shape[-1]:
+            raise Exception("Mismatch in number of quadrature points and values")
+
+        self.Q = Q
+        self.comp = slice(None, None)
+        self.f_at_qpts = f_at_qpts
+        qpts, qwts = Q.get_points(), Q.get_weights()
+        weights = numpy.transpose(numpy.multiply(f_at_qpts, qwts), (-1,) + tuple(range(len(shp))))
+        alphas = list(index_iterator(shp))
+
+        pt_dict = {tuple(pt): [(wt[alpha], alpha) for alpha in alphas] for pt, wt in zip(qpts, weights)}
+        Functional.__init__(self, ref_el, shp, pt_dict, {}, nm or "FrobeniusIntegralMoment")
+
+
+class IntegralLegendreDirectionalMoment(FrobeniusIntegralMoment):
+    """Moment of v.s against a Legendre polynomial over an edge"""
+    def __init__(self, cell, s, entity, mom_deg, quad_deg, nm=""):
+        # mom_deg is degree of moment, quad_deg is the total degree of
+        # polynomial you might need to integrate (or something like that)
+        assert cell.get_spatial_dimension() == 2
+        entity = (1, entity)
+
+        Q = quadrature_schemes.create_quadrature(cell, quad_deg, entity=entity)
+        x = cell.compute_barycentric_coordinates(Q.get_points(), entity=entity)
+
+        f_at_qpts = jacobi.eval_jacobi(0, 0, mom_deg, x[:, 1] - x[:, 0])
+        f_at_qpts /= Q.jacobian_determinant()
+
+        f_at_qpts = numpy.multiply(s[..., None], f_at_qpts)
+        super().__init__(cell, Q, f_at_qpts, nm=nm)
 
 
 class IntegralLegendreNormalMoment(IntegralLegendreDirectionalMoment):
@@ -373,38 +389,17 @@ class IntegralLegendreTangentialMoment(IntegralLegendreDirectionalMoment):
                          "IntegralLegendreTangentialMoment")
 
 
-class IntegralLegendreBidirectionalMoment(Functional):
+class IntegralLegendreBidirectionalMoment(IntegralLegendreDirectionalMoment):
     """Moment of dot(s1, dot(tau, s2)) against Legendre on entity, multiplied by the size of the reference facet"""
     def __init__(self, cell, s1, s2, entity, mom_deg, comp_deg, nm=""):
-        # mom_deg is degree of moment, comp_deg is the total degree of
-        # polynomial you might need to integrate (or something like that)
-        sd = cell.get_spatial_dimension()
-
         s1s2T = numpy.outer(s1, s2)
-        shp = s1s2T.shape
-        quadpoints = comp_deg + 1
-        Q = GaussLegendreQuadratureLineRule(interval(), quadpoints)
-
-        # The volume squared gets the Jacobian mapping from line interval
-        # and the edge length into the functional.
-        x = 2*Q.get_points()[:, 0]-1
-        f_at_qpts = jacobi.eval_jacobi(0, 0, mom_deg, x) * numpy.abs(cell.volume_of_subcomplex(1, entity))**2
-
-        # Map the quadrature points
-        transform = cell.get_entity_transform(sd-1, entity)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-
-        pt_dict = {tuple(pt): [(wt * s1s2T[idx], idx) for idx in index_iterator(shp)]
-                   for pt, wt in zip(points, weights)}
-
-        super().__init__(cell, shp, pt_dict, {}, nm)
+        super().__init__(cell, s1s2T, entity, mom_deg, comp_deg, nm=nm)
 
 
 class IntegralLegendreNormalNormalMoment(IntegralLegendreBidirectionalMoment):
     """Moment of dot(n, dot(tau, n)) against Legendre on entity."""
     def __init__(self, cell, entity, mom_deg, comp_deg):
-        n = cell.compute_normal(entity)
+        n = cell.compute_scaled_normal(entity)
         super().__init__(cell, n, n, entity, mom_deg, comp_deg,
                          "IntegralNormalNormalLegendreMoment")
 
@@ -412,10 +407,18 @@ class IntegralLegendreNormalNormalMoment(IntegralLegendreBidirectionalMoment):
 class IntegralLegendreNormalTangentialMoment(IntegralLegendreBidirectionalMoment):
     """Moment of dot(n, dot(tau, t)) against Legendre on entity."""
     def __init__(self, cell, entity, mom_deg, comp_deg):
-        n = cell.compute_normal(entity)
-        t = cell.compute_normalized_edge_tangent(entity)
+        n = cell.compute_scaled_normal(entity)
+        t = cell.compute_edge_tangent(entity)
         super().__init__(cell, n, t, entity, mom_deg, comp_deg,
                          "IntegralNormalTangentialLegendreMoment")
+
+
+class IntegralLegendreTangentialTangentialMoment(IntegralLegendreBidirectionalMoment):
+    """Moment of dot(t, dot(tau, t)) against Legendre on entity."""
+    def __init__(self, cell, entity, mom_deg, comp_deg):
+        t = cell.compute_edge_tangent(entity)
+        super().__init__(cell, t, t, entity, mom_deg, comp_deg,
+                         "IntegralTangentialTangentialLegendreMoment")
 
 
 class IntegralMomentOfDivergence(Functional):
@@ -460,25 +463,6 @@ class IntegralMomentOfTensorDivergence(Functional):
                     for pt, wt in zip(points, weights)}
 
         super().__init__(ref_el, tuple(), {}, dpt_dict, "IntegralMomentOfDivergence")
-
-
-class FrobeniusIntegralMoment(IntegralMoment):
-
-    def __init__(self, ref_el, Q, f_at_qpts):
-        # f_at_qpts is (some shape) x num_qpts
-        shp = tuple(f_at_qpts.shape[:-1])
-        if len(Q.pts) != f_at_qpts.shape[-1]:
-            raise Exception("Mismatch in number of quadrature points and values")
-
-        self.Q = Q
-        self.comp = slice(None, None)
-        self.f_at_qpts = f_at_qpts
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        weights = numpy.transpose(numpy.multiply(f_at_qpts, qwts), (-1,) + tuple(range(len(shp))))
-        alphas = list(index_iterator(shp))
-
-        pt_dict = {tuple(pt): [(wt[alpha], alpha) for alpha in alphas] for pt, wt in zip(qpts, weights)}
-        Functional.__init__(self, ref_el, shp, pt_dict, {}, "FrobeniusIntegralMoment")
 
 
 class PointNormalEvaluation(Functional):
@@ -581,39 +565,17 @@ class IntegralMomentOfFaceTangentEvaluation(Functional):
                          "IntegralMomentOfFaceTangentEvaluation")
 
 
-class MonkIntegralMoment(Functional):
-    r"""
-    face nodes are \int_F v\cdot p dA where p \in P_{q-2}(f)^3 with p \cdot n = 0
-    (cmp. Peter Monk - Finite Element Methods for Maxwell's equations p. 129)
-    Note that we don't scale by the area of the facet
-
-    :arg ref_el: reference element for which F is a codim-1 entity
-    :arg Q: quadrature rule on the face
-    :arg P_at_qpts: polynomials evaluated at quad points
-    :arg facet: which facet.
-    """
-
-    def __init__(self, ref_el, Q, P_at_qpts, facet):
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd-1, facet)
-        pts = transform(Q.get_points())
-        weights = Q.get_weights() * P_at_qpts
-        pt_dict = {tuple(pt): [(wt[i], (i, )) for i in range(sd)]
-                   for pt, wt in zip(pts, weights)}
-        super().__init__(ref_el, (sd, ), pt_dict, {}, "MonkIntegralMoment")
-
-
 class PointScaledNormalEvaluation(Functional):
     """Implements the evaluation of the normal component of a vector at a
     point on a facet of codimension 1, where the normal is scaled by
     the volume of that facet."""
 
     def __init__(self, ref_el, facet_no, pt):
-        self.n = ref_el.compute_scaled_normal(facet_no)
+        n = ref_el.compute_scaled_normal(facet_no)
         sd = ref_el.get_spatial_dimension()
         shp = (sd,)
 
-        pt_dict = {pt: [(self.n[i], (i,)) for i in range(sd)]}
+        pt_dict = {pt: [(n[i], (i,)) for i in range(sd)]}
         super().__init__(ref_el, shp, pt_dict, {}, "PointScaledNormalEval")
 
     def tostr(self):
@@ -658,33 +620,25 @@ class PointwiseInnerProductEvaluation(Functional):
         wvT = numpy.outer(w, v)
         shp = wvT.shape
 
-        pt_dict = {pt: [(wvT[idx], idx) for idx in index_iterator(shp)]}
+        pt_dict = {tuple(pt): [(wvT[idx], idx) for idx in index_iterator(shp)]}
 
         super().__init__(ref_el, shp, pt_dict, {}, "PointwiseInnerProductEval")
 
 
-class TensorBidirectionalMomentInnerProductEvaluation(Functional):
+class TensorBidirectionalIntegralMoment(FrobeniusIntegralMoment):
     r"""
     This is a functional on symmetric 2-tensor fields. Let u be such a
     field, f a function tabulated at points, and v,w be vectors. This implements the evaluation
     \int v^T u(x) w f(x).
-
     Clearly v^iu_{ij}w^j = u_{ij}v^iw^j. Thus the value can be computed
-    from the Frobenius inner product of u with wv^T. This gives the
+    from the Frobenius inner product of u with vw^T. This gives the
     correct weights.
     """
 
-    def __init__(self, ref_el, v, w, Q, f_at_qpts, comp_deg):
-        wvT = numpy.outer(w, v)
-        shp = wvT.shp
-
-        points = Q.get_points()
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-
-        pt_dict = {tuple(pt): [(wt * wvT[idx], idx) for idx in index_iterator(shp)]
-                   for pt, wt in zip(points, weights)}
-
-        super().__init__(ref_el, shp, pt_dict, {}, "TensorBidirectionalMomentInnerProductEvaluation")
+    def __init__(self, ref_el, v, w, Q, f_at_qpts):
+        vwT = numpy.outer(v, w)
+        F_at_qpts = numpy.multiply(vwT[..., None], f_at_qpts)
+        super().__init__(ref_el, Q, F_at_qpts, "TensorBidirectionalMomentInnerProductEvaluation")
 
 
 class IntegralMomentOfNormalEvaluation(Functional):
@@ -730,27 +684,3 @@ class IntegralMomentOfTangentialEvaluation(Functional):
         pt_dict = {tuple(pt): [(wt*t[i], (i, )) for i in range(sd)]
                    for pt, wt in zip(points, weights)}
         super().__init__(ref_el, (sd, ), pt_dict, {}, "IntegralMomentOfScaledTangentialEvaluation")
-
-
-class IntegralMomentOfNormalNormalEvaluation(Functional):
-    r"""
-    \int_F (n^T tau n) p ds
-    p \in Polynomials
-    :arg ref_el: reference element for which F is a codim-1 entity
-    :arg Q: quadrature rule on the face
-    :arg P_at_qpts: polynomials evaluated at quad points
-    :arg facet: which facet.
-    """
-    def __init__(self, ref_el, Q, P_at_qpts, facet):
-        # scaling on the normal is ok because edge length then weights
-        # the reference element quadrature appropriately
-        n = ref_el.compute_scaled_normal(facet)
-        nnT = numpy.outer(n, n)/numpy.linalg.norm(n)
-        shp = nnT.shape
-        sd = ref_el.get_spatial_dimension()
-        transform = ref_el.get_entity_transform(sd - 1, facet)
-        points = transform(Q.get_points())
-        weights = numpy.multiply(P_at_qpts, Q.get_weights())
-        pt_dict = {tuple(pt): [(wt*nnT[idx], idx) for idx in index_iterator(shp)]
-                   for pt, wt in zip(points, weights)}
-        super().__init__(ref_el, shp, pt_dict, {}, "IntegralMomentOfNormalNormalEvaluation")

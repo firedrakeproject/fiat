@@ -280,11 +280,14 @@ def test_quadrature(quadrature_reference_data, quadrature_test_case):
     def create_data(family, dim, degree):
         '''Create the reference data.
         '''
+        kwargs = {}
+        if family in {"Regge", "Hellan-Herrmann-Johnson"}:
+            kwargs["variant"] = "point"
         # Get domain and element class
         domain = ufc_simplex(dim)
         ElementClass = supported_elements[family]
         # Create element
-        element = ElementClass(domain, degree)
+        element = ElementClass(domain, degree, **kwargs)
         # Create quadrature points
         quad_rule = make_quadrature(domain, num_points)
         points = quad_rule.get_points()
