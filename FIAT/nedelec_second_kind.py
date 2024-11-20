@@ -198,8 +198,8 @@ class NedelecSecondKind(CiarletElement):
 
         sd = ref_el.get_spatial_dimension()
         poly_set = ONPolynomialSet(ref_el, degree, (sd, ), variant="bubble")
-        if variant == "demkowicz":
-            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl")
+        if variant and variant.startswith("demkowicz"):
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", variant=variant)
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "HCurl", type(self))
         else:

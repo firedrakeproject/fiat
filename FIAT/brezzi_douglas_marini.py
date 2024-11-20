@@ -94,8 +94,8 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
 
         sd = ref_el.get_spatial_dimension()
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
-        if variant == "demkowicz":
-            dual = demkowicz.DemkowiczDual(ref_el, degree, "HDiv")
+        if variant and variant.startswith("demkowicz"):
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HDiv", variant=variant)
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "HDiv", type(self))
         else:

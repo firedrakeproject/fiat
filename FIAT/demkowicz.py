@@ -65,7 +65,7 @@ def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
 
 class DemkowiczDual(DualSet):
 
-    def __init__(self, ref_el, degree, sobolev_space, kind=None):
+    def __init__(self, ref_el, degree, sobolev_space, kind=None, variant=None):
         nodes = []
         entity_ids = {}
         reduced_dofs = {}
@@ -76,6 +76,8 @@ class DemkowiczDual(DualSet):
         dual_mapping = {"HCurl": "contravariant", "HDiv": "covariant"}.get(sobolev_space, None)
         if kind is None:
             kind = 1 if formdegree == 0 else 2
+        if variant is None:
+            variant = "demkowicz"
 
         for dim in sorted(top):
             entity_ids[dim] = {}
@@ -91,7 +93,7 @@ class DemkowiczDual(DualSet):
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
                 reduced_dofs[dim] = len(nodes)
             else:
-                Q_ref, Phis, rdofs = self._reference_duals(dim, degree, formdegree, sobolev_space, kind)
+                Q_ref, Phis, rdofs = self._reference_duals(dim, degree, formdegree, sobolev_space, kind, variant)
                 reduced_dofs[dim] = rdofs
                 mapping = dual_mapping if dim == sd else trace
                 for entity in sorted(top[dim]):
@@ -101,13 +103,12 @@ class DemkowiczDual(DualSet):
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         self._reduced_dofs = reduced_dofs
-        super(DemkowiczDual, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
-    def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind):
+    def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind, variant):
         facet = symmetric_simplex(dim)
         Q = create_quadrature(facet, 2 * degree)
         Qpts, Qwts = Q.get_points(), Q.get_weights()
-        exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div, "L2": None}[sobolev_space]
 
         shp = () if formdegree == 0 else (dim,)
         if sobolev_space == "L2" and dim > 2:
@@ -122,10 +123,16 @@ class DemkowiczDual(DualSet):
         if formdegree >= dim:
             K = inner(trial[:1], trial, Qwts)
         else:
-            dtrial = exterior_derivative(P_at_qpts)
-            if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
-                dtrial = dtrial[:, None, :]
-            K = self._bubble_derivative_moments(facet, degree, formdegree, kind, Qpts, Qwts, dtrial)
+            if variant == "demkowicz":
+                deriv = True
+                exterior_derivative = {"H1": grad, "HCurl": curl, "HDiv": div, "L2": None}[sobolev_space]
+                dtrial = exterior_derivative(P_at_qpts)
+                if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
+                    dtrial = dtrial[:, None, :]
+            else:
+                deriv = False
+                dtrial = trial
+            K = self._bubble_derivative_moments(facet, degree, formdegree, kind, Qpts, Qwts, dtrial, deriv=deriv)
         reduced_dofs = K.shape[0]
 
         # Evaluate type-II degrees of freedom on P
@@ -220,7 +227,7 @@ class FDMDual(DemkowiczDual):
         self.Q = Q
         self.V0 = phis[(0,) * sd]
         self.V1 = exterior_derivative(phis)
-        super(FDMDual, self).__init__(ref_el, degree, sobolev_space, kind=None)
+        super().__init__(ref_el, degree, sobolev_space, kind=None)
 
     def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind):
         entity_dofs = self.fe.entity_dofs()
@@ -286,6 +293,7 @@ if __name__ == "__main__":
     kind = 1
     variant = "fdm"
     variant = "demkowicz"
+    # variant = "demkowicz-mass"
     # variant = None
     space_dict = {"H1": (CG, grad),
                   "HCurl": (N1Curl if kind == 1 else N2Curl, curl),

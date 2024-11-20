@@ -196,8 +196,8 @@ class Nedelec(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant=None):
 
-        if variant == "demkowicz":
-            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", kind=1)
+        if variant and variant.startswith("demkowicz"):
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", kind=1, variant=variant)
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "HCurl", type(self))
         else:

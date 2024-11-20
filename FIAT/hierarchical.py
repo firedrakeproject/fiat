@@ -78,7 +78,7 @@ class Legendre(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
         poly_set = ONPolynomialSet(ref_el, degree)
-        if variant == "demkowicz":
+        if variant and variant.startswith("demkowicz"):
             dual = demkowicz.DemkowiczDual(ref_el, degree, "L2")
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "L2", type(self))
@@ -135,7 +135,7 @@ class IntegratedLegendre(finite_element.CiarletElement):
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
-        if variant == "demkowicz":
+        if variant and variant.startswith("demkowicz"):
             dual = demkowicz.DemkowiczDual(ref_el, degree, "H1")
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "H1", type(self))

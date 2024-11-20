@@ -5,6 +5,8 @@ from FIAT import RestrictedElement, HsiehCloughTocher as HCT
 from FIAT.reference_element import ufc_simplex
 from FIAT.functional import PointEvaluation
 from FIAT.macro import CkPolynomialSet
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.jacobi import eval_jacobi
 
 
 @pytest.fixture
@@ -74,3 +76,23 @@ def test_full_polynomials(cell, reduced):
     C1 = CkPolynomialSet(ref_complex, degree, order=1, variant="bubble")
     C1_tab = C1.tabulate(pts)[(0, 0)]
     assert span_greater_equal(tab, C1_tab)
+
+
+def test_reduced_normal_derivative(cell):
+    fe = HCT(cell, reduced=True)
+
+    ref_line = cell.construct_subelement(1)
+    Q = create_quadrature(ref_line, fe.degree()+2)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+
+    bary = ref_line.compute_barycentric_coordinates(qpts)
+    leg2 = eval_jacobi(0, 0, 2, bary[:, 1] - bary[:, 0])
+    wts = numpy.multiply(leg2, qwts)
+    top = cell.get_topology()
+    for e in top[1]:
+        n = cell.compute_normal(e)
+        vals = fe.tabulate(1, qpts, entity=(1, e))
+        fn = vals[(1, 0)] * n[0] + vals[(0, 1)] * n[1]
+
+        fn = fn[:-3]
+        assert numpy.allclose(numpy.dot(fn, wts), 0)
