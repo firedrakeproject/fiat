@@ -19,7 +19,6 @@ from FIAT.polynomial_set import make_bubbles, ONPolynomialSet
 from FIAT.expansions import polynomial_dimension
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import symmetric_simplex
 
 
 def eps(table_u):
@@ -60,7 +59,6 @@ class StokesDual(dual_set.DualSet):
         entity_ids = {}
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
-        self.sd = sd
         shp = (sd,)
 
         mapping = None
@@ -80,7 +78,7 @@ class StokesDual(dual_set.DualSet):
                     moment_degree -= 2*sd
                 elif dim == 2 and sd == 3:
                     moment_degree -= 6
-                Q_ref, Phis = self._reference_duals(dim, degree, moment_degree)
+                Q_ref, Phis = self._reference_duals(ref_el, dim, degree, moment_degree)
 
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
@@ -128,50 +126,45 @@ class StokesDual(dual_set.DualSet):
 
         super().__init__(nodes, ref_el, entity_ids)
 
-    def _reference_duals(self, dim, degree, moment_degree):
-        facet = symmetric_simplex(dim)
-        Q = create_quadrature(facet, 2 * degree)
+    def _reference_duals(self, ref_el, dim, degree, moment_degree):
+        facet = ref_el.construct_subelement(dim)
+
+        sd = ref_el.get_spatial_dimension()
+        shp = (dim,) if dim == sd else ()
+        Vdegree = degree if dim == sd else moment_degree
+        V = ONPolynomialSet(facet, Vdegree, shp, scale="orthonormal")
+        Q = create_quadrature(facet, degree + V.degree)
+        phis = self._interior_basis(V, Q) if dim == sd else self._facet_basis(V, Q)
+        return Q, phis
+
+    def _facet_basis(self, V, Q):
+        """Compute moments of trial space V against a subset of itself.
+        """
+        facet = V.get_reference_element()
+        dim = facet.get_spatial_dimension()
+        return V.tabulate(Q.get_points())[(0,)*dim]
+
+    def _interior_basis(self, V, Q):
+        """Compute div-div and eps-eps moments of the trial space against an
+           orthonormal bases for div(V_0) and eps(V_0).
+        """
+        facet = V.get_reference_element()
+        dim = facet.get_spatial_dimension()
         Qpts, Qwts = Q.get_points(), Q.get_weights()
 
-        shp = (dim,) if dim == self.sd else tuple()
-        V = ONPolynomialSet(facet, degree, shp, scale="orthonormal")
-
-        moments = self._interior_moments if dim == self.sd else self._facet_moments
-        duals = moments(facet, moment_degree, Qpts, Qwts, V)
-        return Q, duals
-
-    def _facet_moments(self, facet, moment_degree, Qpts, Qwts, V):
-        """Integrate trial expressions against an orthonormal basis for
-           the exterior derivative of bubbles.
-        """
-        dim = facet.get_spatial_dimension()
-
-        V_at_qpts = V.tabulate(Qpts)
-        trial = V_at_qpts[(0,) * dim]
-        test = trial[:polynomial_dimension(facet, moment_degree)]
-        K = inner(test, trial, Qwts)
-        return numpy.tensordot(K, trial, axes=(1, 0))
-
-    def _interior_moments(self, facet, moment_degree, Qpts, Qwts, V):
-        """Integrate trial expressions against an orthonormal basis for
-           the exterior derivative of bubbles.
-        """
-        dim = facet.get_spatial_dimension()
-
+        # Trial space
         V_at_qpts = V.tabulate(Qpts, 1)
         trial = V_at_qpts[(0,) * dim]
         eps_trial = eps(V_at_qpts)
-
-        # Get bubbles
-        B = make_bubbles(facet, V.degree, shape=(dim,))
-
-        # Tabulate the exterior derivate
-        B_at_qpts = B.tabulate(Qpts, 1)
-        eps_test = eps(B_at_qpts)
-        div_test = numpy.trace(eps_test, axis1=1, axis2=2)
         div_trial = numpy.trace(eps_trial, axis1=1, axis2=2)
 
-        # Build an orthonormal basis, remove nullspace
+        # Test space: bubbles
+        V0 = make_bubbles(facet, V.degree, shape=(dim,))
+        V0_at_qpts = V0.tabulate(Qpts, 1)
+        eps_test = eps(V0_at_qpts)
+        div_test = numpy.trace(eps_test, axis1=1, axis2=2)
+
+        # Build an orthonormal basis that splits in the div kernel
         B = inner(eps_test, eps_test, Qwts)
         A = inner(div_test, div_test, Qwts)
 
@@ -184,31 +177,35 @@ class StokesDual(dual_set.DualSet):
         S1 *= numpy.sqrt(1 / sig[None, nullspace_dim:])
 
         # Apply change of basis
-        expr = [inner(numpy.tensordot(S1, div_test, axes=(0, 0)), div_trial, Qwts),
-                inner(numpy.tensordot(S2, eps_test, axes=(0, 0)), eps_trial, Qwts)]
-        K = numpy.concatenate(expr, axis=0)
+        div_test = numpy.tensordot(S1, div_test, axes=(0, 0))
+        eps_test = numpy.tensordot(S2, eps_test, axes=(0, 0))
+        K = numpy.concatenate((inner(div_test, div_trial, Qwts),
+                               inner(eps_test, eps_trial, Qwts)), axis=0)
         return numpy.tensordot(K, trial, axes=(1, 0))
 
 
 class Stokes(finite_element.CiarletElement):
-    """Simplicial continuous element with integrated Legendre polynomials."""
+    """Simplicial continuous element that decouples div-free modes and
+    simultaneously diagonalizes the div-div and eps-eps inner-products on
+    the reference element."""
     def __init__(self, ref_el, degree):
         sd = ref_el.get_spatial_dimension()
         if degree < 2*sd:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= {2*sd}")
+
         poly_set = ONPolynomialSet(ref_el, degree, shape=(sd,), variant="bubble")
         dual = StokesDual(ref_el, degree)
         formdegree = sd-1  # (n-1)-form
-        super().__init__(poly_set, dual, degree, formdegree,
-                         mapping="contravariant piola")
+        super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    import FIAT
 
-    dim = 2
-    degree = 10
-    ref_el = symmetric_simplex(dim)
+    dim = 3
+    degree = 8
+    ref_el = FIAT.reference_element.symmetric_simplex(dim)
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
