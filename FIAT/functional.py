@@ -264,7 +264,7 @@ class PointSecondDerivative(Functional):
                 alpha[i] += 1
                 alpha[j] += 1
                 alphas.append(tuple(alpha))
-                tau[cur] = s1[i] * s2[j] / (1 + (i == j))
+                tau[cur] = s1[i] * s2[j] + (i != j) * s2[i] * s1[j]
                 cur += 1
 
         dpt_dict = {tuple(pt): [(tau[i], alphas[i], comp) for i in range(len(alphas))]}
