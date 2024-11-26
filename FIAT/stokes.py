@@ -8,7 +8,8 @@ import numpy
 import scipy
 
 from FIAT import finite_element, dual_set, expansions, jacobi, macro
-from FIAT.functional import (ComponentPointEvaluation,
+from FIAT.functional import (PointEvaluation,
+                             ComponentPointEvaluation,
                              PointTangentialDerivative,
                              PointTangentialSecondDerivative,
                              PointSecondDerivative,
@@ -18,6 +19,7 @@ from FIAT.functional import (ComponentPointEvaluation,
 from FIAT.polynomial_set import make_bubbles, ONPolynomialSet
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.bernstein import Bernstein
 
 
 def eps(table_u):
@@ -42,13 +44,24 @@ def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
     return Q, phis
 
 
-def jacobi_duals(ref_el, weight, moment_degree, degree):
+def jacobi_duals(ref_el, weight, trial_degree, test_degree):
     facet = ref_el.construct_subelement(1)
-    Q = create_quadrature(facet, degree + moment_degree)
+    Q = create_quadrature(facet, trial_degree + test_degree)
     x = facet.compute_barycentric_coordinates(Q.get_points())
     xhat = x[:, 1:] - x[:, :1]
     a = weight
-    phis = jacobi.eval_jacobi_batch(a, a, moment_degree, xhat)
+    phis = jacobi.eval_jacobi_batch(a, a, test_degree, xhat)
+    return Q, phis
+
+
+def dubiner_duals(ref_el, dim, trial_degree, test_degree):
+    if dim == 0:
+        return None, []
+
+    facet = ref_el.construct_subelement(dim)
+    V = ONPolynomialSet(facet, test_degree, scale="orthonormal")
+    Q = create_quadrature(facet, trial_degree + V.degree)
+    phis = V.tabulate(Q.get_points())[(0,)*dim]
     return Q, phis
 
 
@@ -64,7 +77,7 @@ class StokesDual(dual_set.DualSet):
 
         moment_degree = degree - 2*sd
         edge_weight = sd-1
-        Q_edge, phis_edge = jacobi_duals(ref_el, edge_weight, degree-4, degree)
+        Q_edge, phis_edge = jacobi_duals(ref_el, edge_weight, degree, degree-4)
 
         mapping = None
         self._reduced_dofs = {}
@@ -75,7 +88,7 @@ class StokesDual(dual_set.DualSet):
             if dim == 1:
                 Q_ref, Phis = Q_edge, phis_edge[:moment_degree+1]
             elif dim < sd:
-                Q_ref, Phis = self._reference_duals(ref_el, dim, degree, moment_degree)
+                Q_ref, Phis = dubiner_duals(ref_el, dim, degree, moment_degree)
 
             for entity in sorted(top[dim]):
                 cur = len(nodes)
@@ -130,18 +143,6 @@ class StokesDual(dual_set.DualSet):
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
-
-    def _reference_duals(self, ref_el, dim, degree, moment_degree):
-        """Compute moments of trial space V against a subset of itself.
-        """
-        if dim == 0:
-            return None, []
-
-        facet = ref_el.construct_subelement(dim)
-        V = ONPolynomialSet(facet, moment_degree, scale="orthonormal")
-        Q = create_quadrature(facet, degree + V.degree)
-        phis = V.tabulate(Q.get_points())[(0,)*dim]
-        return Q, phis
 
     def _interior_duals(self, ref_el, degree):
         """Compute div-div and eps-eps moments of the trial space against an
@@ -253,9 +254,12 @@ class MacroStokesDual(StokesDual):
         self._reduced_dofs = {}
         for dim in sorted(top):
             entity_ids[dim] = {}
-            if dim > 0 and dim < sd:
-                moment_degree = degree - (dim+1)
-                Q_ref, Phis = self._reference_duals(ref_complex, dim, degree, moment_degree)
+
+            moment_degree = degree - (dim+1)
+            if dim == 1:
+                Q_ref, Phis = jacobi_duals(ref_complex, 0, degree, moment_degree)
+            elif dim > 0 and dim < sd:
+                Q_ref, Phis = dubiner_duals(ref_complex, dim, degree, moment_degree)
 
             self._reduced_dofs[dim] = None
             for entity in sorted(top[dim]):
@@ -295,17 +299,103 @@ class MacroStokes(finite_element.CiarletElement):
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
 
+class DivStokesDual(dual_set.DualSet):
+    def __init__(self, ref_el, degree):
+        self.degree = degree
+        nodes = []
+        entity_ids = {}
+        top = ref_el.get_topology()
+        sd = ref_el.get_spatial_dimension()
+        Q = create_quadrature(ref_el, 2*degree)
+
+        mapping = None
+        for dim in sorted(top):
+            entity_ids[dim] = {}
+            for entity in sorted(top[dim]):
+                entity_ids[dim][entity] = []
+
+        # Vertex dofs
+        for entity in top[0]:
+            pt, = ref_el.make_points(0, entity, degree)
+            nodes.append(PointEvaluation(ref_el, pt))
+
+        if sd == 3:
+            # Edge dofs
+            Q_ref, Phis = jacobi_duals(ref_el, 0, degree, degree-2)
+            for entity in top[1]:
+                Q_edge, phis = map_duals(ref_el, 1, entity, mapping, Q_ref, Phis)
+                nodes.extend(IntegralMoment(ref_el, Q_edge, phi) for phi in phis)
+
+        # Interior dof
+        nodes.append(IntegralMoment(ref_el, Q, numpy.ones(Q.get_weights().shape)))
+
+        # Throwaway dofs
+        B = Bernstein(ref_el, degree)
+        ids = B.entity_dofs()
+
+        indices = []
+        for dim in sorted(top):
+            for entity in sorted(top[dim]):
+                if sd == 3 and dim == 1:
+                    continue
+                start = 1 if dim % sd == 0 else 0
+                indices.extend(ids[dim][entity][start:])
+
+        interior = ids[sd][0][0]
+        phis = B.tabulate(0, Q.get_points())[(0,)*sd]
+        phis -= phis[[interior]]
+        nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis[indices])
+
+        entity_ids[sd][0] = list(range(len(nodes)))
+        super().__init__(nodes, ref_el, entity_ids)
+
+    def get_indices(self, restriction_domain, take_closure=True):
+        """Return the list of dofs with support on the given restriction domain.
+        Allows for reduced Demkowicz elements, excluding the exterior
+        derivative of the previous space in the de Rham complex.
+
+        :arg restriction_domain: can be 'reduced', 'interior', 'vertex',
+                                 'edge', 'face' or 'facet'
+        :kwarg take_closure: Are we taking the closure of the restriction domain?
+        """
+        if restriction_domain == "reduced":
+            sd = self.ref_el.get_spatial_dimension()
+            top = self.ref_el.get_topology()
+            num_bfs = 1 + len(top[0])
+            if sd == 3:
+                num_bfs += len(top[1]) * (self.degree-1)
+            return list(range(num_bfs))
+        else:
+            return dual_set.DualSet.get_indices(self, restriction_domain, take_closure=take_closure)
+
+
+class DivStokes(finite_element.CiarletElement):
+    def __init__(self, ref_el, degree):
+        sd = ref_el.get_spatial_dimension()
+        if degree < 2*sd-1:
+            raise ValueError(f"{type(self).__name__} elements only valid for k >= {2*sd-1}")
+
+        poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
+        dual = DivStokesDual(ref_el, degree)
+        formdegree = sd  # n-form
+        super().__init__(poly_set, dual, degree, formdegree)
+
+
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import FIAT
 
-    dim = 2
-    degree = 8
+    dim = 3
+    degree = 6
     ref_el = FIAT.reference_element.symmetric_simplex(dim)
-    # fe = Stokes(ref_el, degree)
-    fe = MacroStokes(ref_el, degree)
+    fe = Stokes(ref_el, degree)
+    # fe = MacroStokes(ref_el, degree)
     Q = create_quadrature(fe.ref_complex, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
+
+    df = DivStokes(ref_el, degree-1)
+    df = FIAT.RestrictedElement(df, restriction_domain="reduced")
+    print(df.tabulate(0, ref_el.vertices)[(0,)*dim])
 
     family = type(fe).__name__
     domains = (None, "reduced", "facet")

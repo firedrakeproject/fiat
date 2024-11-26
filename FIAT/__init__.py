@@ -14,7 +14,7 @@ from FIAT.hct import HsiehCloughTocher
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
-from FIAT.stokes import Stokes, MacroStokes
+from FIAT.stokes import Stokes, MacroStokes, DivStokes
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
@@ -107,6 +107,7 @@ supported_elements = {"Argyris": Argyris,
                       "Regge": Regge,
                       "Stokes": Stokes,
                       "Macro Stokes": MacroStokes,
+                      "Div Stokes": DivStokes,
                       "EnrichedElement": EnrichedElement,
                       "NodalEnrichedElement": NodalEnrichedElement,
                       "QuadraticPowellSabin6": QuadraticPowellSabin6,
