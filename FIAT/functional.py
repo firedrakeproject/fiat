@@ -14,7 +14,6 @@
 
 from itertools import chain
 import numpy
-import sympy
 
 from FIAT import polynomial_set, jacobi
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
@@ -60,9 +59,7 @@ class Functional(object):
         self.deriv_dict = deriv_dict
         self.functional_type = functional_type
         if len(deriv_dict) > 0:
-            per_point = list(chain(*deriv_dict.values()))
-            alphas = [tuple(foo[1]) for foo in per_point]
-            self.max_deriv_order = max([sum(foo) for foo in alphas])
+            self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
             self.max_deriv_order = 0
 
@@ -215,6 +212,7 @@ class PointDerivative(Functional):
     def __call__(self, fn):
         """Evaluate the functional on the function fn. Note that this depends
         on sympy being able to differentiate fn."""
+        import sympy
         x, = self.deriv_dict
 
         X = tuple(sympy.Symbol(f"X[{i}]") for i in range(len(x)))
