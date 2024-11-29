@@ -1,6 +1,6 @@
-import math
 import numpy as np
 import pytest
+from math import factorial as fct
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT import create_quadrature, make_quadrature, polynomial_set
@@ -13,7 +13,6 @@ Te = UFCTetrahedron()
 
 @pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 4)])
 def test_kmv_quad_tet_schemes(p_d):  # noqa: W503
-    fct = math.factorial
     p, d = p_d
     q = create_quadrature(Te, p, "KMV")
     for i in range(d + 1):
@@ -31,7 +30,6 @@ def test_kmv_quad_tet_schemes(p_d):  # noqa: W503
 
 @pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 5), (4, 7), (5, 9), (6, 11)])
 def test_kmv_quad_tri_schemes(p_d):
-    fct = math.factorial
     p, d = p_d
     q = create_quadrature(T, p, "KMV")
     for i in range(d + 1):

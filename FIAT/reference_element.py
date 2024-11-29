@@ -26,7 +26,7 @@ from itertools import chain, count, product
 from math import factorial
 
 import numpy
-from recursivenodes.nodes import _decode_family, _recursive
+from recursivenodes import recursive_nodes
 
 from FIAT.orientation_utils import (
     Orientation,
@@ -42,20 +42,6 @@ TETRAHEDRON = 3
 QUADRILATERAL = 11
 HEXAHEDRON = 111
 TENSORPRODUCT = 99
-
-
-def multiindex_equal(d, isum, imin=0):
-    """A generator for d-tuple multi-indices whose sum is isum and minimum is imin.
-    """
-    if d <= 0:
-        return
-    imax = isum - (d - 1) * imin
-    if imax < imin:
-        return
-    for i in range(imin, imax):
-        for a in multiindex_equal(d - 1, isum - i, imin=imin):
-            yield a + (i,)
-    yield (imin,) * (d - 1) + (imax,)
 
 
 def lattice_iter(start, finish, depth):
@@ -88,11 +74,11 @@ def make_lattice(verts, n, interior=0, variant=None):
         "equispaced_interior": "equi_interior",
         "gll": "lgl"}
     family = recursivenodes_families.get(variant, variant)
-    family = _decode_family(family)
-    D = len(verts)
-    X = numpy.array(verts)
-    get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
-    return list(map(get_point, multiindex_equal(D, n, interior)))
+    D = len(verts) - 1
+    X = numpy.asarray(verts[::-1])
+    bary = recursive_nodes(D, n, family=family, interior=interior)
+    pts = numpy.dot(bary, X)
+    return list(map(tuple, pts))
 
 
 def linalg_subspace_intersection(A, B):
