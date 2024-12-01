@@ -65,6 +65,23 @@ def dubiner_duals(ref_el, dim, trial_degree, test_degree):
     return Q, phis
 
 
+def vectorize_moments(ref_el, dim, entity, Q, phis):
+    sd = ref_el.get_spatial_dimension()
+    if dim == sd - 1:
+        t = ref_el.compute_tangents(dim, entity)
+        n = numpy.dot([[0, 1], [-1, 0]], *t) if sd == 2 else numpy.cross(*t)
+        comps = (n, *t)
+        for phi in phis:
+            for comp in comps:
+                yield FrobeniusIntegralMoment(ref_el, Q, comp[:, None] * phi[None, :])
+    else:
+        shp = (sd,)
+        comps = list(numpy.ndindex(shp))
+        for phi in phis:
+            for comp in comps:
+                yield IntegralMoment(ref_el, Q, phi, comp=comp, shp=shp)
+
+
 class StokesDual(dual_set.DualSet):
 
     def __init__(self, ref_el, degree):
@@ -137,8 +154,7 @@ class StokesDual(dual_set.DualSet):
 
                 # Rest of the facet moments
                 Q, phis = map_duals(ref_el, dim, entity, mapping, Q_ref, Phis)
-                nodes.extend(IntegralMoment(ref_el, Q, phi, comp=comp, shp=shp)
-                             for phi in phis for comp in comps)
+                nodes.extend(vectorize_moments(ref_el, dim, entity, Q, phis))
 
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
@@ -272,13 +288,13 @@ class MacroStokesDual(StokesDual):
                 elif dim == sd:
                     # Interior dofs
                     Q, phis, nullspace_dim = self._interior_duals(ref_complex, degree)
-                    nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                     self._reduced_dofs[dim] = nullspace_dim
+                    nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 else:
                     # Facet dofs
                     Q, phis = map_duals(ref_el, dim, entity, mapping, Q_ref, Phis)
-                    nodes.extend(IntegralMoment(ref_el, Q, phi, comp=comp, shp=shp)
-                                 for phi in phis for comp in comps)
+                    nodes.extend(vectorize_moments(ref_el, dim, entity, Q, phis))
+
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
         super(StokesDual, self).__init__(nodes, ref_el, entity_ids)
 
@@ -385,17 +401,18 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import FIAT
 
-    dim = 3
+    dim = 2
     degree = 6
     ref_el = FIAT.reference_element.symmetric_simplex(dim)
-    fe = Stokes(ref_el, degree)
-    # fe = MacroStokes(ref_el, degree)
+    # fe = Stokes(ref_el, degree)
+    fe = MacroStokes(ref_el, degree)
+
     Q = create_quadrature(fe.ref_complex, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
-    df = DivStokes(ref_el, degree-1)
-    df = FIAT.RestrictedElement(df, restriction_domain="reduced")
-    print(df.tabulate(0, ref_el.vertices)[(0,)*dim])
+    # df = DivStokes(ref_el, degree-1)
+    # df = FIAT.RestrictedElement(df, restriction_domain="reduced")
+    # print(df.tabulate(0, ref_el.vertices)[(0,)*dim])
 
     family = type(fe).__name__
     domains = (None, "reduced", "facet")
