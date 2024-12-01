@@ -20,6 +20,7 @@ from FIAT.polynomial_set import make_bubbles, ONPolynomialSet
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.bernstein import Bernstein
+from FIAT.hierarchical import make_dual_bubbles
 
 
 def eps(table_u):
@@ -36,54 +37,59 @@ def inner(v, u, Qwts):
                            axes=(range(1, v.ndim), range(1, u.ndim)))
 
 
-def map_duals(ref_el, dim, entity, mapping, Q_ref, Phis):
-    assert mapping is None
-    Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-    Jdet = Q.jacobian_determinant()
-    phis = (1 / Jdet) * Phis
-    return Q, phis
-
-
 def jacobi_duals(ref_el, weight, trial_degree, test_degree):
     facet = ref_el.construct_subelement(1)
     Q = create_quadrature(facet, trial_degree + test_degree)
     x = facet.compute_barycentric_coordinates(Q.get_points())
-    xhat = x[:, 1:] - x[:, :1]
-    a = weight
-    phis = jacobi.eval_jacobi_batch(a, a, test_degree, xhat)
+    phis = jacobi.eval_jacobi_batch(weight, weight, test_degree, x[:, 1:] - x[:, :1])
     return Q, phis
 
 
 def dubiner_duals(ref_el, dim, trial_degree, test_degree):
-    if dim == 0:
-        return None, []
-
     facet = ref_el.construct_subelement(dim)
-    V = ONPolynomialSet(facet, test_degree, scale="orthonormal")
-    Q = create_quadrature(facet, trial_degree + V.degree)
-    phis = V.tabulate(Q.get_points())[(0,)*dim]
+    Q = create_quadrature(facet, trial_degree + test_degree)
+    P = ONPolynomialSet(facet, test_degree, scale="orthonormal")
+    phis = P.tabulate(Q.get_points())[(0,)*dim]
     return Q, phis
 
 
-def vectorize_moments(ref_el, dim, entity, Q, phis):
+def bubble_duals(ref_el, dim, degree):
     sd = ref_el.get_spatial_dimension()
+    facet = ref_el.construct_subelement(dim)
+    Q, phis = make_dual_bubbles(facet, degree)
+    if dim == sd-1:
+        phis[0] = 1.0
+    return Q, phis
+
+
+def map_duals(ref_el, dim, entity, Q_ref, Phis):
+    Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+    phis = (1 / Q.jacobian_determinant()) * Phis
+    return Q, phis
+
+
+def generate_vector_moments(ref_el, dim, entity, Q_ref, Phis):
+    Q, phis = map_duals(ref_el, dim, entity, Q_ref, Phis)
+    sd = ref_el.get_spatial_dimension()
+    start = 0
     if dim == sd - 1:
         t = ref_el.compute_tangents(dim, entity)
         n = numpy.dot([[0, 1], [-1, 0]], *t) if sd == 2 else numpy.cross(*t)
-        comps = (n, *t)
+        comps = numpy.array((n, *t))
+        # comps /= numpy.linalg.norm(comps, axis=1)[:, None]
         for phi in phis:
+            start += 1
             for comp in comps:
                 yield FrobeniusIntegralMoment(ref_el, Q, comp[:, None] * phi[None, :])
-    else:
-        shp = (sd,)
-        comps = list(numpy.ndindex(shp))
-        for phi in phis:
-            for comp in comps:
-                yield IntegralMoment(ref_el, Q, phi, comp=comp, shp=shp)
+
+    shp = (sd,)
+    comps = list(numpy.ndindex(shp))
+    for phi in phis[start:]:
+        for comp in comps:
+            yield IntegralMoment(ref_el, Q, phi, comp=comp, shp=shp)
 
 
 class StokesDual(dual_set.DualSet):
-
     def __init__(self, ref_el, degree):
         nodes = []
         entity_ids = {}
@@ -96,15 +102,12 @@ class StokesDual(dual_set.DualSet):
         edge_weight = sd-1
         Q_edge, phis_edge = jacobi_duals(ref_el, edge_weight, degree, degree-4)
 
-        mapping = None
         self._reduced_dofs = {}
         for dim in sorted(top):
             entity_ids[dim] = {}
             self._reduced_dofs[dim] = None
 
-            if dim == 1:
-                Q_ref, Phis = Q_edge, phis_edge[:moment_degree+1]
-            elif dim < sd:
+            if dim > 0 and dim < sd:
                 Q_ref, Phis = dubiner_duals(ref_el, dim, degree, moment_degree)
 
             for entity in sorted(top[dim]):
@@ -148,13 +151,12 @@ class StokesDual(dual_set.DualSet):
                     for e in edges:
                         mid_edge, = numpy.asarray(ref_el.make_points(dim-1, e, dim))
                         s = mid_face - mid_edge
-                        Q, phis = map_duals(ref_el, dim-1, e, mapping, Q_edge, phis_edge[:degree-5+1])
+                        Q, phis = map_duals(ref_el, dim-1, e, Q_edge, phis_edge[:degree-5+1])
                         nodes.extend(IntegralMomentOfDerivative(ref_el, s, Q, phi, comp=comp, shp=shp)
                                      for phi in phis for comp in comps)
 
                 # Rest of the facet moments
-                Q, phis = map_duals(ref_el, dim, entity, mapping, Q_ref, Phis)
-                nodes.extend(vectorize_moments(ref_el, dim, entity, Q, phis))
+                nodes.extend(generate_vector_moments(ref_el, dim, entity, Q_ref, Phis))
 
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
@@ -221,7 +223,7 @@ class StokesDual(dual_set.DualSet):
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Return the list of dofs with support on the given restriction domain.
-        Allows for reduced Demkowicz elements, excluding the exterior
+        Allows for reduced Stokes elements, excluding the exterior
         derivative of the previous space in the de Rham complex.
 
         :arg restriction_domain: can be 'reduced', 'interior', 'vertex',
@@ -244,8 +246,10 @@ class Stokes(finite_element.CiarletElement):
     """Simplicial continuous element that decouples div-free modes and
     simultaneously diagonalizes the div-div and eps-eps inner-products on
     the reference element."""
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree=None):
         sd = ref_el.get_spatial_dimension()
+        if degree is None:
+            degree = 2*sd
         if degree < 2*sd:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= {2*sd}")
 
@@ -256,7 +260,6 @@ class Stokes(finite_element.CiarletElement):
 
 
 class MacroStokesDual(StokesDual):
-
     def __init__(self, ref_complex, degree):
         nodes = []
         entity_ids = {}
@@ -266,16 +269,12 @@ class MacroStokesDual(StokesDual):
         shp = (sd,)
         comps = list(numpy.ndindex(shp))
 
-        mapping = None
         self._reduced_dofs = {}
         for dim in sorted(top):
             entity_ids[dim] = {}
 
-            moment_degree = degree - (dim+1)
-            if dim == 1:
-                Q_ref, Phis = jacobi_duals(ref_complex, 0, degree, moment_degree)
-            elif dim > 0 and dim < sd:
-                Q_ref, Phis = dubiner_duals(ref_complex, dim, degree, moment_degree)
+            if dim > 0 and dim < sd:
+                Q_ref, Phis = bubble_duals(ref_complex, dim, degree)
 
             self._reduced_dofs[dim] = None
             for entity in sorted(top[dim]):
@@ -292,8 +291,7 @@ class MacroStokesDual(StokesDual):
                     nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 else:
                     # Facet dofs
-                    Q, phis = map_duals(ref_el, dim, entity, mapping, Q_ref, Phis)
-                    nodes.extend(vectorize_moments(ref_el, dim, entity, Q, phis))
+                    nodes.extend(generate_vector_moments(ref_el, dim, entity, Q_ref, Phis))
 
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
         super(StokesDual, self).__init__(nodes, ref_el, entity_ids)
@@ -303,8 +301,10 @@ class MacroStokes(finite_element.CiarletElement):
     """Simplicial continuous element that decouples div-free modes and
     simultaneously diagonalizes the div-div and eps-eps inner-products on
     the reference element."""
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree=None):
         sd = ref_el.get_spatial_dimension()
+        if degree is None:
+            degree = sd
         if degree < sd:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= {sd}")
 
@@ -324,7 +324,6 @@ class DivStokesDual(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         Q = create_quadrature(ref_el, 2*degree)
 
-        mapping = None
         for dim in sorted(top):
             entity_ids[dim] = {}
             for entity in sorted(top[dim]):
@@ -339,7 +338,7 @@ class DivStokesDual(dual_set.DualSet):
             # Edge dofs
             Q_ref, Phis = jacobi_duals(ref_el, 0, degree, degree-2)
             for entity in top[1]:
-                Q_edge, phis = map_duals(ref_el, 1, entity, mapping, Q_ref, Phis)
+                Q_edge, phis = map_duals(ref_el, 1, entity, Q_ref, Phis)
                 nodes.extend(IntegralMoment(ref_el, Q_edge, phi) for phi in phis)
 
         # Interior dof
@@ -367,7 +366,7 @@ class DivStokesDual(dual_set.DualSet):
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Return the list of dofs with support on the given restriction domain.
-        Allows for reduced Demkowicz elements, excluding the exterior
+        Allows for reduced Stokes elements, excluding the exterior
         derivative of the previous space in the de Rham complex.
 
         :arg restriction_domain: can be 'reduced', 'interior', 'vertex',
@@ -398,14 +397,31 @@ class DivStokes(finite_element.CiarletElement):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
     import FIAT
+    import matplotlib.pyplot as plt
+    import sys
+    numpy.set_printoptions(threshold=sys.maxsize)
 
     dim = 2
-    degree = 6
+    degree = 4
     ref_el = FIAT.reference_element.symmetric_simplex(dim)
     # fe = Stokes(ref_el, degree)
     fe = MacroStokes(ref_el, degree)
+    C = fe.poly_set.coeffs
+    C = (abs(C) > 1E-10).astype(int)
+
+    idofs = len(fe.entity_dofs()[dim][0])
+    ref_complex = fe.get_reference_complex()
+    top = ref_complex.topology
+    entity_ids = expansions.polynomial_entity_ids(ref_complex, fe.degree(), continuity="C0")
+    ids = []
+    for dim in top:
+        int_facets = ref_complex.get_interior_facets(dim)
+        for e in top[dim]:
+            if e in int_facets:
+                continue
+            ids.extend(entity_ids[dim][e])
+    print(C[:-idofs][:, :, ids])
 
     Q = create_quadrature(fe.ref_complex, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()

@@ -29,7 +29,7 @@ def test_kmv_quad_tet_schemes(p_d):  # noqa: W503
                 )
 
 
-@pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 5), (4, 7), (5, 9)])
+@pytest.mark.parametrize("p_d", [(1, 1), (2, 3), (3, 5), (4, 7), (5, 9), (6, 11)])
 def test_kmv_quad_tri_schemes(p_d):
     fct = math.factorial
     p, d = p_d
@@ -44,7 +44,7 @@ def test_kmv_quad_tri_schemes(p_d):
 
 @pytest.mark.parametrize(
     "element_degree",
-    [(KMV(T, 1), 1), (KMV(T, 2), 2), (KMV(T, 3), 3), (KMV(T, 4), 4), (KMV(T, 5), 5)],
+    [(KMV(T, 1), 1), (KMV(T, 2), 2), (KMV(T, 3), 3), (KMV(T, 4), 4), (KMV(T, 5), 5), (KMV(T, 6), 6)],
 )
 def test_Kronecker_property_tris(element_degree):
     """
@@ -101,7 +101,7 @@ def test_edge_degree(degree):
 
 @pytest.mark.parametrize(
     "element_degree",
-    [(KMV(T, 1), 1), (KMV(T, 2), 2), (KMV(T, 3), 3), (KMV(T, 4), 4), (KMV(T, 5), 5)],
+    [(KMV(T, 1), 1), (KMV(T, 2), 2), (KMV(T, 3), 3), (KMV(T, 4), 4), (KMV(T, 5), 5), (KMV(T, 6), 6)],
 )
 def test_interpolate_monomials_tris(element_degree):
     element, degree = element_degree

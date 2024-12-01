@@ -20,7 +20,7 @@ from FIAT.check_format_variant import parse_lagrange_variant
 def make_dual_bubbles(ref_el, degree, codim=0):
     """Tabulate the L2-duals of the hierarchical C0 basis."""
     Q = create_quadrature(ref_el, 2 * degree)
-    B = make_bubbles(ref_el, degree, codim=codim, scale="orthonormal")
+    B = make_bubbles(ref_el, degree, codim=codim, scale=1)
     P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
 
     M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)

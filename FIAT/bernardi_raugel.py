@@ -75,6 +75,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             Q, phis = make_dual_bubbles(ref_facet, degree, codim=codim)
             f_at_qpts = phis[-1]
             if codim != 0:
+                # Only for Christiansen-Hu
                 f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / ref_facet.volume()
 
             interior_facets = ref_el.get_interior_facets(sd-1) or ()
@@ -92,8 +93,9 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                         udir = numpy.dot(R, *thats[f]) if sd == 2 else numpy.cross(*thats[f])
                     else:
                         udir = thats[f][i-1]
-                    detJ = Qs[f].jacobian_determinant()
-                    phi_at_qpts = udir[:, None] * f_at_qpts[None, :] / detJ
+
+                    phi_at_qpts = udir[:, None] * f_at_qpts[None, :]
+                    phi_at_qpts *= 1 / Qs[f].jacobian_determinant()
                     nodes.append(FrobeniusIntegralMoment(ref_el, Qs[f], phi_at_qpts))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
