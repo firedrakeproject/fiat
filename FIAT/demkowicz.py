@@ -229,7 +229,7 @@ class FDMDual(DemkowiczDual):
         self.V1 = exterior_derivative(phis)
         super().__init__(ref_el, degree, sobolev_space, kind=None)
 
-    def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind):
+    def _reference_duals(self, dim, degree, formdegree, sobolev_space, kind, variant):
         entity_dofs = self.fe.entity_dofs()
         ells = self.fe.dual_basis()
         Ref_el = self.fe.get_reference_element()
