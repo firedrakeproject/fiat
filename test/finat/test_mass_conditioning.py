@@ -1,10 +1,7 @@
-import FIAT
 import finat
 import numpy as np
 import pytest
 from gem.interpreter import evaluate
-
-from fiat_mapping import FiredrakeMapping
 
 
 @pytest.mark.parametrize("element, degree, variant", [
@@ -19,9 +16,9 @@ from fiat_mapping import FiredrakeMapping
     (finat.Argyris, 5, None),
     (finat.Argyris, 6, None),
 ])
-def test_mass_scaling(element, degree, variant):
+def test_mass_scaling(scaled_ref_to_phys, element, degree, variant):
     sd = 2
-    ref_cell = FIAT.ufc_simplex(sd)
+    ref_cell = scaled_ref_to_phys[sd][0].ref_cell
     if variant is not None:
         ref_element = element(ref_cell, degree, variant=variant)
     else:
@@ -32,12 +29,7 @@ def test_mass_scaling(element, degree, variant):
     qwts = Q.weights
 
     kappa = []
-    for k in range(3):
-        h = 2 ** -k
-        phys_cell = FIAT.ufc_simplex(2)
-        new_verts = h * np.array(phys_cell.get_vertices())
-        phys_cell.vertices = tuple(map(tuple, new_verts))
-        mapping = FiredrakeMapping(ref_cell, phys_cell)
+    for mapping in scaled_ref_to_phys[sd]:
         J_gem = mapping.jacobian_at(ref_cell.make_points(sd, 0, sd+1)[0])
         J = evaluate([J_gem])[0].arr
 
