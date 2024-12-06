@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.tensor_product &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.tensor_product</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.tensor_product</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2008 Robert C. Kirby (Texas Tech University)</span>
+<span class="c1"># Copyright (C) 2013 Andrew T. T. McRae</span>
+<span class="c1"># Modified by Thomas H. Gibson, 2016</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">TensorProductCell</span><span class="p">,</span> <span class="n">UFCQuadrilateral</span><span class="p">,</span> <span class="n">UFCHexahedron</span><span class="p">,</span> <span class="n">flatten_entities</span><span class="p">,</span> <span class="n">compute_unflattening_map</span>
+<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">dual_set</span>
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">functional</span>
+
+
+<span class="k">def</span> <span class="nf">_first_point</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+
+
+<span class="k">def</span> <span class="nf">_first_point_pair</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="TensorProductElement">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement">[docs]</a>
+<span class="k">class</span> <span class="nc">TensorProductElement</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class implementing a finite element that is the tensor product</span>
+<span class="sd">    of two existing finite elements.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
+        <span class="c1"># set up simple things</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">get_order</span><span class="p">(),</span> <span class="n">B</span><span class="o">.</span><span class="n">get_order</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">formdegree</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">formdegree</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="o">+</span> <span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span>
+
+        <span class="c1"># set up reference element</span>
+        <span class="n">ref_el</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span>
+                                   <span class="n">B</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;affine&quot;</span> <span class="ow">and</span> <span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;affine&quot;</span> <span class="ow">and</span> <span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span> <span class="ow">and</span> <span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="s2">&quot;affine&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;check tensor product mappings - at least one must be affine&quot;</span><span class="p">)</span>
+
+        <span class="c1"># set up entity_ids</span>
+        <span class="n">Adofs</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
+        <span class="n">Bdofs</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
+        <span class="n">Bsdim</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">curAdim</span> <span class="ow">in</span> <span class="n">Adofs</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">curBdim</span> <span class="ow">in</span> <span class="n">Bdofs</span><span class="p">:</span>
+                <span class="n">entity_ids</span><span class="p">[(</span><span class="n">curAdim</span><span class="p">,</span> <span class="n">curBdim</span><span class="p">)]</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="n">dim_cur</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">for</span> <span class="n">entityA</span> <span class="ow">in</span> <span class="n">Adofs</span><span class="p">[</span><span class="n">curAdim</span><span class="p">]:</span>
+                    <span class="k">for</span> <span class="n">entityB</span> <span class="ow">in</span> <span class="n">Bdofs</span><span class="p">[</span><span class="n">curBdim</span><span class="p">]:</span>
+                        <span class="n">entity_ids</span><span class="p">[(</span><span class="n">curAdim</span><span class="p">,</span> <span class="n">curBdim</span><span class="p">)][</span><span class="n">dim_cur</span><span class="p">]</span> <span class="o">=</span> \
+                            <span class="p">[</span><span class="n">x</span><span class="o">*</span><span class="n">Bsdim</span> <span class="o">+</span> <span class="n">y</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">Adofs</span><span class="p">[</span><span class="n">curAdim</span><span class="p">][</span><span class="n">entityA</span><span class="p">]</span>
+                                <span class="k">for</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">Bdofs</span><span class="p">[</span><span class="n">curBdim</span><span class="p">][</span><span class="n">entityB</span><span class="p">]]</span>
+                        <span class="n">dim_cur</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># set up dual basis</span>
+        <span class="n">Anodes</span> <span class="o">=</span> <span class="n">A</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">()</span>
+        <span class="n">Bnodes</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">()</span>
+
+        <span class="c1"># build the dual set by inspecting the current dual</span>
+        <span class="c1"># sets item by item.</span>
+        <span class="c1"># Currently supported cases:</span>
+        <span class="c1"># PointEval x PointEval = PointEval [scalar x scalar = scalar]</span>
+        <span class="c1"># PointScaledNormalEval x PointEval = PointScaledNormalEval [vector x scalar = vector]</span>
+        <span class="c1"># ComponentPointEvaluation x PointEval [vector x scalar = vector]</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">Anode</span> <span class="ow">in</span> <span class="n">Anodes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                        <span class="c1"># case: PointEval x PointEval</span>
+                        <span class="c1"># the PointEval functional just requires the</span>
+                        <span class="c1"># coordinates. these are currently stored as</span>
+                        <span class="c1"># the key of a one-item dictionary. we retrieve</span>
+                        <span class="c1"># these by calling get_point_dict(), and</span>
+                        <span class="c1"># use the concatenation to make a new PointEval</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Anode</span><span class="p">)</span> <span class="o">+</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">)))</span>
+                    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">):</span>
+                        <span class="c1"># dummy functional for product with integral moments</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+                                                           <span class="p">{},</span> <span class="s2">&quot;Undefined&quot;</span><span class="p">))</span>
+                    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointDerivative</span><span class="p">):</span>
+                        <span class="c1"># dummy functional for product with point derivative</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+                                                           <span class="p">{},</span> <span class="s2">&quot;Undefined&quot;</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;unsupported functional type&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointScaledNormalEvaluation</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                        <span class="c1"># case: PointScaledNormalEval x PointEval</span>
+                        <span class="c1"># this could be wrong if the second shape</span>
+                        <span class="c1"># has spatial dimension &gt;1, since we are not</span>
+                        <span class="c1"># explicitly scaling by facet size</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                            <span class="c1"># TODO: support this case one day</span>
+                            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;PointScaledNormalEval x PointEval is not yet supported if the second shape has dimension &gt; 1&quot;</span><span class="p">)</span>
+                        <span class="c1"># We cannot make a new functional.PSNEval in</span>
+                        <span class="c1"># the natural way, since it tries to compute</span>
+                        <span class="c1"># the normal vector by itself.</span>
+                        <span class="c1"># Instead, we create things manually, and</span>
+                        <span class="c1"># call Functional() with these arguments</span>
+                        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                        <span class="c1"># The pt_dict is a one-item dictionary containing</span>
+                        <span class="c1"># the details of the functional.</span>
+                        <span class="c1"># The key is the spatial coordinate, which</span>
+                        <span class="c1"># is just a concatenation of the two parts.</span>
+                        <span class="c1"># The value is a list of tuples, representing</span>
+                        <span class="c1"># the normal vector (scaled by the volume of</span>
+                        <span class="c1"># the facet) at that point.</span>
+                        <span class="c1"># Each tuple looks like (foo, (i,)); the i&#39;th</span>
+                        <span class="c1"># component of the scaled normal is foo.</span>
+
+                        <span class="c1"># The following line is only valid when the second</span>
+                        <span class="c1"># shape has spatial dimension 1 (enforced above)</span>
+                        <span class="n">Apoint</span><span class="p">,</span> <span class="n">Avalue</span> <span class="o">=</span> <span class="n">_first_point_pair</span><span class="p">(</span><span class="n">Anode</span><span class="p">)</span>
+                        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">Apoint</span> <span class="o">+</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">):</span> <span class="n">Avalue</span> <span class="o">+</span> <span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Apoint</span><span class="p">),))]}</span>
+
+                        <span class="c1"># The following line should be used in the</span>
+                        <span class="c1"># general case</span>
+                        <span class="c1"># pt_dict = {Anode.get_point_dict().keys()[0] + Bnode.get_point_dict().keys()[0]: Anode.get_point_dict().values()[0] + [(0.0, (ii,)) for ii in range(len(Anode.get_point_dict().keys()[0]), len(Anode.get_point_dict().keys()[0]) + len(Bnode.get_point_dict().keys()[0]))]}</span>
+
+                        <span class="c1"># THE FOLLOWING IS PROBABLY CORRECT BUT UNTESTED</span>
+                        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointScaledNormalEval&quot;</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;unsupported functional type&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEdgeTangentEvaluation</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                        <span class="c1"># case: PointEdgeTangentEval x PointEval</span>
+                        <span class="c1"># this is very similar to the case above, so comments omitted</span>
+                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;PointEdgeTangentEval x PointEval is not yet supported if the second shape has dimension &gt; 1&quot;</span><span class="p">)</span>
+                        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                        <span class="n">Apoint</span><span class="p">,</span> <span class="n">Avalue</span> <span class="o">=</span> <span class="n">_first_point_pair</span><span class="p">(</span><span class="n">Anode</span><span class="p">)</span>
+                        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">Apoint</span> <span class="o">+</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">):</span> <span class="n">Avalue</span> <span class="o">+</span> <span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Apoint</span><span class="p">),))]}</span>
+
+                        <span class="c1"># THE FOLLOWING IS PROBABLY CORRECT BUT UNTESTED</span>
+                        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointEdgeTangent&quot;</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;unsupported functional type&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">ComponentPointEvaluation</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                        <span class="c1"># case: ComponentPointEval x PointEval</span>
+                        <span class="c1"># the CptPointEval functional requires the component</span>
+                        <span class="c1"># and the coordinates. very similar to PE x PE case.</span>
+                        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">ComponentPointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Anode</span><span class="o">.</span><span class="n">comp</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Anode</span><span class="p">)</span> <span class="o">+</span> <span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">)))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;unsupported functional type&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                        <span class="c1"># case: FroIntMom x PointEval</span>
+                        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{}</span>
+                        <span class="n">pt_old</span> <span class="o">=</span> <span class="n">Anode</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
+                        <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">pt_old</span><span class="p">:</span>
+                            <span class="n">pt_dict</span><span class="p">[</span><span class="n">pt</span><span class="o">+</span><span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">)]</span> <span class="o">=</span> <span class="n">pt_old</span><span class="p">[</span><span class="n">pt</span><span class="p">]</span> <span class="o">+</span> <span class="p">[(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+                        <span class="c1"># THE FOLLOWING IS PROBABLY CORRECT BUT UNTESTED</span>
+                        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;FrobeniusIntegralMoment&quot;</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;unsupported functional type&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Bnode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                        <span class="c1"># case: IntMom x PointEval</span>
+                        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{}</span>
+                        <span class="n">pt_old</span> <span class="o">=</span> <span class="n">Anode</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
+                        <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">pt_old</span><span class="p">:</span>
+                            <span class="n">pt_dict</span><span class="p">[</span><span class="n">pt</span><span class="o">+</span><span class="n">_first_point</span><span class="p">(</span><span class="n">Bnode</span><span class="p">)]</span> <span class="o">=</span> <span class="n">pt_old</span><span class="p">[</span><span class="n">pt</span><span class="p">]</span>
+                        <span class="c1"># THE FOLLOWING IS PROBABLY CORRECT BUT UNTESTED</span>
+                        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span>
+                        <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;IntegralMoment&quot;</span><span class="p">))</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;unsupported functional type&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">Anode</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">):</span>
+                <span class="c1"># this should catch everything else</span>
+                <span class="k">for</span> <span class="n">Bnode</span> <span class="ow">in</span> <span class="n">Bnodes</span><span class="p">:</span>
+                    <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;Undefined&quot;</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;unsupported functional type&quot;</span><span class="p">)</span>
+
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
+        <span class="c1"># Set up constituent elements</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">=</span> <span class="n">A</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">B</span> <span class="o">=</span> <span class="n">B</span>
+
+        <span class="c1"># degree for quadrature rule</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">polydegree</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">degree</span><span class="p">(),</span> <span class="n">B</span><span class="o">.</span><span class="n">degree</span><span class="p">())</span>
+
+<div class="viewcode-block" id="TensorProductElement.degree">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.degree">[docs]</a>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the (embedding) polynomial space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polydegree</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.get_nodal_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.get_nodal_basis">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
+<span class="sd">        for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.get_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.get_coeffs">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
+<span class="sd">        finite element.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.tabulate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.tabulate">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
+<span class="sd">        basis functions at given points.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span> <span class="o">=</span> <span class="n">entity</span>
+
+        <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">d</span><span class="p">])</span>
+                      <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">))</span>
+        <span class="n">idA</span><span class="p">,</span> <span class="n">idB</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">unravel_index</span><span class="p">(</span><span class="n">entity_id</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span>
+
+        <span class="c1"># Factor the entity argument to get entities of the component elements</span>
+        <span class="n">entityA_dim</span><span class="p">,</span> <span class="n">entityB_dim</span> <span class="o">=</span> <span class="n">entity_dim</span>
+        <span class="n">entityA</span> <span class="o">=</span> <span class="p">(</span><span class="n">entityA_dim</span><span class="p">,</span> <span class="n">idA</span><span class="p">)</span>
+        <span class="n">entityB</span> <span class="o">=</span> <span class="p">(</span><span class="n">entityB_dim</span><span class="p">,</span> <span class="n">idB</span><span class="p">)</span>
+
+        <span class="n">pointsAdim</span><span class="p">,</span> <span class="n">pointsBdim</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                                  <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">)</span><span class="o">.</span><span class="n">cells</span><span class="p">]</span>
+        <span class="n">pointsA</span> <span class="o">=</span> <span class="p">[</span><span class="n">point</span><span class="p">[:</span><span class="n">pointsAdim</span><span class="p">]</span> <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]</span>
+        <span class="n">pointsB</span> <span class="o">=</span> <span class="p">[</span><span class="n">point</span><span class="p">[</span><span class="n">pointsAdim</span><span class="p">:</span><span class="n">pointsAdim</span> <span class="o">+</span> <span class="n">pointsBdim</span><span class="p">]</span> <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]</span>
+
+        <span class="n">Asdim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">Bsdim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="c1"># Note that for entities other than cells, the following</span>
+        <span class="c1"># tabulations are already appropriately zero-padded so no</span>
+        <span class="c1"># additional zero padding is required.</span>
+        <span class="n">Atab</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">pointsA</span><span class="p">,</span> <span class="n">entityA</span><span class="p">)</span>
+        <span class="n">Btab</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">pointsB</span><span class="p">,</span> <span class="n">entityB</span><span class="p">)</span>
+        <span class="n">npoints</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+
+        <span class="c1"># allow 2 scalar-valued FE spaces, or 1 scalar-valued,</span>
+        <span class="c1"># 1 vector-valued. Combining 2 vector-valued spaces</span>
+        <span class="c1"># into a tensor-valued space via an outer-product</span>
+        <span class="c1"># seems to be a sensible general option, but I don&#39;t</span>
+        <span class="c1"># know how to handle the nestedness of the arrays</span>
+        <span class="c1"># if someone then tries to make a new &quot;tensor finite</span>
+        <span class="c1"># element&quot; where one component is already a</span>
+        <span class="c1"># tensor-valued space!</span>
+        <span class="n">A_valuedim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span>  <span class="c1"># scalar: 0, vector: 1</span>
+        <span class="n">B_valuedim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span>  <span class="c1"># scalar: 0, vector: 1</span>
+        <span class="k">if</span> <span class="n">A_valuedim</span> <span class="o">+</span> <span class="n">B_valuedim</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;tabulate does not support two vector-valued inputs&quot;</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">Asdim</span><span class="o">+</span><span class="n">Bsdim</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>  <span class="c1"># thanks, Rob!</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">A_valuedim</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">B_valuedim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># for each point, get outer product of (A&#39;s basis</span>
+                    <span class="c1"># functions f1, f2, ... evaluated at that point)</span>
+                    <span class="c1"># with (B&#39;s basis functions g1, g2, ... evaluated</span>
+                    <span class="c1"># at that point). This gives temp[point][f_i][g_j].</span>
+                    <span class="c1"># Flatten this, so bfs are</span>
+                    <span class="c1"># in the order f1g1, f1g2, ..., f2g1, f2g2, ...</span>
+                    <span class="c1"># which is compatible with the entity_dofs order.</span>
+                    <span class="c1"># We now have temp[point][full basis function]</span>
+                    <span class="c1"># Transpose this to get temp[bf][point],</span>
+                    <span class="c1"># and we are done.</span>
+                    <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span>
+                                       <span class="n">Atab</span><span class="p">[</span><span class="n">alpha</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">Asdim</span><span class="p">]][</span><span class="o">...</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span>
+                                       <span class="n">Btab</span><span class="p">[</span><span class="n">alpha</span><span class="p">[</span><span class="n">Asdim</span><span class="p">:</span><span class="n">Asdim</span><span class="o">+</span><span class="n">Bsdim</span><span class="p">]][</span><span class="o">...</span><span class="p">,</span> <span class="n">j</span><span class="p">])</span>
+                        <span class="o">.</span><span class="n">ravel</span><span class="p">()</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">npoints</span><span class="p">)])</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+                <span class="k">elif</span> <span class="n">A_valuedim</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">B_valuedim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># similar to above, except A&#39;s basis functions</span>
+                    <span class="c1"># are now vector-valued. numpy.outer flattens the</span>
+                    <span class="c1"># array, so it&#39;s like taking the OP of</span>
+                    <span class="c1"># f1_x, f1_y, f2_x, f2_y, ... with g1, g2, ...</span>
+                    <span class="c1"># this gives us</span>
+                    <span class="c1"># temp[point][f1x, f1y, f2x, f2y, ...][g_j].</span>
+                    <span class="c1"># reshape once to get temp[point][f_i][x/y][g_j]</span>
+                    <span class="c1"># transpose to get temp[point][x/y][f_i][g_j]</span>
+                    <span class="c1"># reshape to flatten the last two indices, this</span>
+                    <span class="c1"># gives us temp[point][x/y][full bf_i]</span>
+                    <span class="c1"># finally, transpose the first and last indices</span>
+                    <span class="c1"># to get temp[bf_i][x/y][point], and we are done.</span>
+                    <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span>
+                                       <span class="n">Atab</span><span class="p">[</span><span class="n">alpha</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">Asdim</span><span class="p">]][</span><span class="o">...</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span>
+                                       <span class="n">Btab</span><span class="p">[</span><span class="n">alpha</span><span class="p">[</span><span class="n">Asdim</span><span class="p">:</span><span class="n">Asdim</span><span class="o">+</span><span class="n">Bsdim</span><span class="p">]][</span><span class="o">...</span><span class="p">,</span> <span class="n">j</span><span class="p">])</span>
+                        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">npoints</span><span class="p">)])</span>
+                    <span class="k">assert</span> <span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span>
+                    <span class="n">temp2</span> <span class="o">=</span> <span class="n">temp</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                                          <span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">//</span><span class="mi">2</span><span class="p">,</span>
+                                          <span class="mi">2</span><span class="p">,</span>
+                                          <span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>\
+                        <span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>\
+                        <span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">2</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>\
+                        <span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp2</span>
+                <span class="k">elif</span> <span class="n">A_valuedim</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">B_valuedim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="c1"># as above, with B&#39;s functions now vector-valued.</span>
+                    <span class="c1"># we now do... [numpy.outer ... for ...] gives</span>
+                    <span class="c1"># temp[point][f_i][g1x,g1y,g2x,g2y,...].</span>
+                    <span class="c1"># reshape to temp[point][f_i][g_j][x/y]</span>
+                    <span class="c1"># flatten middle: temp[point][full bf_i][x/y]</span>
+                    <span class="c1"># transpose to temp[bf_i][x/y][point]</span>
+                    <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span>
+                        <span class="n">Atab</span><span class="p">[</span><span class="n">alpha</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">Asdim</span><span class="p">]][</span><span class="o">...</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span>
+                        <span class="n">Btab</span><span class="p">[</span><span class="n">alpha</span><span class="p">[</span><span class="n">Asdim</span><span class="p">:</span><span class="n">Asdim</span><span class="o">+</span><span class="n">Bsdim</span><span class="p">]][</span><span class="o">...</span><span class="p">,</span> <span class="n">j</span><span class="p">])</span>
+                        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Atab</span><span class="p">[</span><span class="n">alpha</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="n">Asdim</span><span class="p">]][</span><span class="mi">0</span><span class="p">]))])</span>
+                    <span class="k">assert</span> <span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span>
+                    <span class="n">temp2</span> <span class="o">=</span> <span class="n">temp</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                                          <span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">//</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>\
+                        <span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">temp</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>\
+                        <span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp2</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.value_shape">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.value_shape">[docs]</a>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the value shape of the finite element functions.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">()</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()[</span><span class="mi">0</span><span class="p">],)</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()[</span><span class="mi">0</span><span class="p">],)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;value_shape not implemented&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.dmats">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.dmats">[docs]</a>
+    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
+<span class="sd">        derivatives.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;dmats not implemented&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.get_num_members">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.get_num_members">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return number of members of the expansion set.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_num_members not implemented&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.is_nodal">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.TensorProductElement.is_nodal">[docs]</a>
+    <span class="k">def</span> <span class="nf">is_nodal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># This element is nodal iff all factor elements are nodal.</span>
+        <span class="k">return</span> <span class="nb">all</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">is_nodal</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">is_nodal</span><span class="p">()])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="FlattenedDimensions">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions">[docs]</a>
+<span class="k">class</span> <span class="nc">FlattenedDimensions</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A wrapper class that flattens entity dimensions of a FIAT element defined</span>
+<span class="sd">    on a TensorProductCell to one with quadrilateral/hexahedron entities.</span>
+<span class="sd">    TensorProductCell has dimension defined as a tuple of factor element dimensions</span>
+<span class="sd">    (i, j) in 2D  and (i, j, k) in 3D.</span>
+<span class="sd">    Flattened dimension is a sum of the tuple elements.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
+
+        <span class="n">nodes</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">nodes</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">ref_el</span> <span class="o">=</span> <span class="n">UFCQuadrilateral</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">ref_el</span> <span class="o">=</span> <span class="n">UFCHexahedron</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Illegal element dimension </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">dim</span><span class="p">)</span>
+
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">entity_ids</span>
+
+        <span class="n">flat_entity_ids</span> <span class="o">=</span> <span class="n">flatten_entities</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">DualSet</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">flat_entity_ids</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">get_order</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">_mapping</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">element</span> <span class="o">=</span> <span class="n">element</span>
+
+        <span class="c1"># Construct unflattening map for passing correct values to tabulate()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">())</span>
+
+<div class="viewcode-block" id="FlattenedDimensions.degree">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.degree">[docs]</a>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the (embedding) polynomial space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FlattenedDimensions.tabulate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.tabulate">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
+<span class="sd">        basis functions at given points.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># Entity is provided in flattened form (d, i)</span>
+        <span class="c1"># Appropriate product entity is taken from the unflattening_map dict</span>
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span> <span class="o">=</span> <span class="n">entity</span>
+        <span class="n">product_entity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">)]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">product_entity</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FlattenedDimensions.value_shape">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.value_shape">[docs]</a>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the value shape of the finite element functions.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FlattenedDimensions.get_nodal_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.get_nodal_basis">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
+<span class="sd">        for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FlattenedDimensions.get_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.get_coeffs">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
+<span class="sd">        finite element.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FlattenedDimensions.dmats">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.dmats">[docs]</a>
+    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
+<span class="sd">        derivatives.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">dmats</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FlattenedDimensions.get_num_members">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.get_num_members">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return number of members of the expansion set.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FlattenedDimensions.is_nodal">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.tensor_product.FlattenedDimensions.is_nodal">[docs]</a>
+    <span class="k">def</span> <span class="nf">is_nodal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># This element is nodal iff unflattened element is nodal.</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">is_nodal</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.tensor_product</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

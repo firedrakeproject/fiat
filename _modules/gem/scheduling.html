@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gem.scheduling &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">gem.scheduling</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for gem.scheduling</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Schedules operations to evaluate a multi-root expression DAG,</span>
+<span class="sd">forming an ordered list of Impero terminals.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+
+<span class="kn">from</span> <span class="nn">gem</span> <span class="kn">import</span> <span class="n">gem</span><span class="p">,</span> <span class="n">impero</span>
+<span class="kn">from</span> <span class="nn">gem.node</span> <span class="kn">import</span> <span class="n">collect_refcount</span>
+
+
+<div class="viewcode-block" id="OrderedDefaultDict">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.OrderedDefaultDict">[docs]</a>
+<span class="k">class</span> <span class="nc">OrderedDefaultDict</span><span class="p">(</span><span class="n">collections</span><span class="o">.</span><span class="n">OrderedDict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A dictionary that provides a default value and ordered iteration.</span>
+
+<span class="sd">    :arg factory: The callable used to create the default value.</span>
+
+<span class="sd">    See :class:`collections.OrderedDict` for description of the</span>
+<span class="sd">    remaining arguments.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factory</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">factory</span> <span class="o">=</span> <span class="n">factory</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">OrderedDefaultDict</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__missing__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">):</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">factory</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">val</span></div>
+
+
+
+<div class="viewcode-block" id="ReferenceStager">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.ReferenceStager">[docs]</a>
+<span class="k">class</span> <span class="nc">ReferenceStager</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Provides staging for nodes in reference counted expression</span>
+<span class="sd">    DAGs.  A callback function is called once the reference count is</span>
+<span class="sd">    exhausted.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reference_count</span><span class="p">,</span> <span class="n">callback</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialises a ReferenceStager.</span>
+
+<span class="sd">        :arg reference_count: initial reference counts for all</span>
+<span class="sd">                              expected nodes</span>
+<span class="sd">        :arg callback: function to call on each node when</span>
+<span class="sd">                       reference count is exhausted</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">waiting</span> <span class="o">=</span> <span class="n">reference_count</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
+
+<div class="viewcode-block" id="ReferenceStager.decref">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.ReferenceStager.decref">[docs]</a>
+    <span class="k">def</span> <span class="nf">decref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decreases the reference count of a node, and possibly</span>
+<span class="sd">        triggering a callback (when the reference count drops to</span>
+<span class="sd">        zero).&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="mi">1</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">waiting</span><span class="p">[</span><span class="n">o</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">waiting</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">waiting</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="n">o</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ReferenceStager.empty">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.ReferenceStager.empty">[docs]</a>
+    <span class="k">def</span> <span class="nf">empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;All reference counts exhausted?&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">waiting</span><span class="o">.</span><span class="n">values</span><span class="p">())</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="Queue">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.Queue">[docs]</a>
+<span class="k">class</span> <span class="nc">Queue</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Special queue for operation scheduling.  GEM / Impero nodes are</span>
+<span class="sd">    inserted when they are ready to be scheduled, i.e. any operation</span>
+<span class="sd">    which depends on the operation to be inserted must have been</span>
+<span class="sd">    scheduled already.  This class implements a heuristic for ordering</span>
+<span class="sd">    operations within the constraints in a way which aims to achieve</span>
+<span class="sd">    maximum loop fusion to minimise the size of temporaries which need</span>
+<span class="sd">    to be introduced.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialises a Queue.</span>
+
+<span class="sd">        :arg callback: function called on each element &quot;popped&quot; from the queue</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Must have deterministic iteration over the queue</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">queue</span> <span class="o">=</span> <span class="n">OrderedDefaultDict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">callback</span> <span class="o">=</span> <span class="n">callback</span>
+
+<div class="viewcode-block" id="Queue.insert">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.Queue.insert">[docs]</a>
+    <span class="k">def</span> <span class="nf">insert</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">elem</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Insert element into queue.</span>
+
+<span class="sd">        :arg indices: loop indices used by the scheduling heuristic</span>
+<span class="sd">        :arg elem: element to be scheduled</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">elem</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Queue.process">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.Queue.process">[docs]</a>
+    <span class="k">def</span> <span class="nf">process</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Pops elements from the queue and calls the callback</span>
+<span class="sd">        function on them until the queue is empty.  The callback</span>
+<span class="sd">        function can insert further elements into the queue.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="p">()</span>
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="p">:</span>
+            <span class="c1"># Find innermost non-empty outer loop</span>
+            <span class="k">while</span> <span class="n">indices</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">i</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                <span class="n">indices</span> <span class="o">=</span> <span class="n">indices</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="c1"># Pick a loop</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">i</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)]</span> <span class="o">==</span> <span class="n">indices</span><span class="p">:</span>
+                    <span class="n">indices</span> <span class="o">=</span> <span class="n">i</span>
+                    <span class="k">break</span>
+
+            <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="p">[</span><span class="n">indices</span><span class="p">]:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">callback</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">())</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="handle">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.handle">[docs]</a>
+<span class="k">def</span> <span class="nf">handle</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">push</span><span class="p">,</span> <span class="n">decref</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function for scheduling&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Variable</span><span class="p">):</span>
+        <span class="c1"># Declared in the kernel header</span>
+        <span class="k">pass</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Constant</span><span class="p">):</span>
+        <span class="c1"># Constant literals inlined, unless tensor-valued</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">Evaluate</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">):</span>  <span class="c1"># should rarely happen</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">shape</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">FlexiblyIndexed</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">indirect_children</span><span class="p">:</span>
+            <span class="c1"># Do not inline;</span>
+            <span class="c1"># Index expression can be involved if it contains VariableIndex.</span>
+            <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">Evaluate</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">indirect_children</span><span class="p">):</span>
+            <span class="n">decref</span><span class="p">(</span><span class="n">child</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">):</span>
+        <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">Noop</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+        <span class="n">push</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">Accumulate</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Node</span><span class="p">):</span>
+        <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">Evaluate</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+            <span class="n">decref</span><span class="p">(</span><span class="n">child</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">impero</span><span class="o">.</span><span class="n">Initialise</span><span class="p">):</span>
+        <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">impero</span><span class="o">.</span><span class="n">Accumulate</span><span class="p">):</span>
+        <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="n">push</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">Initialise</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">indexsum</span><span class="p">))</span>
+        <span class="n">decref</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">indexsum</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">impero</span><span class="o">.</span><span class="n">Return</span><span class="p">):</span>
+        <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="n">decref</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">expression</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">impero</span><span class="o">.</span><span class="n">ReturnAccumulate</span><span class="p">):</span>
+        <span class="n">ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="n">decref</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">indexsum</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;no handler for node type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="emit_operations">
+<a class="viewcode-back" href="../../gem.html#gem.scheduling.emit_operations">[docs]</a>
+<span class="k">def</span> <span class="nf">emit_operations</span><span class="p">(</span><span class="n">assignments</span><span class="p">,</span> <span class="n">get_indices</span><span class="p">,</span> <span class="n">emit_return_accumulate</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Makes an ordering of operations to evaluate a multi-root</span>
+<span class="sd">    expression DAG.</span>
+
+<span class="sd">    :arg assignments: Iterable of (variable, expression) pairs.</span>
+<span class="sd">                      The value of expression is written into variable</span>
+<span class="sd">                      upon execution.</span>
+<span class="sd">    :arg get_indices: mapping from GEM nodes to an ordering of free</span>
+<span class="sd">                      indices</span>
+<span class="sd">    :arg emit_return_accumulate: emit ReturnAccumulate nodes? Set to</span>
+<span class="sd">                      False if the output variables are not guaranteed</span>
+<span class="sd">                      zero on entry to the kernel.</span>
+<span class="sd">    :returns: list of Impero terminals correctly ordered to evaluate</span>
+<span class="sd">              the assignments</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Prepare reference counts</span>
+    <span class="n">refcount</span> <span class="o">=</span> <span class="n">collect_refcount</span><span class="p">([</span><span class="n">e</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">assignments</span><span class="p">])</span>
+
+    <span class="c1"># Stage return operations</span>
+    <span class="n">staging</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">variable</span><span class="p">,</span> <span class="n">expression</span> <span class="ow">in</span> <span class="n">assignments</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">emit_return_accumulate</span> <span class="ow">and</span> \
+                <span class="n">refcount</span><span class="p">[</span><span class="n">expression</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">)</span> \
+                <span class="ow">and</span> <span class="nb">set</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">free_indices</span><span class="p">):</span>
+            <span class="n">staging</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">ReturnAccumulate</span><span class="p">(</span><span class="n">variable</span><span class="p">,</span> <span class="n">expression</span><span class="p">))</span>
+            <span class="n">refcount</span><span class="p">[</span><span class="n">expression</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">staging</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">impero</span><span class="o">.</span><span class="n">Return</span><span class="p">(</span><span class="n">variable</span><span class="p">,</span> <span class="n">expression</span><span class="p">))</span>
+
+    <span class="c1"># Prepare data structures</span>
+    <span class="k">def</span> <span class="nf">push_node</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+        <span class="n">queue</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">get_indices</span><span class="p">(</span><span class="n">node</span><span class="p">),</span> <span class="n">node</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">push_op</span><span class="p">(</span><span class="n">op</span><span class="p">):</span>
+        <span class="n">queue</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">loop_shape</span><span class="p">(</span><span class="n">get_indices</span><span class="p">),</span> <span class="n">op</span><span class="p">)</span>
+
+    <span class="n">ops</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">stager</span> <span class="o">=</span> <span class="n">ReferenceStager</span><span class="p">(</span><span class="n">refcount</span><span class="p">,</span> <span class="n">push_node</span><span class="p">)</span>
+    <span class="n">queue</span> <span class="o">=</span> <span class="n">Queue</span><span class="p">(</span><span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">handle</span><span class="p">,</span> <span class="n">ops</span><span class="p">,</span> <span class="n">push_op</span><span class="p">,</span> <span class="n">stager</span><span class="o">.</span><span class="n">decref</span><span class="p">))</span>
+
+    <span class="c1"># Enqueue return operations</span>
+    <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">staging</span><span class="p">:</span>
+        <span class="n">push_op</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+
+    <span class="c1"># Schedule operations</span>
+    <span class="n">queue</span><span class="o">.</span><span class="n">process</span><span class="p">()</span>
+
+    <span class="c1"># Assert that nothing left unprocessed</span>
+    <span class="k">assert</span> <span class="n">stager</span><span class="o">.</span><span class="n">empty</span><span class="p">()</span>
+
+    <span class="c1"># Return</span>
+    <span class="n">ops</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">ops</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">gem.scheduling</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

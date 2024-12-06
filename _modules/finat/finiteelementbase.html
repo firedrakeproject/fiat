@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>finat.finiteelementbase &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.finiteelementbase</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for finat.finiteelementbase</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span><span class="p">,</span> <span class="n">abstractproperty</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+
+<span class="kn">import</span> <span class="nn">gem</span>
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">from</span> <span class="nn">gem.interpreter</span> <span class="kn">import</span> <span class="n">evaluate</span>
+<span class="kn">from</span> <span class="nn">gem.optimise</span> <span class="kn">import</span> <span class="n">delta_elimination</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span> <span class="n">traverse_product</span>
+<span class="kn">from</span> <span class="nn">gem.utils</span> <span class="kn">import</span> <span class="n">cached_property</span>
+
+<span class="kn">from</span> <span class="nn">finat.quadrature</span> <span class="kn">import</span> <span class="n">make_quadrature</span>
+
+
+<div class="viewcode-block" id="FiniteElementBase">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase">[docs]</a>
+<span class="k">class</span> <span class="nc">FiniteElementBase</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
+
+    <span class="nd">@abstractproperty</span>
+    <span class="k">def</span> <span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;The reference cell on which the element is defined.&#39;&#39;&#39;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;The reference cell complex over which bases are defined.</span>
+<span class="sd">           Can be different than self.cell in the case of macro elements.&#39;&#39;&#39;</span>
+
+    <span class="nd">@abstractproperty</span>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;The degree of the embedding polynomial space.</span>
+
+<span class="sd">        In the tensor case this is a tuple.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+
+    <span class="nd">@abstractproperty</span>
+    <span class="k">def</span> <span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Degree of the associated form (FEEC)&#39;&#39;&#39;</span>
+
+<div class="viewcode-block" id="FiniteElementBase.entity_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.entity_dofs">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom for the finite element.&#39;&#39;&#39;</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Returns a nested dictionary that gives, for each dimension,</span>
+<span class="sd">        for each entity, and for each possible entity orientation, the</span>
+<span class="sd">        DoF permutation array that maps the entity local DoF ordering</span>
+<span class="sd">        to the canonical global DoF ordering.</span>
+
+<span class="sd">        The entity permutations `dict` for the degree 4 Lagrange finite</span>
+<span class="sd">        element on the interval, for instance, is given by:</span>
+
+<span class="sd">        .. code-block:: python3</span>
+
+<span class="sd">            {0: {0: {0: [0]},</span>
+<span class="sd">                 1: {0: [0]}},</span>
+<span class="sd">             1: {0: {0: [0, 1, 2],</span>
+<span class="sd">                     1: [2, 1, 0]}}}</span>
+
+<span class="sd">        Note that there are two entities on dimension ``0`` (vertices),</span>
+<span class="sd">        each of which has only one possible orientation, while there is</span>
+<span class="sd">        a single entity on dimension ``1`` (interval), which has two</span>
+<span class="sd">        possible orientations representing non-reflected and reflected</span>
+<span class="sd">        intervals.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">_entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Compute the nodes on the closure of each sub_entity.</span>
+        <span class="n">entity_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">e</span><span class="p">:</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">entity_dofs</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">se</span><span class="p">]</span>
+                                        <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">se</span> <span class="ow">in</span> <span class="n">sub_entities</span><span class="p">]))</span>
+                      <span class="k">for</span> <span class="n">e</span><span class="p">,</span> <span class="n">sub_entities</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+                <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">sub_entities</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+<div class="viewcode-block" id="FiniteElementBase.entity_closure_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.entity_closure_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom on the closure of those entities for the finite</span>
+<span class="sd">        element.&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_closure_dofs</span></div>
+
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">_entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">esd</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">entity_dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">sub_entities</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
+            <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
+
+            <span class="n">entity_cell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">)</span>
+            <span class="n">quad</span> <span class="o">=</span> <span class="n">make_quadrature</span><span class="p">(</span><span class="n">entity_cell</span><span class="p">,</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">))</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
+
+            <span class="n">eps</span> <span class="o">=</span> <span class="mf">1.e-8</span>  <span class="c1"># Is this a safe value?</span>
+
+            <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()[</span><span class="n">entity_dim</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="c1"># Tabulate basis functions on the facet</span>
+                <span class="n">vals</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_evaluation</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">quad</span><span class="o">.</span><span class="n">point_set</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="n">f</span><span class="p">))</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                <span class="c1"># Integrate the square of the basis functions on the facet.</span>
+                <span class="n">ints</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span>
+                    <span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">),</span>
+                                                         <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">vals</span><span class="p">,</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">)),</span> <span class="n">zeta</span><span class="p">),</span>
+                                <span class="n">quad</span><span class="o">.</span><span class="n">weight_expression</span><span class="p">),</span>
+                    <span class="n">quad</span><span class="o">.</span><span class="n">point_set</span><span class="o">.</span><span class="n">indices</span>
+                <span class="p">)</span>
+                <span class="n">evaluation</span><span class="p">,</span> <span class="o">=</span> <span class="n">evaluate</span><span class="p">([</span><span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">ints</span><span class="p">,</span> <span class="n">beta</span><span class="p">)])</span>
+                <span class="n">ints</span> <span class="o">=</span> <span class="n">evaluation</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+                <span class="k">assert</span> <span class="n">evaluation</span><span class="o">.</span><span class="n">fids</span> <span class="o">==</span> <span class="p">()</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">f</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">dof</span> <span class="k">for</span> <span class="n">dof</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ints</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="n">eps</span><span class="p">]</span>
+
+            <span class="n">esd</span><span class="p">[</span><span class="n">entity_dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="n">esd</span>
+
+<div class="viewcode-block" id="FiniteElementBase.entity_support_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.entity_support_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom that have non-zero support on those entities for the</span>
+<span class="sd">        finite element.&#39;&#39;&#39;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_support_dofs</span></div>
+
+
+<div class="viewcode-block" id="FiniteElementBase.space_dimension">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.space_dimension">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the dimension of the finite element space.&#39;&#39;&#39;</span></div>
+
+
+    <span class="nd">@abstractproperty</span>
+    <span class="k">def</span> <span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple indicating the number of degrees of freedom in the</span>
+<span class="sd">        element. For example a scalar quadratic Lagrange element on a triangle</span>
+<span class="sd">        would return (6,) while a vector valued version of the same element</span>
+<span class="sd">        would return (6, 2)&#39;&#39;&#39;</span>
+
+    <span class="nd">@abstractproperty</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple indicating the shape of the element.&#39;&#39;&#39;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;The FIAT element equivalent to this FInAT element.&#39;&#39;&#39;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Cannot make equivalent FIAT element for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="FiniteElementBase.get_indices">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.get_indices">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple of GEM :class:`Index` of the correct extents to loop over</span>
+<span class="sd">        the basis functions of this element.&#39;&#39;&#39;</span>
+
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_shape</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FiniteElementBase.get_value_indices">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.get_value_indices">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_value_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple of GEM :class:`~gem.Index` of the correct extents to loop over</span>
+<span class="sd">        the value shape of this element.&#39;&#39;&#39;</span>
+
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FiniteElementBase.basis_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.basis_evaluation">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at known points on the</span>
+<span class="sd">        reference element.</span>
+
+<span class="sd">        :param order: return derivatives up to this order.</span>
+<span class="sd">        :param ps: the point set object.</span>
+<span class="sd">        :param entity: the cell entity on which to tabulate.</span>
+<span class="sd">        :param coordinate_mapping: a</span>
+<span class="sd">           :class:`~.physically_mapped.PhysicalGeometry` object that</span>
+<span class="sd">           provides physical geometry callbacks (may be None).</span>
+<span class="sd">        &#39;&#39;&#39;</span></div>
+
+
+<div class="viewcode-block" id="FiniteElementBase.point_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.point_evaluation">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at an arbitrary points on</span>
+<span class="sd">        the reference element.</span>
+
+<span class="sd">        :param order: return derivatives up to this order.</span>
+<span class="sd">        :param refcoords: GEM expression representing the coordinates</span>
+<span class="sd">                          on the reference entity.  Its shape must be</span>
+<span class="sd">                          a vector with the correct dimension, its</span>
+<span class="sd">                          free indices are arbitrary.</span>
+<span class="sd">        :param entity: the cell entity on which to tabulate.</span>
+<span class="sd">        &#39;&#39;&#39;</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return a dual evaluation gem weight tensor Q and point set x to dual</span>
+<span class="sd">        evaluate a function fn at.</span>
+
+<span class="sd">        The general dual evaluation is then Q * fn(x) (the contraction of Q</span>
+<span class="sd">        with fn(x) along the the indices of x and any shape introduced by fn).</span>
+
+<span class="sd">        If the dual weights are scalar then Q, for a general scalar FIAT</span>
+<span class="sd">        element, is a matrix with dimensions</span>
+
+<span class="sd">        .. code-block:: text</span>
+
+<span class="sd">            (num_nodes, num_points)</span>
+
+<span class="sd">        If the dual weights are tensor valued then Q, for a general tensor</span>
+<span class="sd">        valued FIAT element, is a tensor with dimensions</span>
+
+<span class="sd">        .. code-block:: text</span>
+
+<span class="sd">            (num_nodes, num_points, dual_weight_shape[0], ..., dual_weight_shape[n])</span>
+
+<span class="sd">        If the dual basis is of a tensor product or FlattenedDimensions element</span>
+<span class="sd">        with N factors then Q in general is a tensor with dimensions</span>
+
+<span class="sd">        .. code-block:: text</span>
+
+<span class="sd">            (num_nodes_factor1, ..., num_nodes_factorN,</span>
+<span class="sd">             num_points_factor1, ..., num_points_factorN,</span>
+<span class="sd">             dual_weight_shape[0], ..., dual_weight_shape[n])</span>
+
+<span class="sd">        where num_points_factorX are made free indices that match the free</span>
+<span class="sd">        indices of x (which is now a TensorPointSet).</span>
+
+<span class="sd">        If the dual basis is of a tensor finite element with some shape</span>
+<span class="sd">        (S1, S2, ..., Sn) then the tensor element tQ is constructed from the</span>
+<span class="sd">        base element&#39;s Q by taking the outer product with appropriately sized</span>
+<span class="sd">        identity matrices:</span>
+
+<span class="sd">        .. code-block:: text</span>
+
+<span class="sd">            tQ = Q ⊗ 𝟙ₛ₁ ⊗ 𝟙ₛ₂ ⊗ ... ⊗ 𝟙ₛₙ</span>
+
+<span class="sd">        .. note::</span>
+
+<span class="sd">            When Q is returned, the contraction indices of the point set are</span>
+<span class="sd">            already free indices rather than being left in its shape (as either</span>
+<span class="sd">            ``num_points`` or ``num_points_factorX``). This is to avoid index</span>
+<span class="sd">            labelling confusion when performing the dual evaluation</span>
+<span class="sd">            contraction.</span>
+
+<span class="sd">        .. note::</span>
+
+<span class="sd">            FIAT element dual bases are built from their ``Functional.pt_dict``</span>
+<span class="sd">            properties. Therefore any FIAT dual bases with derivative nodes</span>
+<span class="sd">            represented via a ``Functional.deriv_dict`` property does not</span>
+<span class="sd">            currently have a FInAT dual basis.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Dual basis not defined for element </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="FiniteElementBase.dual_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.dual_evaluation">[docs]</a>
+    <span class="k">def</span> <span class="nf">dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Get a GEM expression for performing the dual basis evaluation at</span>
+<span class="sd">        the nodes of the reference element. Currently only works for flat</span>
+<span class="sd">        elements: tensor elements are implemented in</span>
+<span class="sd">        :class:`TensorFiniteElement`.</span>
+
+<span class="sd">        :param fn: Callable representing the function to dual evaluate.</span>
+<span class="sd">                   Callable should take in an :class:`AbstractPointSet` and</span>
+<span class="sd">                   return a GEM expression for evaluation of the function at</span>
+<span class="sd">                   those points.</span>
+<span class="sd">        :returns: A tuple ``(dual_evaluation_gem_expression, basis_indices)``</span>
+<span class="sd">                  where the given ``basis_indices`` are those needed to form a</span>
+<span class="sd">                  return expression for the code which is compiled from</span>
+<span class="sd">                  ``dual_evaluation_gem_expression`` (alongside any argument</span>
+<span class="sd">                  multiindices already encoded within ``fn``)</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">Q</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
+
+        <span class="n">expr</span> <span class="o">=</span> <span class="n">fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="c1"># Apply targeted sum factorisation and delta elimination to</span>
+        <span class="c1"># the expression</span>
+        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">delta_elimination</span><span class="p">(</span><span class="o">*</span><span class="n">traverse_product</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="n">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">)</span>
+        <span class="c1"># NOTE: any shape indices in the expression are because the</span>
+        <span class="c1"># expression is tensor valued.</span>
+        <span class="k">assert</span> <span class="n">expr</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">shape</span><span class="p">):]</span>
+        <span class="n">shape_indices</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+        <span class="n">basis_indices</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+        <span class="n">Qi</span> <span class="o">=</span> <span class="n">Q</span><span class="p">[</span><span class="n">basis_indices</span> <span class="o">+</span> <span class="n">shape_indices</span><span class="p">]</span>
+        <span class="n">expri</span> <span class="o">=</span> <span class="n">expr</span><span class="p">[</span><span class="n">shape_indices</span><span class="p">]</span>
+        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">Qi</span> <span class="o">*</span> <span class="n">expri</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span> <span class="o">+</span> <span class="n">shape_indices</span><span class="p">)</span>
+        <span class="c1"># Now we want to factorise over the new contraction with x,</span>
+        <span class="c1"># ignoring any shape indices to avoid hitting the sum-</span>
+        <span class="c1"># factorisation index limit (this is a bit of a hack).</span>
+        <span class="c1"># Really need to do a more targeted job here.</span>
+        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">optimise</span><span class="o">.</span><span class="n">contraction</span><span class="p">(</span><span class="n">evaluation</span><span class="p">,</span> <span class="n">shape_indices</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">basis_indices</span></div>
+
+
+    <span class="nd">@abstractproperty</span>
+    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Appropriate mapping from the reference cell to a physical cell for</span>
+<span class="sd">        all basis functions of the finite element.&#39;&#39;&#39;</span></div>
+
+
+
+<div class="viewcode-block" id="entity_support_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.entity_support_dofs">[docs]</a>
+<span class="k">def</span> <span class="nf">entity_support_dofs</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;Return the map of entity id to the degrees of freedom for which</span>
+<span class="sd">    the corresponding basis functions take non-zero values.</span>
+
+<span class="sd">    :arg elem: FInAT finite element</span>
+<span class="sd">    :arg entity_dim: Dimension of the cell subentity.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">return</span> <span class="n">elem</span><span class="o">.</span><span class="n">entity_support_dofs</span><span class="p">()[</span><span class="n">entity_dim</span><span class="p">]</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.finiteelementbase</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

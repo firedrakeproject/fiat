@@ -1,0 +1,117 @@
+gem package
+===========
+
+Submodules
+----------
+
+gem.coffee module
+-----------------
+
+.. automodule:: gem.coffee
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.flop\_count module
+----------------------
+
+.. automodule:: gem.flop_count
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.gem module
+--------------
+
+.. automodule:: gem.gem
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.impero module
+-----------------
+
+.. automodule:: gem.impero
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.impero\_utils module
+------------------------
+
+.. automodule:: gem.impero_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.interpreter module
+----------------------
+
+.. automodule:: gem.interpreter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.node module
+---------------
+
+.. automodule:: gem.node
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.optimise module
+-------------------
+
+.. automodule:: gem.optimise
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.pprint module
+-----------------
+
+.. automodule:: gem.pprint
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.refactorise module
+----------------------
+
+.. automodule:: gem.refactorise
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.scheduling module
+---------------------
+
+.. automodule:: gem.scheduling
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.unconcatenate module
+------------------------
+
+.. automodule:: gem.unconcatenate
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+gem.utils module
+----------------
+
+.. automodule:: gem.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: gem
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>finat.hdivcurl &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.hdivcurl</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for finat.hdivcurl</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">FIAT.hdivcurl</span> <span class="kn">import</span> <span class="n">Hdiv</span><span class="p">,</span> <span class="n">Hcurl</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">LINE</span>
+
+<span class="kn">import</span> <span class="nn">gem</span>
+<span class="kn">from</span> <span class="nn">gem.utils</span> <span class="kn">import</span> <span class="n">cached_property</span>
+<span class="kn">from</span> <span class="nn">finat.finiteelementbase</span> <span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span> <span class="nn">finat.tensor_product</span> <span class="kn">import</span> <span class="n">TensorProductElement</span>
+
+
+<div class="viewcode-block" id="WrapperElementBase">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.WrapperElementBase">[docs]</a>
+<span class="k">class</span> <span class="nc">WrapperElementBase</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Common base class for H(div) and H(curl) element wrappers.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrappee</span><span class="p">,</span> <span class="n">transform</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span> <span class="o">=</span> <span class="n">wrappee</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;An appropriate tensor product FInAT element whose basis</span>
+<span class="sd">        functions are mapped to produce an H(div) or H(curl)</span>
+<span class="sd">        conforming element.&quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">transform</span> <span class="o">=</span> <span class="n">transform</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;A transformation applied on the scalar/vector values of the</span>
+<span class="sd">        wrapped element to produce an H(div) or H(curl) conforming</span>
+<span class="sd">        element.&quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">cell</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">complex</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">degree</span>
+
+<div class="viewcode-block" id="WrapperElementBase.entity_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.WrapperElementBase.entity_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">entity_permutations</span>
+
+<div class="viewcode-block" id="WrapperElementBase.entity_closure_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.WrapperElementBase.entity_closure_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">entity_closure_dofs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="WrapperElementBase.entity_support_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.WrapperElementBase.entity_support_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">entity_support_dofs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="WrapperElementBase.space_dimension">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.WrapperElementBase.space_dimension">[docs]</a>
+    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">index_shape</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),)</span>
+
+    <span class="k">def</span> <span class="nf">_transform_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">core_eval</span><span class="p">):</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
+        <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">promote</span><span class="p">(</span><span class="n">table</span><span class="p">):</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">partial_indexed</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span>
+            <span class="n">u</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">zeta</span><span class="p">),</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">promote</span><span class="p">(</span><span class="n">table</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">core_eval</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+<div class="viewcode-block" id="WrapperElementBase.basis_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.WrapperElementBase.basis_evaluation">[docs]</a>
+    <span class="k">def</span> <span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">core_eval</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">basis_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transform_evaluation</span><span class="p">(</span><span class="n">core_eval</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="WrapperElementBase.point_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.WrapperElementBase.point_evaluation">[docs]</a>
+    <span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">core_eval</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">point_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transform_evaluation</span><span class="p">(</span><span class="n">core_eval</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">Q</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">dual_basis</span>
+        <span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
+        <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
+        <span class="c1"># Index out the basis indices from wrapee&#39;s Q, to get</span>
+        <span class="c1"># something of wrappee.value_shape, then promote to new shape</span>
+        <span class="c1"># with the same transform as done for basis evaluation</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">partial_indexed</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">beta</span><span class="p">)))</span>
+        <span class="c1"># Finally wrap up Q in shape again (now with some extra</span>
+        <span class="c1"># value_shape indices)</span>
+        <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">Q</span><span class="p">[</span><span class="n">zeta</span><span class="p">],</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">),</span> <span class="n">x</span></div>
+
+
+
+<div class="viewcode-block" id="HDivElement">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.HDivElement">[docs]</a>
+<span class="k">class</span> <span class="nc">HDivElement</span><span class="p">(</span><span class="n">WrapperElementBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;H(div) wrapper element for tensor product elements.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrappee</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">wrappee</span><span class="p">,</span> <span class="n">TensorProductElement</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">wrappee</span><span class="o">.</span><span class="n">factors</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Form degree of subelement is None, cannot H(div)!&quot;</span><span class="p">)</span>
+
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">wrappee</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">formdegree</span> <span class="o">!=</span> <span class="n">wrappee</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;H(div) requires (n-1)-form element!&quot;</span><span class="p">)</span>
+
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">select_hdiv_transformer</span><span class="p">(</span><span class="n">wrappee</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">wrappee</span><span class="p">,</span> <span class="n">transform</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
+
+<div class="viewcode-block" id="HDivElement.fiat_equivalent">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.HDivElement.fiat_equivalent">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Hdiv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;contravariant piola&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="HCurlElement">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.HCurlElement">[docs]</a>
+<span class="k">class</span> <span class="nc">HCurlElement</span><span class="p">(</span><span class="n">WrapperElementBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;H(curl) wrapper element for tensor product elements.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrappee</span><span class="p">):</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">wrappee</span><span class="p">,</span> <span class="n">TensorProductElement</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">wrappee</span><span class="o">.</span><span class="n">factors</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Form degree of subelement is None, cannot H(curl)!&quot;</span><span class="p">)</span>
+
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">wrappee</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">formdegree</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;H(curl) requires 1-form element!&quot;</span><span class="p">)</span>
+
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">select_hcurl_transformer</span><span class="p">(</span><span class="n">wrappee</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">wrappee</span><span class="p">,</span> <span class="n">transform</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">1</span>
+
+<div class="viewcode-block" id="HCurlElement.fiat_equivalent">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.HCurlElement.fiat_equivalent">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Hcurl</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;covariant piola&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="select_hdiv_transformer">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.select_hdiv_transformer">[docs]</a>
+<span class="k">def</span> <span class="nf">select_hdiv_transformer</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
+    <span class="c1"># Assume: something x interval</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+    <span class="k">assert</span> <span class="n">element</span><span class="o">.</span><span class="n">factors</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">LINE</span>
+
+    <span class="c1"># Globally consistent edge orientations of the reference</span>
+    <span class="c1"># quadrilateral: rightward horizontally, upward vertically.</span>
+    <span class="c1"># Their rotation by 90 degrees anticlockwise is interpreted as the</span>
+    <span class="c1"># positive direction for normal vectors.</span>
+    <span class="n">ks</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="c1"># Make the scalar value the leftward-pointing normal on the</span>
+        <span class="c1"># y-aligned edges.</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">v</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+    <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="c1"># Make the scalar value the upward-pointing normal on the</span>
+        <span class="c1"># x-aligned edges.</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">v</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="c1"># Same for 3D, so z-plane.</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">v</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+            <span class="c1"># Pad the 2-vector normal on the &quot;base&quot; cell into a</span>
+            <span class="c1"># 3-vector, maintaining direction.</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
+                              <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
+                              <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+            <span class="c1"># Rotate the 2-vector tangential component on the &quot;base&quot;</span>
+            <span class="c1"># cell 90 degrees anticlockwise into a 3-vector and pad.</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
+                              <span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,))),</span>
+                              <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Unexpected original mapping!&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Unexpected form degree combination!&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="select_hcurl_transformer">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.select_hcurl_transformer">[docs]</a>
+<span class="k">def</span> <span class="nf">select_hcurl_transformer</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
+    <span class="c1"># Assume: something x interval</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+    <span class="k">assert</span> <span class="n">element</span><span class="o">.</span><span class="n">factors</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">LINE</span>
+
+    <span class="c1"># Globally consistent edge orientations of the reference</span>
+    <span class="c1"># quadrilateral: rightward horizontally, upward vertically.</span>
+    <span class="c1"># Tangential vectors interpret these as the positive direction.</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">ks</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="c1"># Can only be 2D.  Make the scalar value the</span>
+            <span class="c1"># rightward-pointing tangential on the x-aligned edges.</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">v</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+        <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># Can be any spatial dimension.  Make the scalar value the</span>
+            <span class="c1"># upward-pointing tangential.</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span> <span class="o">*</span> <span class="p">(</span><span class="n">dim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">v</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="kc">False</span>
+    <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+        <span class="c1"># Second factor must be continuous interval.  Just padding.</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
+                          <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
+                          <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+    <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+        <span class="c1"># Second factor must be continuous interval.  Rotate the</span>
+        <span class="c1"># 2-vector tangential component on the &quot;base&quot; cell 90 degrees</span>
+        <span class="c1"># clockwise into a 3-vector and pad.</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,))),</span>
+                          <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
+                          <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Unexpected original mapping!&quot;</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.hdivcurl</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.guzman_neilan &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.guzman_neilan</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.guzman_neilan</h1><div class="highlight"><pre>
+<span></span><span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="c1">#</span>
+<span class="c1"># Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024</span>
+
+<span class="c1"># This is not quite Guzman-Neilan, but it has 2*dim*(dim+1) dofs and includes</span>
+<span class="c1"># dim**2-1 extra constraint functionals.  The first (dim+1)**2 basis functions</span>
+<span class="c1"># are the reference element bfs, but the extra dim**2-1 are used in the</span>
+<span class="c1"># transformation theory.</span>
+
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">expansions</span>
+<span class="kn">from</span> <span class="nn">FIAT.bernardi_raugel</span> <span class="kn">import</span> <span class="n">BernardiRaugelSpace</span><span class="p">,</span> <span class="n">BernardiRaugelDualSet</span><span class="p">,</span> <span class="n">BernardiRaugel</span>
+<span class="kn">from</span> <span class="nn">FIAT.alfeld_sorokina</span> <span class="kn">import</span> <span class="n">AlfeldSorokina</span>
+<span class="kn">from</span> <span class="nn">FIAT.brezzi_douglas_marini</span> <span class="kn">import</span> <span class="n">BrezziDouglasMarini</span>
+<span class="kn">from</span> <span class="nn">FIAT.macro</span> <span class="kn">import</span> <span class="n">AlfeldSplit</span>
+<span class="kn">from</span> <span class="nn">FIAT.quadrature_schemes</span> <span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span> <span class="nn">FIAT.restricted</span> <span class="kn">import</span> <span class="n">RestrictedElement</span>
+<span class="kn">from</span> <span class="nn">FIAT.nodal_enriched</span> <span class="kn">import</span> <span class="n">NodalEnrichedElement</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">math</span>
+
+
+<div class="viewcode-block" id="GuzmanNeilanSpace">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.GuzmanNeilanSpace">[docs]</a>
+<span class="k">def</span> <span class="nf">GuzmanNeilanSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return a basis for the (extended) Guzman-Neilan H1 space.</span>
+
+<span class="sd">    Project the extended Bernardi-Raugel space (Pk + FacetBubble)^d</span>
+<span class="sd">    into C0 Pk(Alfeld)^d with P_{k-1} divergence, preserving its trace.</span>
+
+<span class="sd">    :arg ref_el: a simplex</span>
+<span class="sd">    :arg order: the maximal polynomial degree</span>
+<span class="sd">    :kwarg kind: kind = 1 gives Pk^d + GN bubbles,</span>
+<span class="sd">                 kind = 2 gives C0 Pk(Alfeld)^d + GN bubbles.</span>
+<span class="sd">    :kwarg reduced: Include tangential bubbles if reduced = False.</span>
+
+<span class="sd">    :returns: a PolynomialSet basis for the Guzman-Neilan H1 space.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+    <span class="n">C0</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">sd</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span>
+    <span class="n">B</span> <span class="o">=</span> <span class="n">take_interior_bubbles</span><span class="p">(</span><span class="n">C0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">sd</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">B</span> <span class="o">=</span> <span class="n">modified_bubble_subspace</span><span class="p">(</span><span class="n">B</span><span class="p">)</span>
+
+    <span class="n">K</span> <span class="o">=</span> <span class="n">ref_complex</span> <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">ref_el</span>
+    <span class="n">num_bubbles</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="n">reduced</span><span class="p">:</span>
+        <span class="n">BR</span> <span class="o">=</span> <span class="n">BernardiRaugel</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span>
+        <span class="n">reduced_dim</span> <span class="o">=</span> <span class="n">BR</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">()</span> <span class="o">-</span> <span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">BR</span> <span class="o">=</span> <span class="n">BR</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">reduced_dim</span><span class="p">)))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">num_bubbles</span> <span class="o">*=</span> <span class="n">sd</span>
+        <span class="n">BR</span> <span class="o">=</span> <span class="n">BernardiRaugelSpace</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+
+    <span class="n">GN</span> <span class="o">=</span> <span class="n">constant_div_projection</span><span class="p">(</span><span class="n">BR</span><span class="p">,</span> <span class="n">C0</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">num_bubbles</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">GN</span></div>
+
+
+
+<div class="viewcode-block" id="GuzmanNeilanH1">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.GuzmanNeilanH1">[docs]</a>
+<span class="k">class</span> <span class="nc">GuzmanNeilanH1</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Guzman-Neilan H1-conforming (extended) macroelement.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="n">sd</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> is only defined for order &lt; dim&quot;</span><span class="p">)</span>
+        <span class="n">degree</span> <span class="o">=</span> <span class="n">sd</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">GuzmanNeilanSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="n">kind</span><span class="p">)</span>
+        <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span> <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">ref_el</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">BernardiRaugelDualSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">)</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># (n-1)-form</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="GuzmanNeilanFirstKindH1">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.GuzmanNeilanFirstKindH1">[docs]</a>
+<span class="k">class</span> <span class="nc">GuzmanNeilanFirstKindH1</span><span class="p">(</span><span class="n">GuzmanNeilanH1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Guzman-Neilan H1-conforming (extended) macroelement of the first kind.</span>
+
+<span class="sd">    Reference element: a simplex of any dimension.</span>
+<span class="sd">    Function space: Pk^d + normal facet bubbles with div in P0, with 1 &lt;= k &lt; dim.</span>
+<span class="sd">    Degrees of freedom: evaluation at Pk lattice points, and normal moments on faces.</span>
+
+<span class="sd">    This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="GuzmanNeilanSecondKindH1">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.GuzmanNeilanSecondKindH1">[docs]</a>
+<span class="k">class</span> <span class="nc">GuzmanNeilanSecondKindH1</span><span class="p">(</span><span class="n">GuzmanNeilanH1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Guzman-Neilan H1-conforming (extended) macroelement of the second kind.</span>
+
+<span class="sd">    Reference element: a simplex of any dimension.</span>
+<span class="sd">    Function space: C0 Pk^d(Alfeld) + normal facet bubbles with div in P0, with 1 &lt;= k &lt; dim.</span>
+<span class="sd">    Degrees of freedom: evaluation at Pk(Alfeld) lattice points, and normal moments on faces.</span>
+
+<span class="sd">    This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="GuzmanNeilanH1div">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.GuzmanNeilanH1div">[docs]</a>
+<span class="k">def</span> <span class="nf">GuzmanNeilanH1div</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Guzman-Neilan H1(div)-conforming (extended) macroelement.</span>
+
+<span class="sd">    Reference element: a simplex of any dimension.</span>
+<span class="sd">    Function space: C0 P2^d(Alfeld) with C0 P1 divergence + normal facet bubbles with div in P0.</span>
+<span class="sd">    Degrees of freedom: evaluation at P2(Alfeld) lattice points, divergence at P1 lattice points,</span>
+<span class="sd">                        and normal moments on faces.</span>
+
+<span class="sd">    This element belongs to a Stokes complex, and is paired with CG1(Alfeld).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">AS</span> <span class="o">=</span> <span class="n">AlfeldSorokina</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">reduced</span> <span class="ow">or</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="c1"># Only extract the div bubbles</span>
+        <span class="n">div_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">node</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">AS</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">())</span>
+                     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">AS</span> <span class="o">=</span> <span class="n">RestrictedElement</span><span class="p">(</span><span class="n">AS</span><span class="p">,</span> <span class="n">indices</span><span class="o">=</span><span class="n">div_nodes</span><span class="p">)</span>
+    <span class="n">GN</span> <span class="o">=</span> <span class="n">GuzmanNeilanH1</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">NodalEnrichedElement</span><span class="p">(</span><span class="n">AS</span><span class="p">,</span> <span class="n">GN</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="inner">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.inner">[docs]</a>
+<span class="k">def</span> <span class="nf">inner</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">qwts</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the L2 inner product from tabulation arrays and quadrature weights&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">qwts</span><span class="p">),</span> <span class="n">u</span><span class="p">,</span>
+                           <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">v</span><span class="o">.</span><span class="n">ndim</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">ndim</span><span class="p">)))</span></div>
+
+
+
+<div class="viewcode-block" id="div">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.div">[docs]</a>
+<span class="k">def</span> <span class="nf">div</span><span class="p">(</span><span class="n">U</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the divergence from tabulation dict.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">U</span><span class="p">[</span><span class="n">k</span><span class="p">][:,</span> <span class="n">k</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="p">:]</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">U</span> <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="take_interior_bubbles">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.take_interior_bubbles">[docs]</a>
+<span class="k">def</span> <span class="nf">take_interior_bubbles</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract the interior bubbles up to the given degree from a complete PolynomialSet.&quot;&quot;&quot;</span>
+    <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+    <span class="n">ncomp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">P</span><span class="o">.</span><span class="n">get_shape</span><span class="p">())</span>
+    <span class="n">dimPk</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">expansion_set</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">P</span><span class="o">.</span><span class="n">degree</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">ncomp</span> <span class="o">*</span> <span class="n">dimPk</span> <span class="o">==</span> <span class="n">P</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">()</span>
+    <span class="n">continuity</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span>
+    <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_entity_ids</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">P</span><span class="o">.</span><span class="n">degree</span><span class="p">,</span>
+                                                  <span class="n">continuity</span><span class="o">=</span><span class="n">continuity</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">degree</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">degree</span> <span class="o">&gt;=</span> <span class="n">P</span><span class="o">.</span><span class="n">degree</span><span class="p">:</span>
+        <span class="n">slices</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">slices</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="nb">slice</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">}</span>
+
+    <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span> <span class="o">*</span> <span class="n">dimPk</span>
+           <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">slices</span>
+           <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">ref_complex</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="n">dim</span><span class="p">))</span>
+           <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">f</span><span class="p">][</span><span class="n">slices</span><span class="p">[</span><span class="n">dim</span><span class="p">]]</span>
+           <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ncomp</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">P</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="modified_bubble_subspace">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.modified_bubble_subspace">[docs]</a>
+<span class="k">def</span> <span class="nf">modified_bubble_subspace</span><span class="p">(</span><span class="n">B</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct the interior bubble space M_k(K^r) from (Guzman and Neilan, 2019).&quot;&quot;&quot;</span>
+    <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">degree</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">degree</span>
+    <span class="n">rule</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">degree</span><span class="p">)</span>
+    <span class="n">qpts</span><span class="p">,</span> <span class="n">qwts</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">rule</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+
+    <span class="c1"># tabulate the linear hat function associated with the barycenter</span>
+    <span class="n">hat</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">take</span><span class="p">([</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">hat_at_qpts</span> <span class="o">=</span> <span class="n">hat</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">][</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># tabulate the bubbles = hat ** (degree - k) * BDMk_facet</span>
+    <span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span>
+    <span class="n">bubbles</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">)[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">hat_at_qpts</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">**</span> <span class="n">degree</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="c1"># tabulate the BDM facet functions</span>
+        <span class="n">BDM</span> <span class="o">=</span> <span class="n">BrezziDouglasMarini</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+        <span class="n">BDM_facet</span> <span class="o">=</span> <span class="n">BDM</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">BDM</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_indices</span><span class="p">(</span><span class="s2">&quot;facet&quot;</span><span class="p">))</span>
+        <span class="n">phis</span> <span class="o">=</span> <span class="n">BDM_facet</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
+
+        <span class="n">bubbles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">phis</span><span class="p">,</span> <span class="n">hat_at_qpts</span> <span class="o">**</span> <span class="p">(</span><span class="n">degree</span><span class="o">-</span><span class="n">k</span><span class="p">)))</span>
+
+    <span class="n">bubbles</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="n">bubbles</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># store the bubbles into a PolynomialSet via L2 projection</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">B</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">inner</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">qwts</span><span class="p">),</span> <span class="n">inner</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">bubbles</span><span class="p">,</span> <span class="n">qwts</span><span class="p">))</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">(),</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span>
+                                     <span class="n">B</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span> <span class="n">coeffs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">M</span></div>
+
+
+
+<div class="viewcode-block" id="constant_div_projection">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.guzman_neilan.constant_div_projection">[docs]</a>
+<span class="k">def</span> <span class="nf">constant_div_projection</span><span class="p">(</span><span class="n">BR</span><span class="p">,</span> <span class="n">C0</span><span class="p">,</span> <span class="n">M</span><span class="p">,</span> <span class="n">num_bubbles</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Project the BR space into C0 Pk(Alfeld)^d with P_{k-1} divergence.&quot;&quot;&quot;</span>
+    <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">C0</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">degree</span> <span class="o">=</span> <span class="n">C0</span><span class="o">.</span><span class="n">degree</span>
+    <span class="n">rule</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">degree</span><span class="p">)</span>
+    <span class="n">qpts</span><span class="p">,</span> <span class="n">qwts</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">rule</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+
+    <span class="c1"># Take the test space for the divergence in L2 \ R</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">())))</span>
+    <span class="n">P</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
+    <span class="n">P</span> <span class="o">-=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">qwts</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">/</span> <span class="nb">sum</span><span class="p">(</span><span class="n">qwts</span><span class="p">)</span>
+
+    <span class="n">U</span> <span class="o">=</span> <span class="n">M</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">BR</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Invert the divergence</span>
+    <span class="n">B</span> <span class="o">=</span> <span class="n">inner</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">div</span><span class="p">(</span><span class="n">U</span><span class="p">),</span> <span class="n">qwts</span><span class="p">)</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">inner</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">div</span><span class="p">(</span><span class="n">X</span><span class="p">)[</span><span class="o">-</span><span class="n">num_bubbles</span><span class="p">:],</span> <span class="n">qwts</span><span class="p">)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">g</span><span class="p">)</span>
+
+    <span class="c1"># Add correction to BR bubbles</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="n">C0</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">inner</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">qwts</span><span class="p">),</span> <span class="n">inner</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">X</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">],</span> <span class="n">qwts</span><span class="p">))</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">coeffs</span><span class="o">.</span><span class="n">T</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">BR</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(),</span> <span class="n">sd</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">coeffs</span><span class="p">[</span><span class="o">-</span><span class="n">num_bubbles</span><span class="p">:]</span> <span class="o">-=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">M</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">(),</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="n">GN</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span>
+                                      <span class="n">C0</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span> <span class="n">coeffs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">GN</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.guzman_neilan</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

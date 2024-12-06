@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>finat.fiat_elements &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.fiat_elements</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for finat.fiat_elements</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">FIAT</span>
+<span class="kn">import</span> <span class="nn">gem</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">sympy</span> <span class="k">as</span> <span class="nn">sp</span>
+<span class="kn">from</span> <span class="nn">gem.utils</span> <span class="kn">import</span> <span class="n">cached_property</span>
+
+<span class="kn">from</span> <span class="nn">finat.finiteelementbase</span> <span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span> <span class="nn">finat.point_set</span> <span class="kn">import</span> <span class="n">PointSet</span>
+<span class="kn">from</span> <span class="nn">finat.sympy2gem</span> <span class="kn">import</span> <span class="n">sympy2gem</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">firedrake_citations</span> <span class="kn">import</span> <span class="n">Citations</span>
+    <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Geevers2018new&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{Geevers2018new,</span>
+<span class="s2"> title={New higher-order mass-lumped tetrahedral elements for wave propagation modelling},</span>
+<span class="s2"> author={Geevers, Sjoerd and Mulder, Wim A and van der Vegt, Jaap JW},</span>
+<span class="s2"> journal={SIAM journal on scientific computing},</span>
+<span class="s2"> volume=</span><span class="si">{40}</span><span class="s2">,</span>
+<span class="s2"> number=</span><span class="si">{5}</span><span class="s2">,</span>
+<span class="s2"> pages={A2830--A2857},</span>
+<span class="s2"> year=</span><span class="si">{2018}</span><span class="s2">,</span>
+<span class="s2"> publisher=</span><span class="si">{SIAM}</span><span class="s2">,</span>
+<span class="s2"> doi={https://doi.org/10.1137/18M1175549},</span>
+<span class="s2">}</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Chin1999higher&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{chin1999higher,</span>
+<span class="s2"> title={Higher-order triangular and tetrahedral finite elements with mass lumping for solving the wave equation},</span>
+<span class="s2"> author={Chin-Joe-Kong, MJS and Mulder, Wim A and Van Veldhuizen, M},</span>
+<span class="s2"> journal={Journal of Engineering Mathematics},</span>
+<span class="s2"> volume=</span><span class="si">{35}</span><span class="s2">,</span>
+<span class="s2"> number=</span><span class="si">{4}</span><span class="s2">,</span>
+<span class="s2"> pages={405--426},</span>
+<span class="s2"> year=</span><span class="si">{1999}</span><span class="s2">,</span>
+<span class="s2"> publisher=</span><span class="si">{Springer}</span><span class="s2">,</span>
+<span class="s2"> doi={https://doi.org/10.1023/A:1004420829610},</span>
+<span class="s2">}</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">Citations</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="FiatElement">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement">[docs]</a>
+<span class="k">class</span> <span class="nc">FiatElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for finite elements for which the tabulation is provided</span>
+<span class="sd">    by FIAT.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fiat_element</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_element</span> <span class="o">=</span> <span class="n">fiat_element</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Requires FIAT.CiarletElement</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span>
+
+<div class="viewcode-block" id="FiatElement.entity_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement.entity_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="FiatElement.entity_closure_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement.entity_closure_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_closure_dofs</span><span class="p">()</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">entity_permutations</span><span class="p">()</span>
+
+<div class="viewcode-block" id="FiatElement.space_dimension">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement.space_dimension">[docs]</a>
+    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">(),)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Just return the underlying FIAT element</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span>
+
+<div class="viewcode-block" id="FiatElement.basis_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement.basis_evaluation">[docs]</a>
+    <span class="k">def</span> <span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at known points on the</span>
+<span class="sd">        reference element.</span>
+
+<span class="sd">        :param order: return derivatives up to this order.</span>
+<span class="sd">        :param ps: the point set.</span>
+<span class="sd">        :param entity: the cell entity on which to tabulate.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">space_dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+        <span class="n">value_size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">fiat_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="o">.</span><span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># In almost all cases, we have</span>
+        <span class="c1"># self.space_dimension() == self._element.space_dimension()</span>
+        <span class="c1"># But for Bell, FIAT reports 21 basis functions,</span>
+        <span class="c1"># but FInAT only 18 (because there are actually 18</span>
+        <span class="c1"># basis functions, and the additional 3 are for</span>
+        <span class="c1"># dealing with transformations between physical</span>
+        <span class="c1"># and reference space).</span>
+        <span class="n">index_shape</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">(),)</span>
+        <span class="k">for</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">fiat_table</span> <span class="ow">in</span> <span class="n">fiat_result</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fiat_table</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Failure</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span><span class="p">,</span> <span class="n">fiat_table</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">derivative</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+            <span class="n">table_roll</span> <span class="o">=</span> <span class="n">fiat_table</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span>
+                <span class="n">space_dimension</span><span class="p">,</span> <span class="n">value_size</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ps</span><span class="o">.</span><span class="n">points</span><span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+            <span class="n">exprs</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">table_roll</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">derivative</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">degree</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">complex</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
+                    <span class="c1"># Make sure numerics satisfies theory</span>
+                    <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+                <span class="k">elif</span> <span class="n">derivative</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">:</span>
+                    <span class="c1"># Make sure numerics satisfies theory</span>
+                    <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+                    <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_shape</span><span class="p">)))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">point_indices</span> <span class="o">=</span> <span class="n">ps</span><span class="o">.</span><span class="n">indices</span>
+                    <span class="n">point_shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">point_indices</span><span class="p">)</span>
+
+                    <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">partial_indexed</span><span class="p">(</span>
+                        <span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">point_shape</span> <span class="o">+</span> <span class="n">index_shape</span><span class="p">)),</span>
+                        <span class="n">point_indices</span>
+                    <span class="p">))</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span><span class="p">:</span>
+                <span class="c1"># As above, this extent may be different from that</span>
+                <span class="c1"># advertised by the finat element.</span>
+                <span class="n">beta</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">index_shape</span><span class="p">)</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">beta</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">())</span>
+
+                <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span>
+                    <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span>
+                        <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                            <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span> <span class="k">for</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">exprs</span><span class="p">]</span>
+                        <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span><span class="p">)),</span>
+                        <span class="n">zeta</span><span class="p">),</span>
+                    <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">expr</span><span class="p">,</span> <span class="o">=</span> <span class="n">exprs</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">expr</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="FiatElement.point_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FiatElement.point_evaluation">[docs]</a>
+    <span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at an arbitrary points on</span>
+<span class="sd">        the reference element.</span>
+
+<span class="sd">        :param order: return derivatives up to this order.</span>
+<span class="sd">        :param refcoords: GEM expression representing the coordinates</span>
+<span class="sd">                          on the reference entity.  Its shape must be</span>
+<span class="sd">                          a vector with the correct dimension, its</span>
+<span class="sd">                          free indices are arbitrary.</span>
+<span class="sd">        :param entity: the cell entity on which to tabulate.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_i</span> <span class="o">=</span> <span class="n">entity</span>
+
+        <span class="c1"># Spatial dimension of the entity</span>
+        <span class="n">esd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">)</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">refcoords</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span> <span class="ow">and</span> <span class="n">refcoords</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">esd</span><span class="p">,)</span>
+
+        <span class="k">return</span> <span class="n">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="p">(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">))</span></div>
+
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">_dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Return the numerical part of the dual basis, this split is</span>
+        <span class="c1"># needed because the dual_basis itself can&#39;t produce the same</span>
+        <span class="c1"># point set over and over in case it is used multiple times</span>
+        <span class="c1"># (in for example a tensorproductelement).</span>
+        <span class="n">fiat_dual_basis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">()</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">allpts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># Find the unique points to evaluate at.</span>
+        <span class="c1"># We might be able to make this a smaller set by treating each</span>
+        <span class="c1"># point one by one, but most of the redundancy comes from</span>
+        <span class="c1"># multiple functionals using the same quadrature rule.</span>
+        <span class="k">for</span> <span class="n">dual</span> <span class="ow">in</span> <span class="n">fiat_dual_basis</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dual</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;FIAT dual bases with derivative nodes represented via a ``Functional.deriv_dict`` property do not currently have a FInAT dual basis&quot;</span><span class="p">)</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">pts</span><span class="p">))</span>  <span class="c1"># need this for determinism</span>
+            <span class="k">if</span> <span class="n">pts</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="c1"># k are indices into Q (see below) for the seen points</span>
+                <span class="n">kstart</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">allpts</span><span class="p">)</span>
+                <span class="n">kend</span> <span class="o">=</span> <span class="n">kstart</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+                <span class="n">seen</span><span class="p">[</span><span class="n">pts</span><span class="p">]</span> <span class="o">=</span> <span class="n">kstart</span><span class="p">,</span> <span class="n">kend</span>
+                <span class="n">allpts</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+        <span class="c1"># Build Q.</span>
+        <span class="c1"># Q is a tensor of weights (of total rank R) to contract with a unique</span>
+        <span class="c1"># vector of points to evaluate at, giving a tensor (of total rank R-1)</span>
+        <span class="c1"># where the first indices (rows) correspond to a basis functional</span>
+        <span class="c1"># (node).</span>
+        <span class="c1"># Q is a DOK Sparse matrix in (row, col, higher,..)=&gt;value pairs (to</span>
+        <span class="c1"># become a gem.SparseLiteral when implemented).</span>
+        <span class="c1"># Rows (i) are number of nodes/dual functionals.</span>
+        <span class="c1"># Columns (k) are unique points to evaluate.</span>
+        <span class="c1"># Higher indices (*cmp) are tensor indices of the weights when weights</span>
+        <span class="c1"># are tensor valued.</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">dual</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">fiat_dual_basis</span><span class="p">):</span>
+            <span class="n">point_dict</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">point_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+            <span class="n">kstart</span><span class="p">,</span> <span class="n">kend</span> <span class="o">=</span> <span class="n">seen</span><span class="p">[</span><span class="n">pts</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">kstart</span><span class="p">,</span> <span class="n">kend</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">weight</span><span class="p">,</span> <span class="n">cmp</span> <span class="ow">in</span> <span class="n">point_dict</span><span class="p">[</span><span class="n">p</span><span class="p">]:</span>
+                    <span class="n">Q</span><span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="o">*</span><span class="n">cmp</span><span class="p">)]</span> <span class="o">=</span> <span class="n">weight</span>
+        <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">key</span><span class="p">))</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+               <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">weight</span> <span class="ow">in</span> <span class="n">Q</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="c1"># Identity matrix Q can be expressed symbolically</span>
+            <span class="n">extents</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">max</span><span class="p">,</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">Q</span><span class="o">.</span><span class="n">keys</span><span class="p">())))</span>
+            <span class="n">js</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">e</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">extents</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">js</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="o">*</span><span class="n">js</span><span class="p">),</span> <span class="n">js</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># temporary until sparse literals are implemented in GEM which will</span>
+            <span class="c1"># automatically convert a dictionary of keys internally.</span>
+            <span class="c1"># TODO the below is unnecessarily slow and would be sped up</span>
+            <span class="c1"># significantly by building Q in a COO format rather than DOK (i.e.</span>
+            <span class="c1"># storing coords and associated data in (nonzeros, entries) shaped</span>
+            <span class="c1"># numpy arrays) to take advantage of numpy multiindexing</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">Qshape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">s</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Q</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Qshape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">s</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">map</span><span class="p">(</span><span class="nb">max</span><span class="p">,</span> <span class="o">*</span><span class="n">Q</span><span class="p">))</span>
+            <span class="n">Qdense</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">Qshape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">Q</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">Qdense</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">Qdense</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Q</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">allpts</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Return Q with x.indices already a free index for the</span>
+        <span class="c1"># consumer to use</span>
+        <span class="c1"># expensive numerical extraction is done once per element</span>
+        <span class="c1"># instance, but the point set must be created every time we</span>
+        <span class="c1"># build the dual.</span>
+        <span class="n">Q</span><span class="p">,</span> <span class="n">pts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dual_basis</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">PointSet</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
+        <span class="k">assert</span> <span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">extent</span>
+        <span class="n">i</span><span class="p">,</span> <span class="o">*</span><span class="n">js</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="o">*</span><span class="n">x</span><span class="o">.</span><span class="n">indices</span><span class="p">,</span> <span class="o">*</span><span class="n">js</span><span class="p">)),</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="o">*</span><span class="n">js</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">Q</span><span class="p">,</span> <span class="n">x</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">mappings</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">mapping</span><span class="p">())</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mappings</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">,</span> <span class="o">=</span> <span class="n">mappings</span>
+            <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="point_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.point_evaluation">[docs]</a>
+<span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="n">fiat_element</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="p">):</span>
+    <span class="c1"># Coordinates on the reference entity (SymPy)</span>
+    <span class="n">esd</span><span class="p">,</span> <span class="o">=</span> <span class="n">refcoords</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">Xi</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;X Y Z&#39;</span><span class="p">)[:</span><span class="n">esd</span><span class="p">]</span>
+
+    <span class="n">space_dimension</span> <span class="o">=</span> <span class="n">fiat_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+    <span class="n">value_size</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">fiat_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">fiat_result</span> <span class="o">=</span> <span class="n">fiat_element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="p">[</span><span class="n">Xi</span><span class="p">],</span> <span class="n">entity</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">fiat_table</span> <span class="ow">in</span> <span class="n">fiat_result</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">fiat_table</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">):</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Failure</span><span class="p">((</span><span class="n">space_dimension</span><span class="p">,)</span> <span class="o">+</span> <span class="n">fiat_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">(),</span> <span class="n">fiat_table</span><span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Convert SymPy expression to GEM</span>
+        <span class="n">mapper</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">node</span><span class="o">.</span><span class="n">Memoizer</span><span class="p">(</span><span class="n">sympy2gem</span><span class="p">)</span>
+        <span class="n">mapper</span><span class="o">.</span><span class="n">bindings</span> <span class="o">=</span> <span class="p">{</span><span class="n">s</span><span class="p">:</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">refcoords</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span>
+                           <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">Xi</span><span class="p">)}</span>
+        <span class="n">gem_table</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="n">mapper</span><span class="p">)(</span><span class="n">fiat_table</span><span class="p">)</span>
+
+        <span class="n">table_roll</span> <span class="o">=</span> <span class="n">gem_table</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">space_dimension</span><span class="p">,</span> <span class="n">value_size</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+
+        <span class="n">exprs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">table_roll</span><span class="p">:</span>
+            <span class="n">exprs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">space_dimension</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">fiat_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">():</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">space_dimension</span><span class="p">),)</span>
+            <span class="n">zeta</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span>
+                         <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">fiat_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span>
+                <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span>
+                    <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+                        <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span> <span class="k">for</span> <span class="n">expr</span> <span class="ow">in</span> <span class="n">exprs</span><span class="p">]</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">fiat_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())),</span>
+                    <span class="n">zeta</span><span class="p">),</span>
+                <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">expr</span><span class="p">,</span> <span class="o">=</span> <span class="n">exprs</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">expr</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="Regge">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.Regge">[docs]</a>
+<span class="k">class</span> <span class="nc">Regge</span><span class="p">(</span><span class="n">FiatElement</span><span class="p">):</span>  <span class="c1"># symmetric matrix valued</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Regge</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="HellanHerrmannJohnson">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.HellanHerrmannJohnson">[docs]</a>
+<span class="k">class</span> <span class="nc">HellanHerrmannJohnson</span><span class="p">(</span><span class="n">FiatElement</span><span class="p">):</span>  <span class="c1"># symmetric matrix valued</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">HellanHerrmannJohnson</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="GopalakrishnanLedererSchoberlFirstKind">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.GopalakrishnanLedererSchoberlFirstKind">[docs]</a>
+<span class="k">class</span> <span class="nc">GopalakrishnanLedererSchoberlFirstKind</span><span class="p">(</span><span class="n">FiatElement</span><span class="p">):</span>  <span class="c1"># traceless matrix valued</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">GopalakrishnanLedererSchoberlFirstKind</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="GopalakrishnanLedererSchoberlSecondKind">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.GopalakrishnanLedererSchoberlSecondKind">[docs]</a>
+<span class="k">class</span> <span class="nc">GopalakrishnanLedererSchoberlSecondKind</span><span class="p">(</span><span class="n">FiatElement</span><span class="p">):</span>  <span class="c1"># traceless matrix valued</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">GopalakrishnanLedererSchoberlSecondKind</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="ScalarFiatElement">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.ScalarFiatElement">[docs]</a>
+<span class="k">class</span> <span class="nc">ScalarFiatElement</span><span class="p">(</span><span class="n">FiatElement</span><span class="p">):</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="Bernstein">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.Bernstein">[docs]</a>
+<span class="k">class</span> <span class="nc">Bernstein</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="c1"># TODO: Replace this with a smarter implementation</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Bernstein</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="Bubble">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.Bubble">[docs]</a>
+<span class="k">class</span> <span class="nc">Bubble</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Bubble</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="FacetBubble">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.FacetBubble">[docs]</a>
+<span class="k">class</span> <span class="nc">FacetBubble</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">FacetBubble</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="CrouzeixRaviart">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.CrouzeixRaviart">[docs]</a>
+<span class="k">class</span> <span class="nc">CrouzeixRaviart</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">CrouzeixRaviart</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="Lagrange">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.Lagrange">[docs]</a>
+<span class="k">class</span> <span class="nc">Lagrange</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Lagrange</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="KongMulderVeldhuizen">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.KongMulderVeldhuizen">[docs]</a>
+<span class="k">class</span> <span class="nc">KongMulderVeldhuizen</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">KongMulderVeldhuizen</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;Chin1999higher&quot;</span><span class="p">)</span>
+            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;Geevers2018new&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DiscontinuousLagrange">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.DiscontinuousLagrange">[docs]</a>
+<span class="k">class</span> <span class="nc">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="Real">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.Real">[docs]</a>
+<span class="k">class</span> <span class="nc">Real</span><span class="p">(</span><span class="n">DiscontinuousLagrange</span><span class="p">):</span>
+    <span class="o">...</span></div>
+
+
+
+<div class="viewcode-block" id="Serendipity">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.Serendipity">[docs]</a>
+<span class="k">class</span> <span class="nc">Serendipity</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Serendipity</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="DPC">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.DPC">[docs]</a>
+<span class="k">class</span> <span class="nc">DPC</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">DPC</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="DiscontinuousTaylor">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.DiscontinuousTaylor">[docs]</a>
+<span class="k">class</span> <span class="nc">DiscontinuousTaylor</span><span class="p">(</span><span class="n">ScalarFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">DiscontinuousTaylor</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="VectorFiatElement">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.VectorFiatElement">[docs]</a>
+<span class="k">class</span> <span class="nc">VectorFiatElement</span><span class="p">(</span><span class="n">FiatElement</span><span class="p">):</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),)</span></div>
+
+
+
+<div class="viewcode-block" id="RaviartThomas">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.RaviartThomas">[docs]</a>
+<span class="k">class</span> <span class="nc">RaviartThomas</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">RaviartThomas</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="TrimmedSerendipityFace">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.TrimmedSerendipityFace">[docs]</a>
+<span class="k">class</span> <span class="nc">TrimmedSerendipityFace</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">TrimmedSerendipityFace</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TrimmedSerendipityDiv">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.TrimmedSerendipityDiv">[docs]</a>
+<span class="k">class</span> <span class="nc">TrimmedSerendipityDiv</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">TrimmedSerendipityDiv</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TrimmedSerendipityEdge">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.TrimmedSerendipityEdge">[docs]</a>
+<span class="k">class</span> <span class="nc">TrimmedSerendipityEdge</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">TrimmedSerendipityEdge</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TrimmedSerendipityCurl">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.TrimmedSerendipityCurl">[docs]</a>
+<span class="k">class</span> <span class="nc">TrimmedSerendipityCurl</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">TrimmedSerendipityCurl</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BrezziDouglasMarini">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.BrezziDouglasMarini">[docs]</a>
+<span class="k">class</span> <span class="nc">BrezziDouglasMarini</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">BrezziDouglasMarini</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCubeEdge">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.BrezziDouglasMariniCubeEdge">[docs]</a>
+<span class="k">class</span> <span class="nc">BrezziDouglasMariniCubeEdge</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">BrezziDouglasMariniCubeEdge</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCubeFace">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.BrezziDouglasMariniCubeFace">[docs]</a>
+<span class="k">class</span> <span class="nc">BrezziDouglasMariniCubeFace</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">BrezziDouglasMariniCubeFace</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BrezziDouglasFortinMarini">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.BrezziDouglasFortinMarini">[docs]</a>
+<span class="k">class</span> <span class="nc">BrezziDouglasFortinMarini</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">BrezziDouglasFortinMarini</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="Nedelec">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.Nedelec">[docs]</a>
+<span class="k">class</span> <span class="nc">Nedelec</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">Nedelec</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="NedelecSecondKind">
+<a class="viewcode-back" href="../../finat.html#finat.fiat_elements.NedelecSecondKind">[docs]</a>
+<span class="k">class</span> <span class="nc">NedelecSecondKind</span><span class="p">(</span><span class="n">VectorFiatElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">NedelecSecondKind</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">))</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.fiat_elements</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

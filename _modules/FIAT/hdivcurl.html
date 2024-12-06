@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.hdivcurl &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.hdivcurl</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.hdivcurl</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2013 Andrew T. T. McRae (Imperial College London)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">types</span>
+<span class="kn">from</span> <span class="nn">FIAT.tensor_product</span> <span class="kn">import</span> <span class="n">TensorProductElement</span>
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">functional</span>
+
+
+<div class="viewcode-block" id="Hdiv">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdivcurl.Hdiv">[docs]</a>
+<span class="k">def</span> <span class="nf">Hdiv</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">TensorProductElement</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;form degree of sub-element was None (not set during initialisation), Hdiv cannot be done without this information&quot;</span><span class="p">)</span>
+    <span class="n">formdegree</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="o">+</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">formdegree</span> <span class="o">!=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Tried to use Hdiv on a non-(n-1)-form element&quot;</span><span class="p">)</span>
+
+    <span class="n">newelement</span> <span class="o">=</span> <span class="n">TensorProductElement</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="p">)</span>  <span class="c1"># make a copy to return</span>
+
+    <span class="c1"># redefine value_shape()</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the value shape of the finite element functions.&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),)</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">value_shape</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">MethodType</span><span class="p">(</span><span class="n">value_shape</span><span class="p">,</span> <span class="n">newelement</span><span class="p">)</span>
+
+    <span class="c1"># store old _mapping</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">=</span> <span class="n">newelement</span><span class="o">.</span><span class="n">_mapping</span>
+
+    <span class="c1"># redefine _mapping</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">_mapping</span> <span class="o">=</span> <span class="s2">&quot;contravariant piola&quot;</span>
+
+    <span class="c1"># store formdegree</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">formdegree</span> <span class="o">=</span> <span class="n">formdegree</span>
+
+    <span class="c1"># redefine tabulate</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">old_tabulate</span> <span class="o">=</span> <span class="n">newelement</span><span class="o">.</span><span class="n">tabulate</span>
+
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
+<span class="sd">        basis functions at given points.&quot;&quot;&quot;</span>
+
+        <span class="c1"># don&#39;t duplicate what the old function does fine...</span>
+        <span class="n">old_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
+        <span class="n">new_result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">old_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">temp_old</span> <span class="o">=</span> <span class="n">old_result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+                <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sd</span><span class="p">,</span> <span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="c1"># both constituents affine, i.e., they were 0 forms or n-forms.</span>
+                <span class="c1"># to sum to n-1, we must have &quot;0-form on an interval&quot; crossed</span>
+                <span class="c1"># with something discontinuous.</span>
+                <span class="c1"># look for the (continuous) 0-form, and put the value there</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># first element, so (-x, 0, ...)</span>
+                    <span class="c1"># Sign flip to ensure that a positive value of the node</span>
+                    <span class="c1"># means a vector field having a direction &quot;to the left&quot;</span>
+                    <span class="c1"># relative to direction in which the nodes are placed on an</span>
+                    <span class="c1"># edge in case of higher-order schemes.</span>
+                    <span class="c1"># This is required for unstructured quadrilateral meshes.</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:]</span>
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># second element, so (..., 0, x)</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Hdiv affine/affine form degrees broke&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+                <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sd</span><span class="p">,</span> <span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">Asd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                <span class="c1"># one component is affine, one is contravariant piola</span>
+                <span class="c1"># the affine one must be an n-form, hence discontinuous</span>
+                <span class="c1"># this component/these components get zeroed out</span>
+                <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+                    <span class="c1"># first element, so (x1, ..., xn, 0, ...)</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="p">:</span><span class="n">Asd</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+                    <span class="c1"># second element, so (..., 0, x1, ..., xn)</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="n">Asd</span><span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Hdiv contravariant piola couldn&#39;t find an existing ConPi subelement&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+                <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sd</span><span class="p">,</span> <span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="c1"># one component is affine, one is covariant piola</span>
+                <span class="c1"># the affine one must be an n-form, hence discontinuous</span>
+                <span class="c1"># this component/these components get zeroed out</span>
+                <span class="c1"># the remaining part gets perped</span>
+                <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+                    <span class="n">Asd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">Asd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must be 2d shape to automatically convert covariant to contravariant&quot;</span><span class="p">)</span>
+                    <span class="n">temp_perp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                    <span class="c1"># first element, so (x2, -x1, 0, ...)</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="p">:</span><span class="n">Asd</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_perp</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+                    <span class="n">Bsd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">Bsd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must be 2d shape to automatically convert covariant to contravariant&quot;</span><span class="p">)</span>
+                    <span class="n">temp_perp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                    <span class="c1"># second element, so (..., 0, x2, -x1)</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="n">Asd</span><span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Hdiv covariant piola couldn&#39;t find an existing CovPi subelement&quot;</span><span class="p">)</span>
+            <span class="n">new_result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span>
+        <span class="k">return</span> <span class="n">new_result</span>
+
+    <span class="n">newelement</span><span class="o">.</span><span class="n">tabulate</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">MethodType</span><span class="p">(</span><span class="n">tabulate</span><span class="p">,</span> <span class="n">newelement</span><span class="p">)</span>
+
+    <span class="c1"># splat any PointEvaluation functionals.</span>
+    <span class="c1"># they become a nasty mix of internal and external component DOFs</span>
+    <span class="k">if</span> <span class="n">newelement</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+        <span class="n">oldnodes</span> <span class="o">=</span> <span class="n">newelement</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">nodes</span>
+        <span class="n">newnodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">oldnodes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                <span class="n">newnodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;Undefined&quot;</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">newnodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="n">newelement</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">nodes</span> <span class="o">=</span> <span class="n">newnodes</span>
+
+    <span class="k">return</span> <span class="n">newelement</span></div>
+
+
+
+<div class="viewcode-block" id="Hcurl">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdivcurl.Hcurl">[docs]</a>
+<span class="k">def</span> <span class="nf">Hcurl</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">TensorProductElement</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;form degree of sub-element was None (not set during initialisation), Hcurl cannot be done without this information&quot;</span><span class="p">)</span>
+    <span class="n">formdegree</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="o">+</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">formdegree</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Tried to use Hcurl on a non-1-form element&quot;</span><span class="p">)</span>
+
+    <span class="n">newelement</span> <span class="o">=</span> <span class="n">TensorProductElement</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="p">)</span>  <span class="c1"># make a copy to return</span>
+
+    <span class="c1"># redefine value_shape()</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the value shape of the finite element functions.&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),)</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">value_shape</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">MethodType</span><span class="p">(</span><span class="n">value_shape</span><span class="p">,</span> <span class="n">newelement</span><span class="p">)</span>
+
+    <span class="c1"># store old _mapping</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">=</span> <span class="n">newelement</span><span class="o">.</span><span class="n">_mapping</span>
+
+    <span class="c1"># redefine _mapping</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">_mapping</span> <span class="o">=</span> <span class="s2">&quot;covariant piola&quot;</span>
+
+    <span class="c1"># store formdegree</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">formdegree</span> <span class="o">=</span> <span class="n">formdegree</span>
+
+    <span class="c1"># redefine tabulate</span>
+    <span class="n">newelement</span><span class="o">.</span><span class="n">old_tabulate</span> <span class="o">=</span> <span class="n">newelement</span><span class="o">.</span><span class="n">tabulate</span>
+
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
+<span class="sd">        basis functions at given points.&quot;&quot;&quot;</span>
+
+        <span class="c1"># don&#39;t duplicate what the old function does fine...</span>
+        <span class="n">old_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">old_tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
+        <span class="n">new_result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">old_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">temp_old</span> <span class="o">=</span> <span class="n">old_result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+                <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sd</span><span class="p">,</span> <span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="c1"># both constituents affine, i.e., they were 0 forms or n-forms.</span>
+                <span class="c1"># to sum to 1, we must have &quot;1-form on an interval&quot; crossed with</span>
+                <span class="c1"># a bunch of 0-forms (continuous).</span>
+                <span class="c1"># look for the 1-form, and put the value in the other place</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="c1"># first element, so (x, 0, ...)</span>
+                    <span class="c1"># No sign flip here, nor at the other branch, to ensure that</span>
+                    <span class="c1"># a positive value of the node means a vector field having</span>
+                    <span class="c1"># the same direction as the direction in which the nodes are</span>
+                    <span class="c1"># placed on an edge in case of higher-order schemes.</span>
+                    <span class="c1"># This is required for unstructured quadrilateral meshes.</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:]</span>
+                <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="c1"># second element, so (..., 0, x)</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Hcurl affine/affine form degrees broke&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+                <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sd</span><span class="p">,</span> <span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="n">Asd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                <span class="c1"># one component is affine, one is covariant piola</span>
+                <span class="c1"># the affine one must be an 0-form, hence continuous</span>
+                <span class="c1"># this component/these components get zeroed out</span>
+                <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+                    <span class="c1"># first element, so (x1, ..., xn, 0, ...)</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="p">:</span><span class="n">Asd</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span>
+                    <span class="c1"># second element, so (..., 0, x1, ..., xn)</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="n">Asd</span><span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Hdiv contravariant piola couldn&#39;t find an existing ConPi subelement&quot;</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+                <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">sd</span><span class="p">,</span> <span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="c1"># one component is affine, one is contravariant piola</span>
+                <span class="c1"># the affine one must be an 0-form, hence continuous</span>
+                <span class="c1"># this component/these components get zeroed out</span>
+                <span class="c1"># the remaining part gets perped</span>
+                <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+                    <span class="n">Asd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">Asd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must be 2d shape to automatically convert contravariant to covariant&quot;</span><span class="p">)</span>
+                    <span class="n">temp_perp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                    <span class="c1"># first element, so (-x2, x1, 0, ...)</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="p">:</span><span class="n">Asd</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_perp</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
+                    <span class="n">Bsd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">B</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">Bsd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must be 2d shape to automatically convert contravariant to covariant&quot;</span><span class="p">)</span>
+                    <span class="n">temp_perp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">temp_old</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">temp_old</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                    <span class="c1"># second element, so (..., 0, -x2, x1)</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="o">-</span><span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp_perp</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+                    <span class="n">temp</span><span class="p">[:,</span> <span class="n">Asd</span><span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">temp_old</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:]</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Hcurl contravariant piola couldn&#39;t find an existing CovPi subelement&quot;</span><span class="p">)</span>
+            <span class="n">new_result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">temp</span>
+        <span class="k">return</span> <span class="n">new_result</span>
+
+    <span class="n">newelement</span><span class="o">.</span><span class="n">tabulate</span> <span class="o">=</span> <span class="n">types</span><span class="o">.</span><span class="n">MethodType</span><span class="p">(</span><span class="n">tabulate</span><span class="p">,</span> <span class="n">newelement</span><span class="p">)</span>
+
+    <span class="c1"># splat any PointEvaluation functionals.</span>
+    <span class="c1"># they become a nasty mix of internal and external component DOFs</span>
+    <span class="k">if</span> <span class="n">newelement</span><span class="o">.</span><span class="n">_oldmapping</span> <span class="o">==</span> <span class="s2">&quot;affine&quot;</span><span class="p">:</span>
+        <span class="n">oldnodes</span> <span class="o">=</span> <span class="n">newelement</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">nodes</span>
+        <span class="n">newnodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">oldnodes</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">):</span>
+                <span class="n">newnodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">Functional</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;Undefined&quot;</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">newnodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+        <span class="n">newelement</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">nodes</span> <span class="o">=</span> <span class="n">newnodes</span>
+
+    <span class="k">return</span> <span class="n">newelement</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.hdivcurl</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

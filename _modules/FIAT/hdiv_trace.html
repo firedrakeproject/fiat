@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.hdiv_trace &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.hdiv_trace</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.hdiv_trace</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2016 Thomas H. Gibson</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">FIAT.discontinuous_lagrange</span> <span class="kn">import</span> <span class="n">DiscontinuousLagrange</span>
+<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="n">PointEvaluation</span>
+<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="p">(</span><span class="n">ufc_simplex</span><span class="p">,</span> <span class="n">POINT</span><span class="p">,</span>
+                                    <span class="n">LINE</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">,</span>
+                                    <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">TETRAHEDRON</span><span class="p">,</span>
+                                    <span class="n">TENSORPRODUCT</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">FIAT.tensor_product</span> <span class="kn">import</span> <span class="n">TensorProductElement</span>
+
+<span class="c1"># Numerical tolerance for facet-entity identifications</span>
+<span class="n">epsilon</span> <span class="o">=</span> <span class="mf">1e-10</span>
+
+
+<div class="viewcode-block" id="TraceError">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.TraceError">[docs]</a>
+<span class="k">class</span> <span class="nc">TraceError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception caused by tabulating a trace element on the interior of a cell,</span>
+<span class="sd">    or the gradient of a trace element.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span></div>
+
+
+
+<div class="viewcode-block" id="HDivTrace">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace">[docs]</a>
+<span class="k">class</span> <span class="nc">HDivTrace</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class implementing the trace of hdiv elements. This class</span>
+<span class="sd">    is a stand-alone element family that produces a DG-facet field.</span>
+<span class="sd">    This element is what&#39;s produced after performing the trace</span>
+<span class="sd">    operation on an existing H(Div) element.</span>
+
+<span class="sd">    This element is also known as the discontinuous trace field that</span>
+<span class="sd">    arises in several DG formulations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructor for the HDivTrace element.</span>
+
+<span class="sd">        :arg ref_el: A reference element, which may be a tensor product</span>
+<span class="sd">                     cell.</span>
+<span class="sd">        :arg degree: The degree of approximation. If on a tensor product</span>
+<span class="sd">                     cell, then provide a tuple of degrees if you want</span>
+<span class="sd">                     varying degrees.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot take the trace of a </span><span class="si">%d</span><span class="s2">-dim cell.&quot;</span> <span class="o">%</span> <span class="n">sd</span><span class="p">)</span>
+
+        <span class="c1"># Store the degrees if on a tensor product cell</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TENSORPRODUCT</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">degree</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+                <span class="n">degree</span> <span class="o">=</span> <span class="p">(</span><span class="n">degree</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span>
+
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">degree</span><span class="p">),</span> <span class="p">(</span>
+                <span class="s2">&quot;Number of specified degrees must be equal to the number of cells.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">TETRAHEDRON</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                    <span class="s2">&quot;Trace element on a </span><span class="si">%s</span><span class="s2"> not implemented&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+                <span class="p">)</span>
+            <span class="c1"># Cannot have varying degrees for these reference cells</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must have a tensor product cell if providing multiple degrees&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Initialize entity dofs and construct the DG elements</span>
+        <span class="c1"># for the facets</span>
+        <span class="n">facet_sd</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">dg_elements</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">entity_dofs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">top_dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">topology</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">cell</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">top_dim</span><span class="p">)</span>
+            <span class="n">entity_dofs</span><span class="p">[</span><span class="n">top_dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="c1"># We have a facet entity!</span>
+            <span class="k">if</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">==</span> <span class="n">facet_sd</span><span class="p">:</span>
+                <span class="n">dg_elements</span><span class="p">[</span><span class="n">top_dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">construct_dg_element</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+            <span class="c1"># Initialize</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">:</span>
+                <span class="n">entity_dofs</span><span class="p">[</span><span class="n">top_dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Compute the dof numbering for all facet entities</span>
+        <span class="c1"># and extract nodes</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">facet_dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">dg_elements</span><span class="p">):</span>
+            <span class="n">element</span> <span class="o">=</span> <span class="n">dg_elements</span><span class="p">[</span><span class="n">facet_dim</span><span class="p">]</span>
+            <span class="n">nf</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+            <span class="n">num_facets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">topology</span><span class="p">[</span><span class="n">facet_dim</span><span class="p">])</span>
+
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">):</span>
+                <span class="n">entity_dofs</span><span class="p">[</span><span class="n">facet_dim</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">nf</span><span class="p">))</span>
+                <span class="n">offset</span> <span class="o">+=</span> <span class="n">nf</span>
+
+                <span class="c1"># Run over nodes and collect the points for point evaluations</span>
+                <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">():</span>
+                    <span class="n">facet_pt</span><span class="p">,</span> <span class="o">=</span> <span class="n">dof</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
+                    <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                    <span class="n">pts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">transform</span><span class="p">(</span><span class="n">facet_pt</span><span class="p">)))</span>
+
+        <span class="c1"># Setting up dual basis - only point evaluations</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pt</span><span class="p">)</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">pts</span><span class="p">]</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">DualSet</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_dofs</span><span class="p">)</span>
+
+        <span class="c1"># Degree of the element</span>
+        <span class="n">deg</span> <span class="o">=</span> <span class="nb">max</span><span class="p">([</span><span class="n">e</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">dg_elements</span><span class="o">.</span><span class="n">values</span><span class="p">()])</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">deg</span><span class="p">,</span>
+                         <span class="n">formdegree</span><span class="o">=</span><span class="n">facet_sd</span><span class="p">,</span>
+                         <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;affine&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Set up facet elements</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dg_elements</span> <span class="o">=</span> <span class="n">dg_elements</span>
+
+        <span class="c1"># Degree for quadrature rule</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">polydegree</span> <span class="o">=</span> <span class="n">deg</span>
+
+<div class="viewcode-block" id="HDivTrace.degree">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.degree">[docs]</a>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the (embedding) polynomial space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polydegree</span></div>
+
+
+<div class="viewcode-block" id="HDivTrace.get_nodal_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.get_nodal_basis">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
+<span class="sd">        for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented for the trace element.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="HDivTrace.get_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.get_coeffs">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
+<span class="sd">        finite element.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented for the trace element.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="HDivTrace.tabulate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.tabulate">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to a given order of</span>
+<span class="sd">        basis functions at given points.</span>
+
+<span class="sd">        :arg order: The maximum order of derivative.</span>
+<span class="sd">        :arg points: An iterable of points.</span>
+<span class="sd">        :arg entity: Optional (dimension, entity number) pair</span>
+<span class="sd">                     indicating which topological entity of the</span>
+<span class="sd">                     reference element to tabulate on.  If ``None``,</span>
+<span class="sd">                     tabulated values are computed by geometrically</span>
+<span class="sd">                     approximating which facet the points are on.</span>
+
+<span class="sd">        .. note ::</span>
+
+<span class="sd">           Performing illegal tabulations on this element will result in either</span>
+<span class="sd">           a tabulation table of `numpy.nan` arrays (`entity=None` case), or</span>
+<span class="sd">           insertions of the `TraceError` exception class. This is due to the</span>
+<span class="sd">           fact that performing cell-wise tabulations, or asking for any order</span>
+<span class="sd">           of derivative evaluations, are not mathematically well-defined.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">facet_sd</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="c1"># Initializing dictionary with zeros</span>
+        <span class="n">phivals</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+                <span class="n">phivals</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">(),</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)))</span>
+
+        <span class="n">evalkey</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span>
+
+        <span class="c1"># If entity is None, identify facet using numerical tolerance and</span>
+        <span class="c1"># return the tabulated values</span>
+        <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># NOTE: Numerical approximation of the facet id is currently only</span>
+            <span class="c1"># implemented for simplex reference cells.</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">TETRAHEDRON</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                    <span class="s2">&quot;Tabulating this element on a </span><span class="si">%s</span><span class="s2"> cell without providing &quot;</span>
+                    <span class="s2">&quot;an entity is not currently supported.&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">)</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Attempt to identify which facet (if any) the given points are on</span>
+            <span class="n">vertices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span>
+            <span class="n">coordinates</span> <span class="o">=</span> <span class="n">barycentric_coordinates</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)</span>
+            <span class="n">unique_facet</span><span class="p">,</span> <span class="n">success</span> <span class="o">=</span> <span class="n">extract_unique_facet</span><span class="p">(</span><span class="n">coordinates</span><span class="p">)</span>
+
+            <span class="c1"># If not successful, return NaNs</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">success</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">phivals</span><span class="p">:</span>
+                    <span class="n">phivals</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">(),</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)),</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="n">phivals</span>
+
+            <span class="c1"># Otherwise, extract non-zero values and insertion indices</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Map points to the reference facet</span>
+                <span class="n">new_points</span> <span class="o">=</span> <span class="n">map_to_reference_facet</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">unique_facet</span><span class="p">)</span>
+
+                <span class="c1"># Retrieve values by tabulating the DG element</span>
+                <span class="n">element</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dg_elements</span><span class="p">[</span><span class="n">facet_sd</span><span class="p">]</span>
+                <span class="n">nf</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+                <span class="n">nonzerovals</span><span class="p">,</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">new_points</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                <span class="n">indices</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">nf</span> <span class="o">*</span> <span class="n">unique_facet</span><span class="p">,</span> <span class="n">nf</span> <span class="o">*</span> <span class="p">(</span><span class="n">unique_facet</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">entity_dim</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">entity</span>
+
+            <span class="c1"># If the user is directly specifying cell-wise tabulation, return</span>
+            <span class="c1"># TraceErrors in dict for appropriate handling in the form compiler</span>
+            <span class="k">if</span> <span class="n">entity_dim</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dg_elements</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">phivals</span><span class="p">:</span>
+                    <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;The HDivTrace element can only be tabulated on facets.&quot;</span>
+                    <span class="n">phivals</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">TraceError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+                <span class="k">return</span> <span class="n">phivals</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Retrieve function evaluations (order = 0 case)</span>
+                <span class="n">offset</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">for</span> <span class="n">facet_dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dg_elements</span><span class="p">):</span>
+                    <span class="n">element</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dg_elements</span><span class="p">[</span><span class="n">facet_dim</span><span class="p">]</span>
+                    <span class="n">nf</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+                    <span class="n">num_facets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">facet_dim</span><span class="p">])</span>
+
+                    <span class="c1"># Loop over the number of facets until we find a facet</span>
+                    <span class="c1"># with matching dimension and id</span>
+                    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">):</span>
+                        <span class="c1"># Found it! Grab insertion indices</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="o">==</span> <span class="n">entity</span><span class="p">:</span>
+                            <span class="n">nonzerovals</span><span class="p">,</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">points</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                            <span class="n">indices</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">nf</span><span class="p">)</span>
+
+                        <span class="n">offset</span> <span class="o">+=</span> <span class="n">nf</span>
+
+        <span class="c1"># If asking for gradient evaluations, insert TraceError in</span>
+        <span class="c1"># gradient slots</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Gradients on trace elements are not well-defined.&quot;</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">phivals</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">key</span> <span class="o">!=</span> <span class="n">evalkey</span><span class="p">:</span>
+                    <span class="n">phivals</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">TraceError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Insert non-zero values in appropriate place</span>
+        <span class="n">phivals</span><span class="p">[</span><span class="n">evalkey</span><span class="p">][</span><span class="n">indices</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">nonzerovals</span>
+
+        <span class="k">return</span> <span class="n">phivals</span></div>
+
+
+<div class="viewcode-block" id="HDivTrace.value_shape">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.value_shape">[docs]</a>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the value shape of the finite element functions.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="HDivTrace.dmats">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.dmats">[docs]</a>
+    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
+<span class="sd">        derivatives.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;dmats not implemented for the trace element.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="HDivTrace.get_num_members">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.get_num_members">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return number of members of the expansion set.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_num_members not implemented for the trace element.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="HDivTrace.is_nodal">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.is_nodal">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">is_nodal</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="construct_dg_element">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.construct_dg_element">[docs]</a>
+<span class="k">def</span> <span class="nf">construct_dg_element</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a discontinuous galerkin element of a given degree</span>
+<span class="sd">    on a particular reference cell.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="n">LINE</span><span class="p">,</span> <span class="n">TRIANGLE</span><span class="p">]:</span>
+        <span class="n">dg_element</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+
+    <span class="c1"># Quadrilateral facets could be on a FiredrakeQuadrilateral.</span>
+    <span class="c1"># In this case, we treat this as an interval x interval cell:</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">QUADRILATERAL</span><span class="p">:</span>
+        <span class="n">dg_a</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dg_b</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dg_element</span> <span class="o">=</span> <span class="n">TensorProductElement</span><span class="p">(</span><span class="n">dg_a</span><span class="p">,</span> <span class="n">dg_b</span><span class="p">)</span>
+
+    <span class="c1"># This handles the more general case for facets:</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TENSORPRODUCT</span><span class="p">:</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">),</span> <span class="p">(</span>
+            <span class="s2">&quot;Must provide the same number of degrees as the number &quot;</span>
+            <span class="s2">&quot;of cells that make up the tensor product cell.&quot;</span>
+        <span class="p">)</span>
+        <span class="n">sub_elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">construct_dg_element</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">POINT</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_elements</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">dg_element</span> <span class="o">=</span> <span class="n">TensorProductElement</span><span class="p">(</span><span class="o">*</span><span class="n">sub_elements</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dg_element</span><span class="p">,</span> <span class="o">=</span> <span class="n">sub_elements</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">&quot;Reference cells of type </span><span class="si">%s</span><span class="s2"> not currently supported&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">dg_element</span></div>
+
+
+
+<span class="c1"># The following functions are credited to Marie E. Rognes:</span>
+<div class="viewcode-block" id="extract_unique_facet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.extract_unique_facet">[docs]</a>
+<span class="k">def</span> <span class="nf">extract_unique_facet</span><span class="p">(</span><span class="n">coordinates</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="n">epsilon</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Determines whether a set of points (described in its barycentric coordinates)</span>
+<span class="sd">    are all on one of the facet sub-entities, and return the particular facet and</span>
+<span class="sd">    whether the search has been successful.</span>
+
+<span class="sd">    :arg coordinates: A set of points described in barycentric coordinates.</span>
+<span class="sd">    :arg tolerance: A fixed tolerance for geometric identifications.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">facets</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coordinates</span><span class="p">:</span>
+        <span class="n">on_facet</span> <span class="o">=</span> <span class="nb">set</span><span class="p">([</span><span class="n">i</span> <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">l</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">tolerance</span><span class="p">])</span>
+        <span class="n">facets</span> <span class="o">+=</span> <span class="p">[</span><span class="n">on_facet</span><span class="p">]</span>
+
+    <span class="n">unique_facet</span> <span class="o">=</span> <span class="n">facets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">facets</span><span class="p">:</span>
+        <span class="n">unique_facet</span> <span class="o">=</span> <span class="n">unique_facet</span> <span class="o">&amp;</span> <span class="n">f</span>
+
+    <span class="c1"># Handle coordinates not on facets</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique_facet</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># If we have a unique facet, return it and success</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">unique_facet</span><span class="o">.</span><span class="n">pop</span><span class="p">(),</span> <span class="kc">True</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="barycentric_coordinates">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.barycentric_coordinates">[docs]</a>
+<span class="k">def</span> <span class="nf">barycentric_coordinates</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Computes the barycentric coordinates for a set of points relative to a</span>
+<span class="sd">    simplex defined by a set of vertices.</span>
+
+<span class="sd">    :arg points: A set of points.</span>
+<span class="sd">    :arg vertices: A set of vertices that define the simplex.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Form mapping matrix</span>
+    <span class="n">T</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">vertices</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">-</span> <span class="n">vertices</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">invT</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">T</span><span class="p">)</span>
+
+    <span class="n">points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+    <span class="n">bary</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;ij,kj-&gt;ki&quot;</span><span class="p">,</span> <span class="n">invT</span><span class="p">,</span> <span class="p">(</span><span class="n">points</span> <span class="o">-</span> <span class="n">vertices</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+    <span class="n">last</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">bary</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">bary</span><span class="p">,</span> <span class="n">last</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="map_from_reference_facet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.map_from_reference_facet">[docs]</a>
+<span class="k">def</span> <span class="nf">map_from_reference_facet</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the physical coordinate of a point using barycentric</span>
+<span class="sd">    coordinates.</span>
+
+<span class="sd">    :arg point: The reference points to be mapped to the facet.</span>
+<span class="sd">    :arg vertices: The vertices defining the physical element.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Compute the barycentric coordinates of the point relative to the reference facet</span>
+    <span class="n">reference_simplex</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">reference_vertices</span> <span class="o">=</span> <span class="n">reference_simplex</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+    <span class="n">coords</span> <span class="o">=</span> <span class="n">barycentric_coordinates</span><span class="p">([</span><span class="n">point</span><span class="p">,</span> <span class="p">],</span> <span class="n">reference_vertices</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Evaluates the physical coordinate of the point using barycentric coordinates</span>
+    <span class="n">point</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">vertices</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">coords</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">coords</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">point</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="map_to_reference_facet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.map_to_reference_facet">[docs]</a>
+<span class="k">def</span> <span class="nf">map_to_reference_facet</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Given a set of points and vertices describing a facet of a simplex in n-dimensional</span>
+<span class="sd">    coordinates (where the points lie on the facet), map the points to the reference simplex</span>
+<span class="sd">    of dimension (n-1).</span>
+
+<span class="sd">    :arg points: A set of points in n-D.</span>
+<span class="sd">    :arg vertices: A set of vertices describing a facet of a simplex in n-D.</span>
+<span class="sd">    :arg facet: Integer representing the facet number.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Compute the barycentric coordinates of the points with respect to the</span>
+    <span class="c1"># full physical simplex</span>
+    <span class="n">all_coords</span> <span class="o">=</span> <span class="n">barycentric_coordinates</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">)</span>
+
+    <span class="c1"># Extract vertices of the reference facet</span>
+    <span class="n">reference_facet_simplex</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">vertices</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">reference_vertices</span> <span class="o">=</span> <span class="n">reference_facet_simplex</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+
+    <span class="n">reference_points</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">coords</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">all_coords</span><span class="p">):</span>
+        <span class="c1"># Extract the correct subset of barycentric coordinates since we know</span>
+        <span class="c1"># which facet we are on</span>
+        <span class="n">new_coords</span> <span class="o">=</span> <span class="p">[</span><span class="n">coords</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">coords</span><span class="p">))</span> <span class="k">if</span> <span class="n">j</span> <span class="o">!=</span> <span class="n">facet</span><span class="p">]</span>
+
+        <span class="c1"># Evaluate the reference coordinate of a point in barycentric coordinates</span>
+        <span class="n">reference_pt</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">reference_vertices</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> <span class="o">*</span> <span class="n">new_coords</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                           <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">new_coords</span><span class="p">)))</span>
+
+        <span class="n">reference_points</span> <span class="o">+=</span> <span class="p">[</span><span class="n">reference_pt</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">reference_points</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.hdiv_trace</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

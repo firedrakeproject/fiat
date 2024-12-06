@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>User manual &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="_static/documentation_options.js?v=e952a2db"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Release notes" href="releases.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="releases.html" title="Release notes"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="installation.html" title="Installation"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">User manual</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="user-manual">
+<h1>User manual<a class="headerlink" href="#user-manual" title="Link to this heading">¶</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This page is work in progress and needs substantial editing.</p>
+</div>
+<p>FIAT (FInite element Automatic Tabulator) is a Python package for
+defining and evaluating a wide range of different finite element basis
+functions for numerical partial differential equations.  It is
+intended to make <a href="#id1"><span class="problematic" id="id2">``</span></a>difficult’’ elements such as high-order
+Brezzi-Douglas-Marini <a class="reference internal" href="#bdm" id="id3"><span>[BDM]</span></a> elements usable by providing
+abstractions so that they may be implemented succinctly and hence
+treated as a black box.  FIAT is intended for use at two different
+levels.  For one, it is designed to provide a standard API for finite
+element bases so that programmers may use whatever elements they need
+in their code.  At a lower level, it provides necessary infrastructure to
+rapidly deploy new kinds of finite elements without expensive symbolic
+computation or tedious algebraic manipulation.
+It is my goal that a large number of people use FIAT without ever
+knowing it.  Thanks to several ongoing projects such as
+Sundance <a class="reference internal" href="#sundance" id="id4"><span>[Sundance]</span></a>, FFC <a class="reference internal" href="#ffc" id="id5"><span>[FFC]</span></a>, and PETSc <a class="reference internal" href="#petsc" id="id6"><span>[PETSc]</span></a>, it is becoming
+possible to to define finite element methods using mathematical
+notation in some high-level or domain-specific language.  The primary
+shortcoming of these projects is their lack of support for general
+elements.  It is one thing to <a href="#id7"><span class="problematic" id="id8">``</span></a>provide hooks’’ for general elements,
+but absent a tool such as FIAT, these hooks remain mainly empty.  As
+these projects mature, I hope to expose users of the finite element
+method to the exotic world of potentially high-degree finite element
+on unstructured grids using the best elements in <span class="math notranslate nohighlight">\(H^1\)</span>,
+<span class="math notranslate nohighlight">\(H(\mathrm{div})\)</span>, and <span class="math notranslate nohighlight">\(H(\mathrm{curl})\)</span>.</p>
+<p>In this brief (and still developing) guide, I will first
+present the high-level API for users who wish to instantiate a finite
+element on a reference domain and evaluate its basis functions and
+derivatives at some quadrature points.  Then, I will explain some of
+the underlying infrastructure so as to demonstrate how to add new
+elements.</p>
+<section id="using-fiat-a-tutorial-with-lagrange-elements">
+<h2>Using FIAT: A tutorial with Lagrange elements<a class="headerlink" href="#using-fiat-a-tutorial-with-lagrange-elements" title="Link to this heading">¶</a></h2>
+<section id="importing-fiat">
+<h3>Importing FIAT<a class="headerlink" href="#importing-fiat" title="Link to this heading">¶</a></h3>
+<p>FIAT is organized as a package in Python, consisting of several
+modules.  In order to get some of the packages, we use the line</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">Lagrange</span><span class="p">,</span> <span class="n">quadrature</span><span class="p">,</span> <span class="n">shapes</span>
+</pre></div>
+</div>
+<p>This loads several modules for the Lagrange elements, quadrature
+rules, and the simplicial element shapes which FIAT implements.  The
+roles each of these plays will become clear shortly.</p>
+</section>
+<section id="important-note">
+<h3>Important note<a class="headerlink" href="#important-note" title="Link to this heading">¶</a></h3>
+<p>Throughout, FIAT defines the reference elements based on the interval
+<span class="math notranslate nohighlight">\((-1,1)\)</span> rather than the more common <span class="math notranslate nohighlight">\((0,1)\)</span>.  So, the one-dimensional
+reference element is <span class="math notranslate nohighlight">\((-1,1)\)</span>, the three vertices of the reference
+triangle are <span class="math notranslate nohighlight">\((-1,-1),(1,-1),(1,-1)\)</span>, and the four vertices of the
+reference tetrahedron are <span class="math notranslate nohighlight">\((-1,-1,-1),(1,-1,-1),(-1,1,-1),(-1,-1,1)\)</span>.</p>
+</section>
+<section id="instantiating-elements">
+<h3>Instantiating elements<a class="headerlink" href="#instantiating-elements" title="Link to this heading">¶</a></h3>
+<p>FIAT uses a lightweight object-oriented infrastructure to define
+finite elements.  The <code class="docutils literal notranslate"><span class="pre">Lagrange</span></code> module contains a class
+<code class="docutils literal notranslate"><span class="pre">Lagrange</span></code> modeling the Lagrange finite element family.  This
+class is a subclass of some <code class="docutils literal notranslate"><span class="pre">FiniteElement</span></code> class contained in
+another module (<code class="docutils literal notranslate"><span class="pre">polynomial</span></code> to be precise).  So, having imported
+the <code class="docutils literal notranslate"><span class="pre">Lagrange</span></code> module, we can create the Lagrange element of
+degree <code class="docutils literal notranslate"><span class="pre">2</span></code> on triangles by</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">shape</span> <span class="o">=</span> <span class="n">shapes</span><span class="o">.</span><span class="n">TRIANGLE</span>
+<span class="n">degree</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">U</span> <span class="o">=</span> <span class="n">Lagrange</span><span class="o">.</span><span class="n">Lagrange</span><span class="p">(</span> <span class="n">shape</span> <span class="p">,</span> <span class="n">degree</span> <span class="p">)</span>
+</pre></div>
+</div>
+<p>Here, <code class="docutils literal notranslate"><span class="pre">shapes.TRIANGLE</span></code> is an integer code indicating the two
+dimensional simplex.  <code class="docutils literal notranslate"><span class="pre">shapes</span></code> also defines
+<code class="docutils literal notranslate"><span class="pre">LINE</span></code> and <code class="docutils literal notranslate"><span class="pre">TETRAHEDRON</span></code>.  Most of the
+upper-level interface to FIAT is dimensionally abstracted over element
+shape.</p>
+<p>The class <code class="docutils literal notranslate"><span class="pre">FiniteElement</span></code> supports three methods, modeled on the
+abstract definition of Ciarlet.  These methods are
+<code class="docutils literal notranslate"><span class="pre">domain_shape()</span></code>, <code class="docutils literal notranslate"><span class="pre">function_space()</span></code>, and <code class="docutils literal notranslate"><span class="pre">dual_basis()</span></code>.
+The first of these returns the code for the shape and the second
+returns the nodes of the finite element (including information related
+to topological association of nodes with mesh entities, needed for
+creating degree of freedom orderings).</p>
+</section>
+</section>
+<section id="quadrature-rules">
+<h2>Quadrature rules<a class="headerlink" href="#quadrature-rules" title="Link to this heading">¶</a></h2>
+<p>FIAT implements arbitrary-order collapsed quadrature, as discussed in
+Karniadakis and Sherwin~cite{}, for the simplex of dimension one,
+two, or three.  The simplest way to get a quadrature rule is through
+the function <code class="docutils literal notranslate"><span class="pre">`make_quadrature(shape,m)`</span></code>, which takes a shape code
+and an integer indicating the number of points per direction.  For
+building element matrices using quadratics, we will typically need a
+second or third order integration rule, so we can get such a rule by</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature</span><span class="o">.</span><span class="n">make_quadrature</span><span class="p">(</span> <span class="n">shape</span> <span class="p">,</span> <span class="mi">2</span> <span class="p">)</span>
+</pre></div>
+</div>
+<p>This uses two points in each direction on the reference square, then
+maps them to the reference triangle.  We may get a
+<code class="docutils literal notranslate"><span class="pre">Numeric.array</span></code> of the quadrature weights with the method
+<code class="docutils literal notranslate"><span class="pre">Q.get_weights()</span></code> and a list of tuples storing the quadrature
+points with the method <code class="docutils literal notranslate"><span class="pre">Q.get_points()</span></code>.</p>
+</section>
+<section id="tabulation">
+<h2>Tabulation<a class="headerlink" href="#tabulation" title="Link to this heading">¶</a></h2>
+<p>FIAT provides functions for tabulating the element basis functions and
+their derivatives.  To get the <code class="docutils literal notranslate"><span class="pre">FunctionSpace</span></code> object, we do</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Ufs</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">function_space</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>To get the values of each basis function at each of the quadrature
+points, we use the <code class="docutils literal notranslate"><span class="pre">tabulate()</span></code> method</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Ufs</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span> <span class="p">)</span>
+<span class="go">array([[ 0.22176167, -0.12319761, -0.11479229, -0.06377178],</span>
+<span class="go">      [-0.11479229, -0.06377178,  0.22176167, -0.12319761],</span>
+<span class="go">      [-0.10696938,  0.18696938, -0.10696938,  0.18696938],</span>
+<span class="go">      [ 0.11074286,  0.19356495,  0.41329796,  0.72239423],</span>
+<span class="go">      [ 0.41329796,  0.72239423,  0.11074286,  0.19356495],</span>
+<span class="go">      [ 0.47595918,  0.08404082,  0.47595918,  0.08404082]])</span>
+</pre></div>
+</div>
+<p>This returns a two-dimensional <code class="docutils literal notranslate"><span class="pre">Numeric.array</span></code> with rows for each
+basis function and columns for each input point.</p>
+<p>Also, finite element codes require tabulation of the basis functions’
+derivatives.  Each <code class="docutils literal notranslate"><span class="pre">FunctionSpace</span></code> object also provides a method
+<code class="docutils literal notranslate"><span class="pre">tabulate_jet(i,xs)</span></code> that returns a list of Python dictionaries.
+The <code class="docutils literal notranslate"><span class="pre">i``th</span> <span class="pre">entry</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">list</span> <span class="pre">is</span> <span class="pre">a</span> <span class="pre">dictionary</span> <span class="pre">storing</span> <span class="pre">the</span> <span class="pre">values</span> <span class="pre">of</span>
+<span class="pre">all</span> <span class="pre">``i``th</span> <span class="pre">order</span> <span class="pre">derivatives.</span>&#160; <span class="pre">Each</span> <span class="pre">dictionary</span> <span class="pre">maps</span> <span class="pre">a</span> <span class="pre">multiindex</span>
+<span class="pre">(a</span> <span class="pre">tuple</span> <span class="pre">of</span> <span class="pre">length</span> <span class="pre">``i</span></code>) to the table of the associated partial
+derivatives of the basis functions at those points.  For example,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Ufs_jet</span> <span class="o">=</span> <span class="n">Ufs</span><span class="o">.</span><span class="n">tabulate_jet</span><span class="p">(</span> <span class="mi">1</span> <span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span> <span class="p">)</span>
+</pre></div>
+</div>
+<p>tabulates the zeroth and first partial derivatives of the function
+space at the quadrature points.  Then,</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Ufs_jet</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="go">{(0, 0): array([[ 0.22176167, -0.12319761, -0.11479229, -0.06377178],</span>
+<span class="go">      [-0.11479229, -0.06377178,  0.22176167, -0.12319761],</span>
+<span class="go">      [-0.10696938,  0.18696938, -0.10696938,  0.18696938],</span>
+<span class="go">      [ 0.11074286,  0.19356495,  0.41329796,  0.72239423],</span>
+<span class="go">      [ 0.41329796,  0.72239423,  0.11074286,  0.19356495],</span>
+<span class="go">      [ 0.47595918,  0.08404082,  0.47595918,  0.08404082]])}</span>
+</pre></div>
+</div>
+<p>gives us a dictionary mapping the only zeroth-order partial derivative
+to the values of the basis functions at the quadrature points.  More
+interestingly, we may get the first derivatives in the x- and y-
+directions with</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">Ufs_jet</span><span class="p">[</span><span class="mi">1</span><span class="p">][(</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">)]</span>
+<span class="go">array([[-0.83278049, -0.06003983,  0.14288254,  0.34993778],</span>
+<span class="go">      [-0.14288254, -0.34993778,  0.83278049,  0.06003983],</span>
+<span class="go">      [ 0.        ,  0.        ,  0.        ,  0.        ],</span>
+<span class="go">      [ 0.31010205,  1.28989795,  0.31010205,  1.28989795],</span>
+<span class="go">      [-0.31010205, -1.28989795, -0.31010205, -1.28989795],</span>
+<span class="go">      [ 0.97566304,  0.40997761, -0.97566304, -0.40997761]])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">Ufs_jet</span><span class="p">[</span><span class="mi">1</span><span class="p">][(</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">)]</span>
+<span class="go">array([[ -8.32780492e-01,  -6.00398310e-02,   1.42882543e-01,   3.49937780e-01],</span>
+<span class="go">      [  7.39494156e-17,   4.29608279e-17,   4.38075188e-17,   7.47961065e-17],</span>
+<span class="go">      [ -1.89897949e-01,   7.89897949e-01,  -1.89897949e-01,   7.89897949e-01],</span>
+<span class="go">      [  3.57117457e-01,   1.50062220e-01,   1.33278049e+00,   5.60039831e-01],</span>
+<span class="go">      [  1.02267844e+00,  -7.29858118e-01,   4.70154051e-02,  -1.13983573e+00],</span>
+<span class="go">      [ -3.57117457e-01,  -1.50062220e-01,  -1.33278049e+00,  -5.60039831e-01]])</span>
+</pre></div>
+</div>
+</section>
+<section id="lower-level-api">
+<h2>Lower-level API<a class="headerlink" href="#lower-level-api" title="Link to this heading">¶</a></h2>
+<p>Not only does FIAT provide a high-level library interface for users to
+evaluate existing finite element bases, but it also provides
+lower-level tools.  Here, we survey these tools module-by-module.</p>
+<section id="shapes-py">
+<h3>shapes.py<a class="headerlink" href="#shapes-py" title="Link to this heading">¶</a></h3>
+<p>FIAT currenly only supports simplicial reference elements, but does so
+in a fairly dimensionally-independent way (up to tetrahedra).</p>
+</section>
+<section id="jacobi-py">
+<h3>jacobi.py<a class="headerlink" href="#jacobi-py" title="Link to this heading">¶</a></h3>
+<p>This is a low-level module that tabulates the Jacobi polynomials and
+their derivatives, and also provides Gauss-Jacobi points.  This module
+will seldom if ever be imported directly by users.  For more
+information, consult the documentation strings and source code.</p>
+</section>
+<section id="expansions-py">
+<h3>expansions.py<a class="headerlink" href="#expansions-py" title="Link to this heading">¶</a></h3>
+<p>FIAT relies on orthonormal polynomial bases.  These are constructed by
+mapping appropriate Jacobi polynomials from the reference cube to the
+reference simplex, as described in the reference of Karniadakis and
+Sherwin~cite{}.  The module <code class="docutils literal notranslate"><span class="pre">expansions.py</span></code> implements these
+orthonormal expansions.  This is also a low-level module that will
+infrequently be used directly, but it forms the backbone for the
+module <code class="docutils literal notranslate"><span class="pre">polynomial.py</span></code>.</p>
+</section>
+<section id="quadrature-py">
+<h3>quadrature.py<a class="headerlink" href="#quadrature-py" title="Link to this heading">¶</a></h3>
+<p>FIAT makes heavy use of numerical quadrature, both internally and in
+the user interface.  Internally, many function spaces or degrees of
+freedom are defined in terms of integral quantities having certain
+behavior.  Keeping with the theme of arbitrary order approximations,
+FIAT provides arbitrary order quadrature rules on the reference
+simplices.  These are constructed by mapping Gauss-Jacobi rules from
+the reference cube.  While these rules are suboptimal in terms of
+order of accuracy achieved for a given number of points, they may be
+generated mechanically in a simpler way than symmetric quadrature
+rules.  In the future, we hope to have the best symmetric existing
+rules integrated into FIAT.</p>
+<p>Unless one is modifying the quadrature rules available, all of the
+functionality of <code class="docutils literal notranslate"><span class="pre">quadrature.py</span></code> may be accessed through the
+single function <code class="docutils literal notranslate"><span class="pre">make_quadrature</span></code>.
+This function takes the code for a shape and the number of points in
+each coordinate direction and returns a quadrature rule.  Internally,
+there is a lightweight class hierarchy rooted at an abstract
+<code class="docutils literal notranslate"><span class="pre">QuadratureRule</span></code> class, where the quadrature rules for
+different shapes are actually different classes.  However, the dynamic
+typing of Python relieves the user from these considerations.  The
+interface to an instance consists in the following methods.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">get_points()</span></code>, which returns a list of the quadrature
+points, each stored as a tuple.  For dimensional uniformity,
+one-dimensional quadrature rules are stored as lists of 1-tuples
+rather than as lists of numbers.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_weights()</span></code>, which returns a <code class="docutils literal notranslate"><span class="pre">Numeric.array</span></code>
+of quadrature weights.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">integrate(f)</span></code>, which takes a callable object <code class="docutils literal notranslate"><span class="pre">f</span></code>
+and returns the (approximate) integral over the domain</p></li>
+<li><p>Also, the <code class="docutils literal notranslate"><span class="pre">__call__</span></code> method is overloaded so that a
+quadrature rule may be applied to a callable object.  This is
+syntactic sugar on top of the <code class="docutils literal notranslate"><span class="pre">integrate</span></code> method.</p></li>
+</ul>
+</section>
+<section id="polynomial-py">
+<h3>polynomial.py<a class="headerlink" href="#polynomial-py" title="Link to this heading">¶</a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">polynomial</span></code> module provides the bulk of the classes
+needed to represent polynomial bases and finite element spaces.
+The class <code class="docutils literal notranslate"><span class="pre">PolynomialBase</span></code> provides a high-level access to
+the orthonormal expansion bases; it is typically not instantiated
+directly in an application, but all other kinds of polynomial bases
+are constructed as linear combinations of the members of a
+<code class="docutils literal notranslate"><span class="pre">PolynomialBase</span></code> instance.  The module provides classes for
+scalar and vector-valued polynomial sets, as well as an interface to individual
+polynomials and finite element spaces.</p>
+<section id="polynomialbase">
+<h4>PolynomialBase<a class="headerlink" href="#polynomialbase" title="Link to this heading">¶</a></h4>
+</section>
+<section id="polynomialset">
+<h4>PolynomialSet<a class="headerlink" href="#polynomialset" title="Link to this heading">¶</a></h4>
+<p>The <code class="docutils literal notranslate"><span class="pre">PolynomialSet</span></code> function is a factory function interface into
+the hierarchy</p>
+<div role="list" class="citation-list">
+<div class="citation" id="bdm" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id3">BDM</a><span class="fn-bracket">]</span></span>
+<p>Brezzi, Franco; Douglas, Jim, Jr.; Marini, L. D. “Two families of mixed finite elements for second order elliptic problems”. Numerische Mathematik. vol 47. no. 2. June 1985. 217—235. doi:10.1007/BF01389710</p>
+</div>
+<div class="citation" id="sundance" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id4">Sundance</a><span class="fn-bracket">]</span></span>
+<p><a class="reference external" href="http://www.math.ttu.edu/~klong/Sundance/html/index.html">http://www.math.ttu.edu/~klong/Sundance/html/index.html</a></p>
+</div>
+<div class="citation" id="ffc" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id5">FFC</a><span class="fn-bracket">]</span></span>
+<p><a class="reference external" href="https://bitbucket.org/fenics-project/ffc/src/master/">https://bitbucket.org/fenics-project/ffc/src/master/</a></p>
+</div>
+<div class="citation" id="petsc" role="doc-biblioentry">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id6">PETSc</a><span class="fn-bracket">]</span></span>
+<p><a class="reference external" href="https://www.mcs.anl.gov/petsc/">https://www.mcs.anl.gov/petsc/</a></p>
+</div>
+</div>
+</section>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div>
+    <h3><a href="index.html">Table of Contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">User manual</a><ul>
+<li><a class="reference internal" href="#using-fiat-a-tutorial-with-lagrange-elements">Using FIAT: A tutorial with Lagrange elements</a><ul>
+<li><a class="reference internal" href="#importing-fiat">Importing FIAT</a></li>
+<li><a class="reference internal" href="#important-note">Important note</a></li>
+<li><a class="reference internal" href="#instantiating-elements">Instantiating elements</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#quadrature-rules">Quadrature rules</a></li>
+<li><a class="reference internal" href="#tabulation">Tabulation</a></li>
+<li><a class="reference internal" href="#lower-level-api">Lower-level API</a><ul>
+<li><a class="reference internal" href="#shapes-py">shapes.py</a></li>
+<li><a class="reference internal" href="#jacobi-py">jacobi.py</a></li>
+<li><a class="reference internal" href="#expansions-py">expansions.py</a></li>
+<li><a class="reference internal" href="#quadrature-py">quadrature.py</a></li>
+<li><a class="reference internal" href="#polynomial-py">polynomial.py</a><ul>
+<li><a class="reference internal" href="#polynomialbase">PolynomialBase</a></li>
+<li><a class="reference internal" href="#polynomialset">PolynomialSet</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="installation.html"
+                          title="previous chapter">Installation</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="releases.html"
+                          title="next chapter">Release notes</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/manual.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="releases.html" title="Release notes"
+             >next</a> |</li>
+        <li class="right" >
+          <a href="installation.html" title="Installation"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">User manual</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

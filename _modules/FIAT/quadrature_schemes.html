@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.quadrature_schemes &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.quadrature_schemes</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.quadrature_schemes</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Quadrature schemes on cells</span>
+
+<span class="sd">This module generates quadrature schemes on reference cells that integrate</span>
+<span class="sd">exactly a polynomial of a given degree using a specified scheme.</span>
+
+<span class="sd">Scheme options are:</span>
+
+<span class="sd">  scheme=&quot;default&quot;</span>
+
+<span class="sd">  scheme=&quot;canonical&quot; (collapsed Gauss scheme)</span>
+
+<span class="sd">Background on the schemes:</span>
+
+<span class="sd">  Keast rules for tetrahedra:</span>
+<span class="sd">    Keast, P. Moderate-degree tetrahedral quadrature formulas, Computer</span>
+<span class="sd">    Methods in Applied Mechanics and Engineering 55(3):339-348, 1986.</span>
+<span class="sd">    http://dx.doi.org/10.1016/0045-7825(86)90059-9</span>
+
+<span class="sd">  Xiao-Gimbutas rules for simplices:</span>
+<span class="sd">    Xiao, H., and Gimbutas, Z. A numerical algorithm for the construction of</span>
+<span class="sd">    efficient quadrature rules in two and higher dimensions, Computers &amp;</span>
+<span class="sd">    mathematics with applications 59(2): 663-676, 2010.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># Copyright (C) 2011 Garth N. Wells</span>
+<span class="c1"># Copyright (C) 2016 Miklos Homolya</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="c1">#</span>
+<span class="c1"># First added:  2011-04-19</span>
+<span class="c1"># Last changed: 2011-04-19</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<span class="kn">from</span> <span class="nn">FIAT.quadrature</span> <span class="kn">import</span> <span class="p">(</span><span class="n">QuadratureRule</span><span class="p">,</span> <span class="n">FacetQuadratureRule</span><span class="p">,</span> <span class="n">make_quadrature</span><span class="p">,</span>
+                             <span class="n">make_tensor_product_quadrature</span><span class="p">,</span> <span class="n">map_quadrature</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="p">(</span><span class="n">HEXAHEDRON</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="n">TENSORPRODUCT</span><span class="p">,</span>
+                                    <span class="n">TETRAHEDRON</span><span class="p">,</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">UFCTetrahedron</span><span class="p">,</span>
+                                    <span class="n">UFCTriangle</span><span class="p">,</span> <span class="n">symmetric_simplex</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">FIAT.macro</span> <span class="kn">import</span> <span class="n">MacroQuadratureRule</span>
+
+
+<div class="viewcode-block" id="create_quadrature">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature_schemes.create_quadrature">[docs]</a>
+<span class="k">def</span> <span class="nf">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate quadrature rule for given reference element that will integrate a</span>
+<span class="sd">    polynomial of order &#39;degree&#39; exactly.</span>
+
+<span class="sd">    For low-degree polynomials on triangles (&lt;=50) and tetrahedra (&lt;=15), this uses</span>
+<span class="sd">    hard-coded rules, otherwise it falls back to a collapsed Gauss scheme on</span>
+<span class="sd">    simplices.  On tensor-product cells, it is a tensor-product quadrature rule</span>
+<span class="sd">    of the subcells.</span>
+
+<span class="sd">    :arg ref_el: The FIAT cell to create the quadrature for.</span>
+<span class="sd">    :arg degree: The degree of polynomial that the rule should integrate exactly.</span>
+<span class="sd">    :kwarg scheme: The quadrature scheme, can be choosen from [&quot;default&quot;, &quot;canonical&quot;, &quot;KMV&quot;]</span>
+<span class="sd">        &quot;default&quot; -&gt; hard-coded scheme for low degree and collapsed Gauss scheme for high degree,</span>
+<span class="sd">        &quot;canonical&quot; -&gt; collapsed Gauss scheme,</span>
+<span class="sd">        &quot;KMV&quot; -&gt; spectral lumped scheme for low degree (&lt;=5 on triangles, &lt;=3 on tetrahedra).</span>
+<span class="sd">    :kwarg entity: A tuple of entity dimension and entity id specifying the</span>
+<span class="sd">        integration domain. If not provided, the domain is the entire cell.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">dimension</span><span class="p">,</span> <span class="n">entity_id</span> <span class="o">=</span> <span class="n">entity</span>
+        <span class="n">sub_el</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span>
+        <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">sub_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="n">scheme</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
+        <span class="n">dimension</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span>
+        <span class="n">sub_el</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span>
+        <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">sub_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="n">scheme</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">MacroQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TENSORPRODUCT</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">degree</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="n">degree</span> <span class="o">=</span> <span class="p">(</span><span class="n">degree</span><span class="p">,)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span>
+
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span>
+        <span class="n">quad_rules</span> <span class="o">=</span> <span class="p">[</span><span class="n">create_quadrature</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">scheme</span><span class="p">)</span>
+                      <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">degree</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">make_tensor_product_quadrature</span><span class="p">(</span><span class="o">*</span><span class="n">quad_rules</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="n">HEXAHEDRON</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">product</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Need positive degree, not </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">degree</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;default&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TRIANGLE</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_triangle_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TETRAHEDRON</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_tetrahedron_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;canonical&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">scheme</span> <span class="o">==</span> <span class="s2">&quot;KMV&quot;</span><span class="p">:</span>  <span class="c1"># Kong-Mulder-Veldhuizen scheme</span>
+        <span class="k">return</span> <span class="n">_kmv_lump_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown quadrature scheme: </span><span class="si">%s</span><span class="s2">.&quot;</span> <span class="o">%</span> <span class="n">scheme</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Get quadrature scheme from FIAT interface&quot;&quot;&quot;</span>
+
+    <span class="c1"># Number of points per axis for exact integration</span>
+    <span class="n">num_points_per_axis</span> <span class="o">=</span> <span class="p">(</span><span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+
+    <span class="c1"># Create and return FIAT quadrature rule</span>
+    <span class="k">return</span> <span class="n">make_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">num_points_per_axis</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_kmv_lump_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Specialized quadrature schemes for P &lt; 6 for KMV simplical elements.&quot;&quot;&quot;</span>
+
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="c1"># set the unit element</span>
+    <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">UFCTriangle</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">T</span> <span class="o">=</span> <span class="n">UFCTetrahedron</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">w</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">6.0</span>
+        <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">w</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">24.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># edge midpoints</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># barycenter</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">40.0</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">15.0</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">9.0</span> <span class="o">/</span> <span class="mf">40.0</span>
+        <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+            <span class="c1"># in facets</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="mf">0.33333333333333337</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+            <span class="c1"># in the cell</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">([(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)])</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mf">17.0</span> <span class="o">/</span> <span class="mf">5040.0</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="mf">315.0</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">10</span><span class="p">:</span><span class="mi">14</span><span class="p">]</span> <span class="o">=</span> <span class="mf">9.0</span> <span class="o">/</span> <span class="mf">560.0</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">14</span><span class="p">]</span> <span class="o">=</span> <span class="mf">16.0</span> <span class="o">/</span> <span class="mf">315.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.2934695559090401</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="mf">0.2073451756635909</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>  <span class="c1"># edge points</span>
+            <span class="p">)</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)]</span>
+            <span class="p">)</span>  <span class="c1"># points in center of cell</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.007436456512410291</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.02442084061702551</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">9</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1103885289202054</span>
+        <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>  <span class="c1"># 12 points on edges of facets (0--&gt;1--&gt;2)</span>
+
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>  <span class="c1"># 12 points (3 points on each facet, 1st two parallel to edge 0)</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">6</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>  <span class="c1"># 4 points inside the cell</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00068688236002531922325120561367839</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">16</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0015107814913526136472998739890272</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">16</span><span class="p">:</span><span class="mi">28</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0050062894680040258624242888174649</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">28</span><span class="p">:</span><span class="mi">32</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.021428571428571428571428571428571</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.2113248654051871</span>  <span class="c1"># 0.2113248654051871</span>
+            <span class="n">betas</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">0.4247639617258106</span><span class="p">,</span>
+                <span class="mf">0.130791593829745</span>
+            <span class="p">]</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># edge midpoints</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>  <span class="c1"># edge points</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">beta</span> <span class="ow">in</span> <span class="n">betas</span><span class="p">:</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)]</span>
+                <span class="p">)</span>  <span class="c1"># points in center of cell</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.003174603174603175</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0126984126984127</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.01071428571428571</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.07878121446939182</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">15</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.05058386489568756</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">0.3632980741536860e-00</span><span class="p">,</span>
+                <span class="mf">0.1322645816327140e-00</span>
+            <span class="p">]</span>
+            <span class="n">betas</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">0.4578368380791611e-00</span><span class="p">,</span>
+                <span class="mf">0.2568591072619591e-00</span><span class="p">,</span>
+                <span class="mf">0.5752768441141011e-01</span>
+            <span class="p">]</span>
+            <span class="n">gamma</span> <span class="o">=</span> <span class="mf">0.7819258362551702e-01</span>
+            <span class="n">delta</span> <span class="o">=</span> <span class="mf">0.2210012187598900e-00</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">]</span>  <span class="c1"># edge points</span>
+                <span class="p">)</span>
+            <span class="k">for</span> <span class="n">beta</span> <span class="ow">in</span> <span class="n">betas</span><span class="p">:</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)]</span>
+                <span class="p">)</span>  <span class="c1"># points in center of cell</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
+                <span class="p">]</span>  <span class="c1"># edge points</span>
+            <span class="p">)</span>
+            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.7094239706792450e-03</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.6190565003676629e-02</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">9</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.3480578640489211e-02</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">15</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.3453043037728279e-01</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">18</span><span class="p">:</span><span class="mi">21</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.4590123763076286e-01</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">21</span><span class="p">:</span><span class="mi">24</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1162613545961757e-01</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">24</span><span class="p">:</span><span class="mi">30</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.2727857596999626e-01</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+            <span class="n">episilon</span> <span class="o">=</span> <span class="mf">5.00000000000000e-1</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">8.29411811106452e-2</span><span class="p">,</span>
+                <span class="mf">2.68649695592714e-1</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="n">betas</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">4.68059729056814e-1</span><span class="p">,</span>
+                <span class="mf">7.93088545089875e-2</span><span class="p">,</span>
+                <span class="mf">3.92931636618867e-1</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="n">gammas</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">2.48172758709406e-1</span><span class="p">,</span>
+                <span class="mf">1.56582066033687e-1</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="n">deltas</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">6.99812197147049e-1</span><span class="p">,</span>
+                <span class="mf">2.43089592364562e-1</span><span class="p">,</span>
+            <span class="p">]</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="mf">5.35113520281665e-4</span><span class="p">,</span>
+                <span class="mf">4.29435346026293e-3</span><span class="p">,</span>
+                <span class="mf">3.02990950926060e-3</span><span class="p">,</span>
+                <span class="mf">3.16396316646563e-3</span><span class="p">,</span>
+                <span class="mf">2.43035184285235e-2</span><span class="p">,</span>
+                <span class="mf">1.66312091329395e-2</span><span class="p">,</span>
+                <span class="mf">3.42178857644876e-2</span><span class="p">,</span>
+                <span class="mf">1.73480160090330e-2</span><span class="p">,</span>
+                <span class="mf">1.98004044953264e-2</span><span class="p">,</span>
+            <span class="p">]</span>
+
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="n">episilon</span><span class="p">,</span> <span class="n">episilon</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">episilon</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">episilon</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>
+            <span class="p">)</span>  <span class="c1"># edge midpoints (class 2 points)</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">]</span>  <span class="c1"># edge points (sets of class 3 points)</span>
+                <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">beta</span> <span class="ow">in</span> <span class="n">betas</span><span class="p">:</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)</span>
+                    <span class="p">]</span>  <span class="c1"># interior points on bisector (sets of class 5 points)</span>
+                <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">gammas</span><span class="p">,</span> <span class="n">deltas</span><span class="p">):</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                    <span class="p">[</span>
+                        <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
+                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
+                        <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
+                    <span class="p">]</span>  <span class="c1"># interior points (sets of class 6 points)</span>
+                <span class="p">)</span>
+
+            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">39</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># class 1 points (vertices)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># class 2 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>  <span class="c1"># class 3 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">18</span><span class="p">:</span><span class="mi">21</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>  <span class="c1"># class 5 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">21</span><span class="p">:</span><span class="mi">24</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">24</span><span class="p">:</span><span class="mi">27</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">27</span><span class="p">:</span><span class="mi">33</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">7</span><span class="p">]</span>  <span class="c1"># class 6 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">33</span><span class="p">:</span><span class="mi">39</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+    <span class="c1"># Return scheme</span>
+    <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="xg_scheme">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature_schemes.xg_scheme">[docs]</a>
+<span class="k">def</span> <span class="nf">xg_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A (nearly) Gaussian simplicial quadrature with very few quadrature nodes,</span>
+<span class="sd">    available for low-to-moderate orders.</span>
+
+<span class="sd">    Raises `ValueError` if no quadrature rule for the requested parameters is available.</span>
+
+<span class="sd">    See</span>
+
+<span class="sd">        H. Xiao and Z. Gimbutas, &quot;A numerical algorithm for the construction of</span>
+<span class="sd">        efficient quadrature rules in two and higher dimensions,&quot; Computers &amp;</span>
+<span class="sd">        Mathematics with Applications, vol. 59, no. 2, pp. 663-676, 2010.</span>
+<span class="sd">        http://dx.doi.org/10.1016/j.camwa.2009.10.027</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">FIAT.xg_quad_data</span> <span class="kn">import</span> <span class="n">triangle_table</span> <span class="k">as</span> <span class="n">table</span>
+    <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">FIAT.xg_quad_data</span> <span class="kn">import</span> <span class="n">tetrahedron_table</span> <span class="k">as</span> <span class="n">table</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Xiao-Gambutas rule not availale for </span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2"> dimensions.&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">order_table</span> <span class="o">=</span> <span class="n">table</span><span class="p">[</span><span class="n">degree</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Xiao-Gambutas rule not availale for degree </span><span class="si">{</span><span class="n">degree</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="n">pts_ref</span> <span class="o">=</span> <span class="n">order_table</span><span class="p">[</span><span class="s2">&quot;points&quot;</span><span class="p">]</span>
+    <span class="n">wts_ref</span> <span class="o">=</span> <span class="n">order_table</span><span class="p">[</span><span class="s2">&quot;weights&quot;</span><span class="p">]</span>
+    <span class="n">Ref1</span> <span class="o">=</span> <span class="n">symmetric_simplex</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
+    <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">Ref1</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_triangle_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a quadrature scheme on a triangle of specified order. Falls</span>
+<span class="sd">    back on canonical rule for higher orders.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># Scheme from Zienkiewicz and Taylor, 1 point, degree of precision 1</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="o">/</span><span class="mf">3.0</span><span class="p">]])</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="c1"># Scheme from Strang and Fix, 3 points, degree of precision 2</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">6.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="o">/</span><span class="mf">6.0</span><span class="p">],</span>
+                         <span class="p">[</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">6.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="o">/</span><span class="mf">3.0</span><span class="p">],</span>
+                         <span class="p">[</span><span class="mf">2.0</span><span class="o">/</span><span class="mf">3.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="o">/</span><span class="mf">6.0</span><span class="p">]])</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">6.0</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="c1"># Scheme from Strang and Fix, 6 points, degree of precision 3</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.659027622374092</span><span class="p">,</span> <span class="mf">0.231933368553031</span><span class="p">],</span>
+                         <span class="p">[</span><span class="mf">0.659027622374092</span><span class="p">,</span> <span class="mf">0.109039009072877</span><span class="p">],</span>
+                         <span class="p">[</span><span class="mf">0.231933368553031</span><span class="p">,</span> <span class="mf">0.659027622374092</span><span class="p">],</span>
+                         <span class="p">[</span><span class="mf">0.231933368553031</span><span class="p">,</span> <span class="mf">0.109039009072877</span><span class="p">],</span>
+                         <span class="p">[</span><span class="mf">0.109039009072877</span><span class="p">,</span> <span class="mf">0.659027622374092</span><span class="p">],</span>
+                         <span class="p">[</span><span class="mf">0.109039009072877</span><span class="p">,</span> <span class="mf">0.231933368553031</span><span class="p">]])</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">12.0</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Get Xiao-Gambutas scheme</span>
+            <span class="k">return</span> <span class="n">xg_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="c1"># Get canonical scheme</span>
+            <span class="k">return</span> <span class="n">_fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+
+    <span class="c1"># Return scheme</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">UFCTriangle</span><span class="p">(),</span> <span class="n">ref_el</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_tetrahedron_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a quadrature scheme on a tetrahedron of specified</span>
+<span class="sd">    degree. Falls back on canonical rule for higher orders&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># Scheme from Zienkiewicz and Taylor, 1 point, degree of precision 1</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="o">/</span><span class="mf">4.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="o">/</span><span class="mf">4.0</span><span class="p">]])</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">6.0</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="c1"># Scheme from Zienkiewicz and Taylor, 4 points, degree of precision 2</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="mf">0.585410196624969</span><span class="p">,</span> <span class="mf">0.138196601125011</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">b</span><span class="p">],</span>
+                         <span class="p">[</span><span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">],</span>
+                         <span class="p">[</span><span class="n">b</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">],</span>
+                         <span class="p">[</span><span class="n">b</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">b</span><span class="p">]])</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">4</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">w</span><span class="o">.</span><span class="n">fill</span><span class="p">(</span><span class="mf">1.0</span><span class="o">/</span><span class="mf">24.0</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Get Xiao-Gambutas scheme</span>
+            <span class="k">return</span> <span class="n">xg_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="c1"># Get canonical scheme</span>
+            <span class="k">return</span> <span class="n">_fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+
+    <span class="c1"># Return scheme</span>
+    <span class="n">x</span><span class="p">,</span> <span class="n">w</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">UFCTetrahedron</span><span class="p">(),</span> <span class="n">ref_el</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.quadrature_schemes</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

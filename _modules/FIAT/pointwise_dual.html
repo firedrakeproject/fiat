@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.pointwise_dual &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.pointwise_dual</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.pointwise_dual</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2020 Robert C. Kirby (Baylor University)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="c1">#</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="n">Functional</span>
+<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">zip_longest</span>
+
+
+<div class="viewcode-block" id="compute_pointwise_dual">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.pointwise_dual.compute_pointwise_dual">[docs]</a>
+<span class="k">def</span> <span class="nf">compute_pointwise_dual</span><span class="p">(</span><span class="n">el</span><span class="p">,</span> <span class="n">pts</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a dual basis to the basis for el as a linear combination</span>
+<span class="sd">    of a set of pointwise evaluations.  This is useful when the</span>
+<span class="sd">    prescribed finite element isn&#39;t Ciarlet (e.g. the basis functions</span>
+<span class="sd">    are provided explicitly as formulae).  Alternately, the element&#39;s</span>
+<span class="sd">    given dual basis may involve differentiation, making run-time</span>
+<span class="sd">    interpolation difficult in FIAT clients.  The pointwise dual,</span>
+<span class="sd">    consisting only of pointwise evaluations, will effectively replace</span>
+<span class="sd">    these derivatives with (automatically determined) finite</span>
+<span class="sd">    differences.  This is exact on the polynomial space, but is an</span>
+<span class="sd">    approximation if applied to functions outside the space.</span>
+
+<span class="sd">    :param el: a :class:`FiniteElement`.</span>
+<span class="sd">    :param pts: an iterable of points with the same length as el&#39;s</span>
+<span class="sd">                dimension.  These points must be unisolvent for the</span>
+<span class="sd">                polynomial space</span>
+<span class="sd">    :returns: a :class `DualSet`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">nbf</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
+
+    <span class="n">T</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">ref_el</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">T</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+    <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">nbf</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">el</span><span class="o">.</span><span class="n">value_shape</span><span class="p">())),</span> <span class="n">sd</span><span class="p">)</span>
+
+    <span class="n">z</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span><span class="p">)</span>
+
+    <span class="n">nds</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">V</span> <span class="o">=</span> <span class="n">el</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">pts</span><span class="p">)[</span><span class="n">z</span><span class="p">]</span>
+
+    <span class="c1"># Make a square system, invert, and then put it back in the right</span>
+    <span class="c1"># shape so we have (nbf, ..., npts) with more dimensions</span>
+    <span class="c1"># for vector or tensor-valued elements.</span>
+    <span class="n">alphas</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">nbf</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+    <span class="c1"># Each row of alphas gives the coefficients of a functional,</span>
+    <span class="c1"># represented, as elsewhere in FIAT, as a summation of</span>
+    <span class="c1"># components of the input at particular points.</span>
+
+    <span class="c1"># This logic picks out the points and components for which the</span>
+    <span class="c1"># weights are actually nonzero to construct the functional.</span>
+
+    <span class="n">pts</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">coeffs</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="n">nonzero</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">coeffs</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1.e-12</span><span class="p">)</span>
+        <span class="o">*</span><span class="n">comp</span><span class="p">,</span> <span class="n">pt_index</span> <span class="o">=</span> <span class="n">nonzero</span>
+
+        <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">coeff_comp</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">[</span><span class="n">pt_index</span><span class="p">],</span>
+                                  <span class="n">zip_longest</span><span class="p">(</span><span class="n">coeffs</span><span class="p">[</span><span class="n">nonzero</span><span class="p">],</span>
+                                              <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">comp</span><span class="p">),</span> <span class="n">fillvalue</span><span class="o">=</span><span class="p">())):</span>
+            <span class="n">pt_dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">)]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">coeff_comp</span><span class="p">)</span>
+
+        <span class="n">nds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Functional</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="n">el</span><span class="o">.</span><span class="n">value_shape</span><span class="p">(),</span> <span class="nb">dict</span><span class="p">(</span><span class="n">pt_dict</span><span class="p">),</span> <span class="p">{},</span> <span class="s2">&quot;node&quot;</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">DualSet</span><span class="p">(</span><span class="n">nds</span><span class="p">,</span> <span class="n">T</span><span class="p">,</span> <span class="n">el</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">())</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.pointwise_dual</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

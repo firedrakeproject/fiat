@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.functional &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.functional</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.functional</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2008 Robert C. Kirby (Texas Tech University)</span>
+<span class="c1">#</span>
+<span class="c1"># Modified 2020 by the same from Baylor University</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="c1"># functionals require:</span>
+<span class="c1"># - a degree of accuracy (-1 indicates that it works for all functions</span>
+<span class="c1">#   such as point evaluation)</span>
+<span class="c1"># - a reference element domain</span>
+<span class="c1"># - type information</span>
+
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">sympy</span>
+
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">jacobi</span><span class="p">,</span> <span class="n">quadrature_schemes</span>
+
+
+<div class="viewcode-block" id="index_iterator">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.index_iterator">[docs]</a>
+<span class="k">def</span> <span class="nf">index_iterator</span><span class="p">(</span><span class="n">shp</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a generator iterating over all indices in</span>
+<span class="sd">    shp in generalized column-major order  So if shp = (2,2), then we</span>
+<span class="sd">    construct the sequence (0,0),(0,1),(1,0),(1,1)&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shp</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Functional">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional">[docs]</a>
+<span class="k">class</span> <span class="nc">Functional</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Abstract class representing a linear functional.</span>
+<span class="sd">    All FIAT functionals are discrete in the sense that</span>
+<span class="sd">    they are written as a weighted sum of (derivatives of components of) their</span>
+<span class="sd">    argument evaluated at particular points.</span>
+
+<span class="sd">    :arg ref_el: a :class:`Cell`</span>
+<span class="sd">    :arg target_shape: a tuple indicating the value shape of functions on</span>
+<span class="sd">         the functional operates (e.g. if the function eats 2-vectors</span>
+<span class="sd">         then target_shape is (2,) and if it eats scalars then</span>
+<span class="sd">         target_shape is ()</span>
+<span class="sd">    :arg pt_dict: A dict mapping points to lists of information about</span>
+<span class="sd">         how the functional is evaluated.  Each entry in the list takes</span>
+<span class="sd">         the form of a tuple (wt, comp) so that (at least if the</span>
+<span class="sd">         deriv_dict argument is empty), the functional takes the form</span>
+<span class="sd">         :math:`\ell(f) = \sum_{q=1}^{N_q} \sum_{k=1}^{K_q} w^q_k f_{c_k}(x_q)`</span>
+<span class="sd">         where :math:`f_{c_k}` indicates a particular vector or tensor component</span>
+<span class="sd">    :arg deriv_dict: A dict that is similar to `pt_dict`, although the entries</span>
+<span class="sd">         of each list are tuples (wt, alpha, comp) with alpha a tuple</span>
+<span class="sd">         of nonnegative integers corresponding to the order of partial</span>
+<span class="sd">         differentiation in each spatial direction.</span>
+<span class="sd">    :arg functional_type: a string labeling the kind of functional</span>
+<span class="sd">         this is.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">target_shape</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="n">deriv_dict</span><span class="p">,</span>
+                 <span class="n">functional_type</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_el</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_shape</span> <span class="o">=</span> <span class="n">target_shape</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span> <span class="o">=</span> <span class="n">pt_dict</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span> <span class="o">=</span> <span class="n">deriv_dict</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">functional_type</span> <span class="o">=</span> <span class="n">functional_type</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">deriv_dict</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">per_point</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">deriv_dict</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">foo</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">foo</span> <span class="ow">in</span> <span class="n">per_point</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_deriv_order</span> <span class="o">=</span> <span class="nb">max</span><span class="p">([</span><span class="nb">sum</span><span class="p">(</span><span class="n">foo</span><span class="p">)</span> <span class="k">for</span> <span class="n">foo</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">max_deriv_order</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="Functional.evaluate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.evaluate">[docs]</a>
+    <span class="k">def</span> <span class="nf">evaluate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Obsolete and broken functional evaluation.</span>
+
+<span class="sd">        To evaluate the functional, call it on the target function:</span>
+
+<span class="sd">          functional(function)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="s2">&quot;To evaluate the functional just call it on a function.&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Evaluation is not yet implemented for </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Functional.get_point_dict">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.get_point_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_point_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the functional information, which is a dictionary</span>
+<span class="sd">        mapping each point in the support of the functional to a list</span>
+<span class="sd">        of pairs containing the weight and component.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span></div>
+
+
+<div class="viewcode-block" id="Functional.get_reference_element">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.get_reference_element">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_reference_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the reference element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span></div>
+
+
+<div class="viewcode-block" id="Functional.get_type_tag">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.get_type_tag">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_type_tag</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the type of function (e.g. point evaluation or</span>
+<span class="sd">        normal component, which is probably handy for clients of FIAT&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">functional_type</span></div>
+
+
+<div class="viewcode-block" id="Functional.to_riesz">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.to_riesz">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_riesz</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poly_set</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Constructs an array representation of the functional so</span>
+<span class="sd">        that the functional may be applied to a function expressed in</span>
+<span class="sd">        in terms of the expansion set underlying  `poly_set` by means</span>
+<span class="sd">        of contracting coefficients.</span>
+
+<span class="sd">        That is, `poly_set` will have members all expressed in the</span>
+<span class="sd">        form :math:`p = \sum_{i} \alpha^i \phi_i`</span>
+<span class="sd">        where :math:`\{\phi_i\}_{i}` is some orthonormal expansion set</span>
+<span class="sd">        and :math:`\alpha^i` are coefficients.  Note: the orthonormal</span>
+<span class="sd">        expansion set is always scalar-valued but if the members of</span>
+<span class="sd">        `poly_set` are vector or tensor valued the :math:`\alpha^i`</span>
+<span class="sd">        will be scalars or vectors.</span>
+
+<span class="sd">        This function constructs a tensor :math:`R` such that the</span>
+<span class="sd">        contraction of :math:`R` with the array of coefficients</span>
+<span class="sd">        :math:`\alpha` produces the effect of :math:`\ell(f)`</span>
+
+<span class="sd">        In the case of scalar-value functions, :math:`R` is just a</span>
+<span class="sd">        vector of the same length as the expansion set, and</span>
+<span class="sd">        :math:`R_i = \ell(\phi_i)`.  For vector-valued spaces,</span>
+<span class="sd">        :math:`R_{ij}` will be :math:`\ell(e^i \phi_j)` where</span>
+<span class="sd">        :math:`e^i` is the canonical unit vector nonzero only in one</span>
+<span class="sd">        entry :math:`i`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">es</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
+        <span class="n">ed</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span>
+        <span class="n">nexp</span> <span class="o">=</span> <span class="n">es</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">ed</span><span class="p">)</span>
+
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
+
+        <span class="n">pts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">npts</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+
+        <span class="n">bfs</span> <span class="o">=</span> <span class="n">es</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">ed</span><span class="p">,</span> <span class="n">pts</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">poly_set</span><span class="o">.</span><span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+
+        <span class="c1"># loop over points</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">npts</span><span class="p">):</span>
+            <span class="n">pt_cur</span> <span class="o">=</span> <span class="n">pts</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+            <span class="n">wc_list</span> <span class="o">=</span> <span class="n">pt_dict</span><span class="p">[</span><span class="n">pt_cur</span><span class="p">]</span>
+
+            <span class="c1"># loop over expansion functions</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">):</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">in</span> <span class="n">wc_list</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">c</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">w</span> <span class="o">*</span> <span class="n">bfs</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">:</span>
+            <span class="n">dpt_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span>
+
+            <span class="c1"># this makes things quicker since it uses dmats after</span>
+            <span class="c1"># instantiation</span>
+            <span class="n">es_foo</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">ed</span><span class="p">)</span>
+            <span class="n">dpts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">dpt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+            <span class="n">dbfs</span> <span class="o">=</span> <span class="n">es_foo</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">dpts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_deriv_order</span><span class="p">)</span>
+
+            <span class="n">ndpts</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dpts</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ndpts</span><span class="p">):</span>
+                <span class="n">dpt_cur</span> <span class="o">=</span> <span class="n">dpts</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                <span class="n">wac_list</span> <span class="o">=</span> <span class="n">dpt_dict</span><span class="p">[</span><span class="n">dpt_cur</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nexp</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">in</span> <span class="n">wac_list</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="n">c</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">w</span> <span class="o">*</span> <span class="n">dbfs</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">)][</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="Functional.tostr">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.Functional.tostr">[docs]</a>
+    <span class="k">def</span> <span class="nf">tostr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">functional_type</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PointEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">PointEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class representing point evaluation of scalar functions at a</span>
+<span class="sd">    particular point x.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="p">):</span> <span class="p">[(</span><span class="mf">1.0</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">())]}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointEval&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate the functional on the function fn.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">fn</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">])</span>
+
+<div class="viewcode-block" id="PointEvaluation.tostr">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointEvaluation.tostr">[docs]</a>
+    <span class="k">def</span> <span class="nf">tostr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="s2">&quot;u(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">),)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ComponentPointEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.ComponentPointEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">ComponentPointEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class representing point evaluation of a particular component</span>
+<span class="sd">    of a vector/tensor function at a particular point x.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">comp</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">comp</span> <span class="o">=</span> <span class="p">(</span><span class="n">comp</span><span class="p">,)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shp</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">comp</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Component and shape are incompatible&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">i</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="n">n</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">comp</span><span class="p">,</span> <span class="n">shp</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Illegal component&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comp</span> <span class="o">=</span> <span class="n">comp</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">x</span><span class="p">):</span> <span class="p">[(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">comp</span><span class="p">)]}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;ComponentPointEval&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ComponentPointEvaluation.tostr">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.ComponentPointEvaluation.tostr">[docs]</a>
+    <span class="k">def</span> <span class="nf">tostr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="s2">&quot;(u[</span><span class="si">%d</span><span class="s2">](</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">comp</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">))</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PointDerivative">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointDerivative">[docs]</a>
+<span class="k">class</span> <span class="nc">PointDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class representing point partial differentiation of scalar</span>
+<span class="sd">    functions at a particular point x.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">alpha</span><span class="p">):</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">x</span><span class="p">:</span> <span class="p">[(</span><span class="mf">1.0</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">),</span> <span class="nb">tuple</span><span class="p">())]}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">order</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;PointDeriv&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate the functional on the function fn. Note that this depends</span>
+<span class="sd">        on sympy being able to differentiate fn.&quot;&quot;&quot;</span>
+        <span class="n">x</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">deriv_dict</span>
+
+        <span class="n">X</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Symbol</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;X[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">]&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)))</span>
+
+        <span class="n">dvars</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">d</span> <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">a</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">)</span>
+                      <span class="k">for</span> <span class="n">count</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">a</span><span class="p">))</span>
+
+        <span class="n">df</span> <span class="o">=</span> <span class="n">sympy</span><span class="o">.</span><span class="n">lambdify</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">sympy</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">fn</span><span class="p">(</span><span class="n">X</span><span class="p">),</span> <span class="o">*</span><span class="n">dvars</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">df</span><span class="p">(</span><span class="o">*</span><span class="n">x</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointNormalDerivative">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointNormalDerivative">[docs]</a>
+<span class="k">class</span> <span class="nc">PointNormalDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents d/dn at a point on a facet.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">pt</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet_no</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
+            <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">alphas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="p">[(</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">]),</span> <span class="nb">tuple</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;PointNormalDeriv&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointNormalSecondDerivative">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointNormalSecondDerivative">[docs]</a>
+<span class="k">class</span> <span class="nc">PointNormalSecondDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents d^/dn^2 at a point on a facet.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">pt</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet_no</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">tau</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">sd</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span><span class="p">,))</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">sd</span><span class="p">):</span>
+                <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">alphas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">))</span>
+                <span class="n">tau</span><span class="p">[</span><span class="n">cur</span><span class="p">]</span> <span class="o">=</span> <span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+                <span class="n">cur</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tau</span> <span class="o">=</span> <span class="n">tau</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">alphas</span> <span class="o">=</span> <span class="n">alphas</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="p">[(</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;PointNormalDeriv&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointDivergence">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointDivergence">[docs]</a>
+<span class="k">class</span> <span class="nc">PointDivergence</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class representing point divergence of vector</span>
+<span class="sd">    functions at a particular point x.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">x</span><span class="p">:</span> <span class="p">[(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="p">(</span><span class="n">alpha</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="mi">1</span><span class="p">),))</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">]}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">),),</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;PointDiv&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMoment</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Functional representing integral of the input against some tabulated function f.</span>
+
+<span class="sd">    :arg ref_el: a :class:`Cell`.</span>
+<span class="sd">    :arg Q: a :class:`QuadratureRule`.</span>
+<span class="sd">    :arg f_at_qpts: an array tabulating the function f at the quadrature</span>
+<span class="sd">         points.</span>
+<span class="sd">    :arg comp: Optional argument indicating that only a particular</span>
+<span class="sd">         component of the input function should be integrated against f</span>
+<span class="sd">    :arg shp: Optional argument giving the value shape of input functions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">comp</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(),</span> <span class="n">shp</span><span class="o">=</span><span class="nb">tuple</span><span class="p">()):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comp</span> <span class="o">=</span> <span class="n">comp</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">,</span> <span class="n">comp</span><span class="p">)]</span> <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;IntegralMoment&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Evaluate the functional on the function fn.&quot;&quot;&quot;</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">wts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">foo</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">foo</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">values</span><span class="p">())])</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">([</span><span class="n">fn</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pts</span><span class="p">],</span> <span class="n">wts</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">comp</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">comp</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfNormalDerivative">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfNormalDerivative">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Functional giving normal derivative integrated against some function on a facet.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet_no</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+        <span class="c1"># map points onto facet</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">)</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dpts</span> <span class="o">=</span> <span class="n">points</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span>
+                         <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;IntegralMomentOfNormalDerivative&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="FrobeniusIntegralMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.FrobeniusIntegralMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">FrobeniusIntegralMoment</span><span class="p">(</span><span class="n">IntegralMoment</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="c1"># f_at_qpts is (some shape) x num_qpts</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">pts</span><span class="p">)</span> <span class="o">!=</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Mismatch in number of quadrature points and values&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comp</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
+        <span class="n">qpts</span><span class="p">,</span> <span class="n">qwts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">qwts</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,)</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shp</span><span class="p">))))</span>
+        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">index_iterator</span><span class="p">(</span><span class="n">shp</span><span class="p">))</span>
+
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">alpha</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">]</span> <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">qpts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+        <span class="n">Functional</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="n">nm</span> <span class="ow">or</span> <span class="s2">&quot;FrobeniusIntegralMoment&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralLegendreDirectionalMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralLegendreDirectionalMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralLegendreDirectionalMoment</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moment of v.s against a Legendre polynomial over an edge&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">quad_deg</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="c1"># mom_deg is degree of moment, quad_deg is the total degree of</span>
+        <span class="c1"># polynomial you might need to integrate (or something like that)</span>
+        <span class="k">assert</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
+
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature_schemes</span><span class="o">.</span><span class="n">create_quadrature</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">quad_deg</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="n">entity</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">entity</span><span class="o">=</span><span class="n">entity</span><span class="p">)</span>
+
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">jacobi</span><span class="o">.</span><span class="n">eval_jacobi</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="n">f_at_qpts</span> <span class="o">/=</span> <span class="n">Q</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">()</span>
+
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">f_at_qpts</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="n">nm</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralLegendreNormalMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralLegendreNormalMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralLegendreNormalMoment</span><span class="p">(</span><span class="n">IntegralLegendreDirectionalMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moment of v.n against a Legendre polynomial over an edge&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">,</span>
+                         <span class="s2">&quot;IntegralLegendreNormalMoment&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralLegendreTangentialMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralLegendreTangentialMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralLegendreTangentialMoment</span><span class="p">(</span><span class="n">IntegralLegendreDirectionalMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moment of v.t against a Legendre polynomial over an edge&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">,</span>
+                         <span class="s2">&quot;IntegralLegendreTangentialMoment&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralLegendreBidirectionalMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralLegendreBidirectionalMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralLegendreBidirectionalMoment</span><span class="p">(</span><span class="n">IntegralLegendreDirectionalMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moment of dot(s1, dot(tau, s2)) against Legendre on entity, multiplied by the size of the reference facet&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
+        <span class="n">s1s2T</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">s1s2T</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="n">nm</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralLegendreNormalNormalMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralLegendreNormalNormalMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralLegendreNormalNormalMoment</span><span class="p">(</span><span class="n">IntegralLegendreBidirectionalMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moment of dot(n, dot(tau, n)) against Legendre on entity.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">,</span>
+                         <span class="s2">&quot;IntegralNormalNormalLegendreMoment&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralLegendreNormalTangentialMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralLegendreNormalTangentialMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralLegendreNormalTangentialMoment</span><span class="p">(</span><span class="n">IntegralLegendreBidirectionalMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moment of dot(n, dot(tau, t)) against Legendre on entity.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">,</span>
+                         <span class="s2">&quot;IntegralNormalTangentialLegendreMoment&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralLegendreTangentialTangentialMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralLegendreTangentialTangentialMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralLegendreTangentialTangentialMoment</span><span class="p">(</span><span class="n">IntegralLegendreBidirectionalMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Moment of dot(t, dot(tau, t)) against Legendre on entity.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">mom_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">,</span>
+                         <span class="s2">&quot;IntegralTangentialTangentialLegendreMoment&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfDivergence">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfDivergence">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfDivergence</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Functional representing integral of the divergence of the input</span>
+<span class="sd">    against some tabulated function f.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dpts</span> <span class="o">=</span> <span class="n">points</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">,</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span>
+                         <span class="s2">&quot;IntegralMomentOfDivergence&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfTensorDivergence">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfTensorDivergence">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfTensorDivergence</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Like IntegralMomentOfDivergence, but on symmetric tensors.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dpts</span> <span class="o">=</span> <span class="n">points</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">sd</span><span class="p">)</span>
+
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="k">assert</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">sd</span>
+        <span class="k">assert</span> <span class="n">f_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span><span class="o">.</span><span class="n">T</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">index_iterator</span><span class="p">(</span><span class="n">shp</span><span class="p">)]</span>
+                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;IntegralMomentOfDivergence&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointNormalEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointNormalEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">PointNormalEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the evaluation of the normal component of a vector at a</span>
+<span class="sd">    point on a facet of codimension 1.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">pt</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet_no</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="n">n</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="p">[(</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">shp</span><span class="p">[</span><span class="mi">0</span><span class="p">])]}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointNormalEval&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointEdgeTangentEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointEdgeTangentEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">PointEdgeTangentEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the evaluation of the tangential component of a</span>
+<span class="sd">    vector at a point on a facet of dimension 1.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">edge_no</span><span class="p">,</span> <span class="n">pt</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">edge_no</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="n">t</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="n">t</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="p">[(</span><span class="n">t</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">shp</span><span class="p">[</span><span class="mi">0</span><span class="p">])]}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointEdgeTangent&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PointEdgeTangentEvaluation.tostr">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointEdgeTangentEvaluation.tostr">[docs]</a>
+    <span class="k">def</span> <span class="nf">tostr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="s2">&quot;(u.t)(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">),)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfEdgeTangentEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfEdgeTangentEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfEdgeTangentEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    \int_e v\cdot t p ds</span>
+
+<span class="sd">    p \in Polynomials</span>
+
+<span class="sd">    :arg ref_el: reference element for which e is a dim-1 entity</span>
+<span class="sd">    :arg Q: quadrature rule on the face</span>
+<span class="sd">    :arg P_at_qpts: polynomials evaluated at quad points</span>
+<span class="sd">    :arg edge: which edge.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">edge</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">edge</span><span class="p">)</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">t</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span>
+                         <span class="s2">&quot;IntegralMomentOfEdgeTangentEvaluation&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointFaceTangentEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointFaceTangentEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">PointFaceTangentEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the evaluation of a tangential component of a</span>
+<span class="sd">    vector at a point on a facet of codimension 1.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">face_no</span><span class="p">,</span> <span class="n">tno</span><span class="p">,</span> <span class="n">pt</span><span class="p">):</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_face_tangents</span><span class="p">(</span><span class="n">face_no</span><span class="p">)[</span><span class="n">tno</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">=</span> <span class="n">t</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tno</span> <span class="o">=</span> <span class="n">tno</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="p">[(</span><span class="n">t</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]}</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span>
+        <span class="n">Functional</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointFaceTangent&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PointFaceTangentEvaluation.tostr">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointFaceTangentEvaluation.tostr">[docs]</a>
+    <span class="k">def</span> <span class="nf">tostr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="s2">&quot;(u.t</span><span class="si">%d</span><span class="s2">)(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tno</span><span class="p">,</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">),)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfFaceTangentEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfFaceTangentEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfFaceTangentEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    \int_F v \times n \cdot p ds</span>
+
+<span class="sd">    p \in Polynomials</span>
+
+<span class="sd">    :arg ref_el: reference element for which F is a codim-1 entity</span>
+<span class="sd">    :arg Q: quadrature rule on the face</span>
+<span class="sd">    :arg P_at_qpts: polynomials evaluated at quad points</span>
+<span class="sd">    :arg facet: which facet.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
+        <span class="n">P_at_qpts</span> <span class="o">=</span> <span class="p">[[</span><span class="n">P_at_qpts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">P_at_qpts</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">],</span> <span class="n">P_at_qpts</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">i</span><span class="p">]]</span>
+                     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())))</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wgt</span><span class="p">,</span> <span class="n">phi</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">):</span>
+            <span class="n">phixn</span> <span class="o">=</span> <span class="p">[</span><span class="n">phi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">phi</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                     <span class="n">phi</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+                     <span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">phi</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+            <span class="n">pt_dict</span><span class="p">[</span><span class="n">pt</span><span class="p">]</span> <span class="o">=</span> <span class="p">[(</span><span class="n">wgt</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">)),</span>
+                           <span class="p">(</span><span class="n">wgt</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">-</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">)),</span>
+                           <span class="p">(</span><span class="n">wgt</span><span class="o">*</span><span class="p">(</span><span class="o">-</span><span class="n">n</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="n">n</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">phixn</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="p">))]</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span>
+                         <span class="s2">&quot;IntegralMomentOfFaceTangentEvaluation&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointScaledNormalEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointScaledNormalEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">PointScaledNormalEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the evaluation of the normal component of a vector at a</span>
+<span class="sd">    point on a facet of codimension 1, where the normal is scaled by</span>
+<span class="sd">    the volume of that facet.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">pt</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet_no</span><span class="p">)</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span>
+
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pt</span><span class="p">:</span> <span class="p">[(</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointScaledNormalEval&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PointScaledNormalEvaluation.tostr">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointScaledNormalEvaluation.tostr">[docs]</a>
+    <span class="k">def</span> <span class="nf">tostr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="k">return</span> <span class="s2">&quot;(u.n)(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">),)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfScaledNormalEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfScaledNormalEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfScaledNormalEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    \int_F v\cdot n p ds</span>
+
+<span class="sd">    p \in Polynomials</span>
+
+<span class="sd">    :arg ref_el: reference element for which F is a codim-1 entity</span>
+<span class="sd">    :arg Q: quadrature rule on the face</span>
+<span class="sd">    :arg P_at_qpts: polynomials evaluated at quad points</span>
+<span class="sd">    :arg facet: which facet.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span> <span class="o">*</span> <span class="n">P_at_qpts</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;IntegralMomentOfScaledNormalEvaluation&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointwiseInnerProductEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.PointwiseInnerProductEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">PointwiseInnerProductEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This is a functional on symmetric 2-tensor fields. Let u be such a</span>
+<span class="sd">    field, p be a point, and v,w be vectors. This implements the evaluation</span>
+<span class="sd">    v^T u(p) w.</span>
+
+<span class="sd">    Clearly v^iu_{ij}w^j = u_{ij}v^iw^j. Thus the value can be computed</span>
+<span class="sd">    from the Frobenius inner product of u with wv^T. This gives the</span>
+<span class="sd">    correct weights.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">pt</span><span class="p">):</span>
+        <span class="n">wvT</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="n">wvT</span><span class="o">.</span><span class="n">shape</span>
+
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wvT</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">index_iterator</span><span class="p">(</span><span class="n">shp</span><span class="p">)]}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;PointwiseInnerProductEval&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TensorBidirectionalIntegralMoment">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.TensorBidirectionalIntegralMoment">[docs]</a>
+<span class="k">class</span> <span class="nc">TensorBidirectionalIntegralMoment</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This is a functional on symmetric 2-tensor fields. Let u be such a</span>
+<span class="sd">    field, f a function tabulated at points, and v,w be vectors. This implements the evaluation</span>
+<span class="sd">    \int v^T u(x) w f(x).</span>
+<span class="sd">    Clearly v^iu_{ij}w^j = u_{ij}v^iw^j. Thus the value can be computed</span>
+<span class="sd">    from the Frobenius inner product of u with vw^T. This gives the</span>
+<span class="sd">    correct weights.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">):</span>
+        <span class="n">vwT</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
+        <span class="n">F_at_qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">vwT</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">f_at_qpts</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">F_at_qpts</span><span class="p">,</span> <span class="s2">&quot;TensorBidirectionalMomentInnerProductEvaluation&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfNormalEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfNormalEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfNormalEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    \int_F v\cdot n p ds</span>
+<span class="sd">    p \in Polynomials</span>
+<span class="sd">    :arg ref_el: reference element for which F is a codim-1 entity</span>
+<span class="sd">    :arg Q: quadrature rule on the face</span>
+<span class="sd">    :arg P_at_qpts: polynomials evaluated at quad points</span>
+<span class="sd">    :arg facet: which facet.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
+        <span class="c1"># scaling on the normal is ok because edge length then weights</span>
+        <span class="c1"># the reference element quadrature appropriately</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;IntegralMomentOfNormalEvaluation&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="IntegralMomentOfTangentialEvaluation">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfTangentialEvaluation">[docs]</a>
+<span class="k">class</span> <span class="nc">IntegralMomentOfTangentialEvaluation</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    \int_F v\cdot n p ds</span>
+<span class="sd">    p \in Polynomials</span>
+<span class="sd">    :arg ref_el: reference element for which F is a codim-1 entity</span>
+<span class="sd">    :arg Q: quadrature rule on the face</span>
+<span class="sd">    :arg P_at_qpts: polynomials evaluated at quad points</span>
+<span class="sd">    :arg facet: which facet.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
+        <span class="c1"># scaling on the tangent is ok because edge length then weights</span>
+        <span class="c1"># the reference element quadrature appropriately</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">P_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+        <span class="n">pt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">t</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+                   <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">),</span> <span class="n">pt_dict</span><span class="p">,</span> <span class="p">{},</span> <span class="s2">&quot;IntegralMomentOfScaledTangentialEvaluation&quot;</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.functional</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,557 @@
+FIAT package
+============
+
+Submodules
+----------
+
+FIAT.P0 module
+--------------
+
+.. automodule:: FIAT.P0
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.Sminus module
+------------------
+
+.. automodule:: FIAT.Sminus
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.SminusCurl module
+----------------------
+
+.. automodule:: FIAT.SminusCurl
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.SminusDiv module
+---------------------
+
+.. automodule:: FIAT.SminusDiv
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.alfeld\_sorokina module
+----------------------------
+
+.. automodule:: FIAT.alfeld_sorokina
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.argyris module
+-------------------
+
+.. automodule:: FIAT.argyris
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.arnold\_qin module
+-----------------------
+
+.. automodule:: FIAT.arnold_qin
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.arnold\_winther module
+---------------------------
+
+.. automodule:: FIAT.arnold_winther
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.barycentric\_interpolation module
+--------------------------------------
+
+.. automodule:: FIAT.barycentric_interpolation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.bell module
+----------------
+
+.. automodule:: FIAT.bell
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.bernardi\_raugel module
+----------------------------
+
+.. automodule:: FIAT.bernardi_raugel
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.bernstein module
+---------------------
+
+.. automodule:: FIAT.bernstein
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.brezzi\_douglas\_fortin\_marini module
+-------------------------------------------
+
+.. automodule:: FIAT.brezzi_douglas_fortin_marini
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.brezzi\_douglas\_marini module
+-----------------------------------
+
+.. automodule:: FIAT.brezzi_douglas_marini
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.brezzi\_douglas\_marini\_cube module
+-----------------------------------------
+
+.. automodule:: FIAT.brezzi_douglas_marini_cube
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.bubble module
+------------------
+
+.. automodule:: FIAT.bubble
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.check\_format\_variant module
+----------------------------------
+
+.. automodule:: FIAT.check_format_variant
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.christiansen\_hu module
+----------------------------
+
+.. automodule:: FIAT.christiansen_hu
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.crouzeix\_raviart module
+-----------------------------
+
+.. automodule:: FIAT.crouzeix_raviart
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.discontinuous module
+-------------------------
+
+.. automodule:: FIAT.discontinuous
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.discontinuous\_lagrange module
+-----------------------------------
+
+.. automodule:: FIAT.discontinuous_lagrange
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.discontinuous\_pc module
+-----------------------------
+
+.. automodule:: FIAT.discontinuous_pc
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.discontinuous\_raviart\_thomas module
+------------------------------------------
+
+.. automodule:: FIAT.discontinuous_raviart_thomas
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.discontinuous\_taylor module
+---------------------------------
+
+.. automodule:: FIAT.discontinuous_taylor
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.dual\_set module
+---------------------
+
+.. automodule:: FIAT.dual_set
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.enriched module
+--------------------
+
+.. automodule:: FIAT.enriched
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.expansions module
+----------------------
+
+.. automodule:: FIAT.expansions
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.fdm\_element module
+------------------------
+
+.. automodule:: FIAT.fdm_element
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.finite\_element module
+---------------------------
+
+.. automodule:: FIAT.finite_element
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.functional module
+----------------------
+
+.. automodule:: FIAT.functional
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.gauss\_legendre module
+---------------------------
+
+.. automodule:: FIAT.gauss_legendre
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.gauss\_lobatto\_legendre module
+------------------------------------
+
+.. automodule:: FIAT.gauss_lobatto_legendre
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.gauss\_radau module
+------------------------
+
+.. automodule:: FIAT.gauss_radau
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.gopalakrishnan\_lederer\_schoberl module
+---------------------------------------------
+
+.. automodule:: FIAT.gopalakrishnan_lederer_schoberl
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.guzman\_neilan module
+--------------------------
+
+.. automodule:: FIAT.guzman_neilan
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.hct module
+---------------
+
+.. automodule:: FIAT.hct
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.hdiv\_trace module
+-----------------------
+
+.. automodule:: FIAT.hdiv_trace
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.hdivcurl module
+--------------------
+
+.. automodule:: FIAT.hdivcurl
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.hellan\_herrmann\_johnson module
+-------------------------------------
+
+.. automodule:: FIAT.hellan_herrmann_johnson
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.hermite module
+-------------------
+
+.. automodule:: FIAT.hermite
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.hierarchical module
+------------------------
+
+.. automodule:: FIAT.hierarchical
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.hu\_zhang module
+---------------------
+
+.. automodule:: FIAT.hu_zhang
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.jacobi module
+------------------
+
+.. automodule:: FIAT.jacobi
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.johnson\_mercier module
+----------------------------
+
+.. automodule:: FIAT.johnson_mercier
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.kong\_mulder\_veldhuizen module
+------------------------------------
+
+.. automodule:: FIAT.kong_mulder_veldhuizen
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.lagrange module
+--------------------
+
+.. automodule:: FIAT.lagrange
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.macro module
+-----------------
+
+.. automodule:: FIAT.macro
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.mardal\_tai\_winther module
+--------------------------------
+
+.. automodule:: FIAT.mardal_tai_winther
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.mixed module
+-----------------
+
+.. automodule:: FIAT.mixed
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.morley module
+------------------
+
+.. automodule:: FIAT.morley
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.nedelec module
+-------------------
+
+.. automodule:: FIAT.nedelec
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.nedelec\_second\_kind module
+---------------------------------
+
+.. automodule:: FIAT.nedelec_second_kind
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.nodal\_enriched module
+---------------------------
+
+.. automodule:: FIAT.nodal_enriched
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.orientation\_utils module
+------------------------------
+
+.. automodule:: FIAT.orientation_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.orthopoly module
+---------------------
+
+.. automodule:: FIAT.orthopoly
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.pointwise\_dual module
+---------------------------
+
+.. automodule:: FIAT.pointwise_dual
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.polynomial\_set module
+---------------------------
+
+.. automodule:: FIAT.polynomial_set
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.powell\_sabin module
+-------------------------
+
+.. automodule:: FIAT.powell_sabin
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.quadrature module
+----------------------
+
+.. automodule:: FIAT.quadrature
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.quadrature\_element module
+-------------------------------
+
+.. automodule:: FIAT.quadrature_element
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.quadrature\_schemes module
+-------------------------------
+
+.. automodule:: FIAT.quadrature_schemes
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.raviart\_thomas module
+---------------------------
+
+.. automodule:: FIAT.raviart_thomas
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.reference\_element module
+------------------------------
+
+.. automodule:: FIAT.reference_element
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.regge module
+-----------------
+
+.. automodule:: FIAT.regge
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.restricted module
+----------------------
+
+.. automodule:: FIAT.restricted
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.serendipity module
+-----------------------
+
+.. automodule:: FIAT.serendipity
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.tensor\_product module
+---------------------------
+
+.. automodule:: FIAT.tensor_product
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+FIAT.xg\_quad\_data module
+--------------------------
+
+.. automodule:: FIAT.xg_quad_data
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: FIAT
+   :members:
+   :undoc-members:
+   :show-inheritance:

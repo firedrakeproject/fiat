@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>finat.tensor_product &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.tensor_product</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for finat.tensor_product</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">reduce</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">product</span>
+<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">methodcaller</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<span class="kn">import</span> <span class="nn">FIAT</span>
+<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">TensorProductCell</span>
+<span class="kn">from</span> <span class="nn">FIAT.orientation_utils</span> <span class="kn">import</span> <span class="n">make_entity_permutations_tensorproduct</span>
+
+<span class="kn">import</span> <span class="nn">gem</span>
+<span class="kn">from</span> <span class="nn">gem.utils</span> <span class="kn">import</span> <span class="n">cached_property</span>
+
+<span class="kn">from</span> <span class="nn">finat.finiteelementbase</span> <span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span> <span class="nn">finat.point_set</span> <span class="kn">import</span> <span class="n">PointSingleton</span><span class="p">,</span> <span class="n">PointSet</span><span class="p">,</span> <span class="n">TensorPointSet</span>
+
+
+<div class="viewcode-block" id="TensorProductElement">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement">[docs]</a>
+<span class="k">class</span> <span class="nc">TensorProductElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factors</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">TensorProductElement</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">factors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">factors</span><span class="p">)</span>
+
+        <span class="n">shapes</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">value_shape</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span> <span class="k">if</span> <span class="n">fe</span><span class="o">.</span><span class="n">value_shape</span> <span class="o">!=</span> <span class="p">()]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shapes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value_shape</span> <span class="o">=</span> <span class="p">()</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">shapes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_value_shape</span> <span class="o">=</span> <span class="n">shapes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Only one nonscalar factor permitted!&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TensorProductElement.cell">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.cell">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">cell</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.complex">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.complex">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">complex</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">])</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">degree</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TensorProductElement.formdegree">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.formdegree">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span></div>
+
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">_entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">productise</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">,</span> <span class="n">methodcaller</span><span class="p">(</span><span class="s2">&quot;entity_dofs&quot;</span><span class="p">))</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">_entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">productise</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">,</span> <span class="n">methodcaller</span><span class="p">(</span><span class="s2">&quot;entity_support_dofs&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="TensorProductElement.entity_dofs">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.entity_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_dofs</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.entity_permutations">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.entity_permutations">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">compose_permutations</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.space_dimension">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.space_dimension">[docs]</a>
+    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">fe</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">])</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">index_shape</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">]))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value_shape</span>
+
+<div class="viewcode-block" id="TensorProductElement.fiat_equivalent">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.fiat_equivalent">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># FIAT TensorProductElement support only 2 factors</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">B</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span>
+        <span class="k">return</span> <span class="n">FIAT</span><span class="o">.</span><span class="n">TensorProductElement</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_factor_entity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entity</span><span class="p">):</span>
+        <span class="c1"># Default entity</span>
+        <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span> <span class="o">=</span> <span class="n">entity</span>
+
+        <span class="c1"># Factor entity</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span>
+
+        <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">d</span><span class="p">])</span>
+                      <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">))</span>
+        <span class="n">entities</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">unravel_index</span><span class="p">(</span><span class="n">entity_id</span><span class="p">,</span> <span class="n">shape</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">entities</span>
+
+    <span class="k">def</span> <span class="nf">_merge_evaluations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factor_results</span><span class="p">):</span>
+        <span class="c1"># Spatial dimension</span>
+        <span class="n">dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+        <span class="c1"># Derivative order</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">sum</span><span class="p">,</span> <span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">factor_results</span><span class="p">)))</span>
+
+        <span class="c1"># A list of slices that are used to select dimensions</span>
+        <span class="c1"># corresponding to each subelement.</span>
+        <span class="n">dim_slices</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="o">.</span><span class="n">_split_slices</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                                                      <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cells</span><span class="p">])</span>
+
+        <span class="c1"># A list of multiindices, one multiindex per subelement, each</span>
+        <span class="c1"># multiindex describing the shape of basis functions of the</span>
+        <span class="c1"># subelement.</span>
+        <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">]</span>
+
+        <span class="c1"># A list of multiindices, one multiindex per subelement, each</span>
+        <span class="c1"># multiindex describing the value shape of the subelement.</span>
+        <span class="n">zetas</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">]</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">derivative</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">Delta</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">dimension</span><span class="p">,</span> <span class="n">derivative</span><span class="p">):</span>
+                <span class="c1"># Split the multiindex for the subelements</span>
+                <span class="n">deltas</span> <span class="o">=</span> <span class="p">[</span><span class="n">Delta</span><span class="p">[</span><span class="n">s</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">dim_slices</span><span class="p">]</span>
+                <span class="c1"># GEM scalars (can have free indices) for collecting</span>
+                <span class="c1"># the contributions from the subelements.</span>
+                <span class="n">scalars</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">fr</span><span class="p">,</span> <span class="n">delta</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">zeta</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">factor_results</span><span class="p">,</span> <span class="n">deltas</span><span class="p">,</span> <span class="n">alphas</span><span class="p">,</span> <span class="n">zetas</span><span class="p">):</span>
+                    <span class="c1"># Turn basis shape to free indices, select the</span>
+                    <span class="c1"># right derivative entry, and collect the result.</span>
+                    <span class="n">scalars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">fr</span><span class="p">[</span><span class="n">delta</span><span class="p">],</span> <span class="n">alpha</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">))</span>
+                <span class="c1"># Multiply the values from the subelements and wrap up</span>
+                <span class="c1"># non-point indices into shape.</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">Delta</span><span class="p">]</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span>
+                    <span class="n">reduce</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">,</span> <span class="n">scalars</span><span class="p">),</span>
+                    <span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">alphas</span> <span class="o">+</span> <span class="n">zetas</span><span class="p">)))</span>
+                <span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+<div class="viewcode-block" id="TensorProductElement.basis_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.basis_evaluation">[docs]</a>
+    <span class="k">def</span> <span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">entities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_factor_entity</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">entities</span><span class="p">)</span>
+
+        <span class="n">ps_factors</span> <span class="o">=</span> <span class="n">factor_point_set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">,</span> <span class="n">ps</span><span class="p">)</span>
+
+        <span class="n">factor_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">basis_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">ps_</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+                          <span class="k">for</span> <span class="n">fe</span><span class="p">,</span> <span class="n">ps_</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">,</span> <span class="n">ps_factors</span><span class="p">,</span> <span class="n">entities</span><span class="p">)]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merge_evaluations</span><span class="p">(</span><span class="n">factor_results</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TensorProductElement.point_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.point_evaluation">[docs]</a>
+    <span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">entities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_factor_entity</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">entities</span><span class="p">)</span>
+
+        <span class="c1"># Split point expression</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">)</span>
+        <span class="n">point_dims</span> <span class="o">=</span> <span class="p">[</span><span class="n">cell</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                      <span class="k">for</span> <span class="n">cell</span><span class="p">,</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">)]</span>
+        <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span> <span class="ow">and</span> <span class="n">point</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">point_dims</span><span class="p">),)</span>
+        <span class="n">slices</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="o">.</span><span class="n">_split_slices</span><span class="p">(</span><span class="n">point_dims</span><span class="p">)</span>
+        <span class="n">point_factors</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">slices</span><span class="p">:</span>
+            <span class="n">point_factors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span>
+                <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span><span class="p">,))</span>
+                 <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">s</span><span class="o">.</span><span class="n">stop</span><span class="p">)]</span>
+            <span class="p">))</span>
+
+        <span class="c1"># Subelement results</span>
+        <span class="n">factor_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">point_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">p_</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+                          <span class="k">for</span> <span class="n">fe</span><span class="p">,</span> <span class="n">p_</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">,</span> <span class="n">point_factors</span><span class="p">,</span> <span class="n">entities</span><span class="p">)]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merge_evaluations</span><span class="p">(</span><span class="n">factor_results</span><span class="p">)</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Outer product the dual bases of the factors</span>
+        <span class="n">qs</span><span class="p">,</span> <span class="n">pss</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">factor</span><span class="o">.</span><span class="n">dual_basis</span> <span class="k">for</span> <span class="n">factor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">))</span>
+        <span class="n">ps</span> <span class="o">=</span> <span class="n">TensorPointSet</span><span class="p">(</span><span class="n">pss</span><span class="p">)</span>
+        <span class="c1"># Naming as _merge_evaluations above</span>
+        <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span><span class="n">factor</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span> <span class="k">for</span> <span class="n">factor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">]</span>
+        <span class="n">zetas</span> <span class="o">=</span> <span class="p">[</span><span class="n">factor</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span> <span class="k">for</span> <span class="n">factor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">]</span>
+        <span class="c1"># Index the factors by so that we can reshape into index-shape</span>
+        <span class="c1"># followed by value-shape</span>
+        <span class="n">qis</span> <span class="o">=</span> <span class="p">[</span><span class="n">q</span><span class="p">[</span><span class="n">alpha</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">]</span> <span class="k">for</span> <span class="n">q</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">zeta</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">qs</span><span class="p">,</span> <span class="n">alphas</span><span class="p">,</span> <span class="n">zetas</span><span class="p">)]</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span>
+            <span class="n">reduce</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">,</span> <span class="n">qis</span><span class="p">),</span>
+            <span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">alphas</span> <span class="o">+</span> <span class="n">zetas</span><span class="p">)))</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">Q</span><span class="p">,</span> <span class="n">ps</span>
+
+<div class="viewcode-block" id="TensorProductElement.mapping">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.mapping">[docs]</a>
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">mappings</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">mapping</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span> <span class="k">if</span> <span class="n">fe</span><span class="o">.</span><span class="n">mapping</span> <span class="o">!=</span> <span class="s2">&quot;affine&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mappings</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;affine&quot;</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">mappings</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">mappings</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="productise">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.productise">[docs]</a>
+<span class="k">def</span> <span class="nf">productise</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;Tensor product the dict mapping topological entities to dofs across factors.</span>
+
+<span class="sd">    :arg factors: element factors.</span>
+<span class="sd">    :arg method: instance method to call on each factor to get dofs.&#39;&#39;&#39;</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">factors</span><span class="p">)</span>
+    <span class="n">dofs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+                         <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">factors</span><span class="p">]):</span>
+        <span class="n">dim_dofs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">topds</span> <span class="o">=</span> <span class="p">[</span><span class="n">method</span><span class="p">(</span><span class="n">fe</span><span class="p">)[</span><span class="n">d</span><span class="p">]</span>
+                 <span class="k">for</span> <span class="n">fe</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">dim</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">tuple_ei</span> <span class="ow">in</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">sorted</span><span class="p">(</span><span class="n">topd</span><span class="p">)</span> <span class="k">for</span> <span class="n">topd</span> <span class="ow">in</span> <span class="n">topds</span><span class="p">]):</span>
+            <span class="n">tuple_vs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">topd</span><span class="p">[</span><span class="n">ei</span><span class="p">]</span>
+                                      <span class="k">for</span> <span class="n">topd</span><span class="p">,</span> <span class="n">ei</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">topds</span><span class="p">,</span> <span class="n">tuple_ei</span><span class="p">)]))</span>
+            <span class="k">if</span> <span class="n">tuple_vs</span><span class="p">:</span>
+                <span class="n">vs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">ravel_multi_index</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">tuple_vs</span><span class="p">),</span> <span class="n">shape</span><span class="p">))</span>
+                <span class="n">dim_dofs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tuple_ei</span><span class="p">,</span> <span class="n">vs</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">dim_dofs</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tuple_ei</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="c1"># flatten entity numbers</span>
+        <span class="n">dofs</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">enumerate</span><span class="p">(</span><span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">dim_dofs</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">dofs</span></div>
+
+
+
+<div class="viewcode-block" id="compose_permutations">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.compose_permutations">[docs]</a>
+<span class="k">def</span> <span class="nf">compose_permutations</span><span class="p">(</span><span class="n">factors</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;For the :class:`TensorProductElement` object composed of factors,</span>
+<span class="sd">    construct, for each dimension tuple, for each entity, and for each possible</span>
+<span class="sd">    entity orientation combination, the DoF permutation list.</span>
+
+<span class="sd">    :arg factors: element factors.</span>
+<span class="sd">    :returns: entity_permutation dict of the :class:`TensorProductElement` object</span>
+<span class="sd">        composed of factors.</span>
+
+<span class="sd">    For tensor-product elements, one needs to consider two kinds of orientations:</span>
+<span class="sd">    extrinsic orientations and intrinsic (&quot;material&quot;) orientations.</span>
+
+<span class="sd">    Example</span>
+<span class="sd">    -------</span>
+
+<span class="sd">    UFCQuadrilateral := UFCInterval x UFCInterval</span>
+
+<span class="sd">    eo (extrinsic orientation): swap axes (X -&gt; y, Y-&gt; x)</span>
+<span class="sd">    io (intrinsic orientation): reflect component intervals</span>
+<span class="sd">    o (total orientation)     : (2 ** dim) * eo + io</span>
+
+<span class="sd">    eo\\io    0      1      2      3</span>
+
+<span class="sd">           1---3  0---2  3---1  2---0</span>
+<span class="sd">      0    |   |  |   |  |   |  |   |</span>
+<span class="sd">           0---2  1---3  2---0  3---1</span>
+
+<span class="sd">           2---3  3---2  0---1  1---0</span>
+<span class="sd">      1    |   |  |   |  |   |  |   |</span>
+<span class="sd">           0---1  1---0  2---3  3---2</span>
+
+<span class="sd">    .. code-block:: python3</span>
+
+<span class="sd">        import FIAT</span>
+<span class="sd">        import finat</span>
+
+<span class="sd">        cell = FIAT.ufc_cell(&quot;interval&quot;)</span>
+<span class="sd">        elem = finat.DiscontinuousLagrange(cell, 1)</span>
+<span class="sd">        elem = finat.TensorProductElement([elem, elem])</span>
+<span class="sd">        print(elem.entity_permutations)</span>
+
+<span class="sd">    prints:</span>
+
+<span class="sd">    {(0, 0): {0: {(0, 0, 0): []},</span>
+<span class="sd">              1: {(0, 0, 0): []},</span>
+<span class="sd">              2: {(0, 0, 0): []},</span>
+<span class="sd">              3: {(0, 0, 0): []}},</span>
+<span class="sd">     (0, 1): {0: {(0, 0, 0): [],</span>
+<span class="sd">                  (0, 0, 1): []},</span>
+<span class="sd">              1: {(0, 0, 0): [],</span>
+<span class="sd">                  (0, 0, 1): []}},</span>
+<span class="sd">     (1, 0): {0: {(0, 0, 0): [],</span>
+<span class="sd">                  (0, 1, 0): []},</span>
+<span class="sd">              1: {(0, 0, 0): [],</span>
+<span class="sd">                  (0, 1, 0): []}},</span>
+<span class="sd">     (1, 1): {0: {(0, 0, 0): [0, 1, 2, 3],</span>
+<span class="sd">                  (0, 0, 1): [1, 0, 3, 2],</span>
+<span class="sd">                  (0, 1, 0): [2, 3, 0, 1],</span>
+<span class="sd">                  (0, 1, 1): [3, 2, 1, 0],</span>
+<span class="sd">                  (1, 0, 0): [0, 2, 1, 3],</span>
+<span class="sd">                  (1, 0, 1): [2, 0, 3, 1],</span>
+<span class="sd">                  (1, 1, 0): [1, 3, 0, 2],</span>
+<span class="sd">                  (1, 1, 1): [3, 1, 2, 0]}}}</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">permutations</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">cells</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">cell</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="n">factors</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">cells</span><span class="p">]):</span>
+        <span class="n">dim_permutations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">e_o_p_maps</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">entity_permutations</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">fe</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">dim</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">e_tuple</span> <span class="ow">in</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="nb">sorted</span><span class="p">(</span><span class="n">e_o_p_map</span><span class="p">)</span> <span class="k">for</span> <span class="n">e_o_p_map</span> <span class="ow">in</span> <span class="n">e_o_p_maps</span><span class="p">]):</span>
+            <span class="n">o_p_maps</span> <span class="o">=</span> <span class="p">[</span><span class="n">e_o_p_map</span><span class="p">[</span><span class="n">e</span><span class="p">]</span> <span class="k">for</span> <span class="n">e_o_p_map</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">e_o_p_maps</span><span class="p">,</span> <span class="n">e_tuple</span><span class="p">)]</span>
+            <span class="n">o_tuple_perm_map</span> <span class="o">=</span> <span class="n">make_entity_permutations_tensorproduct</span><span class="p">(</span><span class="n">cells</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">o_p_maps</span><span class="p">)</span>
+            <span class="n">dim_permutations</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">e_tuple</span><span class="p">,</span> <span class="n">o_tuple_perm_map</span><span class="p">))</span>
+        <span class="n">permutations</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">enumerate</span><span class="p">(</span><span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">dim_permutations</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">permutations</span></div>
+
+
+
+<div class="viewcode-block" id="factor_point_set">
+<a class="viewcode-back" href="../../finat.html#finat.tensor_product.factor_point_set">[docs]</a>
+<span class="k">def</span> <span class="nf">factor_point_set</span><span class="p">(</span><span class="n">product_cell</span><span class="p">,</span> <span class="n">product_dim</span><span class="p">,</span> <span class="n">point_set</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factors a point set for the product element into a point sets for</span>
+<span class="sd">    each subelement.</span>
+
+<span class="sd">    :arg product_cell: a TensorProductCell</span>
+<span class="sd">    :arg product_dim: entity dimension for the product cell</span>
+<span class="sd">    :arg point_set: point set for the product element</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">product_cell</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">product_dim</span><span class="p">)</span>
+    <span class="n">point_dims</span> <span class="o">=</span> <span class="p">[</span><span class="n">cell</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+                  <span class="k">for</span> <span class="n">cell</span><span class="p">,</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">product_cell</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">product_dim</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">point_set</span><span class="p">,</span> <span class="n">TensorPointSet</span><span class="p">)</span> <span class="ow">and</span> \
+       <span class="nb">len</span><span class="p">(</span><span class="n">product_cell</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">point_set</span><span class="o">.</span><span class="n">factors</span><span class="p">):</span>
+        <span class="c1"># Just give the factors asserting matching dimensions.</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">point_set</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">point_dims</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">ps</span><span class="o">.</span><span class="n">dimension</span> <span class="o">==</span> <span class="n">dim</span>
+                   <span class="k">for</span> <span class="n">ps</span><span class="p">,</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">point_set</span><span class="o">.</span><span class="n">factors</span><span class="p">,</span> <span class="n">point_dims</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">point_set</span><span class="o">.</span><span class="n">factors</span>
+
+    <span class="c1"># Split the point coordinates along the point dimensions</span>
+    <span class="c1"># required by the subelements.</span>
+    <span class="k">assert</span> <span class="n">point_set</span><span class="o">.</span><span class="n">dimension</span> <span class="o">==</span> <span class="nb">sum</span><span class="p">(</span><span class="n">point_dims</span><span class="p">)</span>
+    <span class="n">slices</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="o">.</span><span class="n">_split_slices</span><span class="p">(</span><span class="n">point_dims</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">point_set</span><span class="p">,</span> <span class="n">PointSingleton</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">PointSingleton</span><span class="p">(</span><span class="n">point_set</span><span class="o">.</span><span class="n">point</span><span class="p">[</span><span class="n">s</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">slices</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">point_set</span><span class="p">,</span> <span class="p">(</span><span class="n">PointSet</span><span class="p">,</span> <span class="n">TensorPointSet</span><span class="p">)):</span>
+        <span class="c1"># Use the same point index for the new point sets.</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">slices</span><span class="p">:</span>
+            <span class="n">ps</span> <span class="o">=</span> <span class="n">PointSet</span><span class="p">(</span><span class="n">point_set</span><span class="o">.</span><span class="n">points</span><span class="p">[:,</span> <span class="n">s</span><span class="p">])</span>
+            <span class="n">ps</span><span class="o">.</span><span class="n">indices</span> <span class="o">=</span> <span class="n">point_set</span><span class="o">.</span><span class="n">indices</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;How to tabulate TensorProductElement on </span><span class="si">%s</span><span class="s2">?&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">point_set</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,))</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.tensor_product</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

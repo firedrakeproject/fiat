@@ -1,0 +1,317 @@
+finat package
+=============
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   finat.ufl
+
+Submodules
+----------
+
+finat.alfeld\_sorokina module
+-----------------------------
+
+.. automodule:: finat.alfeld_sorokina
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.argyris module
+--------------------
+
+.. automodule:: finat.argyris
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.arnold\_qin module
+------------------------
+
+.. automodule:: finat.arnold_qin
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.aw module
+---------------
+
+.. automodule:: finat.aw
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.bell module
+-----------------
+
+.. automodule:: finat.bell
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.bernardi\_raugel module
+-----------------------------
+
+.. automodule:: finat.bernardi_raugel
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.cell\_tools module
+------------------------
+
+.. automodule:: finat.cell_tools
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.christiansen\_hu module
+-----------------------------
+
+.. automodule:: finat.christiansen_hu
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.cube module
+-----------------
+
+.. automodule:: finat.cube
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.direct\_serendipity module
+--------------------------------
+
+.. automodule:: finat.direct_serendipity
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.discontinuous module
+--------------------------
+
+.. automodule:: finat.discontinuous
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.enriched module
+---------------------
+
+.. automodule:: finat.enriched
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.fiat\_elements module
+---------------------------
+
+.. automodule:: finat.fiat_elements
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.finiteelementbase module
+------------------------------
+
+.. automodule:: finat.finiteelementbase
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.guzman\_neilan module
+---------------------------
+
+.. automodule:: finat.guzman_neilan
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.hct module
+----------------
+
+.. automodule:: finat.hct
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.hdivcurl module
+---------------------
+
+.. automodule:: finat.hdivcurl
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.hermite module
+--------------------
+
+.. automodule:: finat.hermite
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.hz module
+---------------
+
+.. automodule:: finat.hz
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.johnson\_mercier module
+-----------------------------
+
+.. automodule:: finat.johnson_mercier
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.mixed module
+------------------
+
+.. automodule:: finat.mixed
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.morley module
+-------------------
+
+.. automodule:: finat.morley
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.mtw module
+----------------
+
+.. automodule:: finat.mtw
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.nodal\_enriched module
+----------------------------
+
+.. automodule:: finat.nodal_enriched
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.physically\_mapped module
+-------------------------------
+
+.. automodule:: finat.physically_mapped
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.piola\_mapped module
+--------------------------
+
+.. automodule:: finat.piola_mapped
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.point\_set module
+-----------------------
+
+.. automodule:: finat.point_set
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.powell\_sabin module
+--------------------------
+
+.. automodule:: finat.powell_sabin
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.quadrature module
+-----------------------
+
+.. automodule:: finat.quadrature
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.quadrature\_element module
+--------------------------------
+
+.. automodule:: finat.quadrature_element
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.restricted module
+-----------------------
+
+.. automodule:: finat.restricted
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.runtime\_tabulated module
+-------------------------------
+
+.. automodule:: finat.runtime_tabulated
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.spectral module
+---------------------
+
+.. automodule:: finat.spectral
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.sympy2gem module
+----------------------
+
+.. automodule:: finat.sympy2gem
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.tensor\_product module
+----------------------------
+
+.. automodule:: finat.tensor_product
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.tensorfiniteelement module
+--------------------------------
+
+.. automodule:: finat.tensorfiniteelement
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+finat.trace module
+------------------
+
+.. automodule:: finat.trace
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: finat
+   :members:
+   :undoc-members:
+   :show-inheritance:

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.dual_set &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.dual_set</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.dual_set</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2008-2012 Robert C. Kirby (Texas Tech University)</span>
+<span class="c1">#</span>
+<span class="c1"># Modified 2020 by the same at Baylor University.</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">functional</span>
+
+
+<div class="viewcode-block" id="DualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet">[docs]</a>
+<span class="k">class</span> <span class="nc">DualSet</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span> <span class="o">=</span> <span class="n">merge_entities</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span> <span class="o">=</span> <span class="n">nodes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_el</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span> <span class="o">=</span> <span class="n">entity_ids</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity_permutations</span> <span class="o">=</span> <span class="n">entity_permutations</span>
+
+        <span class="c1"># Compute the nodes on the closure of each sub_entity.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">sub_entities</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">for</span> <span class="n">e</span><span class="p">,</span> <span class="n">sub_entities</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">ids</span> <span class="o">=</span> <span class="p">[]</span>
+
+                <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">se</span> <span class="ow">in</span> <span class="n">sub_entities</span><span class="p">:</span>
+                    <span class="n">ids</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">se</span><span class="p">]</span>
+                <span class="n">ids</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">e</span><span class="p">]</span> <span class="o">=</span> <span class="n">ids</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DualSet.get_nodes">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_nodes">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span></div>
+
+
+<div class="viewcode-block" id="DualSet.get_entity_closure_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_entity_closure_ids">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_entity_closure_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span></div>
+
+
+<div class="viewcode-block" id="DualSet.get_entity_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_entity_ids">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_entity_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span></div>
+
+
+<div class="viewcode-block" id="DualSet.get_entity_permutations">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_entity_permutations">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;This method returns a nested dictionary that gives, for</span>
+<span class="sd">        each dimension, for each entity, and for each possible entity</span>
+<span class="sd">        orientation, the DoF permutation array that maps the entity</span>
+<span class="sd">        local DoF ordering to the canonical global DoF ordering; see</span>
+<span class="sd">        :class:`~.Simplex` and :class:`~.UFCQuadrilateral` for how we</span>
+<span class="sd">        define entity orientations for standard cells.</span>
+
+<span class="sd">        The entity permutations `dict` for the degree 4 Lagrange finite</span>
+<span class="sd">        element on the interval, for instance, is given by:</span>
+
+<span class="sd">        .. code-block:: python3</span>
+
+<span class="sd">            {0: {0: {0: [0]},</span>
+<span class="sd">                 1: {0: [0]}},</span>
+<span class="sd">             1: {0: {0: [0, 1, 2],</span>
+<span class="sd">                     1: [2, 1, 0]}}}</span>
+
+<span class="sd">        Note that there are two entities on dimension ``0`` (vertices),</span>
+<span class="sd">        each of which has only one possible orientation, while there is</span>
+<span class="sd">        a single entity on dimension ``1`` (interval), which has two</span>
+<span class="sd">        possible orientations representing non-reflected and reflected</span>
+<span class="sd">        intervals.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_permutations</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_permutations</span></div>
+
+
+<div class="viewcode-block" id="DualSet.get_reference_element">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_reference_element">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_reference_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span></div>
+
+
+<div class="viewcode-block" id="DualSet.to_riesz">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.to_riesz">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_riesz</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poly_set</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;This method gives the action of the entire dual set</span>
+<span class="sd">        on each member of the expansion set underlying poly_set.</span>
+<span class="sd">        Then, applying the linear functionals of the dual set to an</span>
+<span class="sd">        arbitrary polynomial in poly_set is accomplished by (generalized)</span>
+<span class="sd">        matrix multiplication.</span>
+
+<span class="sd">        For scalar-valued spaces, this produces a matrix</span>
+<span class="sd">        :\math:`R_{i, j}` such that</span>
+<span class="sd">        :\math:`\ell_i(f) = \sum_{j} a_j \ell_i(\phi_j)`</span>
+<span class="sd">        for :\math:`f=\sum_{j} a_j \phi_j`.</span>
+
+<span class="sd">        More generally, it will have shape concatenating</span>
+<span class="sd">        the number of functionals in the dual set, the value shape</span>
+<span class="sd">        of functions it takes, and the number of members of the</span>
+<span class="sd">        expansion set.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># This rather technical code queries the low-level information</span>
+        <span class="c1"># in pt_dict and deriv_dict</span>
+        <span class="c1"># for each functional to find out where it evaluates its</span>
+        <span class="c1"># inputs and/or their derivatives.  Then, it tabulates the</span>
+        <span class="c1"># expansion set one time for all the function values and</span>
+        <span class="c1"># another for all of the derivatives.  This circumvents</span>
+        <span class="c1"># needing to call the to_riesz method of each functional and</span>
+        <span class="c1"># also limits the number of different calls to tabulate.</span>
+
+        <span class="n">tshape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">target_shape</span>
+        <span class="n">num_nodes</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+        <span class="n">es</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
+        <span class="n">ed</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span>
+        <span class="n">num_exp</span> <span class="o">=</span> <span class="n">es</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">poly_set</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">())</span>
+
+        <span class="n">riesz_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_nodes</span><span class="p">,</span> <span class="o">*</span><span class="n">tshape</span><span class="p">,</span> <span class="n">num_exp</span><span class="p">)</span>
+        <span class="n">mat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">riesz_shape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+
+        <span class="n">pts</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">dpts</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="n">Qs_to_ells</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ell</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ell</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">dpts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ell</span><span class="o">.</span><span class="n">deriv_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ell</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">):</span>
+                <span class="n">Q</span> <span class="o">=</span> <span class="n">ell</span><span class="o">.</span><span class="n">Q</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Q</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">pts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ell</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+            <span class="k">if</span> <span class="n">Q</span> <span class="ow">in</span> <span class="n">Qs_to_ells</span><span class="p">:</span>
+                <span class="n">Qs_to_ells</span><span class="p">[</span><span class="n">Q</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Qs_to_ells</span><span class="p">[</span><span class="n">Q</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="n">Qs_to_pts</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">Qs_to_pts</span><span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">pts</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">Q</span> <span class="ow">in</span> <span class="n">Qs_to_ells</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">Q</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">cur_pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">pts</span><span class="p">))</span>
+                <span class="n">Qs_to_pts</span><span class="p">[</span><span class="n">Q</span><span class="p">]</span> <span class="o">=</span> <span class="n">cur_pts</span>
+                <span class="n">pts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">cur_pts</span><span class="p">)</span>
+
+        <span class="c1"># Now tabulate the function values</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">pts</span><span class="p">))</span>
+        <span class="n">expansion_values</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">es</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">ed</span><span class="p">,</span> <span class="n">pts</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">Q</span> <span class="ow">in</span> <span class="n">Qs_to_ells</span><span class="p">:</span>
+            <span class="n">ells</span> <span class="o">=</span> <span class="n">Qs_to_ells</span><span class="p">[</span><span class="n">Q</span><span class="p">]</span>
+            <span class="n">cur_pts</span> <span class="o">=</span> <span class="n">Qs_to_pts</span><span class="p">[</span><span class="n">Q</span><span class="p">]</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">cur_pts</span><span class="p">))</span>
+            <span class="n">wshape</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ells</span><span class="p">),</span> <span class="o">*</span><span class="n">tshape</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">cur_pts</span><span class="p">))</span>
+            <span class="n">wts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">wshape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">Q</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ells</span><span class="p">):</span>
+                    <span class="n">ell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wc_list</span> <span class="ow">in</span> <span class="n">ell</span><span class="o">.</span><span class="n">pt_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                        <span class="n">j</span> <span class="o">=</span> <span class="n">cur_pts</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">in</span> <span class="n">wc_list</span><span class="p">:</span>
+                            <span class="n">wts</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">c</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ells</span><span class="p">):</span>
+                    <span class="n">ell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                    <span class="n">wts</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">ell</span><span class="o">.</span><span class="n">comp</span><span class="p">][:]</span> <span class="o">=</span> <span class="n">ell</span><span class="o">.</span><span class="n">f_at_qpts</span>
+                <span class="n">qwts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+                <span class="n">wts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">wts</span><span class="p">,</span> <span class="n">qwts</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">wts</span><span class="p">)</span>
+            <span class="n">mat</span><span class="p">[</span><span class="n">ells</span><span class="p">]</span> <span class="o">+=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">wts</span><span class="p">,</span> <span class="n">expansion_values</span><span class="p">[</span><span class="n">indices</span><span class="p">])</span>
+
+        <span class="c1"># Tabulate the derivative values that are needed</span>
+        <span class="n">max_deriv_order</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ell</span><span class="o">.</span><span class="n">max_deriv_order</span> <span class="k">for</span> <span class="n">ell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">max_deriv_order</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">dpts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">dpts</span><span class="p">))</span>
+            <span class="c1"># It&#39;s easiest/most efficient to get derivatives of the</span>
+            <span class="c1"># expansion set through the polynomial set interface.</span>
+            <span class="c1"># This is creating a short-lived set to do just this.</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_exp</span><span class="p">)</span>
+            <span class="n">expansion</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">ed</span><span class="p">,</span> <span class="n">ed</span><span class="p">,</span> <span class="n">es</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span>
+            <span class="n">dexpansion_values</span> <span class="o">=</span> <span class="n">expansion</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">dpts</span><span class="p">,</span> <span class="n">max_deriv_order</span><span class="p">)</span>
+
+            <span class="n">ells</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">ell</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ell</span><span class="o">.</span><span class="n">deriv_dict</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">wshape</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ells</span><span class="p">),</span> <span class="o">*</span><span class="n">tshape</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">dpts</span><span class="p">))</span>
+            <span class="n">dwts</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">wshape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">dexpansion_values</span> <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">}</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ells</span><span class="p">):</span>
+                <span class="n">ell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wac_list</span> <span class="ow">in</span> <span class="n">ell</span><span class="o">.</span><span class="n">deriv_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">j</span> <span class="o">=</span> <span class="n">dpts</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="p">(</span><span class="n">w</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="ow">in</span> <span class="n">wac_list</span><span class="p">:</span>
+                        <span class="n">dwts</span><span class="p">[</span><span class="n">alpha</span><span class="p">][</span><span class="n">i</span><span class="p">][</span><span class="n">c</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">w</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">dwts</span><span class="p">:</span>
+                <span class="n">mat</span><span class="p">[</span><span class="n">ells</span><span class="p">]</span> <span class="o">+=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">dwts</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">dexpansion_values</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">mat</span></div>
+
+
+<div class="viewcode-block" id="DualSet.get_indices">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_indices">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the list of dofs with support on a given restriction domain.</span>
+
+<span class="sd">        :arg restriction_domain: can be &#39;interior&#39;, &#39;vertex&#39;, &#39;edge&#39;, &#39;face&#39; or &#39;facet&#39;</span>
+<span class="sd">        :kwarg take_closure: Are we taking the closure of the restriction domain?</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">entity_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;interior&quot;</span><span class="p">:</span>
+            <span class="c1"># Return dofs from interior, never taking the closure</span>
+            <span class="n">indices</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">entities</span> <span class="o">=</span> <span class="n">entity_dofs</span><span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="n">entity_dofs</span><span class="o">.</span><span class="n">keys</span><span class="p">())]</span>
+            <span class="k">for</span> <span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span> <span class="ow">in</span> <span class="n">sorted_by_key</span><span class="p">(</span><span class="n">entities</span><span class="p">):</span>
+                <span class="n">indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">indices</span>
+
+        <span class="c1"># otherwise return dofs with d &lt;= dim</span>
+        <span class="k">if</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;vertex&quot;</span><span class="p">:</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;edge&quot;</span><span class="p">:</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;face&quot;</span><span class="p">:</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;facet&quot;</span><span class="p">:</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Invalid restriction domain&quot;</span><span class="p">)</span>
+
+        <span class="n">is_prodcell</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">entity_dofs</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> <span class="nb">tuple</span><span class="p">)</span>
+
+        <span class="n">ldim</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">take_closure</span> <span class="k">else</span> <span class="n">dim</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ldim</span><span class="p">,</span> <span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">is_prodcell</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">edim</span> <span class="ow">in</span> <span class="n">entity_dofs</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">edim</span><span class="p">)</span> <span class="o">==</span> <span class="n">d</span><span class="p">:</span>
+                        <span class="n">entities</span> <span class="o">=</span> <span class="n">entity_dofs</span><span class="p">[</span><span class="n">edim</span><span class="p">]</span>
+                        <span class="k">for</span> <span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span> <span class="ow">in</span> <span class="n">sorted_by_key</span><span class="p">(</span><span class="n">entities</span><span class="p">):</span>
+                            <span class="n">indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">entities</span> <span class="o">=</span> <span class="n">entity_dofs</span><span class="p">[</span><span class="n">d</span><span class="p">]</span>
+                <span class="k">for</span> <span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span> <span class="ow">in</span> <span class="n">sorted_by_key</span><span class="p">(</span><span class="n">entities</span><span class="p">):</span>
+                    <span class="n">indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">indices</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="sorted_by_key">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.sorted_by_key">[docs]</a>
+<span class="k">def</span> <span class="nf">sorted_by_key</span><span class="p">(</span><span class="n">mapping</span><span class="p">):</span>
+    <span class="s2">&quot;Sort dict items by key, allowing different key types.&quot;</span>
+    <span class="c1"># Python3 doesn&#39;t allow comparing builtins of different type, therefore the typename trick here</span>
+    <span class="k">def</span> <span class="nf">_key</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">mapping</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">_key</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="make_entity_closure_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.make_entity_closure_ids">[docs]</a>
+<span class="k">def</span> <span class="nf">make_entity_closure_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">):</span>
+    <span class="n">entity_closure_ids</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">sub_entities</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">entity_closure_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">e</span><span class="p">,</span> <span class="n">sub_entities</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">ids</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">se</span> <span class="ow">in</span> <span class="n">sub_entities</span><span class="p">:</span>
+                <span class="n">ids</span> <span class="o">+=</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">se</span><span class="p">]</span>
+            <span class="n">ids</span><span class="o">.</span><span class="n">sort</span><span class="p">()</span>
+            <span class="n">entity_closure_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">e</span><span class="p">]</span> <span class="o">=</span> <span class="n">ids</span>
+
+    <span class="k">return</span> <span class="n">entity_closure_ids</span></div>
+
+
+
+<div class="viewcode-block" id="lexsort_nodes">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.lexsort_nodes">[docs]</a>
+<span class="k">def</span> <span class="nf">lexsort_nodes</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sort PointEvaluation nodes in lexicographical ordering.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
+            <span class="n">pt</span><span class="p">,</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
+            <span class="n">pts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
+        <span class="n">bary</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">offset</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">lexsort</span><span class="p">(</span><span class="n">bary</span><span class="o">.</span><span class="n">T</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">order</span></div>
+
+
+
+<div class="viewcode-block" id="merge_entities">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.merge_entities">[docs]</a>
+<span class="k">def</span> <span class="nf">merge_entities</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collect DOFs from simplicial complex onto facets of parent cell.&quot;&quot;&quot;</span>
+    <span class="n">parent_cell</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">parent_cell</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span>
+    <span class="n">parent_ids</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">parent_permutations</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">parent_to_children</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent_to_children</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">)</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">):</span>
+        <span class="c1"># Merge Lagrange dual with lexicographical reordering</span>
+        <span class="n">parent_nodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">):</span>
+            <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">parent_nodes</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">child_dim</span><span class="p">,</span> <span class="n">child_entity</span> <span class="ow">in</span> <span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]:</span>
+                    <span class="n">parent_nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">nodes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">child_dim</span><span class="p">][</span><span class="n">child_entity</span><span class="p">])</span>
+                <span class="n">ids</span> <span class="o">=</span> <span class="n">lexsort_nodes</span><span class="p">(</span><span class="n">parent_cell</span><span class="p">,</span> <span class="n">parent_nodes</span><span class="p">[</span><span class="n">cur</span><span class="p">:],</span> <span class="n">entity</span><span class="o">=</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">),</span> <span class="n">offset</span><span class="o">=</span><span class="n">cur</span><span class="p">)</span>
+                <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">ids</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Merge everything else with the same node ordering</span>
+        <span class="n">parent_nodes</span> <span class="o">=</span> <span class="n">nodes</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">):</span>
+            <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">child_dim</span><span class="p">,</span> <span class="n">child_entity</span> <span class="ow">in</span> <span class="n">parent_to_children</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]:</span>
+                    <span class="n">parent_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">child_dim</span><span class="p">][</span><span class="n">child_entity</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">parent_nodes</span><span class="p">,</span> <span class="n">parent_cell</span><span class="p">,</span> <span class="n">parent_ids</span><span class="p">,</span> <span class="n">parent_permutations</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.dual_set</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.discontinuous &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.discontinuous</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.discontinuous</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2014 Andrew T. T. McRae (Imperial College London)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">CiarletElement</span>
+<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
+
+
+<div class="viewcode-block" id="DiscontinuousElement">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement">[docs]</a>
+<span class="k">class</span> <span class="nc">DiscontinuousElement</span><span class="p">(</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A copy of an existing element where all dofs are associated with the cell&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_element</span> <span class="o">=</span> <span class="n">element</span>
+        <span class="n">new_entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">topology</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="p">):</span>
+            <span class="n">new_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">ent</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">new_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">ent</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">new_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()))</span>
+        <span class="c1"># re-initialise the dual, so entity_closure_dofs is recalculated</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dual</span> <span class="o">=</span> <span class="n">DualSet</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span> <span class="n">new_entity_ids</span><span class="p">)</span>
+
+        <span class="c1"># fully discontinuous</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">formdegree</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+<div class="viewcode-block" id="DiscontinuousElement.degree">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.degree">[docs]</a>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the degree of the (embedding) polynomial space.&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.get_reference_element">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_reference_element">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_reference_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the reference element for the finite element.&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.get_nodal_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_nodal_basis">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
+<span class="sd">        for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.get_order">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_order">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_order</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the order of the element (may be different from the degree)&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_order</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.get_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_coeffs">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
+<span class="sd">        finite element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.mapping">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.mapping">[docs]</a>
+    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a list of appropriate mappings from the reference</span>
+<span class="sd">        element to a physical element for each basis function of the</span>
+<span class="sd">        finite element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">mapping</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.num_sub_elements">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.num_sub_elements">[docs]</a>
+    <span class="k">def</span> <span class="nf">num_sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the number of sub-elements.&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">num_sub_elements</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.space_dimension">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.space_dimension">[docs]</a>
+    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the dimension of the finite element space.&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.tabulate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.tabulate">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
+<span class="sd">        basis functions at given points.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.value_shape">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.value_shape">[docs]</a>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="s2">&quot;Return the value shape of the finite element functions.&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.dmats">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.dmats">[docs]</a>
+    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
+<span class="sd">        derivatives.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">dmats</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="DiscontinuousElement.get_num_members">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_num_members">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+        <span class="s2">&quot;Return number of members of the expansion set.&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.discontinuous</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.serendipity &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.serendipity</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.serendipity</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2019 Cyrus Cheng (Imperial College London)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="c1">#</span>
+<span class="c1"># Modified by David A. Ham (david.ham@imperial.ac.uk), 2019</span>
+
+<span class="kn">import</span> <span class="nn">numbers</span>
+<span class="kn">import</span> <span class="nn">sympy</span>
+<span class="kn">from</span> <span class="nn">sympy</span> <span class="kn">import</span> <span class="n">symbols</span><span class="p">,</span> <span class="n">legendre</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">diff</span><span class="p">,</span> <span class="n">lambdify</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span> <span class="nn">FIAT.lagrange</span> <span class="kn">import</span> <span class="n">Lagrange</span>
+<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">make_entity_closure_ids</span>
+<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="p">(</span><span class="n">compute_unflattening_map</span><span class="p">,</span>
+                                    <span class="n">flatten_reference_cube</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">make_lattice</span>
+
+<span class="kn">from</span> <span class="nn">FIAT.pointwise_dual</span> <span class="kn">import</span> <span class="n">compute_pointwise_dual</span>
+
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x y z&#39;</span><span class="p">)</span>
+<span class="n">variables</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
+<span class="n">leg</span> <span class="o">=</span> <span class="n">legendre</span>
+
+
+<div class="viewcode-block" id="tr">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.tr">[docs]</a>
+<span class="k">def</span> <span class="nf">tr</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mi">0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">((</span><span class="n">n</span><span class="o">-</span><span class="mi">3</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span> <span class="nf">_replace_numbers_with_symbols</span><span class="p">(</span><span class="n">polynomials</span><span class="p">):</span>
+    <span class="c1"># Replace numbers with symbols to work around issue with numpy&gt;=1.24.1;</span>
+    <span class="c1"># see https://github.com/firedrakeproject/fiat/pull/32.</span>
+    <span class="n">extra_vars</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># map from numbers to symbols</span>
+    <span class="n">polynomials_list</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">poly</span> <span class="ow">in</span> <span class="n">polynomials</span><span class="o">.</span><span class="n">tolist</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poly</span><span class="p">,</span> <span class="n">numbers</span><span class="o">.</span><span class="n">Real</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">poly</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">extra_vars</span><span class="p">:</span>
+                <span class="n">extra_vars</span><span class="p">[</span><span class="n">poly</span><span class="p">]</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;num_&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_vars</span><span class="p">)))</span>
+            <span class="n">polynomials_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">extra_vars</span><span class="p">[</span><span class="n">poly</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poly</span><span class="p">,</span> <span class="n">sympy</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">Expr</span><span class="p">):</span>
+            <span class="n">polynomials_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">polynomials</span> <span class="o">=</span> <span class="n">Array</span><span class="p">(</span><span class="n">polynomials_list</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">polynomials</span><span class="p">,</span> <span class="n">extra_vars</span>
+
+
+<div class="viewcode-block" id="Serendipity">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity">[docs]</a>
+<span class="k">class</span> <span class="nc">Serendipity</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Lagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;reference element cannot be dimension 0&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+
+        <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">flat_topology</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+
+        <span class="n">verts</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+
+        <span class="n">dx</span> <span class="o">=</span> <span class="p">((</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span> <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span><span class="o">/</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]))</span>
+        <span class="n">dy</span> <span class="o">=</span> <span class="p">((</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">y</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]),</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span><span class="o">/</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]))</span>
+        <span class="n">x_mid</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">x</span><span class="o">-</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">y_mid</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">y</span><span class="o">-</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dz</span> <span class="o">=</span> <span class="p">((</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">z</span><span class="p">)</span><span class="o">/</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]),</span> <span class="p">(</span><span class="n">z</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span><span class="o">/</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">]))</span>
+            <span class="n">z_mid</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">z</span><span class="o">-</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">+</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="n">dz</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">z_mid</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="n">VL</span> <span class="o">=</span> <span class="n">v_lambda_0</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">)</span>
+        <span class="n">EL</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">FL</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">IL</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">s_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">top_dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">flat_topology</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">top_dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">:</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">top_dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">flat_topology</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">cur</span><span class="p">]</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="n">cur</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">EL</span> <span class="o">+=</span> <span class="n">e_lambda_0</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">flat_topology</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="n">degree</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="n">cur</span> <span class="o">+</span> <span class="n">degree</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="n">FL</span> <span class="o">+=</span> <span class="n">f_lambda_0</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">flat_topology</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="n">tr</span><span class="p">(</span><span class="n">degree</span><span class="p">)))</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="n">cur</span> <span class="o">+</span> <span class="n">tr</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">IL</span> <span class="o">+=</span> <span class="n">i_lambda_0</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span>
+
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">3</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">IL</span><span class="p">)))</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="n">cur</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">IL</span><span class="p">)</span>
+
+        <span class="n">s_list</span> <span class="o">=</span> <span class="n">VL</span> <span class="o">+</span> <span class="n">EL</span> <span class="o">+</span> <span class="n">FL</span> <span class="o">+</span> <span class="n">IL</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">s_list</span><span class="p">)</span> <span class="o">==</span> <span class="n">cur</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="n">formdegree</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">dim</span><span class="p">:</span> <span class="n">Array</span><span class="p">(</span><span class="n">s_list</span><span class="p">)}</span>
+        <span class="n">polynomials</span><span class="p">,</span> <span class="n">extra_vars</span> <span class="o">=</span> <span class="n">_replace_numbers_with_symbols</span><span class="p">(</span><span class="n">Array</span><span class="p">(</span><span class="n">s_list</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">basis_callable</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">dim</span><span class="p">:</span> <span class="p">[</span><span class="n">lambdify</span><span class="p">(</span><span class="n">variables</span><span class="p">[:</span><span class="n">dim</span><span class="p">],</span> <span class="n">polynomials</span><span class="p">,</span>
+                                                   <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                                          <span class="n">extra_vars</span><span class="p">]}</span>
+        <span class="n">topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">topology</span><span class="p">)</span>
+        <span class="n">unflattened_entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">unflattened_entity_closure_ids</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">entity_closure_ids</span> <span class="o">=</span> <span class="n">make_entity_closure_ids</span><span class="p">(</span><span class="n">flat_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">unflattened_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">unflattened_entity_closure_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">flat_topology</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">:</span>
+                <span class="n">unflat_dim</span><span class="p">,</span> <span class="n">unflat_entity</span> <span class="o">=</span> <span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">)]</span>
+                <span class="n">unflattened_entity_ids</span><span class="p">[</span><span class="n">unflat_dim</span><span class="p">][</span><span class="n">unflat_entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+                <span class="n">unflattened_entity_closure_ids</span><span class="p">[</span><span class="n">unflat_dim</span><span class="p">][</span><span class="n">unflat_entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">entity_closure_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span> <span class="o">=</span> <span class="n">unflattened_entity_ids</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span> <span class="o">=</span> <span class="n">unflattened_entity_closure_ids</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_degree</span> <span class="o">=</span> <span class="n">degree</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flat_el</span> <span class="o">=</span> <span class="n">flat_el</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dual</span> <span class="o">=</span> <span class="n">compute_pointwise_dual</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">unisolvent_pts</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Serendipity.degree">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.degree">[docs]</a>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_degree</span> <span class="o">+</span> <span class="mi">1</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.get_nodal_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.get_nodal_basis">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented for serendipity&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.get_dual_set">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.get_dual_set">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_dual_set is not implemented for serendipity&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.get_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.get_coeffs">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented for serendipity&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.tabulate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.tabulate">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span> <span class="o">=</span> <span class="n">entity</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">)</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+
+        <span class="n">phivals</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;no tabulate method for serendipity elements of dimension 1 or less.&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">&gt;=</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;tabulate does not support higher dimensions than 3.&#39;</span><span class="p">)</span>
+        <span class="n">npoints</span><span class="p">,</span> <span class="n">pointdim</span> <span class="o">=</span> <span class="n">points</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">o</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">callable</span><span class="p">,</span> <span class="n">extra_vars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_callable</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span>
+                <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                    <span class="n">polynomials</span> <span class="o">=</span> <span class="n">diff</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">dim</span><span class="p">],</span> <span class="o">*</span><span class="nb">zip</span><span class="p">(</span><span class="n">variables</span><span class="p">,</span> <span class="n">alpha</span><span class="p">))</span>
+                    <span class="n">polynomials</span><span class="p">,</span> <span class="n">extra_vars</span> <span class="o">=</span> <span class="n">_replace_numbers_with_symbols</span><span class="p">(</span><span class="n">polynomials</span><span class="p">)</span>
+                    <span class="nb">callable</span> <span class="o">=</span> <span class="n">lambdify</span><span class="p">(</span><span class="n">variables</span><span class="p">[:</span><span class="n">dim</span><span class="p">]</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">extra_vars</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="n">polynomials</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">polynomials</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">basis_callable</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="nb">callable</span><span class="p">,</span> <span class="n">extra_vars</span><span class="p">]</span>
+                <span class="c1"># Can no longer make a numpy array from objects of inhomogeneous shape</span>
+                <span class="c1"># (unless we specify `dtype==object`);</span>
+                <span class="c1"># see https://github.com/firedrakeproject/fiat/pull/32.</span>
+                <span class="c1">#</span>
+                <span class="c1"># Casting `key`s to float() is needed, otherwise we somehow get the following error:</span>
+                <span class="c1">#</span>
+                <span class="c1"># E           TypeError: unsupported type for persistent hash keying: &lt;class &#39;complex&#39;&gt;</span>
+                <span class="c1">#</span>
+                <span class="c1"># ../../lib/python3.8/site-packages/pytools/persistent_dict.py:243: TypeError</span>
+                <span class="c1">#</span>
+                <span class="c1"># `key`s have been checked to be numbers.Real.</span>
+                <span class="n">extra_arrays</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">npoints</span><span class="p">,</span> <span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">points</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span> <span class="o">*</span> <span class="nb">float</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">extra_vars</span><span class="p">]</span>
+                <span class="n">phivals</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="nb">callable</span><span class="p">(</span><span class="o">*</span><span class="p">([</span><span class="n">points</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pointdim</span><span class="p">)]</span> <span class="o">+</span> <span class="n">extra_arrays</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">phivals</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.entity_dofs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.entity_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.entity_closure_dofs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.entity_closure_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom on the closure of those entities for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.value_shape">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.value_shape">[docs]</a>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.dmats">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.dmats">[docs]</a>
+    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.get_num_members">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.get_num_members">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="Serendipity.space_dimension">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.space_dimension">[docs]</a>
+    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="v_lambda_0">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.v_lambda_0">[docs]</a>
+<span class="k">def</span> <span class="nf">v_lambda_0</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">):</span>
+
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">VL</span> <span class="o">=</span> <span class="p">[</span><span class="n">a</span><span class="o">*</span><span class="n">b</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">dx</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">dy</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">VL</span> <span class="o">=</span> <span class="p">[</span><span class="n">a</span><span class="o">*</span><span class="n">b</span><span class="o">*</span><span class="n">c</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">dx</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">dy</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">dz</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">VL</span></div>
+
+
+
+<div class="viewcode-block" id="e_lambda_0">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.e_lambda_0">[docs]</a>
+<span class="k">def</span> <span class="nf">e_lambda_0</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
+
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">EL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">dx</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">+</span>
+                   <span class="p">[</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">b</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">dy</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">EL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">a</span> <span class="o">*</span> <span class="n">b</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">dx</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">dy</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">+</span>
+                   <span class="p">[</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">a</span> <span class="o">*</span> <span class="n">c</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">dx</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">dz</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span> <span class="o">+</span>
+                   <span class="p">[</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">b</span> <span class="o">*</span> <span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">dy</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">dz</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)])</span>
+
+    <span class="k">return</span> <span class="n">EL</span></div>
+
+
+
+<div class="viewcode-block" id="f_lambda_0">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.f_lambda_0">[docs]</a>
+<span class="k">def</span> <span class="nf">f_lambda_0</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
+
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">FL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">4</span><span class="o">-</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">3</span><span class="p">)])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">FL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">4</span><span class="o">-</span><span class="n">j</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">a</span>
+                    <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">dx</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">3</span><span class="p">)]</span> <span class="o">+</span>
+                   <span class="p">[</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">4</span><span class="o">-</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">b</span>
+                    <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">dy</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">3</span><span class="p">)]</span> <span class="o">+</span>
+                   <span class="p">[</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">4</span><span class="o">-</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">c</span>
+                    <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">dz</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">3</span><span class="p">)])</span>
+
+    <span class="k">return</span> <span class="n">FL</span></div>
+
+
+
+<div class="viewcode-block" id="i_lambda_0">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.i_lambda_0">[docs]</a>
+<span class="k">def</span> <span class="nf">i_lambda_0</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
+
+    <span class="n">IL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">l</span><span class="o">-</span><span class="mi">6</span><span class="o">-</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="o">-</span><span class="n">k</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span> <span class="o">*</span>
+                <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">l</span><span class="o">-</span><span class="mi">5</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">)])</span>
+
+    <span class="k">return</span> <span class="n">IL</span></div>
+
+
+
+<div class="viewcode-block" id="unisolvent_pts">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.unisolvent_pts">[docs]</a>
+<span class="k">def</span> <span class="nf">unisolvent_pts</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">deg</span><span class="p">):</span>
+    <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">K</span><span class="p">)</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">unisolvent_pts_quad</span><span class="p">(</span><span class="n">flat_el</span><span class="p">,</span> <span class="n">deg</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">unisolvent_pts_hex</span><span class="p">(</span><span class="n">flat_el</span><span class="p">,</span> <span class="n">deg</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Serendipity only defined for quads and hexes&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="unisolvent_pts_quad">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.unisolvent_pts_quad">[docs]</a>
+<span class="k">def</span> <span class="nf">unisolvent_pts_quad</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">deg</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gives a set of unisolvent points for the quad serendipity space of order deg.</span>
+<span class="sd">    The S element is not dual to these nodes, but a dual basis can be constructed from them.&quot;&quot;&quot;</span>
+    <span class="n">L</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">vs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="p">[</span><span class="n">pt</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">K</span><span class="o">.</span><span class="n">vertices</span><span class="p">]</span>
+    <span class="n">Lpts</span> <span class="o">=</span> <span class="n">make_lattice</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">deg</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">K</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">Fmap</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="n">epts</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">Fmap</span><span class="p">(</span><span class="n">pt</span><span class="p">))</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">Lpts</span><span class="p">]</span>
+        <span class="n">pts</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">epts</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">deg</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">dx0</span> <span class="o">=</span> <span class="p">(</span><span class="n">vs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">dx1</span> <span class="o">=</span> <span class="p">(</span><span class="n">vs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">internal_nodes</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">dx0</span> <span class="o">*</span> <span class="n">i</span> <span class="o">+</span> <span class="n">dx1</span> <span class="o">*</span> <span class="n">j</span><span class="p">)</span>
+                          <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+                          <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="n">i</span><span class="p">)]</span>
+        <span class="n">pts</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">internal_nodes</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">pts</span></div>
+
+
+
+<div class="viewcode-block" id="unisolvent_pts_hex">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.unisolvent_pts_hex">[docs]</a>
+<span class="k">def</span> <span class="nf">unisolvent_pts_hex</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">deg</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gives a set of unisolvent points for the hex serendipity space of order deg.</span>
+<span class="sd">    The S element is not dual to these nodes, but a dual basis can be constructed from them.&quot;&quot;&quot;</span>
+    <span class="n">L</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">F</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">vs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="p">[</span><span class="n">pt</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">K</span><span class="o">.</span><span class="n">vertices</span><span class="p">]</span>
+    <span class="n">Lpts</span> <span class="o">=</span> <span class="n">make_lattice</span><span class="p">(</span><span class="n">L</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">deg</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">K</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">Fmap</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="n">epts</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">Fmap</span><span class="p">(</span><span class="n">pt</span><span class="p">))</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">Lpts</span><span class="p">]</span>
+        <span class="n">pts</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">epts</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">deg</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">fvs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
+        <span class="c1"># Planar points to map to each face</span>
+        <span class="n">dx0</span> <span class="o">=</span> <span class="p">(</span><span class="n">fvs</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">fvs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">dx1</span> <span class="o">=</span> <span class="p">(</span><span class="n">fvs</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">fvs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:])</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="n">Fpts</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">fvs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">dx0</span> <span class="o">*</span> <span class="n">i</span> <span class="o">+</span> <span class="n">dx1</span> <span class="o">*</span> <span class="n">j</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="n">i</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">K</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="mi">2</span><span class="p">]:</span>
+            <span class="n">Fmap</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">pts</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="nb">tuple</span><span class="p">(</span><span class="n">Fmap</span><span class="p">(</span><span class="n">pt</span><span class="p">))</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">Fpts</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">deg</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">dx0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="mf">1.</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">4</span><span class="p">)</span>
+        <span class="n">dx1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mf">1.</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">4</span><span class="p">)</span>
+        <span class="n">dx2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">1.</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">4</span><span class="p">)</span>
+
+        <span class="n">Ipts</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">dx0</span> <span class="o">*</span> <span class="n">i</span> <span class="o">+</span> <span class="n">dx1</span> <span class="o">*</span> <span class="n">j</span> <span class="o">+</span> <span class="n">dx2</span> <span class="o">*</span> <span class="n">k</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">4</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">3</span><span class="o">-</span><span class="n">i</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="n">i</span><span class="o">-</span><span class="n">j</span><span class="p">)]</span>
+        <span class="n">pts</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">Ipts</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">pts</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.serendipity</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

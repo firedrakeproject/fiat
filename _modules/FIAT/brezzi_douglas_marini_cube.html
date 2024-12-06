@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.brezzi_douglas_marini_cube &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.brezzi_douglas_marini_cube</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.brezzi_douglas_marini_cube</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2019 Cyrus Cheng (Imperial College London)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT.</span>
+<span class="c1">#</span>
+<span class="c1"># FIAT is free software: you can redistribute it and/or modify</span>
+<span class="c1"># it under the terms of the GNU Lesser General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># FIAT is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU Lesser General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU Lesser General Public License</span>
+<span class="c1"># along with FIAT. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+<span class="c1">#</span>
+<span class="c1"># Modified by David A. Ham (david.ham@imperial.ac.uk), 2019</span>
+<span class="c1"># Modified by Thomas Bendall (thomas.bendall@metoffice.gov.uk) 2021</span>
+
+<span class="kn">from</span> <span class="nn">sympy</span> <span class="kn">import</span> <span class="n">symbols</span><span class="p">,</span> <span class="n">legendre</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">diff</span><span class="p">,</span> <span class="n">binomial</span><span class="p">,</span> <span class="n">lambdify</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">make_entity_closure_ids</span>
+<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">compute_unflattening_map</span><span class="p">,</span> <span class="n">flatten_reference_cube</span>
+
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x y&#39;</span><span class="p">)</span>
+<span class="n">variables</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+<span class="n">leg</span> <span class="o">=</span> <span class="n">legendre</span>
+
+
+<div class="viewcode-block" id="triangular_number">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.triangular_number">[docs]</a>
+<span class="k">def</span> <span class="nf">triangular_number</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="p">((</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">n</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube">[docs]</a>
+<span class="k">class</span> <span class="nc">BrezziDouglasMariniCube</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The Brezzi-Douglas-Marini element on quadrilateral cells.</span>
+
+<span class="sd">    :arg ref_el: The reference element.</span>
+<span class="sd">    :arg k: The degree.</span>
+<span class="sd">    :arg mapping: A string giving the Piola mapping.</span>
+<span class="sd">                  Either &#39;contravariant Piola&#39; or &#39;covariant Piola&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">):</span>
+
+        <span class="c1"># Check that ref_el and degree are appropriate</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;BDMc_k elements only valid for k &gt;= 1&quot;</span><span class="p">)</span>
+
+        <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;BDMc_k elements only valid for dimension 2&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Collect the IDs of the reference element entities</span>
+        <span class="n">flat_topology</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">for</span> <span class="n">top_dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">flat_topology</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">top_dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">:</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">top_dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">flat_topology</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">counter</span><span class="p">,</span> <span class="n">counter</span> <span class="o">+</span> <span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">counter</span> <span class="o">+=</span> <span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">entity_ids</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">counter</span><span class="p">,</span> <span class="n">counter</span> <span class="o">+</span> <span class="mi">2</span><span class="o">*</span><span class="n">triangular_number</span><span class="p">(</span><span class="n">degree</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+        <span class="n">counter</span> <span class="o">+=</span> <span class="mi">2</span><span class="o">*</span><span class="n">triangular_number</span><span class="p">(</span><span class="n">degree</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="n">entity_closure_ids</span> <span class="o">=</span> <span class="n">make_entity_closure_ids</span><span class="p">(</span><span class="n">flat_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
+
+        <span class="c1"># Set up FiniteElement</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                         <span class="n">order</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                         <span class="n">mapping</span><span class="o">=</span><span class="n">mapping</span><span class="p">)</span>
+
+        <span class="c1"># Store unflattened entity ID dictionaries</span>
+        <span class="n">topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">topology</span><span class="p">)</span>
+        <span class="n">unflattened_entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">unflattened_entity_closure_ids</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">unflattened_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">unflattened_entity_closure_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">flat_topology</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">:</span>
+                <span class="n">unflat_dim</span><span class="p">,</span> <span class="n">unflat_entity</span> <span class="o">=</span> <span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">)]</span>
+                <span class="n">unflattened_entity_ids</span><span class="p">[</span><span class="n">unflat_dim</span><span class="p">][</span><span class="n">unflat_entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+                <span class="n">unflattened_entity_closure_ids</span><span class="p">[</span><span class="n">unflat_dim</span><span class="p">][</span><span class="n">unflat_entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">entity_closure_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span> <span class="o">=</span> <span class="n">unflattened_entity_ids</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span> <span class="o">=</span> <span class="n">unflattened_entity_closure_ids</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_degree</span> <span class="o">=</span> <span class="n">degree</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flat_el</span> <span class="o">=</span> <span class="n">flat_el</span>
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.degree">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.degree">[docs]</a>
+    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the polynomial space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_degree</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.get_nodal_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_nodal_basis">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented for BDMCE/F elements&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.get_dual_set">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_dual_set">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_dual_set is not implemented for BDMCE/F elements&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.get_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_coeffs">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented for BDMCE/F elements&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.tabulate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.tabulate">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to a given order of</span>
+<span class="sd">        basis functions at given points.</span>
+
+<span class="sd">        :arg order: The maximum order of derivative.</span>
+<span class="sd">        :arg points: An iterable of points.</span>
+<span class="sd">        :arg entity: Optional (dimension, entity number) pair</span>
+<span class="sd">                     indicating which topological entity of the</span>
+<span class="sd">                     reference element to tabulate on.  If ``None``,</span>
+<span class="sd">                     tabulated values are computed by geometrically</span>
+<span class="sd">                     approximating which facet the points are on.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span> <span class="o">=</span> <span class="n">entity</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">)</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">transform</span><span class="p">,</span> <span class="n">points</span><span class="p">)))</span>
+        <span class="n">npoints</span><span class="p">,</span> <span class="n">pointdim</span> <span class="o">=</span> <span class="n">points</span><span class="o">.</span><span class="n">shape</span>
+
+        <span class="c1"># Turn analytic basis functions into python functions via lambdify</span>
+        <span class="n">basis_callable</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">numpy_lambdify</span><span class="p">(</span><span class="n">variables</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)],</span>
+                                                 <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">)}</span>
+
+        <span class="c1"># Dictionary of values of functions</span>
+        <span class="n">phivals</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">o</span><span class="p">)</span>
+            <span class="c1"># Collect basis and derivatives of basis</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">callable</span> <span class="o">=</span> <span class="n">basis_callable</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span>
+                <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+                    <span class="n">diff_basis</span> <span class="o">=</span> <span class="n">diff</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)],</span> <span class="o">*</span><span class="nb">zip</span><span class="p">(</span><span class="n">variables</span><span class="p">,</span> <span class="n">alpha</span><span class="p">))</span>
+                    <span class="nb">callable</span> <span class="o">=</span> <span class="n">numpy_lambdify</span><span class="p">(</span><span class="n">variables</span><span class="p">,</span> <span class="n">diff_basis</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">diff_basis</span>
+
+                <span class="c1"># tabulate by passing points through all lambdified functions</span>
+                <span class="c1"># resulting array has shape (len(self.basis), spatial_dim, npoints)</span>
+                <span class="n">T</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[[</span><span class="n">func_component</span><span class="p">(</span><span class="n">point</span><span class="p">)</span> <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">points</span><span class="p">]</span>
+                               <span class="k">for</span> <span class="n">func_component</span> <span class="ow">in</span> <span class="n">func</span><span class="p">]</span> <span class="k">for</span> <span class="n">func</span> <span class="ow">in</span> <span class="nb">callable</span><span class="p">])</span>
+
+                <span class="n">phivals</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">T</span>
+
+        <span class="k">return</span> <span class="n">phivals</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.entity_dofs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.entity_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.entity_closure_dofs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.entity_closure_dofs">[docs]</a>
+    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom on the closure of those entities for the finite element.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.value_shape">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.value_shape">[docs]</a>
+    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the value shape of the finite element functions.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)][</span><span class="mi">0</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.dmats">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.dmats">[docs]</a>
+    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.get_num_members">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_num_members">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCube.space_dimension">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.space_dimension">[docs]</a>
+    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the dimension of the finite element space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)])</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="bdmce_edge_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.bdmce_edge_basis">[docs]</a>
+<span class="k">def</span> <span class="nf">bdmce_edge_basis</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the basis functions associated with DoFs on the</span>
+<span class="sd">    edges of elements for the HCurl Brezz-Douglas-Marini element on</span>
+<span class="sd">    quadrilateral cells.</span>
+
+<span class="sd">    These were introduced by Brezzi, Douglas, Marini (1985)</span>
+<span class="sd">    &quot;Two families of mixed finite elements for Second Order Elliptic Problems&quot;</span>
+
+<span class="sd">    Following, e.g. Brezzi, Douglas, Fortin, Marini (1987)</span>
+<span class="sd">    &quot;Efficient rectangular mixed finite elements in two and three space variables&quot;</span>
+<span class="sd">    For rectangle K and degree j:</span>
+<span class="sd">    BDM_j(K) = [P_j(K)^2 + Span(curl(xy^{j+1}, x^{j+1}y))] x P_{j-1}(K)</span>
+
+<span class="sd">    The resulting basis functions all have a curl whose polynomials are</span>
+<span class="sd">    of degree (j - 1).</span>
+
+<span class="sd">    :arg deg: The element degree.</span>
+<span class="sd">    :arg dx: A tuple of sympy expressions, expanding the interval in the</span>
+<span class="sd">             x direction. Probably (1-x, x).</span>
+<span class="sd">    :arg dy: A tuple of sympy expressions, expanding the interval in the</span>
+<span class="sd">             y direction. Probably (1-y, y).</span>
+<span class="sd">    :arg x_mid: A sympy expression, probably 2*x-1.</span>
+<span class="sd">    :arg y_mid: A sympy expression, probably 2*y-1.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># For some functions, we need to multiply by a coefficient to ensure that</span>
+    <span class="c1"># the result curl is of the correct degree. The coefficient of the</span>
+    <span class="c1"># highest-order term of leg(deg, 2x-1), is binomial(2*deg, deg)</span>
+    <span class="n">coeff</span> <span class="o">=</span> <span class="n">binomial</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">deg</span><span class="p">,</span> <span class="n">deg</span><span class="p">)</span> <span class="o">/</span> <span class="p">((</span><span class="n">deg</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">binomial</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">deg</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span> <span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+
+    <span class="n">basis</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">deg</span><span class="p">)]</span> <span class="o">+</span>
+                  <span class="p">[(</span><span class="n">coeff</span><span class="o">*-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span> <span class="o">+</span>
+                  <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">deg</span><span class="p">)]</span> <span class="o">+</span>
+                  <span class="p">[(</span><span class="n">coeff</span><span class="o">*</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">+</span>
+                  <span class="p">[(</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">deg</span><span class="p">)]</span> <span class="o">+</span>
+                  <span class="p">[(</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">coeff</span><span class="o">*-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">+</span>
+                  <span class="p">[(</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">deg</span><span class="p">)]</span> <span class="o">+</span>
+                  <span class="p">[(</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">coeff</span><span class="o">*</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])])</span>
+
+    <span class="k">return</span> <span class="n">basis</span></div>
+
+
+
+<div class="viewcode-block" id="bdmce_face_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.bdmce_face_basis">[docs]</a>
+<span class="k">def</span> <span class="nf">bdmce_face_basis</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the basis functions associated with DoFs on the</span>
+<span class="sd">    faces of elements for the HCurl Brezz-Douglas-Marini element on</span>
+<span class="sd">    quadrilateral cells.</span>
+
+<span class="sd">    These were introduced by Brezzi, Douglas, Marini (1985)</span>
+<span class="sd">    &quot;Two families of mixed finite elements for Second Order Elliptic Problems&quot;</span>
+
+<span class="sd">    Following, e.g. Brezzi, Douglas, Fortin, Marini (1987)</span>
+<span class="sd">    &quot;Efficient rectangular mixed finite elements in two and three space variables&quot;</span>
+<span class="sd">    For rectangle K and degree j:</span>
+<span class="sd">    BDM_j(K) = [P_j(K)^2 + Span(curl(xy^{j+1}, x^{j+1}y))] x P_{j-1}(K)</span>
+
+<span class="sd">    The resulting basis functions all have a curl whose polynomials are</span>
+<span class="sd">    of degree (j - 1).</span>
+
+<span class="sd">    :arg deg: The element degree.</span>
+<span class="sd">    :arg dx: A tuple of sympy expressions, expanding the interval in the</span>
+<span class="sd">             x direction. Probably (1-x, x).</span>
+<span class="sd">    :arg dy: A tuple of sympy expressions, expanding the interval in the</span>
+<span class="sd">             y direction. Probably (1-y, y).</span>
+<span class="sd">    :arg x_mid: A sympy expression, probably 2*x-1.</span>
+<span class="sd">    :arg y_mid: A sympy expression, probably 2*y-1.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">basis</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">deg</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">basis</span> <span class="o">+=</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
+            <span class="n">basis</span> <span class="o">+=</span> <span class="p">[(</span><span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">2</span><span class="o">-</span><span class="n">j</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)]</span>
+
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCubeEdge">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCubeEdge">[docs]</a>
+<span class="k">class</span> <span class="nc">BrezziDouglasMariniCubeEdge</span><span class="p">(</span><span class="n">BrezziDouglasMariniCube</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The Brezzi-Douglas-Marini HCurl element on quadrilateral cells.</span>
+
+<span class="sd">    :arg ref_el: The reference element.</span>
+<span class="sd">    :arg k: The degree.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+
+        <span class="n">bdmce_list</span> <span class="o">=</span> <span class="n">construct_bdmce_basis</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">Array</span><span class="p">(</span><span class="n">bdmce_list</span><span class="p">)}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;covariant piola&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BrezziDouglasMariniCubeFace">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCubeFace">[docs]</a>
+<span class="k">class</span> <span class="nc">BrezziDouglasMariniCubeFace</span><span class="p">(</span><span class="n">BrezziDouglasMariniCube</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The Brezzi-Douglas-Marini HDiv element on quadrilateral cells.</span>
+
+<span class="sd">    :arg ref_el: The reference element.</span>
+<span class="sd">    :arg k: The degree.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+
+        <span class="n">bdmce_list</span> <span class="o">=</span> <span class="n">construct_bdmce_basis</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+
+        <span class="c1"># BDMCF functions are rotations of BDMCE functions</span>
+        <span class="n">bdmcf_list</span> <span class="o">=</span> <span class="p">[[</span><span class="o">-</span><span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">bdmce_list</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">Array</span><span class="p">(</span><span class="n">bdmcf_list</span><span class="p">)}</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="construct_bdmce_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.construct_bdmce_basis">[docs]</a>
+<span class="k">def</span> <span class="nf">construct_bdmce_basis</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return the basis functions for a particular BDMCE space as a list.</span>
+
+<span class="sd">    :arg ref_el: The reference element.</span>
+<span class="sd">    :arg k: The degree.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Extract the vertices from the reference element</span>
+    <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+    <span class="n">verts</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+
+    <span class="c1"># dx on reference quad is (1-x, x)</span>
+    <span class="n">dx</span> <span class="o">=</span> <span class="p">((</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]),</span>
+          <span class="p">(</span><span class="n">x</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]))</span>
+    <span class="c1"># dy on reference quad is (1-y, y)</span>
+    <span class="n">dy</span> <span class="o">=</span> <span class="p">((</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">y</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]),</span>
+          <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="c1"># x_mid and y_mid are (2x-1) and (2y-1)</span>
+    <span class="n">x_mid</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">x</span><span class="o">-</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">y_mid</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">y</span><span class="o">-</span><span class="p">(</span><span class="n">verts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">verts</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="c1"># Compute basis functions for BDMcE</span>
+    <span class="n">edge_basis</span> <span class="o">=</span> <span class="n">bdmce_edge_basis</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span>
+    <span class="n">face_basis</span> <span class="o">=</span> <span class="n">bdmce_face_basis</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="k">if</span> <span class="n">degree</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">edge_basis</span> <span class="o">+</span> <span class="n">face_basis</span></div>
+
+
+
+<div class="viewcode-block" id="numpy_lambdify">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.numpy_lambdify">[docs]</a>
+<span class="k">def</span> <span class="nf">numpy_lambdify</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;Unfortunately, SymPy&#39;s own lambdify() doesn&#39;t work well with</span>
+<span class="sd">    NumPy in that simple functions like</span>
+<span class="sd">        lambda x: 1.0,</span>
+<span class="sd">    when evaluated with NumPy arrays, return just &quot;1.0&quot; instead of</span>
+<span class="sd">    an array of 1s with the same shape as x. This function does that.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">lambda_x</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy_lambdify</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="n">modules</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="n">dummify</span><span class="p">)</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">F</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>  <span class="c1"># &#39;function&#39; object is not iterable</span>
+        <span class="c1"># SymPy&#39;s lambdify also works on functions that return arrays.</span>
+        <span class="c1"># However, use it componentwise here so we can add 0*x to each</span>
+        <span class="c1"># component individually. This is necessary to maintain shapes</span>
+        <span class="c1"># if evaluated with NumPy arrays.</span>
+        <span class="n">lmbd_tmp</span> <span class="o">=</span> <span class="n">lambdify</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="n">modules</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="n">dummify</span><span class="p">)</span>
+        <span class="n">lambda_x</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="n">lmbd_tmp</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">u</span><span class="p">])</span> <span class="o">+</span> <span class="mi">0</span> <span class="o">*</span> <span class="n">u</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">lambda_x</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.brezzi_douglas_marini_cube</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

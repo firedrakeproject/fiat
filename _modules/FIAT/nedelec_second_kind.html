@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.nedelec_second_kind &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.nedelec_second_kind</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.nedelec_second_kind</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2010-2012 Marie E. Rognes</span>
+<span class="c1"># Modified by Andrew T. T. McRae (Imperial College London)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+
+<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">CiarletElement</span>
+<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">ONPolynomialSet</span>
+<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="n">PointEdgeTangentEvaluation</span> <span class="k">as</span> <span class="n">Tangent</span>
+<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="n">FrobeniusIntegralMoment</span> <span class="k">as</span> <span class="n">IntegralMoment</span>
+<span class="kn">from</span> <span class="nn">FIAT.raviart_thomas</span> <span class="kn">import</span> <span class="n">RaviartThomas</span>
+<span class="kn">from</span> <span class="nn">FIAT.quadrature</span> <span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
+<span class="kn">from</span> <span class="nn">FIAT.quadrature_schemes</span> <span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span> <span class="nn">FIAT.check_format_variant</span> <span class="kn">import</span> <span class="n">check_format_variant</span>
+
+
+<div class="viewcode-block" id="NedelecSecondKindDual">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.nedelec_second_kind.NedelecSecondKindDual">[docs]</a>
+<span class="k">class</span> <span class="nc">NedelecSecondKindDual</span><span class="p">(</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    This class represents the dual basis for the Nedelec H(curl)</span>
+<span class="sd">    elements of the second kind. The degrees of freedom (L) for the</span>
+<span class="sd">    elements of the k&#39;th degree are</span>
+
+<span class="sd">    d = 2:</span>
+
+<span class="sd">      vertices: None</span>
+
+<span class="sd">      edges:    L(f) = f (x_i) * t       for (k+1) points x_i on each edge</span>
+
+<span class="sd">      cell:     L(f) = \int f * g * dx   for g in RT_{k-1}</span>
+
+
+<span class="sd">    d = 3:</span>
+
+<span class="sd">      vertices: None</span>
+
+<span class="sd">      edges:    L(f)  = f(x_i) * t         for (k+1) points x_i on each edge</span>
+
+<span class="sd">      faces:    L(f) = \int_F f * g * ds   for g in RT_{k-1}(F) for each face F</span>
+
+<span class="sd">      cell:     L(f) = \int f * g * dx     for g in RT_{k-2}</span>
+
+<span class="sd">    Higher spatial dimensions are not yet implemented. (For d = 1,</span>
+<span class="sd">    these elements coincide with the CG_k elements.)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
+
+        <span class="c1"># Define degrees of freedom</span>
+        <span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_degrees_of_freedom</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
+        <span class="c1"># Call init of super-class</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span>
+
+<div class="viewcode-block" id="NedelecSecondKindDual.generate_degrees_of_freedom">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.nedelec_second_kind.NedelecSecondKindDual.generate_degrees_of_freedom">[docs]</a>
+    <span class="k">def</span> <span class="nf">generate_degrees_of_freedom</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
+        <span class="s2">&quot;Generate dofs and geometry-to-dof maps (ids).&quot;</span>
+
+        <span class="n">dofs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># Extract spatial dimension and topology</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="p">(</span><span class="n">d</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)),</span> <span class="s2">&quot;Second kind Nedelecs only implemented in 2/3D.&quot;</span>
+
+        <span class="c1"># Zero vertex-based degrees of freedom (d+1 of these)</span>
+        <span class="n">ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">d</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)}</span>
+
+        <span class="c1"># (degree+1) degrees of freedom per entity of codimension 1 (edges)</span>
+        <span class="p">(</span><span class="n">edge_dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_edge_dofs</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">edge_dofs</span><span class="p">)</span>
+
+        <span class="c1"># Include face degrees of freedom if 3D</span>
+        <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">face_dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">[</span><span class="n">d</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_facet_dofs</span><span class="p">(</span><span class="n">d</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span>
+                                                            <span class="nb">len</span><span class="p">(</span><span class="n">dofs</span><span class="p">),</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
+            <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">face_dofs</span><span class="p">)</span>
+
+        <span class="c1"># Varying degrees of freedom (possibly zero) per cell</span>
+        <span class="n">cell_dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_facet_dofs</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">dofs</span><span class="p">),</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">cell_dofs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_generate_edge_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate degrees of freedom (dofs) for entities of</span>
+<span class="sd">        codimension 1 (edges).&quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;integral&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_facet_dofs</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
+
+        <span class="c1"># (degree+1) tangential component point evaluation degrees of</span>
+        <span class="c1"># freedom per entity of codimension 1 (edges)</span>
+        <span class="n">dofs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;point&quot;</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="mi">1</span><span class="p">])):</span>
+
+                <span class="c1"># Create points for evaluation of tangential components</span>
+                <span class="n">points</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">edge</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span>
+
+                <span class="c1"># A tangential component evaluation for each point</span>
+                <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">Tangent</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">edge</span><span class="p">,</span> <span class="n">point</span><span class="p">)</span> <span class="k">for</span> <span class="n">point</span> <span class="ow">in</span> <span class="n">points</span><span class="p">)</span>
+
+                <span class="c1"># Associate these dofs with this edge</span>
+                <span class="n">i</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span> <span class="o">*</span> <span class="n">edge</span>
+                <span class="n">ids</span><span class="p">[</span><span class="n">edge</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">offset</span> <span class="o">+</span> <span class="n">i</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">i</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_generate_facet_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">codim</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate degrees of freedom (dofs) for facets.&quot;&quot;&quot;</span>
+
+        <span class="c1"># Initialize empty dofs and identifiers (ids)</span>
+        <span class="n">num_facets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">codim</span><span class="p">])</span>
+        <span class="n">dofs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">)}</span>
+
+        <span class="c1"># Return empty info if not applicable</span>
+        <span class="n">rt_degree</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">-</span> <span class="n">codim</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">rt_degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">interpolant_deg</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">degree</span>
+
+        <span class="c1"># Construct quadrature scheme for the reference facet</span>
+        <span class="n">ref_facet</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">codim</span><span class="p">)</span>
+        <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">+</span> <span class="n">rt_degree</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">codim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">Phi</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">rt_degree</span><span class="p">,</span> <span class="p">(</span><span class="n">codim</span><span class="p">,))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Construct Raviart-Thomas on the reference facet</span>
+            <span class="n">RT</span> <span class="o">=</span> <span class="n">RaviartThomas</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">rt_degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
+            <span class="n">Phi</span> <span class="o">=</span> <span class="n">RT</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span>
+
+        <span class="c1"># Evaluate basis functions at reference quadrature points</span>
+        <span class="n">Phis</span> <span class="o">=</span> <span class="n">Phi</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">codim</span><span class="p">]</span>
+        <span class="c1"># Note: Phis has dimensions:</span>
+        <span class="c1"># num_basis_functions x num_components x num_quad_points</span>
+        <span class="n">Phis</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">Phis</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="c1"># Note: Phis has dimensions:</span>
+        <span class="c1"># num_basis_functions x num_quad_points x num_components</span>
+
+        <span class="c1"># Iterate over the facets</span>
+        <span class="n">cur</span> <span class="o">=</span> <span class="n">offset</span>
+        <span class="k">for</span> <span class="n">facet</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">):</span>
+            <span class="c1"># Get the quadrature and Jacobian on this facet</span>
+            <span class="n">Q_facet</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">codim</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
+            <span class="n">J</span> <span class="o">=</span> <span class="n">Q_facet</span><span class="o">.</span><span class="n">jacobian</span><span class="p">()</span>
+            <span class="n">detJ</span> <span class="o">=</span> <span class="n">Q_facet</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">()</span>
+
+            <span class="c1"># Map Phis -&gt; phis (reference values to physical values)</span>
+            <span class="n">piola_map</span> <span class="o">=</span> <span class="n">J</span> <span class="o">/</span> <span class="n">detJ</span>
+            <span class="n">phis</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Phis</span><span class="p">,</span> <span class="n">piola_map</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+            <span class="n">phis</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">phis</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+            <span class="c1"># Construct degrees of freedom as integral moments on this cell,</span>
+            <span class="c1"># using the face quadrature weighted against the values</span>
+            <span class="c1"># of the (physical) Raviart--Thomas&#39;es on the face</span>
+            <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMoment</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">Q_facet</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">)</span>
+
+            <span class="c1"># Assign identifiers (num RTs per face + previous edge dofs)</span>
+            <span class="n">ids</span><span class="p">[</span><span class="n">facet</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">phis</span><span class="p">)))</span>
+            <span class="n">cur</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">phis</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="NedelecSecondKind">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.nedelec_second_kind.NedelecSecondKind">[docs]</a>
+<span class="k">class</span> <span class="nc">NedelecSecondKind</span><span class="p">(</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The H(curl) Nedelec elements of the second kind on triangles and</span>
+<span class="sd">    tetrahedra: the polynomial space described by the full polynomials</span>
+<span class="sd">    of degree k, with a suitable set of degrees of freedom to ensure</span>
+<span class="sd">    H(curl) conformity.</span>
+
+<span class="sd">    :arg ref_el: The reference element.</span>
+<span class="sd">    :arg degree: The degree.</span>
+<span class="sd">    :arg variant: optional variant specifying the types of nodes.</span>
+
+<span class="sd">    variant can be chosen from [&quot;point&quot;, &quot;integral&quot;, &quot;integral(q)&quot;]</span>
+<span class="sd">    &quot;point&quot; -&gt; dofs are evaluated by point evaluation. Note that this variant</span>
+<span class="sd">    has suboptimal convergence order in the H(curl)-norm</span>
+<span class="sd">    &quot;integral&quot; -&gt; dofs are evaluated by quadrature rules with the minimum</span>
+<span class="sd">    degree required for unisolvence.</span>
+<span class="sd">    &quot;integral(q)&quot; -&gt; dofs are evaluated by quadrature rules with the minimum</span>
+<span class="sd">    degree required for unisolvence plus q. You might want to choose a high</span>
+<span class="sd">    quadrature degree to make sure that expressions will be interpolated</span>
+<span class="sd">    exactly. This is important when you want to have (nearly) curl-preserving</span>
+<span class="sd">    interpolation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+
+        <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+
+        <span class="c1"># Check degree</span>
+        <span class="k">assert</span> <span class="n">degree</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Second kind Nedelecs start at 1!&quot;</span>
+
+        <span class="c1"># Get dimension</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+        <span class="c1"># Construct polynomial basis for d-vector fields</span>
+        <span class="n">Ps</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="p">))</span>
+
+        <span class="c1"># Construct dual space</span>
+        <span class="n">Ls</span> <span class="o">=</span> <span class="n">NedelecSecondKindDual</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
+
+        <span class="c1"># Set form degree</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># 1-form</span>
+
+        <span class="c1"># Set mapping</span>
+        <span class="n">mapping</span> <span class="o">=</span> <span class="s2">&quot;covariant piola&quot;</span>
+
+        <span class="c1"># Call init of super-class</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">Ps</span><span class="p">,</span> <span class="n">Ls</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="n">mapping</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.nedelec_second_kind</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

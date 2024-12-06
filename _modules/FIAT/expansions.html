@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.expansions &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.expansions</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.expansions</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2008 Robert C. Kirby (Texas Tech University)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="sd">&quot;&quot;&quot;Principal orthogonal expansion functions as defined by Karniadakis</span>
+<span class="sd">and Sherwin.  These are parametrized over a reference element so as</span>
+<span class="sd">to allow users to get coordinates that they want.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">reference_element</span><span class="p">,</span> <span class="n">jacobi</span>
+
+
+<div class="viewcode-block" id="morton_index2">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.morton_index2">[docs]</a>
+<span class="k">def</span> <span class="nf">morton_index2</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="n">q</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">q</span></div>
+
+
+
+<div class="viewcode-block" id="morton_index3">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.morton_index3">[docs]</a>
+<span class="k">def</span> <span class="nf">morton_index3</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">r</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="n">q</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="n">q</span> <span class="o">+</span> <span class="n">r</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="n">q</span> <span class="o">+</span> <span class="n">r</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span><span class="o">//</span><span class="mi">6</span> <span class="o">+</span> <span class="p">(</span><span class="n">q</span> <span class="o">+</span> <span class="n">r</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">q</span> <span class="o">+</span> <span class="n">r</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span> <span class="o">+</span> <span class="n">r</span></div>
+
+
+
+<div class="viewcode-block" id="jrc">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.jrc">[docs]</a>
+<span class="k">def</span> <span class="nf">jrc</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Jacobi recurrence coefficients&quot;&quot;&quot;</span>
+    <span class="n">an</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="o">+</span><span class="mi">2</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">))</span>
+    <span class="n">bn</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">a</span><span class="o">-</span><span class="n">b</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">))</span>
+    <span class="n">cn</span> <span class="o">=</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="n">a</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="n">b</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="o">+</span><span class="mi">2</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">)</span> <span class="o">/</span> <span class="p">((</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="o">+</span><span class="n">a</span><span class="o">+</span><span class="n">b</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">an</span><span class="p">,</span> <span class="n">bn</span><span class="p">,</span> <span class="n">cn</span></div>
+
+
+
+<div class="viewcode-block" id="integrated_jrc">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.integrated_jrc">[docs]</a>
+<span class="k">def</span> <span class="nf">integrated_jrc</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Integrated Jacobi recurrence coefficients&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">an</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="n">b</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">bn</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span> <span class="o">-</span> <span class="mi">3</span><span class="o">*</span><span class="n">b</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">cn</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">an</span><span class="p">,</span> <span class="n">bn</span><span class="p">,</span> <span class="n">cn</span> <span class="o">=</span> <span class="n">jrc</span><span class="p">(</span><span class="n">a</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">b</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">an</span><span class="p">,</span> <span class="n">bn</span><span class="p">,</span> <span class="n">cn</span></div>
+
+
+
+<div class="viewcode-block" id="pad_coordinates">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.pad_coordinates">[docs]</a>
+<span class="k">def</span> <span class="nf">pad_coordinates</span><span class="p">(</span><span class="n">ref_pts</span><span class="p">,</span> <span class="n">embedded_dim</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pad reference coordinates by appending -1.0.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">ref_pts</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">embedded_dim</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_pts</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="pad_jacobian">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.pad_jacobian">[docs]</a>
+<span class="k">def</span> <span class="nf">pad_jacobian</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">embedded_dim</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Pad coordinate mapping Jacobian by appending zero rows.&quot;&quot;&quot;</span>
+    <span class="n">A</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="n">embedded_dim</span> <span class="o">-</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)])</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">A</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="jacobi_factors">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.jacobi_factors">[docs]</a>
+<span class="k">def</span> <span class="nf">jacobi_factors</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">):</span>
+    <span class="n">fb</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">y</span> <span class="o">+</span> <span class="n">z</span><span class="p">)</span>
+    <span class="n">fa</span> <span class="o">=</span> <span class="n">x</span> <span class="o">+</span> <span class="p">(</span><span class="n">fb</span> <span class="o">+</span> <span class="mf">1.0</span><span class="p">)</span>
+    <span class="n">fc</span> <span class="o">=</span> <span class="n">fb</span> <span class="o">**</span> <span class="mi">2</span>
+    <span class="n">dfa</span> <span class="o">=</span> <span class="n">dfb</span> <span class="o">=</span> <span class="n">dfc</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">dx</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">dfb</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">dy</span> <span class="o">+</span> <span class="n">dz</span><span class="p">)</span>
+        <span class="n">dfa</span> <span class="o">=</span> <span class="n">dx</span> <span class="o">+</span> <span class="n">dfb</span>
+        <span class="n">dfc</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">fb</span> <span class="o">*</span> <span class="n">dfb</span>
+    <span class="k">return</span> <span class="n">fa</span><span class="p">,</span> <span class="n">fb</span><span class="p">,</span> <span class="n">fc</span><span class="p">,</span> <span class="n">dfa</span><span class="p">,</span> <span class="n">dfb</span><span class="p">,</span> <span class="n">dfc</span></div>
+
+
+
+<div class="viewcode-block" id="dubiner_recurrence">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.dubiner_recurrence">[docs]</a>
+<span class="k">def</span> <span class="nf">dubiner_recurrence</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ref_pts</span><span class="p">,</span> <span class="n">Jinv</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).</span>
+
+<span class="sd">    :arg dim: The spatial dimension of the simplex.</span>
+<span class="sd">    :arg n: The polynomial degree.</span>
+<span class="sd">    :arg order: The maximum order of differentiation.</span>
+<span class="sd">    :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.</span>
+<span class="sd">    :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.</span>
+<span class="sd">    :arg scale: A scale factor that sets the first member of expansion set.</span>
+<span class="sd">    :arg variant: Choose between the default (None) orthogonal basis,</span>
+<span class="sd">                  &#39;bubble&#39; for integrated Jacobi polynomials,</span>
+<span class="sd">                  or &#39;dual&#39; for the L2-duals of the integrated Jacobi polynomials.</span>
+
+<span class="sd">    :returns: A tuple with tabulations of the expansion set and its derivatives.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Higher order derivatives not supported&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">variant</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;bubble&quot;</span><span class="p">,</span> <span class="s2">&quot;dual&quot;</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid variant </span><span class="si">{</span><span class="n">variant</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;bubble&quot;</span><span class="p">:</span>
+        <span class="n">scale</span> <span class="o">=</span> <span class="o">-</span><span class="n">scale</span>
+
+    <span class="n">num_members</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">num_members</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="n">phi</span><span class="p">,</span> <span class="n">dphi</span><span class="p">,</span> <span class="n">ddphi</span> <span class="o">=</span> <span class="n">results</span> <span class="o">+</span> <span class="p">(</span><span class="kc">None</span><span class="p">,)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span><span class="o">-</span><span class="n">order</span><span class="p">)</span>
+
+    <span class="n">outer</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+    <span class="n">sym_outer</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">outer</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span> <span class="o">+</span> <span class="n">outer</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+
+    <span class="n">pad_dim</span> <span class="o">=</span> <span class="n">dim</span> <span class="o">+</span> <span class="mi">2</span>
+    <span class="n">dX</span> <span class="o">=</span> <span class="n">pad_jacobian</span><span class="p">(</span><span class="n">Jinv</span><span class="p">,</span> <span class="n">pad_dim</span><span class="p">)</span>
+    <span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">((</span><span class="n">ref_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ref_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dim</span><span class="p">)),</span> <span class="n">scale</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dphi</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">dphi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">*</span> <span class="n">dX</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">ddphi</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">ddphi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">outer</span><span class="p">(</span><span class="n">dphi</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">dX</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">results</span>
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">&gt;</span> <span class="mi">3</span> <span class="ow">or</span> <span class="n">dim</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid number of spatial dimensions&quot;</span><span class="p">)</span>
+
+    <span class="n">beta</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;dual&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="n">integrated_jrc</span> <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;bubble&quot;</span> <span class="k">else</span> <span class="n">jrc</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">pad_coordinates</span><span class="p">(</span><span class="n">ref_pts</span><span class="p">,</span> <span class="n">pad_dim</span><span class="p">)</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">p</span><span class="p">,</span> <span class="n">morton_index2</span><span class="p">,</span> <span class="n">morton_index3</span><span class="p">)[</span><span class="n">dim</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">codim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dim</span><span class="p">):</span>
+        <span class="c1"># Extend the basis from codim to codim + 1</span>
+        <span class="n">fa</span><span class="p">,</span> <span class="n">fb</span><span class="p">,</span> <span class="n">fc</span><span class="p">,</span> <span class="n">dfa</span><span class="p">,</span> <span class="n">dfb</span><span class="p">,</span> <span class="n">dfc</span> <span class="o">=</span> <span class="n">jacobi_factors</span><span class="p">(</span><span class="o">*</span><span class="n">X</span><span class="p">[</span><span class="n">codim</span><span class="p">:</span><span class="n">codim</span><span class="o">+</span><span class="mi">3</span><span class="p">],</span> <span class="o">*</span><span class="n">dX</span><span class="p">[</span><span class="n">codim</span><span class="p">:</span><span class="n">codim</span><span class="o">+</span><span class="mi">3</span><span class="p">])</span>
+        <span class="n">ddfc</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">outer</span><span class="p">(</span><span class="n">dfb</span><span class="p">,</span> <span class="n">dfb</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sub_index</span> <span class="ow">in</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">lattice_iter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">codim</span><span class="p">):</span>
+            <span class="c1"># handle i = 1</span>
+            <span class="n">icur</span> <span class="o">=</span> <span class="n">idx</span><span class="p">(</span><span class="o">*</span><span class="n">sub_index</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">inext</span> <span class="o">=</span> <span class="n">idx</span><span class="p">(</span><span class="o">*</span><span class="n">sub_index</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;bubble&quot;</span><span class="p">:</span>
+                <span class="n">alpha</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="n">b</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">alpha</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;dual&quot;</span><span class="p">:</span>
+                    <span class="n">alpha</span> <span class="o">+=</span> <span class="mi">1</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)</span>
+                <span class="n">a</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">alpha</span> <span class="o">+</span> <span class="n">beta</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1.0</span>
+                <span class="n">b</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">alpha</span> <span class="o">-</span> <span class="n">beta</span><span class="p">)</span>
+
+            <span class="n">factor</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">fa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">fb</span>
+            <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">factor</span> <span class="o">*</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">dphi</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">dfactor</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">dfa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">dfb</span>
+                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">factor</span> <span class="o">*</span> <span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">+</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*</span> <span class="n">dfactor</span>
+                <span class="k">if</span> <span class="n">ddphi</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">factor</span> <span class="o">*</span> <span class="n">ddphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">+</span> <span class="n">sym_outer</span><span class="p">(</span><span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">],</span> <span class="n">dfactor</span><span class="p">)</span>
+
+            <span class="c1"># general i by recurrence</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)):</span>
+                <span class="n">iprev</span><span class="p">,</span> <span class="n">icur</span><span class="p">,</span> <span class="n">inext</span> <span class="o">=</span> <span class="n">icur</span><span class="p">,</span> <span class="n">inext</span><span class="p">,</span> <span class="n">idx</span><span class="p">(</span><span class="o">*</span><span class="n">sub_index</span><span class="p">,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="n">coefficients</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                <span class="n">factor</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">fa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">fb</span>
+                <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">factor</span> <span class="o">*</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">-</span> <span class="n">c</span> <span class="o">*</span> <span class="p">(</span><span class="n">fc</span> <span class="o">*</span> <span class="n">phi</span><span class="p">[</span><span class="n">iprev</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">dphi</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">dfactor</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">dfa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">dfb</span>
+                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">factor</span> <span class="o">*</span> <span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">+</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*</span> <span class="n">dfactor</span> <span class="o">-</span>
+                               <span class="n">c</span> <span class="o">*</span> <span class="p">(</span><span class="n">fc</span> <span class="o">*</span> <span class="n">dphi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="o">+</span> <span class="n">phi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="o">*</span> <span class="n">dfc</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">ddphi</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">factor</span> <span class="o">*</span> <span class="n">ddphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">+</span> <span class="n">sym_outer</span><span class="p">(</span><span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">],</span> <span class="n">dfactor</span><span class="p">)</span> <span class="o">-</span>
+                                <span class="n">c</span> <span class="o">*</span> <span class="p">(</span><span class="n">fc</span> <span class="o">*</span> <span class="n">ddphi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="o">+</span> <span class="n">sym_outer</span><span class="p">(</span><span class="n">dphi</span><span class="p">[</span><span class="n">iprev</span><span class="p">],</span> <span class="n">dfc</span><span class="p">)</span> <span class="o">+</span> <span class="n">phi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="o">*</span> <span class="n">ddfc</span><span class="p">))</span>
+
+        <span class="c1"># normalize</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">codim</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">shift</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;dual&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">lattice_iter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+            <span class="n">icur</span> <span class="o">=</span> <span class="n">idx</span><span class="p">(</span><span class="o">*</span><span class="n">index</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">variant</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">p</span> <span class="o">=</span> <span class="n">index</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">shift</span>
+                <span class="n">alpha</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">index</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="n">d</span> <span class="o">*</span> <span class="n">shift</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="n">norm2</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">d</span><span class="p">)</span> <span class="o">/</span> <span class="n">d</span>
+                <span class="k">if</span> <span class="n">p</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">p</span> <span class="o">+</span> <span class="n">alpha</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">norm2</span> <span class="o">*=</span> <span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="n">alpha</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">p</span> <span class="o">+</span> <span class="n">alpha</span><span class="p">)</span> <span class="o">/</span> <span class="n">p</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">norm2</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="nb">sum</span><span class="p">(</span><span class="n">index</span><span class="p">)</span> <span class="o">+</span> <span class="n">d</span><span class="p">)</span> <span class="o">/</span> <span class="n">d</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">norm2</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*=</span> <span class="n">scale</span>
+    <span class="k">return</span> <span class="n">results</span></div>
+
+
+
+<div class="viewcode-block" id="C0_basis">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.C0_basis">[docs]</a>
+<span class="k">def</span> <span class="nf">C0_basis</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">tabulations</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Modify a tabulation of a hierarchical basis to enforce C0-continuity.</span>
+
+<span class="sd">    :arg dim: The spatial dimension of the simplex.</span>
+<span class="sd">    :arg n: The polynomial degree.</span>
+<span class="sd">    :arg tabulations: An iterable tabulations of the hierarchical basis.</span>
+
+<span class="sd">    :returns: A tuple of tabulations of the C0 basis.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="p">(</span><span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="n">p</span><span class="p">,</span> <span class="n">morton_index2</span><span class="p">,</span> <span class="n">morton_index3</span><span class="p">)[</span><span class="n">dim</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="c1"># Recover facet bubbles</span>
+    <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">tabulations</span><span class="p">:</span>
+        <span class="n">icur</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">for</span> <span class="n">inext</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">dim</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">-=</span> <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">phi</span><span class="p">[</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">)]</span> <span class="o">-=</span> <span class="n">phi</span><span class="p">[</span><span class="n">idx</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="o">-</span><span class="n">i</span><span class="p">):</span>
+                    <span class="n">phi</span><span class="p">[</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)]</span> <span class="o">-=</span> <span class="n">phi</span><span class="p">[</span><span class="n">idx</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">j</span><span class="p">)]</span>
+                <span class="n">icur</span> <span class="o">=</span> <span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">-=</span> <span class="n">phi</span><span class="p">[</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+                <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">-=</span> <span class="n">phi</span><span class="p">[</span><span class="n">idx</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+
+    <span class="c1"># Reorder by dimension and entity on the reference simplex</span>
+    <span class="n">dofs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">dim</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">j</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">j</span><span class="o">-</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">phi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dofs</span><span class="p">]</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">tabulations</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="xi_triangle">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.xi_triangle">[docs]</a>
+<span class="k">def</span> <span class="nf">xi_triangle</span><span class="p">(</span><span class="n">eta</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maps from [-1,1]^2 to the (-1,1) reference triangle.&quot;&quot;&quot;</span>
+    <span class="n">eta1</span><span class="p">,</span> <span class="n">eta2</span> <span class="o">=</span> <span class="n">eta</span>
+    <span class="n">xi1</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">eta1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">eta2</span><span class="p">)</span> <span class="o">-</span> <span class="mf">1.0</span>
+    <span class="n">xi2</span> <span class="o">=</span> <span class="n">eta2</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">xi1</span><span class="p">,</span> <span class="n">xi2</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="xi_tetrahedron">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.xi_tetrahedron">[docs]</a>
+<span class="k">def</span> <span class="nf">xi_tetrahedron</span><span class="p">(</span><span class="n">eta</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maps from [-1,1]^3 to the -1/1 reference tetrahedron.&quot;&quot;&quot;</span>
+    <span class="n">eta1</span><span class="p">,</span> <span class="n">eta2</span><span class="p">,</span> <span class="n">eta3</span> <span class="o">=</span> <span class="n">eta</span>
+    <span class="n">xi1</span> <span class="o">=</span> <span class="mf">0.25</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="n">eta1</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">-</span> <span class="n">eta2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">-</span> <span class="n">eta3</span><span class="p">)</span> <span class="o">-</span> <span class="mf">1.</span>
+    <span class="n">xi2</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">+</span> <span class="n">eta2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.</span> <span class="o">-</span> <span class="n">eta3</span><span class="p">)</span> <span class="o">-</span> <span class="mf">1.</span>
+    <span class="n">xi3</span> <span class="o">=</span> <span class="n">eta3</span>
+    <span class="k">return</span> <span class="n">xi1</span><span class="p">,</span> <span class="n">xi2</span><span class="p">,</span> <span class="n">xi3</span></div>
+
+
+
+<div class="viewcode-block" id="ExpansionSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet">[docs]</a>
+<span class="k">class</span> <span class="nc">ExpansionSet</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns an ExpansionSet instance appropriate for the given</span>
+<span class="sd">        reference element.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">cls</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">ExpansionSet</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">ref_el</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">expansion_set</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">reference_element</span><span class="o">.</span><span class="n">POINT</span><span class="p">:</span> <span class="n">PointExpansionSet</span><span class="p">,</span>
+                <span class="n">reference_element</span><span class="o">.</span><span class="n">LINE</span><span class="p">:</span> <span class="n">LineExpansionSet</span><span class="p">,</span>
+                <span class="n">reference_element</span><span class="o">.</span><span class="n">TRIANGLE</span><span class="p">:</span> <span class="n">TriangleExpansionSet</span><span class="p">,</span>
+                <span class="n">reference_element</span><span class="o">.</span><span class="n">TETRAHEDRON</span><span class="p">:</span> <span class="n">TetrahedronExpansionSet</span><span class="p">,</span>
+            <span class="p">}[</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()]</span>
+            <span class="k">return</span> <span class="n">expansion_set</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid reference element type.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_el</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">variant</span> <span class="o">=</span> <span class="n">variant</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">base_ref_el</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">default_simplex</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span>
+        <span class="n">base_verts</span> <span class="o">=</span> <span class="n">base_ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">affine_mappings</span> <span class="o">=</span> <span class="p">[</span><span class="n">reference_element</span><span class="o">.</span><span class="n">make_affine_mapping</span><span class="p">(</span>
+                                <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices_of_subcomplex</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">cell</span><span class="p">]),</span>
+                                <span class="n">base_verts</span><span class="p">)</span> <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="n">scale</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">base_ref_el</span><span class="o">.</span><span class="n">volume</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span> <span class="o">=</span> <span class="s2">&quot;C0&quot;</span> <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;bubble&quot;</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">recurrence_order</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dmats_cache</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cell_node_map_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+<div class="viewcode-block" id="ExpansionSet.get_scale">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.get_scale">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scale</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">vol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">volume_of_subcomplex</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">cell</span><span class="p">)</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">scale</span> <span class="o">==</span> <span class="s2">&quot;orthonormal&quot;</span><span class="p">:</span>
+                <span class="n">scale</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">vol</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">scale</span> <span class="o">==</span> <span class="s2">&quot;l2 piola&quot;</span><span class="p">:</span>
+                <span class="n">scale</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">vol</span>
+        <span class="k">elif</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">sd</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">affine_mappings</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># return 1 for n=0 to make regression tests pass</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">scale</span></div>
+
+
+<div class="viewcode-block" id="ExpansionSet.get_num_members">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.get_num_members">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">polynomial_dimension</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExpansionSet.get_cell_node_map">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.get_cell_node_map">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_cell_node_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_node_map_cache</span><span class="p">[</span><span class="n">n</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="n">cell_node_map</span> <span class="o">=</span> <span class="n">polynomial_cell_node_map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_node_map_cache</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">cell_node_map</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_tabulate_on_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dict of tabulations such that</span>
+<span class="sd">        tabulations[alpha][i, j] = D^alpha phi_i(pts[j]).&quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+        <span class="n">lorder</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">recurrence_order</span><span class="p">)</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">affine_mappings</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+        <span class="n">ref_pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">T</span><span class="p">),</span> <span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        <span class="n">Jinv</span> <span class="o">=</span> <span class="n">A</span> <span class="k">if</span> <span class="n">direction</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">direction</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_scale</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">dubiner_recurrence</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">lorder</span><span class="p">,</span> <span class="n">ref_pts</span><span class="p">,</span> <span class="n">Jinv</span><span class="p">,</span>
+                                 <span class="n">scale</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">variant</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span><span class="p">:</span>
+            <span class="n">phi</span> <span class="o">=</span> <span class="n">C0_basis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span>
+
+        <span class="c1"># Pack linearly independent components into a dictionary</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">])}</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">phi</span><span class="p">)):</span>
+            <span class="n">vr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span> <span class="o">+</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">indices</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">vr</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="n">r</span><span class="p">]):</span>
+                <span class="n">alpha</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)))</span>
+                <span class="k">if</span> <span class="n">alpha</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">vr</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
+
+        <span class="k">def</span> <span class="nf">distance</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">ai</span> <span class="o">!=</span> <span class="n">bi</span> <span class="k">for</span> <span class="n">ai</span><span class="p">,</span> <span class="n">bi</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">))</span>
+
+        <span class="c1"># Only use dmats if tabulate failed</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">phi</span><span class="p">),</span> <span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="n">dmats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dmats</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
+                <span class="n">base_alpha</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">result</span> <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="o">==</span> <span class="n">i</span><span class="o">-</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">distance</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">vals</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="n">base_alpha</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">dmat</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dmats</span><span class="p">,</span> <span class="n">base_alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">end</span><span class="p">):</span>
+                        <span class="n">vals</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">dmat</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">vals</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">vals</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;A version of tabulate() that also works for a single point.&quot;&quot;&quot;</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+        <span class="n">unique</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="n">cell_point_map</span> <span class="o">=</span> <span class="n">compute_cell_point_map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="n">unique</span><span class="p">)</span>
+        <span class="n">phis</span> <span class="o">=</span> <span class="p">{</span><span class="n">cell</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabulate_on_cell</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">[</span><span class="n">ipts</span><span class="p">],</span> <span class="n">order</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">cell</span><span class="p">,</span> <span class="n">ipts</span> <span class="ow">in</span> <span class="n">cell_point_map</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">phis</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">object</span><span class="p">:</span>
+            <span class="c1"># If binning is undefined, scale by the characteristic function of each subcell</span>
+            <span class="n">Xi</span> <span class="o">=</span> <span class="n">compute_partition_of_unity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="n">unique</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">cell</span><span class="p">,</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">phi</span><span class="p">:</span>
+                    <span class="n">phi</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">*=</span> <span class="n">Xi</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="n">unique</span><span class="p">:</span>
+            <span class="c1"># If binning is not unique, divide by the multiplicity of each point</span>
+            <span class="n">mult</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">cell</span><span class="p">,</span> <span class="n">ipts</span> <span class="ow">in</span> <span class="n">cell_point_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">mult</span><span class="p">[</span><span class="n">ipts</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">for</span> <span class="n">cell</span><span class="p">,</span> <span class="n">ipts</span> <span class="ow">in</span> <span class="n">cell_point_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">phi</span> <span class="o">=</span> <span class="n">phis</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">phi</span><span class="p">:</span>
+                    <span class="n">phi</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">/=</span> <span class="n">mult</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="n">ipts</span><span class="p">]</span>
+
+        <span class="c1"># Insert subcell tabulations into the corresponding submatrices</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">args</span> <span class="k">if</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="bp">Ellipsis</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span>
+        <span class="n">num_phis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">cell_node_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cell_node_map</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">base_phi</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">phis</span><span class="o">.</span><span class="n">values</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">base_phi</span><span class="p">:</span>
+            <span class="n">dtype</span> <span class="o">=</span> <span class="n">base_phi</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_phis</span><span class="p">,</span> <span class="o">*</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">cell_point_map</span><span class="p">:</span>
+                <span class="n">ibfs</span> <span class="o">=</span> <span class="n">cell_node_map</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+                <span class="n">ipts</span> <span class="o">=</span> <span class="n">cell_point_map</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">][</span><span class="n">idx</span><span class="p">(</span><span class="n">ibfs</span><span class="p">,</span> <span class="n">ipts</span><span class="p">)]</span> <span class="o">+=</span> <span class="n">phis</span><span class="p">[</span><span class="n">cell</span><span class="p">][</span><span class="n">alpha</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+<div class="viewcode-block" id="ExpansionSet.tabulate_normal_jumps">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.tabulate_normal_jumps">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate_normal_jumps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">ref_pts</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Tabulates the normal derivative jumps on reference points on a facet.</span>
+
+<span class="sd">        :arg n: the polynomial degree.</span>
+<span class="sd">        :arg ref_pts: an iterable of points on the reference facet.</span>
+<span class="sd">        :arg facet: the facet id.</span>
+<span class="sd">        :kwarg order: the order of differentiation.</span>
+
+<span class="sd">        :returns: a numpy array of tabulations of normal derivative jumps.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">facet</span><span class="p">)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">ref_pts</span><span class="p">)</span>
+        <span class="n">cell_point_map</span> <span class="o">=</span> <span class="n">compute_cell_point_map</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">cell_node_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cell_node_map</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+
+        <span class="n">num_phis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_phis</span><span class="p">,</span> <span class="o">*</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+
+        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">cell_point_map</span><span class="p">:</span>
+            <span class="n">ipts</span> <span class="o">=</span> <span class="n">cell_point_map</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+            <span class="n">ibfs</span> <span class="o">=</span> <span class="n">cell_node_map</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+            <span class="n">normal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
+            <span class="n">side</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">normal</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">))</span>
+            <span class="n">phi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabulate_on_cell</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">[</span><span class="n">ipts</span><span class="p">],</span> <span class="n">order</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
+            <span class="n">v0</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">vr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">sd</span><span class="p">,)</span><span class="o">*</span><span class="n">r</span> <span class="o">+</span> <span class="n">v0</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">v0</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">vr</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="n">r</span><span class="p">]):</span>
+                    <span class="n">vr</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)))]</span>
+                <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">r</span><span class="p">):</span>
+                    <span class="n">vr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">normal</span><span class="p">,</span> <span class="n">vr</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+                <span class="n">indices</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">ibfs</span><span class="p">,</span> <span class="n">ipts</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">r</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">side</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">][</span><span class="n">indices</span><span class="p">]</span> <span class="o">-=</span> <span class="n">vr</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">results</span><span class="p">[</span><span class="n">r</span><span class="p">][</span><span class="n">indices</span><span class="p">]</span> <span class="o">+=</span> <span class="n">vr</span>
+        <span class="k">return</span> <span class="n">results</span></div>
+
+
+<div class="viewcode-block" id="ExpansionSet.tabulate_jumps">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.tabulate_jumps">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate_jumps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Tabulates derivative jumps on given points.</span>
+
+<span class="sd">        :arg n: the polynomial degree.</span>
+<span class="sd">        :arg points: an iterable of points on the cell complex.</span>
+<span class="sd">        :kwarg order: the order of differentiation.</span>
+
+<span class="sd">        :returns: a dictionary of tabulations of derivative jumps across interior facets.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+        <span class="n">num_members</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">cell_node_map</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_cell_node_map</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+
+        <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">interior_facets</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">derivs</span> <span class="o">=</span> <span class="p">{</span><span class="n">cell</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabulate_on_cell</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
+                  <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]}</span>
+        <span class="n">jumps</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span>
+            <span class="n">jumps</span><span class="p">[</span><span class="n">r</span><span class="p">]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_members</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">)</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">interior_facets</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)))</span>
+            <span class="k">for</span> <span class="n">facet</span> <span class="ow">in</span> <span class="n">interior_facets</span><span class="p">:</span>
+                <span class="n">facet_verts</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">facet</span><span class="p">])</span>
+                <span class="n">c0</span><span class="p">,</span> <span class="n">c1</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]</span> <span class="k">if</span> <span class="n">facet_verts</span> <span class="o">&lt;</span> <span class="nb">set</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">k</span><span class="p">]))</span>
+                <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+                    <span class="n">jumps</span><span class="p">[</span><span class="n">r</span><span class="p">][</span><span class="n">cell_node_map</span><span class="p">[</span><span class="n">c1</span><span class="p">],</span> <span class="n">cur</span><span class="p">]</span> <span class="o">+=</span> <span class="n">derivs</span><span class="p">[</span><span class="n">c1</span><span class="p">][</span><span class="n">alpha</span><span class="p">]</span>
+                    <span class="n">jumps</span><span class="p">[</span><span class="n">r</span><span class="p">][</span><span class="n">cell_node_map</span><span class="p">[</span><span class="n">c0</span><span class="p">],</span> <span class="n">cur</span><span class="p">]</span> <span class="o">-=</span> <span class="n">derivs</span><span class="p">[</span><span class="n">c0</span><span class="p">][</span><span class="n">alpha</span><span class="p">]</span>
+                    <span class="n">cur</span> <span class="o">=</span> <span class="n">cur</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">jumps</span></div>
+
+
+<div class="viewcode-block" id="ExpansionSet.get_dmats">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.get_dmats">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a numpy array with the expansion coefficients dmat[k, j, i]</span>
+<span class="sd">        of the gradient of each member of the expansion set:</span>
+<span class="sd">            d/dx_k phi_j = sum_i dmat[k, j, i] phi_i.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">cell</span><span class="p">)</span>
+        <span class="n">cache</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dmats_cache</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">cache</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">cache</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;d&quot;</span><span class="p">))</span>
+
+        <span class="n">D</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices_of_subcomplex</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">D</span><span class="p">][</span><span class="n">cell</span><span class="p">])</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">make_lattice</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;gl&quot;</span><span class="p">)</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabulate_on_cell</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
+        <span class="n">dv</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">v</span><span class="p">[</span><span class="n">alpha</span><span class="p">])</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">D</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="n">dmats</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">v</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">D</span><span class="p">]),</span> <span class="n">dv</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">cache</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">dmats</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ExpansionSet.tabulate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.tabulate">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabulate</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="ExpansionSet.tabulate_derivatives">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.tabulate_derivatives">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate_derivatives</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">):</span>
+        <span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabulate</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># Create the ordinary data structure.</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
+        <span class="n">dv</span> <span class="o">=</span> <span class="p">[</span><span class="n">vals</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[[(</span><span class="n">v</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span> <span class="p">[</span><span class="n">vi</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">vi</span> <span class="ow">in</span> <span class="n">dv</span><span class="p">])</span>
+                 <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">v</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+<div class="viewcode-block" id="ExpansionSet.tabulate_jet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.ExpansionSet.tabulate_jet">[docs]</a>
+    <span class="k">def</span> <span class="nf">tabulate_jet</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">vals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tabulate</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
+        <span class="c1"># Create the ordinary data structure.</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">v0</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">v0</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">vr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">sd</span><span class="p">,)</span> <span class="o">*</span> <span class="n">r</span> <span class="o">+</span> <span class="n">v0</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">v0</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">vr</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="n">r</span><span class="p">]):</span>
+                <span class="n">vr</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">vals</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)))]</span>
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">vr</span><span class="o">.</span><span class="n">transpose</span><span class="p">((</span><span class="n">r</span><span class="p">,</span> <span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">r</span><span class="p">))))</span>
+        <span class="k">return</span> <span class="n">data</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">ref_el</span> <span class="ow">and</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">continuity</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PointExpansionSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.PointExpansionSet">[docs]</a>
+<span class="k">class</span> <span class="nc">PointExpansionSet</span><span class="p">(</span><span class="n">ExpansionSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the point basis on a point reference element.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must have a point&quot;</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_tabulate_on_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dict of tabulations such that</span>
+<span class="sd">        tabulations[alpha][i, j] = D^alpha phi_i(pts[j]).&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">==</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="p">{():</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">)))}</span></div>
+
+
+
+<div class="viewcode-block" id="LineExpansionSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.LineExpansionSet">[docs]</a>
+<span class="k">class</span> <span class="nc">LineExpansionSet</span><span class="p">(</span><span class="n">ExpansionSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the Legendre basis on a line reference element.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Must have a line&quot;</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_tabulate_on_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dict of tabulations such that</span>
+<span class="sd">        tabulations[alpha][i, j] = D^alpha phi_i(pts[j]).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">variant</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">_tabulate_on_cell</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="n">direction</span><span class="p">)</span>
+
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">affine_mappings</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span>
+        <span class="n">Jinv</span> <span class="o">=</span> <span class="n">A</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">direction</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">direction</span><span class="p">)</span>
+        <span class="n">xs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">T</span><span class="p">),</span> <span class="n">b</span><span class="p">)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">scale</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_scale</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xs</span><span class="p">)),</span> <span class="n">xs</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;=</span> <span class="n">k</span><span class="p">:</span>
+                <span class="n">v</span><span class="p">[</span><span class="n">k</span><span class="p">:]</span> <span class="o">=</span> <span class="n">jacobi</span><span class="o">.</span><span class="n">eval_jacobi_batch</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">k</span><span class="p">,</span> <span class="n">xs</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">v</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="o">*=</span> <span class="n">scale</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
+                <span class="n">scale</span><span class="p">[</span><span class="n">p</span><span class="p">]</span> <span class="o">*=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">p</span> <span class="o">+</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">Jinv</span>
+            <span class="n">results</span><span class="p">[(</span><span class="n">k</span><span class="p">,)]</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="k">return</span> <span class="n">results</span></div>
+
+
+
+<div class="viewcode-block" id="TriangleExpansionSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.TriangleExpansionSet">[docs]</a>
+<span class="k">class</span> <span class="nc">TriangleExpansionSet</span><span class="p">(</span><span class="n">ExpansionSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the orthonormal Dubiner basis on a triangular</span>
+<span class="sd">    reference element.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Must have a triangle&quot;</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="TetrahedronExpansionSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.TetrahedronExpansionSet">[docs]</a>
+<span class="k">class</span> <span class="nc">TetrahedronExpansionSet</span><span class="p">(</span><span class="n">ExpansionSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collapsed orthonormal polynomial expansion on a tetrahedron.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Must be a tetrahedron&quot;</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="polynomial_dimension">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.polynomial_dimension">[docs]</a>
+<span class="k">def</span> <span class="nf">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">continuity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the dimension of the space of polynomials of degree no</span>
+<span class="sd">    greater than n on the reference complex.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">POINT</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Only degree zero polynomials supported on point elements.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">1</span>
+    <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span><span class="p">:</span>
+        <span class="n">space_dimension</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">space_dimension</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">space_dimension</span></div>
+
+
+
+<div class="viewcode-block" id="polynomial_entity_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.polynomial_entity_ids">[docs]</a>
+<span class="k">def</span> <span class="nf">polynomial_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">continuity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maps entites of a cell complex to members of a polynomial basis.</span>
+
+<span class="sd">    :arg ref_el: a SimplicialComplex.</span>
+<span class="sd">    :arg n: the polynomial degree of the expansion set.</span>
+<span class="sd">    :arg continuity: the continuity of the expansion set.</span>
+<span class="sd">    :returns: a dict of dicts mapping dimension and entity id to basis functions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span><span class="p">:</span>
+            <span class="n">dofs</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># DG numbering</span>
+            <span class="n">dofs</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span> <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="n">sd</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="n">dofs</span><span class="p">))</span>
+            <span class="n">cur</span> <span class="o">+=</span> <span class="n">dofs</span>
+    <span class="k">return</span> <span class="n">entity_ids</span></div>
+
+
+
+<div class="viewcode-block" id="polynomial_cell_node_map">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.polynomial_cell_node_map">[docs]</a>
+<span class="k">def</span> <span class="nf">polynomial_cell_node_map</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">continuity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maps cells on a simplicial complex to members of a polynomial basis.</span>
+
+<span class="sd">    :arg ref_el: a SimplicialComplex.</span>
+<span class="sd">    :arg n: the polynomial degree of the expansion set.</span>
+<span class="sd">    :arg continuity: the continuity of the expansion set.</span>
+<span class="sd">    :returns: a numpy array mapping cell id to basis functions supported on that cell.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+    <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">polynomial_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">continuity</span><span class="p">)</span>
+    <span class="n">ref_entity_ids</span> <span class="o">=</span> <span class="n">polynomial_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">sd</span><span class="p">),</span> <span class="n">n</span><span class="p">,</span> <span class="n">continuity</span><span class="p">)</span>
+
+    <span class="n">num_cells</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">])</span>
+    <span class="n">dofs_per_cell</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ref_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">])</span>
+                        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">ref_entity_ids</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">ref_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">])</span>
+    <span class="n">cell_node_map</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_cells</span><span class="p">,</span> <span class="n">dofs_per_cell</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_cell_connectivity</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]:</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">ref_entity</span><span class="p">,</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">conn</span><span class="p">[</span><span class="n">cell</span><span class="p">][</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">ref_dofs</span> <span class="o">=</span> <span class="n">ref_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">ref_entity</span><span class="p">]</span>
+                <span class="n">cell_node_map</span><span class="p">[</span><span class="n">cell</span><span class="p">,</span> <span class="n">ref_dofs</span><span class="p">]</span> <span class="o">=</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">cell_node_map</span></div>
+
+
+
+<div class="viewcode-block" id="compute_cell_point_map">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.compute_cell_point_map">[docs]</a>
+<span class="k">def</span> <span class="nf">compute_cell_point_map</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1E-12</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maps cells on a simplicial complex to points.</span>
+<span class="sd">    Points outside the complex are binned to the nearest cell.</span>
+
+<span class="sd">    :arg ref_el: a SimplicialComplex.</span>
+<span class="sd">    :arg pts: an iterable of physical points on the complex.</span>
+<span class="sd">    :kwarg unique: Are we assigning a unique cell to points on facets?</span>
+<span class="sd">    :kwarg tol: the absolute tolerance.</span>
+<span class="sd">    :returns: a dict mapping cell id to the point ids nearest to that cell.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">])</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="bp">Ellipsis</span><span class="p">}</span>
+
+    <span class="n">pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">object</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">cell</span><span class="p">:</span> <span class="bp">Ellipsis</span> <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">])}</span>
+
+    <span class="c1"># The distance to the nearest cell is equal to the distance to the parent cell</span>
+    <span class="n">best</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">tol</span> <span class="o">=</span> <span class="n">best</span> <span class="o">+</span> <span class="n">tol</span>
+
+    <span class="n">cell_point_map</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]):</span>
+        <span class="c1"># Bin points based on l1 distance</span>
+        <span class="n">pts_near_cell</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">cell</span><span class="p">),</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">tol</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts_near_cell</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># singleton case</span>
+            <span class="k">if</span> <span class="n">pts_near_cell</span><span class="p">:</span>
+                <span class="n">cell_point_map</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span> <span class="o">=</span> <span class="bp">Ellipsis</span>
+                <span class="k">if</span> <span class="n">unique</span><span class="p">:</span>
+                    <span class="k">break</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">unique</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">other</span> <span class="ow">in</span> <span class="n">cell_point_map</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="n">pts_near_cell</span><span class="p">[</span><span class="n">other</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">ipts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">pts_near_cell</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ipts</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">cell_point_map</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span> <span class="o">=</span> <span class="n">ipts</span>
+    <span class="k">return</span> <span class="n">cell_point_map</span></div>
+
+
+
+<div class="viewcode-block" id="compute_partition_of_unity">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.compute_partition_of_unity">[docs]</a>
+<span class="k">def</span> <span class="nf">compute_partition_of_unity</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pt</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1E-12</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Computes the partition of unity functions for each subcell.</span>
+
+<span class="sd">    :arg ref_el: a SimplicialComplex.</span>
+<span class="sd">    :arg pt: a physical point on the complex.</span>
+<span class="sd">    :kwarg unique: Are we assigning a unique cell to points on facets?</span>
+<span class="sd">    :kwarg tol: the absolute tolerance.</span>
+<span class="sd">    :returns: a list of (weighted) characteristic functions for each subcell.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">sympy</span> <span class="kn">import</span> <span class="n">Piecewise</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+    <span class="c1"># assert singleton point</span>
+    <span class="n">pt</span> <span class="o">=</span> <span class="n">pt</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">sd</span><span class="p">,))</span>
+
+    <span class="c1"># The distance to the nearest cell is equal to the distance to the parent cell</span>
+    <span class="n">best</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">pt</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">tol</span> <span class="o">=</span> <span class="n">best</span> <span class="o">+</span> <span class="n">tol</span>
+
+    <span class="c1"># Compute characteristic function of each subcell</span>
+    <span class="n">otherwise</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">masks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]):</span>
+        <span class="c1"># Bin points based on l1 distance</span>
+        <span class="n">pt_near_cell</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">pt</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">cell</span><span class="p">),</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">tol</span>
+        <span class="n">masks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Piecewise</span><span class="p">(</span><span class="o">*</span><span class="n">otherwise</span><span class="p">,</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">pt_near_cell</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="kc">True</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">unique</span><span class="p">:</span>
+            <span class="n">otherwise</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">pt_near_cell</span><span class="p">))</span>
+    <span class="c1"># If the point is on a facet, divide the characteristic function by the facet multiplicity</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">unique</span><span class="p">:</span>
+        <span class="n">mult</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">masks</span><span class="p">)</span>
+        <span class="n">masks</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span> <span class="o">/</span> <span class="n">mult</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">masks</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">masks</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.expansions</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

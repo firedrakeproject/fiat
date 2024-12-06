@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.quadrature &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.quadrature</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.quadrature</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2008 Robert C. Kirby (Texas Tech University)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="c1">#</span>
+<span class="c1"># Modified by Marie E. Rognes (meg@simula.no), 2012</span>
+<span class="c1"># Modified by David A. Ham (david.ham@imperial.ac.uk), 2015</span>
+
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">factorial</span>
+<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">from</span> <span class="nn">recursivenodes.quadrature</span> <span class="kn">import</span> <span class="n">gaussjacobi</span><span class="p">,</span> <span class="n">lobattogaussjacobi</span><span class="p">,</span> <span class="n">simplexgausslegendre</span>
+
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">reference_element</span>
+<span class="kn">from</span> <span class="nn">FIAT.orientation_utils</span> <span class="kn">import</span> <span class="n">make_entity_permutations_simplex</span>
+
+
+<div class="viewcode-block" id="pseudo_determinant">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.pseudo_determinant">[docs]</a>
+<span class="k">def</span> <span class="nf">pseudo_determinant</span><span class="p">(</span><span class="n">A</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">det</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">A</span><span class="p">))))</span></div>
+
+
+
+<div class="viewcode-block" id="map_quadrature">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.map_quadrature">[docs]</a>
+<span class="k">def</span> <span class="nf">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">source_cell</span><span class="p">,</span> <span class="n">target_cell</span><span class="p">,</span> <span class="n">jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map quadrature points and weights defined on source_cell to target_cell.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">while</span> <span class="n">source_cell</span><span class="o">.</span><span class="n">get_parent</span><span class="p">():</span>
+        <span class="n">source_cell</span> <span class="o">=</span> <span class="n">source_cell</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span>
+    <span class="n">A</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">make_affine_mapping</span><span class="p">(</span><span class="n">source_cell</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">(),</span>
+                                                 <span class="n">target_cell</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">())</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts_ref</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">pts_ref</span> <span class="o">=</span> <span class="n">pts_ref</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">scale</span> <span class="o">=</span> <span class="n">pseudo_determinant</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">pts</span><span class="p">)</span>
+    <span class="n">wts</span> <span class="o">=</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">wts_ref</span>
+
+    <span class="c1"># return immutable types</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">pts</span><span class="p">))</span>
+    <span class="n">wts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">wts</span><span class="o">.</span><span class="n">flat</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">jacobian</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="n">A</span>
+    <span class="k">return</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span></div>
+
+
+
+<div class="viewcode-block" id="QuadratureRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.QuadratureRule">[docs]</a>
+<span class="k">class</span> <span class="nc">QuadratureRule</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;General class that models integration over a reference element</span>
+<span class="sd">    as the weighted sum of a function evaluated at a set of points.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wts</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Have </span><span class="si">%d</span><span class="s2"> weights, but </span><span class="si">%d</span><span class="s2"> points&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">wts</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts</span><span class="p">)))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_el</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pts</span> <span class="o">=</span> <span class="n">pts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wts</span> <span class="o">=</span> <span class="n">wts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_intrinsic_orientation_permutation_map_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="p">)</span>
+
+<div class="viewcode-block" id="QuadratureRule.get_points">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.QuadratureRule.get_points">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pts</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuadratureRule.get_weights">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.QuadratureRule.get_weights">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">wts</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuadratureRule.integrate">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.QuadratureRule.integrate">[docs]</a>
+    <span class="k">def</span> <span class="nf">integrate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">w</span> <span class="o">*</span> <span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pts</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">wts</span><span class="p">))</span></div>
+
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">extrinsic_orientation_permutation_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;A map from extrinsic orientations to corresponding axis permutation matrices.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        result[eo] gives the physical axis-reference axis permutation matrix corresponding to</span>
+<span class="sd">        eo (extrinsic orientation).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">extrinsic_orientation_permutation_map</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">intrinsic_orientation_permutation_map_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        result[axis][io] gives the physical point-reference point permutation array corresponding to</span>
+<span class="sd">        io (intrinsic orientation) on ``axis``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">m</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_intrinsic_orientation_permutation_map_tuple</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Must set _intrinsic_orientation_permutation_map_tuple&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_intrinsic_orientation_permutation_map_tuple</span></div>
+
+
+
+<div class="viewcode-block" id="GaussJacobiQuadratureLineRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.GaussJacobiQuadratureLineRule">[docs]</a>
+<span class="k">class</span> <span class="nc">GaussJacobiQuadratureLineRule</span><span class="p">(</span><span class="n">QuadratureRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gauss-Jacobi quadature rule determined by Jacobi weights a and b</span>
+<span class="sd">    using m roots of m:th order Jacobi polynomial.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">a</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">b</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+        <span class="n">Ref1</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">DefaultLine</span><span class="p">()</span>
+        <span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span> <span class="o">=</span> <span class="n">gaussjacobi</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span>
+        <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">Ref1</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">QuadratureRule</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span>
+        <span class="c1"># Set _intrinsic_orientation_permutation_map_tuple.</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">factorial</span><span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">m</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">io</span><span class="p">,</span> <span class="n">perm</span> <span class="ow">in</span> <span class="n">make_entity_permutations_simplex</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">a</span><span class="p">[</span><span class="n">io</span><span class="p">,</span> <span class="n">perm</span><span class="p">]</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_intrinsic_orientation_permutation_map_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="GaussLobattoLegendreQuadratureLineRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.GaussLobattoLegendreQuadratureLineRule">[docs]</a>
+<span class="k">class</span> <span class="nc">GaussLobattoLegendreQuadratureLineRule</span><span class="p">(</span><span class="n">QuadratureRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gauss-Lobatto-Legendre quadrature rule on the interval.</span>
+
+<span class="sd">    The quadrature rule uses m points for a degree of precision of 2m-3.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">m</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Gauss-Labotto-Legendre quadrature invalid for fewer than 2 points&quot;</span><span class="p">)</span>
+        <span class="n">Ref1</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">DefaultLine</span><span class="p">()</span>
+        <span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span> <span class="o">=</span> <span class="n">lobattogaussjacobi</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">Ref1</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">QuadratureRule</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="GaussLegendreQuadratureLineRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.GaussLegendreQuadratureLineRule">[docs]</a>
+<span class="k">class</span> <span class="nc">GaussLegendreQuadratureLineRule</span><span class="p">(</span><span class="n">GaussJacobiQuadratureLineRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gauss--Legendre quadrature rule on the interval.</span>
+
+<span class="sd">    The quadrature rule uses m points for a degree of precision of 2m-1.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="RadauQuadratureLineRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.RadauQuadratureLineRule">[docs]</a>
+<span class="k">class</span> <span class="nc">RadauQuadratureLineRule</span><span class="p">(</span><span class="n">QuadratureRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gauss--Radau quadrature rule on the interval.</span>
+
+<span class="sd">    The quadrature rule uses m points for a degree of precision of 2m-1.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">m</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Gauss-Radau quadrature invalid for fewer than 1 points&quot;</span><span class="p">)</span>
+
+        <span class="n">right</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">right</span><span class="p">)</span>
+        <span class="n">x0</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">[</span><span class="n">right</span><span class="p">]</span>
+        <span class="n">volume</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">m</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Make the interior points and weights</span>
+            <span class="n">rule</span> <span class="o">=</span> <span class="n">GaussJacobiQuadratureLineRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="n">right</span><span class="p">)</span>
+            <span class="c1"># Remove the hat weight from the quadrature weights</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="p">,))</span>
+            <span class="n">hat</span> <span class="o">=</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">/</span> <span class="n">volume</span><span class="p">)</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">x0</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="p">)</span>
+            <span class="n">wts</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span> <span class="o">/</span> <span class="n">hat</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="n">rule</span><span class="o">.</span><span class="n">pts</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Special case for lowest order.</span>
+            <span class="n">wts</span> <span class="o">=</span> <span class="p">()</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="p">()</span>
+
+        <span class="c1"># Get the weight at the endpoint via sum(ws) == volume</span>
+        <span class="n">w0</span> <span class="o">=</span> <span class="n">volume</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="n">wts</span><span class="p">)</span>
+        <span class="n">xs</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">pts</span><span class="p">,</span> <span class="n">x0</span><span class="p">)</span> <span class="k">if</span> <span class="n">right</span> <span class="k">else</span> <span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="o">*</span><span class="n">pts</span><span class="p">)</span>
+        <span class="n">ws</span> <span class="o">=</span> <span class="p">(</span><span class="o">*</span><span class="n">wts</span><span class="p">,</span> <span class="n">w0</span><span class="p">)</span> <span class="k">if</span> <span class="n">right</span> <span class="k">else</span> <span class="p">(</span><span class="n">w0</span><span class="p">,</span> <span class="o">*</span><span class="n">wts</span><span class="p">)</span>
+
+        <span class="n">QuadratureRule</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">ws</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="CollapsedQuadratureSimplexRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.CollapsedQuadratureSimplexRule">[docs]</a>
+<span class="k">class</span> <span class="nc">CollapsedQuadratureSimplexRule</span><span class="p">(</span><span class="n">QuadratureRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the collapsed quadrature rules defined in</span>
+<span class="sd">    Karniadakis &amp; Sherwin by mapping products of Gauss-Jacobi rules</span>
+<span class="sd">    from the hypercube to the simplex.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">):</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">Ref1</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">default_simplex</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
+        <span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span> <span class="o">=</span> <span class="n">simplexgausslegendre</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+        <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">Ref1</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">QuadratureRule</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="CollapsedQuadratureTriangleRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.CollapsedQuadratureTriangleRule">[docs]</a>
+<span class="k">class</span> <span class="nc">CollapsedQuadratureTriangleRule</span><span class="p">(</span><span class="n">CollapsedQuadratureSimplexRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the collapsed quadrature rules defined in</span>
+<span class="sd">    Karniadakis &amp; Sherwin by mapping products of Gauss-Jacobi rules</span>
+<span class="sd">    from the square to the triangle.&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="CollapsedQuadratureTetrahedronRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.CollapsedQuadratureTetrahedronRule">[docs]</a>
+<span class="k">class</span> <span class="nc">CollapsedQuadratureTetrahedronRule</span><span class="p">(</span><span class="n">CollapsedQuadratureSimplexRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implements the collapsed quadrature rules defined in</span>
+<span class="sd">    Karniadakis &amp; Sherwin by mapping products of Gauss-Jacobi rules</span>
+<span class="sd">    from the cube to the tetrahedron.&quot;&quot;&quot;</span>
+    <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="FacetQuadratureRule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.FacetQuadratureRule">[docs]</a>
+<span class="k">class</span> <span class="nc">FacetQuadratureRule</span><span class="p">(</span><span class="n">QuadratureRule</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A quadrature rule on a facet mapped from a reference quadrature rule.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">):</span>
+        <span class="c1"># Construct the facet of interest</span>
+        <span class="n">facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">)</span>
+        <span class="n">facet_topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">entity_dim</span><span class="p">][</span><span class="n">entity_id</span><span class="p">]</span>
+        <span class="n">facet</span><span class="o">.</span><span class="n">vertices</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices_of_subcomplex</span><span class="p">(</span><span class="n">facet_topology</span><span class="p">)</span>
+
+        <span class="c1"># Map reference points and weights on the appropriate facet</span>
+        <span class="n">pts_ref</span> <span class="o">=</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
+        <span class="n">wts_ref</span> <span class="o">=</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+        <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="n">J</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">jacobian</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Initialize super class with new points and weights</span>
+        <span class="n">QuadratureRule</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_J</span> <span class="o">=</span> <span class="n">J</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reference_rule</span> <span class="o">=</span> <span class="n">Q_ref</span>
+
+<div class="viewcode-block" id="FacetQuadratureRule.reference_rule">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.FacetQuadratureRule.reference_rule">[docs]</a>
+    <span class="k">def</span> <span class="nf">reference_rule</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reference_rule</span></div>
+
+
+<div class="viewcode-block" id="FacetQuadratureRule.jacobian">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.FacetQuadratureRule.jacobian">[docs]</a>
+    <span class="k">def</span> <span class="nf">jacobian</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_J</span></div>
+
+
+<div class="viewcode-block" id="FacetQuadratureRule.jacobian_determinant">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.FacetQuadratureRule.jacobian_determinant">[docs]</a>
+    <span class="k">def</span> <span class="nf">jacobian_determinant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">pseudo_determinant</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_J</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="make_quadrature">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.make_quadrature">[docs]</a>
+<span class="k">def</span> <span class="nf">make_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the collapsed quadrature rule using m points per</span>
+<span class="sd">    direction on the given reference element. In the tensor product</span>
+<span class="sd">    case, m is a tuple.&quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="n">min_m</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">min_m</span> <span class="o">=</span> <span class="n">m</span>
+
+    <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Expecting at least one (not </span><span class="si">%d</span><span class="s2">) quadrature point per direction&quot;</span> <span class="o">%</span> <span class="n">min_m</span>
+    <span class="k">assert</span> <span class="p">(</span><span class="n">min_m</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">),</span> <span class="n">msg</span>
+
+    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">POINT</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="p">[()],</span> <span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">LINE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">GaussJacobiQuadratureLineRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">TRIANGLE</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">CollapsedQuadratureTriangleRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">TETRAHEDRON</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">CollapsedQuadratureTetrahedronRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">QUADRILATERAL</span><span class="p">:</span>
+        <span class="n">line_rule</span> <span class="o">=</span> <span class="n">GaussJacobiQuadratureLineRule</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">m</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">make_tensor_product_quadrature</span><span class="p">(</span><span class="n">line_rule</span><span class="p">,</span> <span class="n">line_rule</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">HEXAHEDRON</span><span class="p">:</span>
+        <span class="n">line_rule</span> <span class="o">=</span> <span class="n">GaussJacobiQuadratureLineRule</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">m</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">make_tensor_product_quadrature</span><span class="p">(</span><span class="n">line_rule</span><span class="p">,</span> <span class="n">line_rule</span><span class="p">,</span> <span class="n">line_rule</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unable to make quadrature for cell: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">ref_el</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="make_tensor_product_quadrature">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.make_tensor_product_quadrature">[docs]</a>
+<span class="k">def</span> <span class="nf">make_tensor_product_quadrature</span><span class="p">(</span><span class="o">*</span><span class="n">quad_rules</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the quadrature rule for a TensorProduct cell, by combining</span>
+<span class="sd">    the quadrature rules of the components.&quot;&quot;&quot;</span>
+    <span class="n">ref_el</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">TensorProductCell</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">q</span><span class="o">.</span><span class="n">ref_el</span>
+                                                   <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">quad_rules</span><span class="p">])</span>
+    <span class="c1"># Coordinates are &quot;concatenated&quot;, weights are multiplied</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">pt_tuple</span><span class="p">))</span>
+           <span class="k">for</span> <span class="n">pt_tuple</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">q</span><span class="o">.</span><span class="n">pts</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">quad_rules</span><span class="p">])]</span>
+    <span class="n">wts</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">wt_tuple</span><span class="p">)</span>
+           <span class="k">for</span> <span class="n">wt_tuple</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">q</span><span class="o">.</span><span class="n">wts</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">quad_rules</span><span class="p">])]</span>
+    <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.quadrature</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

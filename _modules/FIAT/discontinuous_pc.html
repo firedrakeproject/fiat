@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.discontinuous_pc &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.discontinuous_pc</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.discontinuous_pc</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2018 Cyrus Cheng (Imperial College London)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="c1">#</span>
+<span class="c1"># Modified by David A. Ham (david.ham@imperial.ac.uk), 2018</span>
+
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="p">(</span><span class="n">Point</span><span class="p">,</span>
+                                    <span class="n">DefaultLine</span><span class="p">,</span>
+                                    <span class="n">UFCInterval</span><span class="p">,</span>
+                                    <span class="n">UFCQuadrilateral</span><span class="p">,</span>
+                                    <span class="n">UFCHexahedron</span><span class="p">,</span>
+                                    <span class="n">UFCTriangle</span><span class="p">,</span>
+                                    <span class="n">UFCTetrahedron</span><span class="p">,</span>
+                                    <span class="n">make_affine_mapping</span><span class="p">,</span>
+                                    <span class="n">flatten_reference_cube</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">FIAT.P0</span> <span class="kn">import</span> <span class="n">P0Dual</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="n">hypercube_simplex_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">Point</span><span class="p">():</span> <span class="n">Point</span><span class="p">(),</span>
+                         <span class="n">DefaultLine</span><span class="p">():</span> <span class="n">DefaultLine</span><span class="p">(),</span>
+                         <span class="n">UFCInterval</span><span class="p">():</span> <span class="n">UFCInterval</span><span class="p">(),</span>
+                         <span class="n">UFCQuadrilateral</span><span class="p">():</span> <span class="n">UFCTriangle</span><span class="p">(),</span>
+                         <span class="n">UFCHexahedron</span><span class="p">():</span> <span class="n">UFCTetrahedron</span><span class="p">()}</span>
+
+
+<div class="viewcode-block" id="DPC0">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_pc.DPC0">[docs]</a>
+<span class="k">class</span> <span class="nc">DPC0</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
+        <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">hypercube_simplex_map</span><span class="p">[</span><span class="n">flat_el</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">P0Dual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="c1"># Implement entity_permutations when we handle that for HigherOrderDPC.</span>
+        <span class="c1"># Currently, orientation_tuples in P0Dual(ref_el).entity_permutations</span>
+        <span class="c1"># are missing the extrinsic orientation entry (which should always be 0).</span>
+        <span class="c1"># We should probably just change o_tuple -&gt; (0, ) + o_tuple for non-</span>
+        <span class="c1"># tensorproduct elements for consistency.</span>
+        <span class="n">dual</span><span class="o">.</span><span class="n">entity_permutations</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">degree</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>  <span class="c1"># n-form</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="o">=</span><span class="n">poly_set</span><span class="p">,</span>
+                         <span class="n">dual</span><span class="o">=</span><span class="n">dual</span><span class="p">,</span>
+                         <span class="n">order</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span>
+                         <span class="n">ref_complex</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span>
+                         <span class="n">formdegree</span><span class="o">=</span><span class="n">formdegree</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DPCDualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_pc.DPCDualSet">[docs]</a>
+<span class="k">class</span> <span class="nc">DPCDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for DPC elements.  This class works for</span>
+<span class="sd">    hypercubes of any dimension.  Nodes are point evaluation at</span>
+<span class="sd">    equispaced points.  This is the discontinuous version where</span>
+<span class="sd">    all nodes are topologically associated with the cell itself&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">flat_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Change coordinates here.</span>
+        <span class="c1"># Vertices of the simplex corresponding to the reference element.</span>
+        <span class="n">v_simplex</span> <span class="o">=</span> <span class="n">hypercube_simplex_map</span><span class="p">[</span><span class="n">flat_el</span><span class="p">]</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+        <span class="c1"># Vertices of the reference element.</span>
+        <span class="n">v_hypercube</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+        <span class="c1"># For the mapping, first two vertices are unchanged in all dimensions.</span>
+        <span class="n">v_</span> <span class="o">=</span> <span class="p">[</span><span class="n">v_hypercube</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">v_hypercube</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span><span class="o">*</span><span class="nb">len</span><span class="p">(</span><span class="n">v_hypercube</span><span class="p">))]]</span>
+
+        <span class="c1"># For dimension 1 upwards,</span>
+        <span class="c1"># take the next vertex and map it to the midpoint of the edge/face it belongs to, and shares</span>
+        <span class="c1"># with no other points.</span>
+        <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()):</span>
+            <span class="n">v_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">v_hypercube</span><span class="p">[</span><span class="n">flat_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="n">d</span><span class="p">]</span> <span class="o">+</span>
+                            <span class="n">np</span><span class="o">.</span><span class="n">average</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">v_hypercube</span><span class="p">[::</span><span class="mi">2</span><span class="p">]),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">))))</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">make_affine_mapping</span><span class="p">(</span><span class="n">v_simplex</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v_</span><span class="p">))</span>  <span class="c1"># Make affine mapping to be used later.</span>
+
+        <span class="c1"># make nodes by getting points</span>
+        <span class="c1"># need to do this dimension-by-dimension, facet-by-facet</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">hypercube_simplex_map</span><span class="p">[</span><span class="n">flat_el</span><span class="p">]</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+
+        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">pts_cur</span> <span class="o">=</span> <span class="n">hypercube_simplex_map</span><span class="p">[</span><span class="n">flat_el</span><span class="p">]</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+                <span class="n">pts_cur</span> <span class="o">=</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">matmul</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">+</span> <span class="n">b</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">pts_cur</span><span class="p">]</span>
+                <span class="n">nodes_cur</span> <span class="o">=</span> <span class="p">[</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">flat_el</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+                             <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">pts_cur</span><span class="p">]</span>
+                <span class="n">nnodes_cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes_cur</span><span class="p">)</span>
+                <span class="n">nodes</span> <span class="o">+=</span> <span class="n">nodes_cur</span>
+                <span class="n">cur</span> <span class="o">+=</span> <span class="n">nnodes_cur</span>
+
+        <span class="n">cube_topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">cube_topology</span><span class="p">):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">cube_topology</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="HigherOrderDPC">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_pc.HigherOrderDPC">[docs]</a>
+<span class="k">class</span> <span class="nc">HigherOrderDPC</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The DPC finite element.  It is what it is.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">hypercube_simplex_map</span><span class="p">[</span><span class="n">flat_el</span><span class="p">],</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">DPCDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">flat_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>  <span class="c1"># n-form</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="o">=</span><span class="n">poly_set</span><span class="p">,</span>
+                         <span class="n">dual</span><span class="o">=</span><span class="n">dual</span><span class="p">,</span>
+                         <span class="n">order</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span>
+                         <span class="n">ref_complex</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span>
+                         <span class="n">formdegree</span><span class="o">=</span><span class="n">formdegree</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DPC">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_pc.DPC">[docs]</a>
+<span class="k">def</span> <span class="nf">DPC</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">DPC0</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">HigherOrderDPC</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.discontinuous_pc</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>

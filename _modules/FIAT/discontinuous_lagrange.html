@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.discontinuous_lagrange &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=e952a2db"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.discontinuous_lagrange</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.discontinuous_lagrange</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2008 Robert C. Kirby (Texas Tech University)</span>
+<span class="c1"># Modified by Andrew T. T. McRae (Imperial College London)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span><span class="p">,</span> <span class="n">P0</span>
+<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">LINE</span><span class="p">,</span> <span class="n">make_lattice</span>
+<span class="kn">from</span> <span class="nn">FIAT.orientation_utils</span> <span class="kn">import</span> <span class="n">make_entity_permutations_simplex</span>
+<span class="kn">from</span> <span class="nn">FIAT.barycentric_interpolation</span> <span class="kn">import</span> <span class="n">LagrangePolynomialSet</span><span class="p">,</span> <span class="n">get_lagrange_points</span>
+<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span> <span class="nn">FIAT.check_format_variant</span> <span class="kn">import</span> <span class="n">parse_lagrange_variant</span>
+
+
+<div class="viewcode-block" id="make_entity_permutations">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.make_entity_permutations">[docs]</a>
+<span class="k">def</span> <span class="nf">make_entity_permutations</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">npoints</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">npoints</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">o</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">factorial</span><span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))}</span>
+    <span class="c1"># DG nodes are numbered, in order of significance,</span>
+    <span class="c1"># - by g0: entity dim (vertices first, then edges, then ...)</span>
+    <span class="c1"># - by g1: entity ids (DoFs on entities of smaller ids first)</span>
+    <span class="c1"># - lexicographically as in CG</span>
+    <span class="c1">#</span>
+    <span class="c1"># Example:</span>
+    <span class="c1"># dim = 2, degree = 3 (npoints = degree + 1)</span>
+    <span class="c1">#</span>
+    <span class="c1">#     facet ids     Lexicographic  DG (degree = 3)</span>
+    <span class="c1">#    +              DoF numbering  DoF numbering</span>
+    <span class="c1">#    | \            9              2</span>
+    <span class="c1">#    |   \  0       7 8            6 4</span>
+    <span class="c1">#  1 |     \        4 5 6          5 9 3</span>
+    <span class="c1">#    |       \      0 1 2 3        0 7 8 1</span>
+    <span class="c1">#    +--------+</span>
+    <span class="c1">#        2</span>
+    <span class="c1"># where DG degrees of freedom are numbered to geometrically</span>
+    <span class="c1"># coincide with CG degrees of freedom.</span>
+    <span class="c1">#</span>
+    <span class="c1"># In the below we will show example outputs corresponding to</span>
+    <span class="c1"># the above example.</span>
+
+    <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">mis</span><span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">npoints</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="c1"># &gt;&gt;&gt; a</span>
+    <span class="c1"># [[0, 0, 3],</span>
+    <span class="c1">#  [0, 1, 2],   # (3,0,0)</span>
+    <span class="c1">#  [0, 2, 1],   #</span>
+    <span class="c1">#  [0, 3, 0],   # (2,0,1)(2,1,0)</span>
+    <span class="c1">#  [1, 0, 2],   #</span>
+    <span class="c1">#  [1, 1, 1],   # (1,0,2)(1,1,1)(1,2,0)</span>
+    <span class="c1">#  [1, 2, 0],   #</span>
+    <span class="c1">#  [2, 0, 1],   # (0,0,3)(0,1,2)(0,2,1)(0,3,0)</span>
+    <span class="c1">#  [2, 1, 0],   #</span>
+    <span class="c1">#  [3, 0, 0]]   # Lattice points that a represents</span>
+    <span class="c1"># a.shape[0] = number of DoFs</span>
+    <span class="c1"># a.shape[1] = dim + 1</span>
+    <span class="c1"># sum of each row = degree (bary centric lattice coordinates)</span>
+
+    <span class="c1"># Flip along the axis 1 for convenience.</span>
+    <span class="c1"># This would make: np.lexsort(a.transpose()) = [0, 1, 2, ..., 9].</span>
+    <span class="n">a</span> <span class="o">=</span> <span class="n">a</span><span class="p">[:,</span> <span class="p">::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">index_perms</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">permutations</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)))</span>
+    <span class="c1"># &gt;&gt;&gt; index_perms</span>
+    <span class="c1"># [[0, 1, 2],</span>
+    <span class="c1">#  [0, 2, 1],</span>
+    <span class="c1">#  [1, 0, 2],</span>
+    <span class="c1">#  [1, 2, 0],</span>
+    <span class="c1">#  [2, 0, 1],</span>
+    <span class="c1">#  [2, 1, 0]]</span>
+
+    <span class="c1"># First separate by entity dimension.</span>
+    <span class="n">g0</span> <span class="o">=</span> <span class="n">dim</span> <span class="o">-</span> <span class="p">(</span><span class="n">a</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># &gt;&gt;&gt; g0</span>
+    <span class="c1"># [ 0, 1, 1, 0, 1, 2, 1, 1, 1, 0]  # 0 for vertices</span>
+    <span class="c1">#                                  # 1 for edges</span>
+    <span class="c1">#                                  # 2 for cell</span>
+
+    <span class="c1"># Then separate by entity number.</span>
+    <span class="n">g1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">g0</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">on_facet_d</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[:,</span> <span class="n">d</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+        <span class="n">g1</span> <span class="o">+=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">on_facet_d</span>
+    <span class="c1"># The above logic is consistent with the FIAT entity numbering</span>
+    <span class="c1"># convention (&quot;entities that are not incident to vertex 0 are</span>
+    <span class="c1"># numbered first, then ...&quot;), but vertices are not numbered using</span>
+    <span class="c1"># the same logic in FIAT, so we need to fix:</span>
+    <span class="n">g1</span><span class="p">[</span><span class="n">g0</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">g1</span><span class="p">[</span><span class="n">g0</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="c1"># &gt;&gt;&gt; g1</span>
+    <span class="c1"># [-3, 2, 2,-2, 1, 0, 0, 1, 0,-1]</span>
+
+    <span class="c1"># Compoute the map from the DG DoFs to the lattice points on the cell.</span>
+    <span class="c1"># For each entity dimension, DoFs that have smaller numbers in g1</span>
+    <span class="c1"># will be assigned smaller DG node numbers.</span>
+    <span class="c1"># Order first by g0, then by g1, and finally by a (lexicographically as in CG)</span>
+    <span class="n">g0</span> <span class="o">=</span> <span class="n">g0</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">g1</span> <span class="o">=</span> <span class="n">g1</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="n">dg_to_lattice</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">lexsort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">a</span><span class="p">,</span> <span class="n">g1</span><span class="p">,</span> <span class="n">g0</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)))</span>
+    <span class="c1"># &gt;&gt;&gt; dg_to_lattice</span>
+    <span class="c1"># [ 0, 3, 9, 6, 8, 4, 7, 1, 2, 5]</span>
+
+    <span class="c1"># Compute the inverse map.</span>
+    <span class="n">lattice_to_dg</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">dg_to_lattice</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">im</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dg_to_lattice</span><span class="p">):</span>
+        <span class="n">lattice_to_dg</span><span class="p">[</span><span class="n">im</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+    <span class="c1"># &gt;&gt;&gt; lattice_to_dg</span>
+    <span class="c1"># [ 0, 7, 8, 1, 5, 9, 3, 6, 4, 2]</span>
+    <span class="n">perms</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">index_perm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">index_perms</span><span class="p">):</span>
+        <span class="c1"># First compute permutation in lattice point numbers in lattice point order (as we do for CG cell DoFs)</span>
+        <span class="n">perm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">lexsort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">a</span><span class="p">[:,</span> <span class="n">index_perm</span><span class="p">]))</span>
+        <span class="c1"># Then convert to DG DoF numbers in DG DoF order:</span>
+        <span class="c1"># lattice_to_dg[perm]                -&gt; convert lattice point numbers to DG DoF numbers</span>
+        <span class="c1"># lattice_to_dg[perm][dg_to_lattice] -&gt; reorder for DG DoF order</span>
+        <span class="c1">#</span>
+        <span class="c1"># Example:</span>
+        <span class="c1"># Under one CW rotation, a DG element on a physical cell</span>
+        <span class="c1"># is mapped to the FIAT reference as:</span>
+        <span class="c1">#</span>
+        <span class="c1"># 0</span>
+        <span class="c1"># 7 5</span>
+        <span class="c1"># 8 9 6</span>
+        <span class="c1"># 1 3 4 2</span>
+        <span class="c1">#</span>
+        <span class="c1"># Under the same transformation, the lattice points would</span>
+        <span class="c1"># be mapped as:</span>
+        <span class="c1">#</span>
+        <span class="c1"># 0</span>
+        <span class="c1"># 1 4</span>
+        <span class="c1"># 2 5 7</span>
+        <span class="c1"># 3 6 8 9</span>
+        <span class="c1">#</span>
+        <span class="c1"># In this case we will have:</span>
+        <span class="c1">#</span>
+        <span class="c1"># perm                               = [3, 6, 8, 9, 2, 5, 7, 1, 4, 0]</span>
+        <span class="c1"># lattice_to_dg[perm]                = [1, 3, 4, 2, 8, 9, 6, 7, 5, 0]</span>
+        <span class="c1"># lattice_to_dg[perm][dg_to_lattice] = [1, 2, 0, 6, 5, 8, 7, 3, 4, 9]</span>
+        <span class="c1">#</span>
+        <span class="c1"># Note:</span>
+        <span class="c1"># Sane thing to do is to just number DG dofs on a lattice.</span>
+        <span class="n">perm</span> <span class="o">=</span> <span class="n">lattice_to_dg</span><span class="p">[</span><span class="n">perm</span><span class="p">][</span><span class="n">dg_to_lattice</span><span class="p">]</span>
+        <span class="n">perms</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">=</span> <span class="n">perm</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">perms</span></div>
+
+
+
+<div class="viewcode-block" id="BrokenLagrangeDualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.BrokenLagrangeDualSet">[docs]</a>
+<span class="k">class</span> <span class="nc">BrokenLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Lagrange elements.  This class works for</span>
+<span class="sd">    simplices of any dimension.  Nodes are point evaluation at</span>
+<span class="sd">    equispaced points.  This is the broken version where</span>
+<span class="sd">    all nodes are topologically associated with the cell itself&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># make nodes by getting points</span>
+        <span class="c1"># need to do this dimension-by-dimension, facet-by-facet</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">entity_permutations</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">perms</span> <span class="o">=</span> <span class="n">make_entity_permutations</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">top</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">pts_cur</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">point_variant</span><span class="p">)</span>
+                <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">pts_cur</span><span class="p">)</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">entity_permutations</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">perms</span>
+        <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DiscontinuousLagrangeDualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.DiscontinuousLagrangeDualSet">[docs]</a>
+<span class="k">class</span> <span class="nc">DiscontinuousLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for discontinuous elements with nodes at recursively-defined points.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">):</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">entity_permutations</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">perms</span> <span class="o">=</span> <span class="n">make_entity_permutations_simplex</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="n">sd</span> <span class="k">else</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">entity_permutations</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">perms</span>
+
+        <span class="c1"># make nodes by getting points on the interior facets</span>
+        <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]:</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">pts</span> <span class="o">=</span> <span class="n">make_lattice</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices_of_subcomplex</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">entity</span><span class="p">]),</span>
+                               <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">point_variant</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">pts</span><span class="p">)</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="DiscontinuousLagrange">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.DiscontinuousLagrange">[docs]</a>
+<span class="k">class</span> <span class="nc">DiscontinuousLagrange</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The discontinuous Lagrange finite element.</span>
+
+<span class="sd">    :arg ref_el:  The reference element, which could be a standard FIAT simplex or a split complex</span>
+<span class="sd">    :arg degree:  The polynomial degree</span>
+<span class="sd">    :arg variant: A comma-separated string that may specify the type of point distribution</span>
+<span class="sd">                  and the splitting strategy if a macro element is desired.</span>
+<span class="sd">                  Either option may be omitted.  The default point type is equispaced</span>
+<span class="sd">                  and the default splitting strategy is None.</span>
+<span class="sd">                  Example: variant=&#39;gl&#39; gives a standard unsplit point distribution with</span>
+<span class="sd">                              spectral points.</span>
+<span class="sd">                           variant=&#39;equispaced,Iso(2)&#39; with degree=1 gives the P2:P1 iso element.</span>
+<span class="sd">                           variant=&#39;Alfeld&#39; can be used to obtain a barycentrically refined</span>
+<span class="sd">                              macroelement for Scott-Vogelius.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">splitting</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">discontinuous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
+                <span class="c1"># FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()</span>
+                <span class="k">return</span> <span class="n">P0</span><span class="o">.</span><span class="n">P0</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+        <span class="n">splitting</span><span class="p">,</span> <span class="n">point_variant</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">discontinuous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ref_el</span> <span class="o">=</span> <span class="n">splitting</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">point_variant</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;equispaced&quot;</span><span class="p">,</span> <span class="s2">&quot;gll&quot;</span><span class="p">,</span> <span class="s2">&quot;lgc&quot;</span><span class="p">):</span>
+            <span class="n">dual</span> <span class="o">=</span> <span class="n">BrokenLagrangeDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="n">point_variant</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">dual</span> <span class="o">=</span> <span class="n">DiscontinuousLagrangeDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="n">point_variant</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">LINE</span><span class="p">:</span>
+            <span class="c1"># In 1D we can use the primal basis as the expansion set,</span>
+            <span class="c1"># avoiding any round-off coming from a basis transformation</span>
+            <span class="n">points</span> <span class="o">=</span> <span class="n">get_lagrange_points</span><span class="p">(</span><span class="n">dual</span><span class="p">)</span>
+            <span class="n">poly_set</span> <span class="o">=</span> <span class="n">LagrangePolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">points</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>  <span class="c1"># n-form</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.discontinuous_lagrange</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2024, FEniCS Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    </div>
+  </body>
+</html>
