@@ -134,6 +134,10 @@ register_element("Guzman-Neilan 2nd kind H1", "GN2", 1, H1, "contravariant Piola
 register_element("Guzman-Neilan H1(div)", "GNH1div", 1, H1, "contravariant Piola", (2, None), simplices[1:])
 register_element("Guzman-Neilan Bubble", "GNB", 1, H1, "contravariant Piola", (None, None), simplices[1:])
 
+register_element("Stokes", "Stokes", 1, H1, "contravariant Piola", (None, None), simplices)
+register_element("Macro Stokes", "MacroStokes", 1, H1, "contravariant Piola", (None, None), simplices)
+register_element("Div Stokes", "DivStokes", 0, L2, "identity", (None, None), simplices)
+
 # Special elements
 register_element("Boundary Quadrature", "BQ", 0, L2, "identity", (0, None), any_cell)
 register_element("Bubble", "B", 0, H1, "identity", (2, None), simplices)
