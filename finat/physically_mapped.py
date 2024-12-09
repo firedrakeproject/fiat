@@ -268,15 +268,13 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         assert coordinate_mapping is not None
 
         M = self.basis_transformation(coordinate_mapping)
-        M, = gem.optimise.constant_fold_zero((M,))
+        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
+               for i in range(M.shape[0])]
 
         def matvec(table):
-            table, = gem.optimise.constant_fold_zero((table,))
-            i, j = gem.indices(2)
-            value_indices = self.get_value_indices()
-            table = gem.Indexed(table, (j, ) + value_indices)
-            val = gem.ComponentTensor(gem.IndexSum(M[i, j]*table, (j,)), (i,) + value_indices)
-            # Eliminate zeros
+            table = [gem.partial_indexed(table, (j,)) for j in range(M.shape[1])]
+            expressions = [sum(M.array[i, j] * table[j] for j in js) for i, js in enumerate(csr)]
+            val = gem.ListTensor(expressions)
             return gem.optimise.aggressive_unroll(val)
 
         result = super().basis_evaluation(order, ps, entity=entity)
