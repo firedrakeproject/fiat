@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fenics-fiat"
+version = "2024.0.0"
+dependencies = [
+  "numpy>=1.16",
+  "recursivenodes",
+  "scipy",
+  "symengine",
+  "sympy",
+  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git",
+]
+requires-python = ">=3.10"
+authors = [
+  {name = "Robert C. Kirby et al.", email = "fenics-dev@googlegroups.com"},
+  {name = "Imperial College London and others", email = "david.ham@imperial.ac.uk"},
+]
+description = "FInite element Automatic Tabulator"
+readme = "README.rst"
+classifiers = [
+  "Programming Language :: Python",
+  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
+]
+
+[project.urls]
+Repository = "https://github.com/firedrakeproject/fiat.git"
+
+[project.optional-dependencies]
+doc = [
+  "setuptools",  # for pkg_resources
+  "sphinx",
+]
+test = ["pytest"]
+
+[tool.setuptools]
+packages = ["FIAT", "finat", "finat.ufl", "gem"]

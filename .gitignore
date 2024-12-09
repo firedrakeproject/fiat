@@ -8,4 +8,8 @@
 /doc/sphinx/source/api-doc
 release/
 
-/doc/sphinx/source/_build/
+/docs/build/
+/docs/source/FIAT.rst
+/docs/source/finat.rst
+/docs/source/finat.ufl.rst
+/docs/source/gem.rst
