@@ -113,10 +113,6 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
     def entity_dofs(self):
         return self._entity_dofs
 
-    @property
-    def index_shape(self):
-        return (self._space_dimension,)
-
     def space_dimension(self):
         return self._space_dimension
 

@@ -969,7 +969,7 @@ class Delta(Scalar, Terminal):
 
         # Fixed indices
         if isinstance(i, int) and isinstance(j, int):
-            return Literal(int(i == j))
+            return one if i == j else Zero()
 
         self = super(Delta, cls).__new__(cls)
         self.i = i
