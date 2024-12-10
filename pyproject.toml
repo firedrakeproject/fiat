@@ -37,3 +37,6 @@ test = ["pytest"]
 
 [tool.setuptools]
 packages = ["FIAT", "finat", "finat.ufl", "gem"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"

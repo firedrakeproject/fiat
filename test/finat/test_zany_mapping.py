@@ -4,8 +4,6 @@ import numpy as np
 import pytest
 from gem.interpreter import evaluate
 
-from fiat_mapping import MyMapping
-
 
 def make_unisolvent_points(element, interior=False):
     degree = element.degree()
@@ -23,7 +21,9 @@ def make_unisolvent_points(element, interior=False):
     return pts
 
 
-def check_zany_mapping(element, ref_cell, phys_cell, *args, **kwargs):
+def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
+    phys_cell = ref_to_phys.phys_cell
+    ref_cell = ref_to_phys.ref_cell
     phys_element = element(phys_cell, *args, **kwargs).fiat_equivalent
     finat_element = element(ref_cell, *args, **kwargs)
 
@@ -65,9 +65,8 @@ def check_zany_mapping(element, ref_cell, phys_cell, *args, **kwargs):
     # Zany map the results
     num_bfs = phys_element.space_dimension()
     num_dofs = finat_element.space_dimension()
-    mappng = MyMapping(ref_cell, phys_cell)
     try:
-        Mgem = finat_element.basis_transformation(mappng)
+        Mgem = finat_element.basis_transformation(ref_to_phys)
         M = evaluate([Mgem])[0].arr
         ref_vals_zany = np.tensordot(M, ref_vals_piola, (-1, 0))
     except AttributeError:
@@ -86,30 +85,13 @@ def check_zany_mapping(element, ref_cell, phys_cell, *args, **kwargs):
     assert np.allclose(ref_vals_zany, phys_vals[:num_dofs])
 
 
-@pytest.fixture
-def ref_el(request):
-    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
-    return K
-
-
-@pytest.fixture
-def phys_el(request):
-    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
-    K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
-    K[3].vertices = ((0, 0, 0),
-                     (1., 0.1, -0.37),
-                     (0.01, 0.987, -.23),
-                     (-0.1, -0.2, 1.38))
-    return K
-
-
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
                          finat.Bell,
                          ])
-def test_C1_elements(ref_el, phys_el, element):
-    check_zany_mapping(element, ref_el[2], phys_el[2])
+def test_C1_elements(ref_to_phys, element):
+    check_zany_mapping(element, ref_to_phys[2])
 
 
 @pytest.mark.parametrize("element", [
@@ -117,23 +99,23 @@ def test_C1_elements(ref_el, phys_el, element):
                          finat.QuadraticPowellSabin12,
                          finat.ReducedHsiehCloughTocher,
                          ])
-def test_C1_macroelements(ref_el, phys_el, element):
+def test_C1_macroelements(ref_to_phys, element):
     kwargs = {}
     if element == finat.QuadraticPowellSabin12:
         kwargs = dict(avg=True)
-    check_zany_mapping(element, ref_el[2], phys_el[2], **kwargs)
+    check_zany_mapping(element, ref_to_phys[2], **kwargs)
 
 
 @pytest.mark.parametrize("element, degree", [
     *((finat.Argyris, k) for k in range(5, 8)),
     *((finat.HsiehCloughTocher, k) for k in range(3, 6))
 ])
-def test_high_order_C1_elements(ref_el, phys_el, element, degree):
-    check_zany_mapping(element, ref_el[2], phys_el[2], degree, avg=True)
+def test_high_order_C1_elements(ref_to_phys, element, degree):
+    check_zany_mapping(element, ref_to_phys[2], degree, avg=True)
 
 
-def test_argyris_point(ref_el, phys_el):
-    check_zany_mapping(finat.Argyris, ref_el[2], phys_el[2], variant="point")
+def test_argyris_point(ref_to_phys):
+    check_zany_mapping(finat.Argyris, ref_to_phys[2], variant="point")
 
 
 zany_piola_elements = {
@@ -162,15 +144,15 @@ zany_piola_elements = {
                          *((2, e) for e in zany_piola_elements[3]),
                          *((3, e) for e in zany_piola_elements[3]),
                          ])
-def test_piola(ref_el, phys_el, element, dimension):
-    check_zany_mapping(element, ref_el[dimension], phys_el[dimension])
+def test_piola(ref_to_phys, element, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension])
 
 
 @pytest.mark.parametrize("element, degree, variant", [
     *((finat.HuZhang, k, v) for v in ("integral", "point") for k in range(3, 6)),
 ])
-def test_piola_triangle_high_order(ref_el, phys_el, element, degree, variant):
-    check_zany_mapping(element, ref_el[2], phys_el[2], degree, variant)
+def test_piola_triangle_high_order(ref_to_phys, element, degree, variant):
+    check_zany_mapping(element, ref_to_phys[2], degree, variant)
 
 
 @pytest.mark.parametrize("element, degree", [
@@ -180,5 +162,5 @@ def test_piola_triangle_high_order(ref_el, phys_el, element, degree, variant):
                          *((finat.GopalakrishnanLedererSchoberlSecondKind, k) for k in range(0, 3)),
                          ])
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_affine(ref_el, phys_el, element, degree, dimension):
-    check_zany_mapping(element, ref_el[dimension], phys_el[dimension], degree)
+def test_affine(ref_to_phys, element, degree, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension], degree)
