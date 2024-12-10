@@ -268,11 +268,15 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         assert coordinate_mapping is not None
 
         M = self.basis_transformation(coordinate_mapping)
+        # we expect M to be sparse with O(1) nonzeros per row
+        # for each row, get the column index of each nonzero entry
         csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
                for i in range(M.shape[0])]
 
         def matvec(table):
+            # basis recombination using hand-rolled sparse-dense matrix multiplication
             table = [gem.partial_indexed(table, (j,)) for j in range(M.shape[1])]
+            # the sum approach is faster than calling numpy.dot or gem.IndexSum
             expressions = [sum(M.array[i, j] * table[j] for j in js) for i, js in enumerate(csr)]
             val = gem.ListTensor(expressions)
             return gem.optimise.aggressive_unroll(val)
