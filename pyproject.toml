@@ -11,7 +11,7 @@ dependencies = [
   "scipy",
   "symengine",
   "sympy",
-  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git",
+  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git@ksagiyam/introduce_mixed_map",
 ]
 requires-python = ">=3.10"
 authors = [
