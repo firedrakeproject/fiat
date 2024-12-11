@@ -5,6 +5,7 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import numpy as np
+from FIAT.barycentric_interpolation import get_lagrange_points
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import FiniteElement
@@ -39,7 +40,7 @@ class HDivTrace(FiniteElement):
     arises in several DG formulations.
     """
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, variant=None):
         """Constructor for the HDivTrace element.
 
         :arg ref_el: A reference element, which may be a tensor product
@@ -47,6 +48,7 @@ class HDivTrace(FiniteElement):
         :arg degree: The degree of approximation. If on a tensor product
                      cell, then provide a tuple of degrees if you want
                      varying degrees.
+        :arg variant: The point distribution variant passed on to recursivenodes.
         """
         sd = ref_el.get_spatial_dimension()
         if sd in (0, 1):
@@ -83,7 +85,7 @@ class HDivTrace(FiniteElement):
 
             # We have a facet entity!
             if cell.get_spatial_dimension() == facet_sd:
-                dg_elements[top_dim] = construct_dg_element(cell, degree)
+                dg_elements[top_dim] = construct_dg_element(cell, degree, variant)
             # Initialize
             for entity in entities:
                 entity_dofs[top_dim][entity] = []
@@ -97,15 +99,14 @@ class HDivTrace(FiniteElement):
             nf = element.space_dimension()
             num_facets = len(topology[facet_dim])
 
+            facet_pts = get_lagrange_points(element.dual_basis())
             for i in range(num_facets):
                 entity_dofs[facet_dim][i] = list(range(offset, offset + nf))
                 offset += nf
 
                 # Run over nodes and collect the points for point evaluations
-                for dof in element.dual_basis():
-                    facet_pt, = dof.get_point_dict()
-                    transform = ref_el.get_entity_transform(facet_dim, i)
-                    pts.append(tuple(transform(facet_pt)))
+                transform = ref_el.get_entity_transform(facet_dim, i)
+                pts.extend(transform(facet_pts))
 
         # Setting up dual basis - only point evaluations
         nodes = [PointEvaluation(ref_el, pt) for pt in pts]
@@ -265,19 +266,18 @@ class HDivTrace(FiniteElement):
         return True
 
 
-def construct_dg_element(ref_el, degree):
+def construct_dg_element(ref_el, degree, variant):
     """Constructs a discontinuous galerkin element of a given degree
     on a particular reference cell.
     """
     if ref_el.get_shape() in [LINE, TRIANGLE]:
-        dg_element = DiscontinuousLagrange(ref_el, degree)
+        dg_element = DiscontinuousLagrange(ref_el, degree, variant)
 
     # Quadrilateral facets could be on a FiredrakeQuadrilateral.
     # In this case, we treat this as an interval x interval cell:
     elif ref_el.get_shape() == QUADRILATERAL:
-        dg_a = DiscontinuousLagrange(ufc_simplex(1), degree)
-        dg_b = DiscontinuousLagrange(ufc_simplex(1), degree)
-        dg_element = TensorProductElement(dg_a, dg_b)
+        dg_line = DiscontinuousLagrange(ufc_simplex(1), degree, variant)
+        dg_element = TensorProductElement(dg_line, dg_line)
 
     # This handles the more general case for facets:
     elif ref_el.get_shape() == TENSORPRODUCT:
@@ -285,7 +285,7 @@ def construct_dg_element(ref_el, degree):
             "Must provide the same number of degrees as the number "
             "of cells that make up the tensor product cell."
         )
-        sub_elements = [construct_dg_element(c, d)
+        sub_elements = [construct_dg_element(c, d, variant)
                         for c, d in zip(ref_el.cells, degree)
                         if c.get_shape() != POINT]
 
