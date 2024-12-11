@@ -42,7 +42,7 @@ from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
 from FIAT.macro import MacroQuadratureRule
 
 
-def create_quadrature(ref_el, degree, scheme="default", entity=None):
+def create_quadrature(ref_el, degree, scheme="default", entity=None, trace=False):
     """
     Generate quadrature rule for given reference element that will integrate a
     polynomial of order 'degree' exactly.
@@ -60,6 +60,7 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
         "KMV" -> spectral lumped scheme for low degree (<=5 on triangles, <=3 on tetrahedra).
     :kwarg entity: A tuple of entity dimension and entity id specifying the
         integration domain. If not provided, the domain is the entire cell.
+    :kwarg trace: Are we constructing a quadrature on codimension 1 facets?
     """
     if entity is not None:
         dimension, entity_id = entity
@@ -67,8 +68,10 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
         Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
         return FacetQuadratureRule(ref_el, dimension, entity_id, Q_ref)
 
-    if ref_el.is_macrocell():
+    if ref_el.is_macrocell() or trace:
         dimension = ref_el.get_dimension()
+        if trace:
+            dimension = dimension - 1
         sub_el = ref_el.construct_subelement(dimension)
         Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
         return MacroQuadratureRule(ref_el, Q_ref)
