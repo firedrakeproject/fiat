@@ -552,11 +552,11 @@ def test_nodality_tabulate(element):
     "HDivTrace(T, 0)",
     "HDivTrace(T, 1)",
     "HDivTrace(T, 2)",
-    "HDivTrace(T, 3)",
+    "HDivTrace(T, 3, 'spectral')",
     "HDivTrace(S, 0)",
     "HDivTrace(S, 1)",
     "HDivTrace(S, 2)",
-    "HDivTrace(S, 3)",
+    "HDivTrace(S, 3, 'spectral')",
 ])
 def test_facet_nodality_tabulate(element):
     """Check that certain elements (which do no implement get_nodal_basis)
