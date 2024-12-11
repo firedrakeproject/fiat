@@ -11,7 +11,7 @@ from gem.utils import cached_property
 from finat.point_set import GaussLegendrePointSet, PointSet, TensorPointSet
 
 
-def make_quadrature(ref_el, degree, scheme="default"):
+def make_quadrature(ref_el, degree, scheme="default", trace=False):
     """
     Generate quadrature rule for given reference element
     that will integrate an polynomial of order 'degree' exactly.
@@ -24,8 +24,11 @@ def make_quadrature(ref_el, degree, scheme="default"):
     :arg ref_el: The FIAT cell to create the quadrature for.
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
+    :arg trace: Are we constructing a quadrature on codimension 1 facets?
     """
     if ref_el.get_shape() == TENSORPRODUCT:
+        if trace:
+            raise NotImplementedError("Trace quadrature rule not implemented on tensor product cells")
         try:
             degree = tuple(degree)
         except TypeError:
@@ -37,12 +40,12 @@ def make_quadrature(ref_el, degree, scheme="default"):
         return TensorProductQuadratureRule(quad_rules, ref_el=ref_el)
 
     if ref_el.get_shape() == QUADRILATERAL:
-        return make_quadrature(ref_el.product, degree, scheme)
+        return make_quadrature(ref_el.product, degree, scheme, trace)
 
     if degree < 0:
         raise ValueError("Need positive degree, not %d" % degree)
 
-    if ref_el.get_shape() == LINE and not ref_el.is_macrocell():
+    if ref_el.get_shape() == LINE and not ref_el.is_macrocell() and not trace:
         # FIAT uses Gauss-Legendre line quadature, however, since we
         # symbolically label it as such, we wish not to risk attaching
         # the wrong label in case FIAT changes.  So we explicitly ask
@@ -52,7 +55,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
         point_set = GaussLegendrePointSet(fiat_rule.get_points())
         return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 
-    fiat_rule = fiat_scheme(ref_el, degree, scheme)
+    fiat_rule = fiat_scheme(ref_el, degree, scheme=scheme, trace=trace)
     return QuadratureRule(PointSet(fiat_rule.get_points()), fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 
 

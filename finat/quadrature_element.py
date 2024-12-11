@@ -13,7 +13,7 @@ from finat.finiteelementbase import FiniteElementBase
 from finat.quadrature import make_quadrature, AbstractQuadratureRule
 
 
-def make_quadrature_element(fiat_ref_cell, degree, scheme="default"):
+def make_quadrature_element(fiat_ref_cell, degree, scheme="default", trace=False):
     """Construct a :class:`QuadratureElement` from a given a reference
     element, degree and scheme.
 
@@ -23,9 +23,10 @@ def make_quadrature_element(fiat_ref_cell, degree, scheme="default"):
         integrate exactly.
     :param scheme: The quadrature scheme to use - e.g. "default",
         "canonical" or "KMV".
+    :param trace: Are we constructing a quadrature on codimension 1 facets?
     :returns: The appropriate :class:`QuadratureElement`
     """
-    rule = make_quadrature(fiat_ref_cell, degree, scheme=scheme)
+    rule = make_quadrature(fiat_ref_cell, degree, scheme=scheme, trace=trace)
     return QuadratureElement(fiat_ref_cell, rule)
 
 
