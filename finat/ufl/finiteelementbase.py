@@ -143,7 +143,7 @@ class FiniteElementBase(AbstractFiniteElement):
 
     def _check_component(self, domain, i):
         """Check that component index i is valid."""
-        sh = self.value_shape(domain.geometric_dimension())
+        sh = self.reference_value_shape
         r = len(sh)
         if not (len(i) == r and all(j < k for (j, k) in zip(i, sh))):
             raise ValueError(
