@@ -131,6 +131,7 @@ elements = [
     "DiscontinuousTaylor(S, 2)",
     "CrouzeixRaviart(I, 1)",
     "CrouzeixRaviart(T, 1)",
+    "CrouzeixRaviart(T, 3)",
     "CrouzeixRaviart(S, 1)",
     "RaviartThomas(I, 1)",
     "RaviartThomas(I, 2)",
