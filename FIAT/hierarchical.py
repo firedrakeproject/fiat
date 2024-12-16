@@ -17,12 +17,13 @@ from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import parse_lagrange_variant
 
 
-def make_dual_bubbles(ref_el, degree, codim=0):
+def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None):
     """Tabulate the L2-duals of the hierarchical C0 basis."""
-    Q = create_quadrature(ref_el, 2 * degree)
+    if interpolant_deg is None:
+        interpolant_deg = degree
+    Q = create_quadrature(ref_el, degree + interpolant_deg)
     B = make_bubbles(ref_el, degree, codim=codim, scale="orthonormal")
     P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
-
     M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)
     phis = numpy.linalg.solve(M, P_at_qpts)
     phis = numpy.dot(B.get_coeffs(), phis)
