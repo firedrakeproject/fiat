@@ -11,6 +11,10 @@ from FIAT.hdivcurl import Hdiv, Hcurl                          # noqa: F401
 from FIAT.mixed import MixedElement                            # noqa: F401
 from FIAT.restricted import RestrictedElement                  # noqa: F401
 from FIAT.quadrature_element import QuadratureElement          # noqa: F401
+from FIAT.tensor_product import TensorProductElement           # noqa: F401
+from FIAT.enriched import EnrichedElement                      # noqa: F401
+from FIAT.nodal_enriched import NodalEnrichedElement           # noqa: F401
+from FIAT.discontinuous import DiscontinuousElement            # noqa: F401
 
 # Import finite element classes
 from FIAT.argyris import Argyris
@@ -24,9 +28,9 @@ from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1
 from FIAT.christiansen_hu import ChristiansenHu
 from FIAT.johnson_mercier import JohnsonMercier
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini
-from FIAT.Sminus import TrimmedSerendipityEdge, TrimmedSerendipityFace  # noqa: F401
-from FIAT.SminusDiv import TrimmedSerendipityDiv  # noqa: F401
-from FIAT.SminusCurl import TrimmedSerendipityCurl  # noqa: F401
+from FIAT.Sminus import TrimmedSerendipityEdge, TrimmedSerendipityFace
+from FIAT.SminusDiv import TrimmedSerendipityDiv
+from FIAT.SminusCurl import TrimmedSerendipityCurl
 from FIAT.brezzi_douglas_fortin_marini import BrezziDouglasFortinMarini
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.discontinuous_taylor import DiscontinuousTaylor
@@ -56,10 +60,6 @@ from FIAT.arnold_winther import ArnoldWintherNC
 from FIAT.hu_zhang import HuZhang
 from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
-from FIAT.tensor_product import TensorProductElement
-from FIAT.enriched import EnrichedElement
-from FIAT.nodal_enriched import NodalEnrichedElement
-from FIAT.discontinuous import DiscontinuousElement
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
@@ -76,6 +76,10 @@ supported_elements = {"Argyris": Argyris,
                       "Crouzeix-Raviart": CrouzeixRaviart,
                       "Discontinuous Lagrange": DiscontinuousLagrange,
                       "S": Serendipity,
+                      "SminusF": TrimmedSerendipityFace,
+                      "SminusDiv": TrimmedSerendipityDiv,
+                      "SminusE": TrimmedSerendipityEdge,
+                      "SminusCurl": TrimmedSerendipityCurl,
                       "Brezzi-Douglas-Marini Cube Face": BrezziDouglasMariniCubeFace,
                       "Brezzi-Douglas-Marini Cube Edge": BrezziDouglasMariniCubeEdge,
                       "DPC": DPC,
@@ -83,6 +87,8 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
                       "Hsieh-Clough-Tocher": HsiehCloughTocher,
+                      "QuadraticPowellSabin6": QuadraticPowellSabin6,
+                      "QuadraticPowellSabin12": QuadraticPowellSabin12,
                       "Alfeld-Sorokina": AlfeldSorokina,
                       "Arnold-Qin": ArnoldQin,
                       "Christiansen-Hu": ChristiansenHu,
@@ -102,12 +108,6 @@ supported_elements = {"Argyris": Argyris,
                       "Nedelec 2nd kind H(curl)": NedelecSecondKind,
                       "Raviart-Thomas": RaviartThomas,
                       "Regge": Regge,
-                      "EnrichedElement": EnrichedElement,
-                      "NodalEnrichedElement": NodalEnrichedElement,
-                      "QuadraticPowellSabin6": QuadraticPowellSabin6,
-                      "QuadraticPowellSabin12": QuadraticPowellSabin12,
-                      "TensorProductElement": TensorProductElement,
-                      "BrokenElement": DiscontinuousElement,
                       "HDiv Trace": HDivTrace,
                       "Hellan-Herrmann-Johnson": HellanHerrmannJohnson,
                       "Gopalakrishnan-Lederer-Schoberl 1st kind": GopalakrishnanLedererSchoberlFirstKind,

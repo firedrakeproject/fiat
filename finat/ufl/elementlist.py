@@ -184,8 +184,8 @@ register_element("NCF", None, 1, HDiv, "contravariant Piola", (1, None), ("hexah
 
 register_element("S", None, 0, H1, "identity", (1, None), cubes)
 register_element("DPC", None, 0, L2, "identity", (0, None), cubes)
-register_element("BDMCE", None, 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
-register_element("BDMCF", None, 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
+register_element("Brezzi-Douglas-Marini Cube Edge", "BDMCE", 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
+register_element("Brezzi-Douglas-Marini Cube Face", "BDMCF", 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
 register_element("SminusE", "SminusE", 1, HCurl, "covariant Piola", (1, None), cubes[1:3])
 register_element("SminusF", "SminusF", 1, HDiv, "contravariant Piola", (1, None), cubes[1:2])
 register_element("SminusDiv", "SminusDiv", 1, HDiv, "contravariant Piola", (1, None), cubes[1:3])
