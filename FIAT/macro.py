@@ -1,6 +1,5 @@
 from itertools import chain, combinations
 
-from functools import cache
 import numpy
 
 from FIAT import expansions, polynomial_set
@@ -196,7 +195,6 @@ class SplitSimplicialComplex(SimplicialComplex):
         return self._parent_complex
 
 
-@cache
 class IsoSplit(SplitSimplicialComplex):
     """Splits simplex into the simplicial complex obtained by
     connecting points on a regular lattice.
@@ -302,7 +300,6 @@ class PowellSabinSplit(SplitSimplicialComplex):
             return PowellSabinSplit(subcomplex, dimension=self.split_dimension)
 
 
-@cache
 class AlfeldSplit(PowellSabinSplit):
     """Splits a simplicial complex by connecting cell vertices to their
     barycenter.
