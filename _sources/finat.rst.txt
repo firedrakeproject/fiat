@@ -100,6 +100,14 @@ finat.discontinuous module
    :undoc-members:
    :show-inheritance:
 
+finat.element\_factory module
+-----------------------------
+
+.. automodule:: finat.element_factory
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 finat.enriched module
 ---------------------
 
