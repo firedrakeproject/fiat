@@ -24,6 +24,7 @@ from functools import singledispatch, cache
 
 import finat
 import finat.ufl
+from redefining_fe.cells import CellComplexToUFL as FuseCell
 import ufl
 
 from FIAT import ufc_cell
@@ -112,6 +113,8 @@ def as_fiat_cell(cell):
     :arg cell: the :class:`ufl.Cell` to convert."""
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
+    if isinstance(cell, FuseCell):
+        return cell.to_fiat()
     return ufc_cell(cell)
 
 
@@ -300,6 +303,11 @@ def convert_withmapping(element, **kwargs):
 def convert_restrictedelement(element, **kwargs):
     finat_elem, deps = _create_element(element._element, **kwargs)
     return finat.RestrictedElement(finat_elem, element.restriction_domain()), deps
+
+
+@convert.register(finat.ufl.FuseElement)
+def convert_india_def(element, **kwargs):
+    return finat.fiat_elements.IndiaDefElement(element.triple), set()
 
 
 hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
