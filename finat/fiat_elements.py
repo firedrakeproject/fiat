@@ -484,4 +484,4 @@ class NedelecSecondKind(VectorFiatElement):
 
 class IndiaDefElement(FiatElement):
     def __init__(self, triple):
-        super(IndiaDefElement, self).__init__(triple.to_fiat_elem())
+        super(IndiaDefElement, self).__init__(triple.to_fiat())
