@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.arnold_qin &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -42,19 +42,19 @@
 <span class="c1">#</span>
 <span class="c1"># Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024</span>
 
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span>
-<span class="kn">from</span> <span class="nn">FIAT.bernardi_raugel</span> <span class="kn">import</span> <span class="n">BernardiRaugelDualSet</span>
-<span class="kn">from</span> <span class="nn">FIAT.quadrature_schemes</span> <span class="kn">import</span> <span class="n">create_quadrature</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">TRIANGLE</span>
-<span class="kn">from</span> <span class="nn">FIAT.macro</span> <span class="kn">import</span> <span class="n">CkPolynomialSet</span>
-<span class="kn">from</span> <span class="nn">FIAT.hct</span> <span class="kn">import</span> <span class="n">HsiehCloughTocher</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.bernardi_raugel</span><span class="w"> </span><span class="kn">import</span> <span class="n">BernardiRaugelDualSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRIANGLE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.macro</span><span class="w"> </span><span class="kn">import</span> <span class="n">CkPolynomialSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.hct</span><span class="w"> </span><span class="kn">import</span> <span class="n">HsiehCloughTocher</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
 
 <div class="viewcode-block" id="ArnoldQinSpace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.arnold_qin.ArnoldQinSpace">[docs]</a>
-<span class="k">def</span> <span class="nf">ArnoldQinSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">ArnoldQinSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a basis for the Arnold-Qin space</span>
 <span class="sd">    curl(HCT-red) + P0 x if reduced = True, and</span>
 <span class="sd">    curl(HCT) + P0 x if reduced = False.&quot;&quot;&quot;</span>
@@ -98,10 +98,10 @@
 
 <div class="viewcode-block" id="ArnoldQin">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.arnold_qin.ArnoldQin">[docs]</a>
-<span class="k">class</span> <span class="nc">ArnoldQin</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArnoldQin</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The Arnold-Qin C0(Alfeld) quadratic macroelement with divergence in P0.</span>
 <span class="sd">    This element belongs to a Stokes complex, and is paired with unsplit DG0.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">ArnoldQinSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">reduced</span><span class="p">:</span>
             <span class="n">order</span> <span class="o">=</span> <span class="mi">1</span>
@@ -150,7 +150,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

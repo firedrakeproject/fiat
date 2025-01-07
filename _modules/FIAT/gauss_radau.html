@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.gauss_radau &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -45,16 +45,16 @@
 <span class="c1"># Written by Robert C. Kirby (robert_kirby@baylor.edu), 2020</span>
 
 
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span><span class="p">,</span> <span class="n">quadrature</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">LINE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span><span class="p">,</span> <span class="n">quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">LINE</span>
 
 
 <div class="viewcode-block" id="GaussRadauDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.gauss_radau.GaussRadauDualSet">[docs]</a>
-<span class="k">class</span> <span class="nc">GaussRadauDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GaussRadauDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for 1D discontinuous elements with nodes at the</span>
 <span class="sd">    Gauss-Radau points.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
         <span class="c1"># Do DG connectivity because it&#39;s bonkers to do one-sided assembly even</span>
         <span class="c1"># though we have an endpoint in the point set!</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[],</span> <span class="mi">1</span><span class="p">:</span> <span class="p">[]},</span>
@@ -68,9 +68,9 @@
 
 <div class="viewcode-block" id="GaussRadau">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.gauss_radau.GaussRadau">[docs]</a>
-<span class="k">class</span> <span class="nc">GaussRadau</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GaussRadau</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;1D discontinuous element with nodes at the Gauss-Radau points.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">LINE</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Gauss-Radau elements are only defined in one dimension.&quot;</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
@@ -115,7 +115,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

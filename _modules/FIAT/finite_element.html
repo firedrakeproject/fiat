@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.finite_element &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -46,24 +46,24 @@
 <span class="c1"># Modified by David A. Ham (david.ham@imperial.ac.uk), 2014</span>
 <span class="c1"># Modified by Thomas H. Gibson (t.gibson15@imperial.ac.uk), 2016</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">import</span> <span class="nn">scipy</span>
-<span class="kn">import</span> <span class="nn">warnings</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scipy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
 
-<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
-<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">PolynomialSet</span>
-<span class="kn">from</span> <span class="nn">FIAT.quadrature_schemes</span> <span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">PolynomialSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 
 
 <div class="viewcode-block" id="FiniteElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement">[docs]</a>
-<span class="k">class</span> <span class="nc">FiniteElement</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">FiniteElement</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Class implementing a basic abstraction template for general</span>
 <span class="sd">    finite element families. Finite elements which inherit from</span>
 <span class="sd">    this class are non-nodal unless they are CiarletElement subclasses.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;affine&quot;</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;affine&quot;</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="c1"># Relevant attributes that do not necessarily depend on a PolynomialSet object:</span>
         <span class="c1"># The order (degree) of the polynomial basis</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">order</span> <span class="o">=</span> <span class="n">order</span>
@@ -82,14 +82,14 @@
 
 <div class="viewcode-block" id="FiniteElement.get_reference_element">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.get_reference_element">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_reference_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_reference_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the reference element for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span></div>
 
 
 <div class="viewcode-block" id="FiniteElement.get_reference_complex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.get_reference_complex">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_reference_complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_reference_complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the reference element complex, which is either the reference element or</span>
 <span class="sd">        its subdivision in the case of a macro element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_complex</span></div>
@@ -97,21 +97,21 @@
 
 <div class="viewcode-block" id="FiniteElement.get_dual_set">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.get_dual_set">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the dual for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual</span></div>
 
 
 <div class="viewcode-block" id="FiniteElement.get_order">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.get_order">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_order</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_order</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the order of the element (may be different from the degree).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span></div>
 
 
 <div class="viewcode-block" id="FiniteElement.dual_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.dual_basis">[docs]</a>
-    <span class="k">def</span> <span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the dual basis (list of functionals) for the finite</span>
 <span class="sd">        element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_nodes</span><span class="p">()</span></div>
@@ -119,7 +119,7 @@
 
 <div class="viewcode-block" id="FiniteElement.entity_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.entity_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()</span></div>
@@ -127,7 +127,7 @@
 
 <div class="viewcode-block" id="FiniteElement.entity_closure_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.entity_closure_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom on the closure of those entities for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_entity_closure_ids</span><span class="p">()</span></div>
@@ -135,7 +135,7 @@
 
 <div class="viewcode-block" id="FiniteElement.entity_permutations">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.entity_permutations">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_entity_permutations</span><span class="p">()</span></div>
 
 
@@ -143,14 +143,14 @@
 
 <div class="viewcode-block" id="FiniteElement.get_formdegree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.get_formdegree">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the associated form (FEEC)&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">formdegree</span></div>
 
 
 <div class="viewcode-block" id="FiniteElement.mapping">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.mapping">[docs]</a>
-    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a list of appropriate mappings from the reference</span>
 <span class="sd">        element to a physical element for each basis function of the</span>
 <span class="sd">        finite element.&quot;&quot;&quot;</span>
@@ -159,21 +159,21 @@
 
 <div class="viewcode-block" id="FiniteElement.num_sub_elements">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.num_sub_elements">[docs]</a>
-    <span class="k">def</span> <span class="nf">num_sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">num_sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the number of sub-elements.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mi">1</span></div>
 
 
 <div class="viewcode-block" id="FiniteElement.space_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.space_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the dimension of the finite element space.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">())</span></div>
 
 
 <div class="viewcode-block" id="FiniteElement.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.tabulate">[docs]</a>
-    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
 <span class="sd">        basis functions at given points.</span>
 
@@ -190,7 +190,7 @@
 <div class="viewcode-block" id="FiniteElement.is_nodal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.is_nodal">[docs]</a>
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">is_nodal</span><span class="p">():</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_nodal</span><span class="p">():</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;True if primal and dual bases are orthogonal. If false,</span>
 <span class="sd">        dual basis is not implemented or is undefined.</span>
 
@@ -201,7 +201,7 @@
 
 <div class="viewcode-block" id="FiniteElement.is_macroelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.FiniteElement.is_macroelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">is_macroelement</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_macroelement</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_complex</span></div>
 </div>
 
@@ -209,7 +209,7 @@
 
 <div class="viewcode-block" id="CiarletElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement">[docs]</a>
-<span class="k">class</span> <span class="nc">CiarletElement</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">CiarletElement</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Class implementing Ciarlet&#39;s abstraction of a finite element</span>
 <span class="sd">    being a domain, function space, and set of nodes.</span>
 
@@ -217,7 +217,7 @@
 <span class="sd">    basis generated from polynomials encoded in a `PolynomialSet`.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;affine&quot;</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;affine&quot;</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">ref_el</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
         <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">ref_complex</span> <span class="ow">or</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">ref_complex</span><span class="p">)</span>
@@ -251,14 +251,14 @@
 
 <div class="viewcode-block" id="CiarletElement.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.degree">[docs]</a>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="s2">&quot;Return the degree of the (embedding) polynomial space.&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_set</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="CiarletElement.get_nodal_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.get_nodal_basis">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
 <span class="sd">        for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_set</span></div>
@@ -266,7 +266,7 @@
 
 <div class="viewcode-block" id="CiarletElement.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.get_coeffs">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
 <span class="sd">        finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_set</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span></div>
@@ -274,7 +274,7 @@
 
 <div class="viewcode-block" id="CiarletElement.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.tabulate">[docs]</a>
-    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
 <span class="sd">        basis functions at given points.</span>
 
@@ -295,14 +295,14 @@
 
 <div class="viewcode-block" id="CiarletElement.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.value_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="s2">&quot;Return the value shape of the finite element functions.&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">poly_set</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="CiarletElement.dmats">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.dmats">[docs]</a>
-    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
 <span class="sd">        derivatives.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">get_dmats</span><span class="p">()</span></div>
@@ -310,7 +310,7 @@
 
 <div class="viewcode-block" id="CiarletElement.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.get_num_members">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
         <span class="s2">&quot;Return number of members of the expansion set.&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span></div>
 
@@ -318,7 +318,7 @@
 <div class="viewcode-block" id="CiarletElement.is_nodal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.CiarletElement.is_nodal">[docs]</a>
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">is_nodal</span><span class="p">():</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_nodal</span><span class="p">():</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;True if primal and dual bases are orthogonal. If false,</span>
 <span class="sd">        dual basis is not implemented or is undefined.</span>
 
@@ -331,7 +331,7 @@
 
 <div class="viewcode-block" id="entity_support_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.finite_element.entity_support_dofs">[docs]</a>
-<span class="k">def</span> <span class="nf">entity_support_dofs</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">entity_support_dofs</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the map of entity id to the degrees of freedom for which the</span>
 <span class="sd">    corresponding basis functions take non-zero values</span>
 
@@ -412,7 +412,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

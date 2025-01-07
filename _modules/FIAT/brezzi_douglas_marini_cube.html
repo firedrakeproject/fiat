@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.brezzi_douglas_marini_cube &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -56,12 +56,12 @@
 <span class="c1"># Modified by David A. Ham (david.ham@imperial.ac.uk), 2019</span>
 <span class="c1"># Modified by Thomas Bendall (thomas.bendall@metoffice.gov.uk) 2021</span>
 
-<span class="kn">from</span> <span class="nn">sympy</span> <span class="kn">import</span> <span class="n">symbols</span><span class="p">,</span> <span class="n">legendre</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">diff</span><span class="p">,</span> <span class="n">binomial</span><span class="p">,</span> <span class="n">lambdify</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">make_entity_closure_ids</span>
-<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
-<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">compute_unflattening_map</span><span class="p">,</span> <span class="n">flatten_reference_cube</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sympy</span><span class="w"> </span><span class="kn">import</span> <span class="n">symbols</span><span class="p">,</span> <span class="n">legendre</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">diff</span><span class="p">,</span> <span class="n">binomial</span><span class="p">,</span> <span class="n">lambdify</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_entity_closure_ids</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_unflattening_map</span><span class="p">,</span> <span class="n">flatten_reference_cube</span>
 
 <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x y&#39;</span><span class="p">)</span>
 <span class="n">variables</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
@@ -70,14 +70,14 @@
 
 <div class="viewcode-block" id="triangular_number">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.triangular_number">[docs]</a>
-<span class="k">def</span> <span class="nf">triangular_number</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">triangular_number</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="k">return</span> <span class="nb">int</span><span class="p">((</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">n</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube">[docs]</a>
-<span class="k">class</span> <span class="nc">BrezziDouglasMariniCube</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BrezziDouglasMariniCube</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    The Brezzi-Douglas-Marini element on quadrilateral cells.</span>
 
@@ -87,7 +87,7 @@
 <span class="sd">                  Either &#39;contravariant Piola&#39; or &#39;covariant Piola&#39;.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">):</span>
 
         <span class="c1"># Check that ref_el and degree are appropriate</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
@@ -144,32 +144,32 @@
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.degree">[docs]</a>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the polynomial space.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_degree</span></div>
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.get_nodal_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_nodal_basis">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented for BDMCE/F elements&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.get_dual_set">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_dual_set">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_dual_set is not implemented for BDMCE/F elements&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_coeffs">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented for BDMCE/F elements&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.tabulate">[docs]</a>
-    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to a given order of</span>
 <span class="sd">        basis functions at given points.</span>
 
@@ -218,7 +218,7 @@
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.entity_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.entity_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span></div>
@@ -226,7 +226,7 @@
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.entity_closure_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.entity_closure_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom on the closure of those entities for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span></div>
@@ -234,26 +234,26 @@
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.value_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the value shape of the finite element functions.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)][</span><span class="mi">0</span><span class="p">])</span></div>
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.dmats">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.dmats">[docs]</a>
-    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.get_num_members">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
 
 
 <div class="viewcode-block" id="BrezziDouglasMariniCube.space_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCube.space_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the dimension of the finite element space.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)])</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span></div>
 </div>
@@ -262,7 +262,7 @@
 
 <div class="viewcode-block" id="bdmce_edge_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.bdmce_edge_basis">[docs]</a>
-<span class="k">def</span> <span class="nf">bdmce_edge_basis</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">bdmce_edge_basis</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the basis functions associated with DoFs on the</span>
 <span class="sd">    edges of elements for the HCurl Brezz-Douglas-Marini element on</span>
 <span class="sd">    quadrilateral cells.</span>
@@ -307,7 +307,7 @@
 
 <div class="viewcode-block" id="bdmce_face_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.bdmce_face_basis">[docs]</a>
-<span class="k">def</span> <span class="nf">bdmce_face_basis</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">bdmce_face_basis</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the basis functions associated with DoFs on the</span>
 <span class="sd">    faces of elements for the HCurl Brezz-Douglas-Marini element on</span>
 <span class="sd">    quadrilateral cells.</span>
@@ -344,7 +344,7 @@
 
 <div class="viewcode-block" id="BrezziDouglasMariniCubeEdge">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCubeEdge">[docs]</a>
-<span class="k">class</span> <span class="nc">BrezziDouglasMariniCubeEdge</span><span class="p">(</span><span class="n">BrezziDouglasMariniCube</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BrezziDouglasMariniCubeEdge</span><span class="p">(</span><span class="n">BrezziDouglasMariniCube</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    The Brezzi-Douglas-Marini HCurl element on quadrilateral cells.</span>
 
@@ -352,7 +352,7 @@
 <span class="sd">    :arg k: The degree.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 
         <span class="n">bdmce_list</span> <span class="o">=</span> <span class="n">construct_bdmce_basis</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">Array</span><span class="p">(</span><span class="n">bdmce_list</span><span class="p">)}</span>
@@ -363,7 +363,7 @@
 
 <div class="viewcode-block" id="BrezziDouglasMariniCubeFace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.BrezziDouglasMariniCubeFace">[docs]</a>
-<span class="k">class</span> <span class="nc">BrezziDouglasMariniCubeFace</span><span class="p">(</span><span class="n">BrezziDouglasMariniCube</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BrezziDouglasMariniCubeFace</span><span class="p">(</span><span class="n">BrezziDouglasMariniCube</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    The Brezzi-Douglas-Marini HDiv element on quadrilateral cells.</span>
 
@@ -371,7 +371,7 @@
 <span class="sd">    :arg k: The degree.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 
         <span class="n">bdmce_list</span> <span class="o">=</span> <span class="n">construct_bdmce_basis</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
 
@@ -385,7 +385,7 @@
 
 <div class="viewcode-block" id="construct_bdmce_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.construct_bdmce_basis">[docs]</a>
-<span class="k">def</span> <span class="nf">construct_bdmce_basis</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">construct_bdmce_basis</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Return the basis functions for a particular BDMCE space as a list.</span>
 
@@ -418,7 +418,7 @@
 
 <div class="viewcode-block" id="numpy_lambdify">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_marini_cube.numpy_lambdify">[docs]</a>
-<span class="k">def</span> <span class="nf">numpy_lambdify</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">numpy_lambdify</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">F</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;Unfortunately, SymPy&#39;s own lambdify() doesn&#39;t work well with</span>
 <span class="sd">    NumPy in that simple functions like</span>
 <span class="sd">        lambda x: 1.0,</span>
@@ -474,7 +474,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

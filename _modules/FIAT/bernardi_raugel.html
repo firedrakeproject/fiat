@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.bernardi_raugel &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -47,18 +47,18 @@
 <span class="c1"># are the reference element bfs, but the extra dim**2-1 are used in the</span>
 <span class="c1"># transformation theory.</span>
 
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">expansions</span>
-<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="n">ComponentPointEvaluation</span><span class="p">,</span> <span class="n">FrobeniusIntegralMoment</span>
-<span class="kn">from</span> <span class="nn">FIAT.hierarchical</span> <span class="kn">import</span> <span class="n">make_dual_bubbles</span>
-<span class="kn">from</span> <span class="nn">FIAT.quadrature</span> <span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">expansions</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">ComponentPointEvaluation</span><span class="p">,</span> <span class="n">FrobeniusIntegralMoment</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.hierarchical</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_dual_bubbles</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 
 
 <div class="viewcode-block" id="BernardiRaugelSpace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernardi_raugel.BernardiRaugelSpace">[docs]</a>
-<span class="k">def</span> <span class="nf">BernardiRaugelSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">BernardiRaugelSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a basis for the extended Bernardi-Raugel space: (Pk + FacetBubble)^d.&quot;&quot;&quot;</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="n">sd</span><span class="p">:</span>
@@ -87,9 +87,9 @@
 
 <div class="viewcode-block" id="BernardiRaugelDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernardi_raugel.BernardiRaugelDualSet">[docs]</a>
-<span class="k">class</span> <span class="nc">BernardiRaugelDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BernardiRaugelDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The Bernardi-Raugel dual set.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_complex</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">ref_el</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -145,13 +145,13 @@
 
 <div class="viewcode-block" id="BernardiRaugel">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernardi_raugel.BernardiRaugel">[docs]</a>
-<span class="k">class</span> <span class="nc">BernardiRaugel</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BernardiRaugel</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The Bernardi-Raugel (extended) element.</span>
 
 <span class="sd">    This element does not belong to a Stokes complex, but can be paired with</span>
 <span class="sd">    DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
         <span class="n">degree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="n">degree</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for order &lt; dim&quot;</span><span class="p">)</span>
@@ -197,7 +197,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

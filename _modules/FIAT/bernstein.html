@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.bernstein &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -44,20 +44,22 @@
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
-<span class="kn">import</span> <span class="nn">math</span>
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
-<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
-<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.pointwise_dual</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_pointwise_dual</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_lattice</span>
 
 
 <div class="viewcode-block" id="BernsteinDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernstein.BernsteinDualSet">[docs]</a>
-<span class="k">class</span> <span class="nc">BernsteinDualSet</span><span class="p">(</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BernsteinDualSet</span><span class="p">(</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Bernstein elements.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="c1"># Initialise data structures</span>
         <span class="n">topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity_i</span><span class="p">:</span> <span class="p">[]</span>
@@ -89,31 +91,34 @@
 
 <div class="viewcode-block" id="Bernstein">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernstein.Bernstein">[docs]</a>
-<span class="k">class</span> <span class="nc">Bernstein</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Bernstein</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A finite element with Bernstein polynomials as basis functions.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">BernsteinDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">k</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># 0-form</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+        <span class="n">pts</span> <span class="o">=</span> <span class="n">make_lattice</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;gll&quot;</span><span class="p">)</span>
+        <span class="n">newdual</span> <span class="o">=</span> <span class="n">compute_pointwise_dual</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pts</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dual</span> <span class="o">=</span> <span class="n">newdual</span>
 
 <div class="viewcode-block" id="Bernstein.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernstein.Bernstein.degree">[docs]</a>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The degree of the polynomial space.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_order</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="Bernstein.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernstein.Bernstein.value_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The value shape of the finite element functions.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="Bernstein.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernstein.Bernstein.tabulate">[docs]</a>
-    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
 <span class="sd">        basis functions at given points.</span>
 
@@ -164,7 +169,7 @@
 
 <div class="viewcode-block" id="bernstein_db">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernstein.bernstein_db">[docs]</a>
-<span class="k">def</span> <span class="nf">bernstein_db</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">ks</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">bernstein_db</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">ks</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates Bernstein polynomials or its derivative at barycentric</span>
 <span class="sd">    points.</span>
 
@@ -202,7 +207,7 @@
 
 <div class="viewcode-block" id="bernstein_Dx">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bernstein.bernstein_Dx">[docs]</a>
-<span class="k">def</span> <span class="nf">bernstein_Dx</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">ks</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">R2B</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">bernstein_Dx</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">ks</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">R2B</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates Bernstein polynomials or its derivatives according to</span>
 <span class="sd">    reference coordinates.</span>
 
@@ -282,7 +287,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

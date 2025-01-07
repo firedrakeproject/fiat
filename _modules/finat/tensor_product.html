@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>finat.tensor_product &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -36,29 +36,29 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.tensor_product</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">reduce</span>
-<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">product</span>
-<span class="kn">from</span> <span class="nn">operator</span> <span class="kn">import</span> <span class="n">methodcaller</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">reduce</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">product</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">methodcaller</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">import</span> <span class="nn">FIAT</span>
-<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">TensorProductCell</span>
-<span class="kn">from</span> <span class="nn">FIAT.orientation_utils</span> <span class="kn">import</span> <span class="n">make_entity_permutations_tensorproduct</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorProductCell</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.orientation_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_entity_permutations_tensorproduct</span>
 
-<span class="kn">import</span> <span class="nn">gem</span>
-<span class="kn">from</span> <span class="nn">gem.utils</span> <span class="kn">import</span> <span class="n">cached_property</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">cached_property</span>
 
-<span class="kn">from</span> <span class="nn">finat.finiteelementbase</span> <span class="kn">import</span> <span class="n">FiniteElementBase</span>
-<span class="kn">from</span> <span class="nn">finat.point_set</span> <span class="kn">import</span> <span class="n">PointSingleton</span><span class="p">,</span> <span class="n">PointSet</span><span class="p">,</span> <span class="n">TensorPointSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.finiteelementbase</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.point_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">PointSingleton</span><span class="p">,</span> <span class="n">PointSet</span><span class="p">,</span> <span class="n">TensorPointSet</span>
 
 
 <div class="viewcode-block" id="TensorProductElement">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement">[docs]</a>
-<span class="k">class</span> <span class="nc">TensorProductElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TensorProductElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factors</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factors</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">TensorProductElement</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">factors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">factors</span><span class="p">)</span>
 
@@ -73,25 +73,25 @@
 <div class="viewcode-block" id="TensorProductElement.cell">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.cell">[docs]</a>
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">cell</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">])</span></div>
 
 
 <div class="viewcode-block" id="TensorProductElement.complex">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.complex">[docs]</a>
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">complex</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">])</span></div>
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">degree</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span>
 
 <div class="viewcode-block" id="TensorProductElement.formdegree">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.formdegree">[docs]</a>
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">fe</span><span class="o">.</span><span class="n">formdegree</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">else</span><span class="p">:</span>
@@ -99,50 +99,50 @@
 
 
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">_entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">productise</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">,</span> <span class="n">methodcaller</span><span class="p">(</span><span class="s2">&quot;entity_dofs&quot;</span><span class="p">))</span>
 
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">_entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">productise</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">,</span> <span class="n">methodcaller</span><span class="p">(</span><span class="s2">&quot;entity_support_dofs&quot;</span><span class="p">))</span>
 
 <div class="viewcode-block" id="TensorProductElement.entity_dofs">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.entity_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_dofs</span></div>
 
 
 <div class="viewcode-block" id="TensorProductElement.entity_permutations">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.entity_permutations">[docs]</a>
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">compose_permutations</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TensorProductElement.space_dimension">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.space_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">fe</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">])</span></div>
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">index_shape</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">]))</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_value_shape</span>
 
 <div class="viewcode-block" id="TensorProductElement.fiat_equivalent">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.fiat_equivalent">[docs]</a>
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># FIAT TensorProductElement support only 2 factors</span>
         <span class="n">A</span><span class="p">,</span> <span class="n">B</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span>
         <span class="k">return</span> <span class="n">FIAT</span><span class="o">.</span><span class="n">TensorProductElement</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">)</span></div>
 
 
-    <span class="k">def</span> <span class="nf">_factor_entity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entity</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_factor_entity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">entity</span><span class="p">):</span>
         <span class="c1"># Default entity</span>
         <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
@@ -157,7 +157,7 @@
         <span class="n">entities</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">unravel_index</span><span class="p">(</span><span class="n">entity_id</span><span class="p">,</span> <span class="n">shape</span><span class="p">)))</span>
         <span class="k">return</span> <span class="n">entities</span>
 
-    <span class="k">def</span> <span class="nf">_merge_evaluations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factor_results</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_merge_evaluations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">factor_results</span><span class="p">):</span>
         <span class="c1"># Spatial dimension</span>
         <span class="n">dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
 
@@ -200,7 +200,7 @@
 
 <div class="viewcode-block" id="TensorProductElement.basis_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.basis_evaluation">[docs]</a>
-    <span class="k">def</span> <span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">entities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_factor_entity</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
         <span class="n">entity_dim</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">entities</span><span class="p">)</span>
 
@@ -214,7 +214,7 @@
 
 <div class="viewcode-block" id="TensorProductElement.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.point_evaluation">[docs]</a>
-    <span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">entities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_factor_entity</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
         <span class="n">entity_dim</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">entities</span><span class="p">)</span>
 
@@ -239,7 +239,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># Outer product the dual bases of the factors</span>
         <span class="n">qs</span><span class="p">,</span> <span class="n">pss</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">factor</span><span class="o">.</span><span class="n">dual_basis</span> <span class="k">for</span> <span class="n">factor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">))</span>
         <span class="n">ps</span> <span class="o">=</span> <span class="n">TensorPointSet</span><span class="p">(</span><span class="n">pss</span><span class="p">)</span>
@@ -258,7 +258,7 @@
 <div class="viewcode-block" id="TensorProductElement.mapping">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.mapping">[docs]</a>
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">mappings</span> <span class="o">=</span> <span class="p">[</span><span class="n">fe</span><span class="o">.</span><span class="n">mapping</span> <span class="k">for</span> <span class="n">fe</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">factors</span> <span class="k">if</span> <span class="n">fe</span><span class="o">.</span><span class="n">mapping</span> <span class="o">!=</span> <span class="s2">&quot;affine&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">mappings</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="s2">&quot;affine&quot;</span>
@@ -272,7 +272,7 @@
 
 <div class="viewcode-block" id="productise">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.productise">[docs]</a>
-<span class="k">def</span> <span class="nf">productise</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">productise</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">method</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&#39;&#39;&#39;Tensor product the dict mapping topological entities to dofs across factors.</span>
 
 <span class="sd">    :arg factors: element factors.</span>
@@ -300,7 +300,7 @@
 
 <div class="viewcode-block" id="compose_permutations">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.compose_permutations">[docs]</a>
-<span class="k">def</span> <span class="nf">compose_permutations</span><span class="p">(</span><span class="n">factors</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compose_permutations</span><span class="p">(</span><span class="n">factors</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;For the :class:`TensorProductElement` object composed of factors,</span>
 <span class="sd">    construct, for each dimension tuple, for each entity, and for each possible</span>
 <span class="sd">    entity orientation combination, the DoF permutation list.</span>
@@ -381,7 +381,7 @@
 
 <div class="viewcode-block" id="factor_point_set">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.factor_point_set">[docs]</a>
-<span class="k">def</span> <span class="nf">factor_point_set</span><span class="p">(</span><span class="n">product_cell</span><span class="p">,</span> <span class="n">product_dim</span><span class="p">,</span> <span class="n">point_set</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">factor_point_set</span><span class="p">(</span><span class="n">product_cell</span><span class="p">,</span> <span class="n">product_dim</span><span class="p">,</span> <span class="n">point_set</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Factors a point set for the product element into a point sets for</span>
 <span class="sd">    each subelement.</span>
 
@@ -455,7 +455,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

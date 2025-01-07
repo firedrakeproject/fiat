@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.barycentric_interpolation &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -44,14 +44,14 @@
 <span class="c1">#</span>
 <span class="c1"># Written by Pablo D. Brubeck (brubeck@protonmail.com), 2021</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">reference_element</span><span class="p">,</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">polynomial_set</span>
-<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="n">index_iterator</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">reference_element</span><span class="p">,</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">polynomial_set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">index_iterator</span>
 
 
 <div class="viewcode-block" id="get_lagrange_points">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.get_lagrange_points">[docs]</a>
-<span class="k">def</span> <span class="nf">get_lagrange_points</span><span class="p">(</span><span class="n">nodes</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_lagrange_points</span><span class="p">(</span><span class="n">nodes</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract singleton point for each node.&quot;&quot;&quot;</span>
     <span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
@@ -63,13 +63,13 @@
 
 <div class="viewcode-block" id="barycentric_interpolation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.barycentric_interpolation">[docs]</a>
-<span class="k">def</span> <span class="nf">barycentric_interpolation</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="n">dmat</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">barycentric_interpolation</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="n">dmat</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates a Lagrange basis on a line reference element</span>
 <span class="sd">    via the second barycentric interpolation formula. See Berrut and Trefethen (2004)</span>
 <span class="sd">    https://doi.org/10.1137/S0036144502417715 Eq. (4.2) &amp; (9.4)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">object</span><span class="p">:</span>
-        <span class="kn">from</span> <span class="nn">sympy</span> <span class="kn">import</span> <span class="n">simplify</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">sympy</span><span class="w"> </span><span class="kn">import</span> <span class="n">simplify</span>
         <span class="n">sp_simplify</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="n">simplify</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">sp_simplify</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span>
@@ -92,7 +92,7 @@
 
 <div class="viewcode-block" id="make_dmat">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.make_dmat">[docs]</a>
-<span class="k">def</span> <span class="nf">make_dmat</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_dmat</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns Lagrange differentiation matrix and barycentric weights</span>
 <span class="sd">    associated with x[j].&quot;&quot;&quot;</span>
     <span class="n">dmat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
@@ -107,9 +107,9 @@
 
 <div class="viewcode-block" id="LagrangeLineExpansionSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangeLineExpansionSet">[docs]</a>
-<span class="k">class</span> <span class="nc">LagrangeLineExpansionSet</span><span class="p">(</span><span class="n">expansions</span><span class="o">.</span><span class="n">LineExpansionSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LagrangeLineExpansionSet</span><span class="p">(</span><span class="n">expansions</span><span class="o">.</span><span class="n">LineExpansionSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Lagrange polynomial expansion set for given points the line.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">points</span> <span class="o">=</span> <span class="n">pts</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;d&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cell_node_map</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">compute_cell_point_map</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -127,38 +127,38 @@
 
 <div class="viewcode-block" id="LagrangeLineExpansionSet.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangeLineExpansionSet.get_num_members">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="LagrangeLineExpansionSet.get_cell_node_map">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangeLineExpansionSet.get_cell_node_map">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_cell_node_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_cell_node_map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell_node_map</span></div>
 
 
 <div class="viewcode-block" id="LagrangeLineExpansionSet.get_points">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangeLineExpansionSet.get_points">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">points</span></div>
 
 
 <div class="viewcode-block" id="LagrangeLineExpansionSet.get_dmats">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangeLineExpansionSet.get_dmats">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">dmats</span><span class="p">[</span><span class="n">cell</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">]</span></div>
 
 
-    <span class="k">def</span> <span class="nf">_tabulate_on_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_tabulate_on_cell</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">direction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">barycentric_interpolation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">cell</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">[</span><span class="n">cell</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">dmats</span><span class="p">[</span><span class="n">cell</span><span class="p">],</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="LagrangePolynomialSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangePolynomialSet">[docs]</a>
-<span class="k">class</span> <span class="nc">LagrangePolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LagrangePolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="nb">tuple</span><span class="p">()):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="nb">tuple</span><span class="p">()):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">LINE</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid reference element type.&quot;</span><span class="p">)</span>
 
@@ -226,7 +226,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

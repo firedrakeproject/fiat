@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gem.pprint &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -37,19 +37,19 @@
             
   <h1>Source code for gem.pprint</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;Pretty-printing GEM expressions.&quot;&quot;&quot;</span>
-<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
-<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
 
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">singledispatch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span>
 
-<span class="kn">from</span> <span class="nn">gem</span> <span class="kn">import</span> <span class="n">gem</span>
-<span class="kn">from</span> <span class="nn">gem.node</span> <span class="kn">import</span> <span class="n">collect_refcount</span><span class="p">,</span> <span class="n">post_traversal</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">gem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">collect_refcount</span><span class="p">,</span> <span class="n">post_traversal</span>
 
 
 <div class="viewcode-block" id="Context">
 <a class="viewcode-back" href="../../gem.html#gem.pprint.Context">[docs]</a>
-<span class="k">class</span> <span class="nc">Context</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Context</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">expr_counter</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">expr_name</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="s2">&quot;$</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">expr_counter</span><span class="p">)))</span>
         <span class="n">index_counter</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
@@ -58,21 +58,21 @@
 
 <div class="viewcode-block" id="Context.force_expression">
 <a class="viewcode-back" href="../../gem.html#gem.pprint.Context.force_expression">[docs]</a>
-    <span class="k">def</span> <span class="nf">force_expression</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">force_expression</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">expr_name</span><span class="p">[</span><span class="n">expr</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="Context.expression">
 <a class="viewcode-back" href="../../gem.html#gem.pprint.Context.expression">[docs]</a>
-    <span class="k">def</span> <span class="nf">expression</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">expression</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expr</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">expr_name</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Context.index">
 <a class="viewcode-back" href="../../gem.html#gem.pprint.Context.index">[docs]</a>
-    <span class="k">def</span> <span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_name</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
@@ -96,10 +96,10 @@
 
 <div class="viewcode-block" id="pprint">
 <a class="viewcode-back" href="../../gem.html#gem.pprint.pprint">[docs]</a>
-<span class="k">def</span> <span class="nf">pprint</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="n">global_context</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">pprint</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">,</span> <span class="n">context</span><span class="o">=</span><span class="n">global_context</span><span class="p">):</span>
     <span class="n">refcount</span> <span class="o">=</span> <span class="n">collect_refcount</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">force</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">force</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Variable</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">False</span>
         <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
@@ -124,7 +124,7 @@
 
 <div class="viewcode-block" id="make_decl">
 <a class="viewcode-back" href="../../gem.html#gem.pprint.make_decl">[docs]</a>
-<span class="k">def</span> <span class="nf">make_decl</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_decl</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">ctx</span><span class="p">):</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">name</span>
     <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
         <span class="n">result</span> <span class="o">+=</span> <span class="s1">&#39;[&#39;</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">repr</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span> <span class="o">+</span> <span class="s1">&#39;]&#39;</span>
@@ -136,7 +136,7 @@
 
 <div class="viewcode-block" id="to_str">
 <a class="viewcode-back" href="../../gem.html#gem.pprint.to_str">[docs]</a>
-<span class="k">def</span> <span class="nf">to_str</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">to_str</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">top</span> <span class="ow">and</span> <span class="n">ctx</span><span class="o">.</span><span class="n">expression</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">expression</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">free_indices</span><span class="p">:</span>
@@ -148,12 +148,12 @@
 
 
 <span class="nd">@singledispatch</span>
-<span class="k">def</span> <span class="nf">_to_str</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;GEM node expected&quot;</span><span class="p">)</span>
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Node</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_node</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_node</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="n">front_args</span> <span class="o">=</span> <span class="p">[</span><span class="nb">repr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">__front__</span><span class="p">]</span>
     <span class="n">back_args</span> <span class="o">=</span> <span class="p">[</span><span class="nb">repr</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">__back__</span><span class="p">]</span>
     <span class="n">children</span> <span class="o">=</span> <span class="p">[</span><span class="n">to_str</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span> <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
@@ -161,13 +161,13 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_zero</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_zero</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="k">assert</span> <span class="ow">not</span> <span class="n">node</span><span class="o">.</span><span class="n">shape</span>
     <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%g</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">node</span><span class="o">.</span><span class="n">value</span>
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_literal</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_literal</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
         <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">tolist</span><span class="p">())</span>
     <span class="k">else</span><span class="p">:</span>
@@ -175,13 +175,13 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Variable</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_variable</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_variable</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span>
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_listtensor</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">recurse_rank</span><span class="p">(</span><span class="n">array</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_listtensor</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recurse_rank</span><span class="p">(</span><span class="n">array</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="s1">&#39;[&#39;</span> <span class="o">+</span> <span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">recurse_rank</span><span class="p">,</span> <span class="n">array</span><span class="p">))</span> <span class="o">+</span> <span class="s1">&#39;]&#39;</span>
         <span class="k">else</span><span class="p">:</span>
@@ -191,7 +191,7 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_indexed</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_indexed</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="n">child</span><span class="p">,</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">to_str</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
     <span class="n">dimensions</span> <span class="o">=</span> <span class="p">[]</span>
@@ -207,7 +207,7 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">FlexiblyIndexed</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_flexiblyindexed</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_flexiblyindexed</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="n">child</span><span class="p">,</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">to_str</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span>
     <span class="n">dimensions</span> <span class="o">=</span> <span class="p">[]</span>
@@ -232,7 +232,7 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_indexsum</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_indexsum</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;Sum_{&#39;</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">multiindex</span><span class="p">))</span> <span class="o">+</span> <span class="s1">&#39;} &#39;</span> <span class="o">+</span> <span class="n">to_str</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">prec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">prec</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
         <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;(</span><span class="si">{}</span><span class="s1">)&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
@@ -240,12 +240,12 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_componenttensor</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_componenttensor</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">to_str</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">ctx</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;|&#39;</span> <span class="o">+</span> <span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">ctx</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">multiindex</span><span class="p">)</span>
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Sum</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_sum</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_sum</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="n">children</span> <span class="o">=</span> <span class="p">[</span><span class="n">to_str</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
     <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot; + &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">children</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">prec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">prec</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
@@ -254,7 +254,7 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_product</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_product</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="n">children</span> <span class="o">=</span> <span class="p">[</span><span class="n">to_str</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span> <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
     <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;*&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">children</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">prec</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">prec</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
@@ -263,7 +263,7 @@
 
 
 <span class="nd">@_to_str</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">MathFunction</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_to_str_mathfunction</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_to_str_mathfunction</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">ctx</span><span class="p">,</span> <span class="n">prec</span><span class="p">):</span>
     <span class="n">child</span><span class="p">,</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span>
     <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;(&quot;</span> <span class="o">+</span> <span class="n">to_str</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">ctx</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span>
 </pre></div>
@@ -303,7 +303,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

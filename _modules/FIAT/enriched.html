@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.enriched &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -42,13 +42,13 @@
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
-<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
-<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
-<span class="kn">from</span> <span class="nn">FIAT.mixed</span> <span class="kn">import</span> <span class="n">concatenate_entity_dofs</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.mixed</span><span class="w"> </span><span class="kn">import</span> <span class="n">concatenate_entity_dofs</span>
 
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;EnrichedElement&#39;</span><span class="p">]</span>
@@ -56,7 +56,7 @@
 
 <div class="viewcode-block" id="EnrichedElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement">[docs]</a>
-<span class="k">class</span> <span class="nc">EnrichedElement</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">EnrichedElement</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Class implementing a finite element that combined the degrees of freedom</span>
 <span class="sd">    of two existing finite elements.</span>
 
@@ -64,7 +64,7 @@
 <span class="sd">    primal and dual basis.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">elements</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">elements</span><span class="p">):</span>
         <span class="c1"># Firstly, check it makes sense to enrich.  Elements must have:</span>
         <span class="c1"># - same reference element</span>
         <span class="c1"># - same mapping</span>
@@ -109,21 +109,21 @@
 
 <div class="viewcode-block" id="EnrichedElement.elements">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.elements">[docs]</a>
-    <span class="k">def</span> <span class="nf">elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="s2">&quot;Return reference to original subelements&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span></div>
 
 
 <div class="viewcode-block" id="EnrichedElement.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.degree">[docs]</a>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the (embedding) polynomial space.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polydegree</span></div>
 
 
 <div class="viewcode-block" id="EnrichedElement.get_nodal_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.get_nodal_basis">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
 <span class="sd">        for the finite element.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented&quot;</span><span class="p">)</span></div>
@@ -131,7 +131,7 @@
 
 <div class="viewcode-block" id="EnrichedElement.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.get_coeffs">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
 <span class="sd">        finite element.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented&quot;</span><span class="p">)</span></div>
@@ -139,7 +139,7 @@
 
 <div class="viewcode-block" id="EnrichedElement.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.tabulate">[docs]</a>
-    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
 <span class="sd">        basis functions at given points.&quot;&quot;&quot;</span>
 
@@ -171,7 +171,7 @@
 
 <div class="viewcode-block" id="EnrichedElement.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.value_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the value shape of the finite element functions.&quot;&quot;&quot;</span>
         <span class="n">result</span><span class="p">,</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">result</span></div>
@@ -179,7 +179,7 @@
 
 <div class="viewcode-block" id="EnrichedElement.dmats">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.dmats">[docs]</a>
-    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
 <span class="sd">        derivatives.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;dmats not implemented&quot;</span><span class="p">)</span></div>
@@ -187,7 +187,7 @@
 
 <div class="viewcode-block" id="EnrichedElement.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.enriched.EnrichedElement.get_num_members">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return number of members of the expansion set.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_num_members not implemented&quot;</span><span class="p">)</span></div>
 </div>
@@ -229,7 +229,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

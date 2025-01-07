@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.orthopoly &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -67,14 +67,14 @@
 <span class="sd">    Modified by David A. Ham (david.ham@imperial.ac.uk), 2016</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">reduce</span>
-<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">gamma</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">reduce</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">math</span><span class="w"> </span><span class="kn">import</span> <span class="n">gamma</span>
 
 
 <div class="viewcode-block" id="gauss">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.gauss">[docs]</a>
-<span class="k">def</span> <span class="nf">gauss</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">gauss</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Compute the Gauss nodes and weights from the recursion</span>
 <span class="sd">    coefficients associated with a set of orthogonal polynomials</span>
@@ -91,7 +91,7 @@
 <span class="sd">    http://www.cs.purdue.edu/archives/2002/wxg/codes/gauss.m</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="kn">from</span> <span class="nn">numpy.linalg</span> <span class="kn">import</span> <span class="n">eigh</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">numpy.linalg</span><span class="w"> </span><span class="kn">import</span> <span class="n">eigh</span>
 
     <span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">beta</span><span class="p">)[</span><span class="mi">1</span><span class="p">:],</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
     <span class="n">x</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">eigh</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="s2">&quot;U&quot;</span><span class="p">)</span>
@@ -103,7 +103,7 @@
 
 <div class="viewcode-block" id="lobatto">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.lobatto">[docs]</a>
-<span class="k">def</span> <span class="nf">lobatto</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">xl1</span><span class="p">,</span> <span class="n">xl2</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">lobatto</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">xl1</span><span class="p">,</span> <span class="n">xl2</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Compute the Lobatto nodes and weights with the preassigned</span>
 <span class="sd">        nodea xl1,xl2</span>
@@ -122,7 +122,7 @@
 <span class="sd">        &quot;Some modified matrix eigenvalue problems&quot;</span>
 <span class="sd">        by Gene Golub, SIAM Review Vol 15, No. 2, April 1973, pp.318--334</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="kn">from</span> <span class="nn">numpy.linalg</span> <span class="kn">import</span> <span class="n">solve</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">numpy.linalg</span><span class="w"> </span><span class="kn">import</span> <span class="n">solve</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
     <span class="n">en</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
     <span class="n">en</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
@@ -147,7 +147,7 @@
 
 <div class="viewcode-block" id="rec_jacobi">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.rec_jacobi">[docs]</a>
-<span class="k">def</span> <span class="nf">rec_jacobi</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">rec_jacobi</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Generate the recursion coefficients alpha_k, beta_k</span>
 
@@ -192,7 +192,7 @@
 
 <div class="viewcode-block" id="rec_jacobi01">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.rec_jacobi01">[docs]</a>
-<span class="k">def</span> <span class="nf">rec_jacobi01</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">rec_jacobi01</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Generate the recursion coefficients alpha_k, beta_k</span>
 <span class="sd">    for the Jacobi polynomials which are orthogonal on [0,1]</span>
@@ -235,7 +235,7 @@
 
 <div class="viewcode-block" id="polyval">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.polyval">[docs]</a>
-<span class="k">def</span> <span class="nf">polyval</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">polyval</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Evaluate polynomials on x given the recursion coefficients alpha and beta</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -256,7 +256,7 @@
 
 <div class="viewcode-block" id="jacobi">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.jacobi">[docs]</a>
-<span class="k">def</span> <span class="nf">jacobi</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">NOPT</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">jacobi</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">NOPT</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    JACOBI computes the Jacobi polynomials which are orthogonal on [-1,1]</span>
 <span class="sd">    with respect to the weight w(x)=[(1-x)^a]*[(1+x)^b] and evaluate them</span>
@@ -298,7 +298,7 @@
 
 <div class="viewcode-block" id="jacobiD">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.jacobiD">[docs]</a>
-<span class="k">def</span> <span class="nf">jacobiD</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">NOPT</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">jacobiD</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">NOPT</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    JACOBID computes the first derivatives of the normalized Jacobi</span>
 <span class="sd">    polynomials which are orthogonal on [-1,1] with respect</span>
@@ -320,7 +320,7 @@
 
 <div class="viewcode-block" id="mm_log">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.mm_log">[docs]</a>
-<span class="k">def</span> <span class="nf">mm_log</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">mm_log</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    MM_LOG Modified moments for a logarithmic weight function.</span>
 
@@ -369,7 +369,7 @@
 
 <div class="viewcode-block" id="mod_chebyshev">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.mod_chebyshev">[docs]</a>
-<span class="k">def</span> <span class="nf">mod_chebyshev</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">mom</span><span class="p">,</span> <span class="n">alpham</span><span class="p">,</span> <span class="n">betam</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">mod_chebyshev</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">mom</span><span class="p">,</span> <span class="n">alpham</span><span class="p">,</span> <span class="n">betam</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Calcuate the recursion coefficients for the orthogonal polynomials</span>
 <span class="sd">    which are are orthogonal with respect to a weight function which is</span>
@@ -425,7 +425,7 @@
 
 <div class="viewcode-block" id="rec_jaclog">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.orthopoly.rec_jaclog">[docs]</a>
-<span class="k">def</span> <span class="nf">rec_jaclog</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">rec_jaclog</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">a</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Generate the recursion coefficients alpha_k, beta_k</span>
 
@@ -487,7 +487,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gem.refactorise &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -39,15 +39,15 @@
 <span></span><span class="sd">&quot;&quot;&quot;Data structures and algorithms for generic expansion and</span>
 <span class="sd">refactorisation.&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">Counter</span><span class="p">,</span> <span class="n">OrderedDict</span><span class="p">,</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">namedtuple</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">singledispatch</span>
-<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">product</span>
-<span class="kn">from</span> <span class="nn">sys</span> <span class="kn">import</span> <span class="n">intern</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span><span class="p">,</span> <span class="n">OrderedDict</span><span class="p">,</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">namedtuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">product</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sys</span><span class="w"> </span><span class="kn">import</span> <span class="n">intern</span>
 
-<span class="kn">from</span> <span class="nn">gem.node</span> <span class="kn">import</span> <span class="n">Memoizer</span><span class="p">,</span> <span class="n">traversal</span>
-<span class="kn">from</span> <span class="nn">gem.gem</span> <span class="kn">import</span> <span class="p">(</span><span class="n">Node</span><span class="p">,</span> <span class="n">Conditional</span><span class="p">,</span> <span class="n">Zero</span><span class="p">,</span> <span class="n">Product</span><span class="p">,</span> <span class="n">Sum</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Memoizer</span><span class="p">,</span> <span class="n">traversal</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.gem</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">Node</span><span class="p">,</span> <span class="n">Conditional</span><span class="p">,</span> <span class="n">Zero</span><span class="p">,</span> <span class="n">Product</span><span class="p">,</span> <span class="n">Sum</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">,</span>
                      <span class="n">ListTensor</span><span class="p">,</span> <span class="n">one</span><span class="p">,</span> <span class="n">MathFunction</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">gem.optimise</span> <span class="kn">import</span> <span class="p">(</span><span class="n">remove_componenttensors</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">remove_componenttensors</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span>
                           <span class="n">traverse_product</span><span class="p">,</span> <span class="n">traverse_sum</span><span class="p">,</span> <span class="n">unroll_indexsum</span><span class="p">,</span>
                           <span class="n">make_rename_map</span><span class="p">,</span> <span class="n">make_renamer</span><span class="p">)</span>
 
@@ -83,7 +83,7 @@
 
 <div class="viewcode-block" id="MonomialSum">
 <a class="viewcode-back" href="../../gem.html#gem.refactorise.MonomialSum">[docs]</a>
-<span class="k">class</span> <span class="nc">MonomialSum</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MonomialSum</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents a sum of :py:class:`Monomial`s.</span>
 
 <span class="sd">    The set of :py:class:`Monomial` summands are represented as a</span>
@@ -91,7 +91,7 @@
 <span class="sd">    ``atomics`` to a ``rest`` GEM expression.  This representation</span>
 <span class="sd">    makes it easier to merge similar monomials.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># (unordered sum_indices, unordered atomics) -&gt; rest</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">monomials</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="n">Zero</span><span class="p">)</span>
 
@@ -101,12 +101,12 @@
         <span class="c1">#     (ordered sum_indices, ordered atomics)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ordering</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ordering</span><span class="p">)</span>
 
 <div class="viewcode-block" id="MonomialSum.add">
 <a class="viewcode-back" href="../../gem.html#gem.refactorise.MonomialSum.add">[docs]</a>
-    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sum_indices</span><span class="p">,</span> <span class="n">atomics</span><span class="p">,</span> <span class="n">rest</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sum_indices</span><span class="p">,</span> <span class="n">atomics</span><span class="p">,</span> <span class="n">rest</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Updates the :py:class:`MonomialSum` adding a new monomial.&quot;&quot;&quot;</span>
         <span class="n">sum_indices</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span>
         <span class="n">sum_indices_set</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span>
@@ -123,7 +123,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">ordering</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">atomics</span><span class="p">))</span></div>
 
 
-    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Iteration yields :py:class:`Monomial` objects&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">atomics</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ordering</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">rest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">monomials</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
@@ -132,7 +132,7 @@
 <div class="viewcode-block" id="MonomialSum.sum">
 <a class="viewcode-back" href="../../gem.html#gem.refactorise.MonomialSum.sum">[docs]</a>
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">sum</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sum</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Sum of multiple :py:class:`MonomialSum`s&quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">MonomialSum</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
@@ -149,7 +149,7 @@
 <div class="viewcode-block" id="MonomialSum.product">
 <a class="viewcode-back" href="../../gem.html#gem.refactorise.MonomialSum.product">[docs]</a>
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">product</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">product</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Product of multiple :py:class:`MonomialSum`s&quot;&quot;&quot;</span>
         <span class="n">rename_map</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;rename_map&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">rename_map</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -176,14 +176,14 @@
 
 <div class="viewcode-block" id="FactorisationError">
 <a class="viewcode-back" href="../../gem.html#gem.refactorise.FactorisationError">[docs]</a>
-<span class="k">class</span> <span class="nc">FactorisationError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">FactorisationError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when factorisation fails to achieve some desired form.&quot;&quot;&quot;</span>
     <span class="k">pass</span></div>
 
 
 
 <span class="nd">@singledispatch</span>
-<span class="k">def</span> <span class="nf">_collect_monomials</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_collect_monomials</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Refactorises an expression into a sum-of-products form, using</span>
 <span class="sd">    distributivity rules (i.e. a*(b + c) -&gt; a*b + a*c).  Expansion</span>
 <span class="sd">    proceeds until all &quot;compound&quot; expressions are broken up.</span>
@@ -197,7 +197,7 @@
 <span class="sd">                                expressions with expansion.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Phase 1: Collect and categorise product terms</span>
-    <span class="k">def</span> <span class="nf">stop_at</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop_at</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
         <span class="c1"># Break up compounds only</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">classifier</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span> <span class="o">!=</span> <span class="n">COMPOUND</span>
     <span class="n">common_indices</span><span class="p">,</span> <span class="n">terms</span> <span class="o">=</span> <span class="n">traverse_product</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="n">stop_at</span><span class="p">)</span>
@@ -265,7 +265,7 @@
 
 
 <span class="nd">@_collect_monomials</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MathFunction</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_collect_monomials_mathfunction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_collect_monomials_mathfunction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
     <span class="n">name</span> <span class="o">=</span> <span class="n">expression</span><span class="o">.</span><span class="n">name</span>
     <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;conj&quot;</span><span class="p">,</span> <span class="s2">&quot;real&quot;</span><span class="p">,</span> <span class="s2">&quot;imag&quot;</span><span class="p">}:</span>
         <span class="c1"># These are allowed to be applied to arguments, and hence must</span>
@@ -288,7 +288,7 @@
 
 
 <span class="nd">@_collect_monomials</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Conditional</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">_collect_monomials_conditional</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_collect_monomials_conditional</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Refactorises a conditional expression into a sum-of-products form,</span>
 <span class="sd">    pulling only &quot;atomics&quot; out of conditional expressions.</span>
 
@@ -321,7 +321,7 @@
 
 <div class="viewcode-block" id="collect_monomials">
 <a class="viewcode-back" href="../../gem.html#gem.refactorise.collect_monomials">[docs]</a>
-<span class="k">def</span> <span class="nf">collect_monomials</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">classifier</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">collect_monomials</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">classifier</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Refactorises expressions into a sum-of-products form, using</span>
 <span class="sd">    distributivity rules (i.e. a*(b + c) -&gt; a*b + a*c).  Expansion</span>
 <span class="sd">    proceeds until all &quot;compound&quot; expressions are broken up.</span>
@@ -395,7 +395,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.reference_element &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -57,16 +57,16 @@
 
 <span class="sd">Currently implemented are UFC and Default Line, Triangle and Tetrahedron.</span>
 <span class="sd">&quot;&quot;&quot;</span>
-<span class="kn">import</span> <span class="nn">operator</span>
-<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">reduce</span>
-<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">product</span>
-<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">factorial</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">reduce</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">product</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">math</span><span class="w"> </span><span class="kn">import</span> <span class="n">factorial</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">from</span> <span class="nn">recursivenodes.nodes</span> <span class="kn">import</span> <span class="n">_decode_family</span><span class="p">,</span> <span class="n">_recursive</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">recursivenodes.nodes</span><span class="w"> </span><span class="kn">import</span> <span class="n">_decode_family</span><span class="p">,</span> <span class="n">_recursive</span>
 
-<span class="kn">from</span> <span class="nn">FIAT.orientation_utils</span> <span class="kn">import</span> <span class="p">(</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.orientation_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">Orientation</span><span class="p">,</span>
     <span class="n">make_cell_orientation_reflection_map_simplex</span><span class="p">,</span>
     <span class="n">make_cell_orientation_reflection_map_tensorproduct</span><span class="p">,</span>
@@ -84,7 +84,7 @@
 
 <div class="viewcode-block" id="multiindex_equal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.multiindex_equal">[docs]</a>
-<span class="k">def</span> <span class="nf">multiindex_equal</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">isum</span><span class="p">,</span> <span class="n">imin</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">multiindex_equal</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">isum</span><span class="p">,</span> <span class="n">imin</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A generator for d-tuple multi-indices whose sum is isum and minimum is imin.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">d</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
@@ -101,7 +101,7 @@
 
 <div class="viewcode-block" id="lattice_iter">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.lattice_iter">[docs]</a>
-<span class="k">def</span> <span class="nf">lattice_iter</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">finish</span><span class="p">,</span> <span class="n">depth</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">lattice_iter</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">finish</span><span class="p">,</span> <span class="n">depth</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Generator iterating over the depth-dimensional lattice of</span>
 <span class="sd">    integers between start and (finish-1).  This works on simplices in</span>
 <span class="sd">    0d, 1d, 2d, 3d, and beyond&quot;&quot;&quot;</span>
@@ -119,7 +119,7 @@
 
 <div class="viewcode-block" id="make_lattice">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.make_lattice">[docs]</a>
-<span class="k">def</span> <span class="nf">make_lattice</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">interior</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_lattice</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">interior</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a lattice of points on the simplex defined by verts.</span>
 <span class="sd">    For example, the 1:st order lattice will be just the vertices.</span>
 <span class="sd">    The optional argument interior specifies how many points from</span>
@@ -144,7 +144,7 @@
 
 <div class="viewcode-block" id="linalg_subspace_intersection">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.linalg_subspace_intersection">[docs]</a>
-<span class="k">def</span> <span class="nf">linalg_subspace_intersection</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">linalg_subspace_intersection</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Computes the intersection of the subspaces spanned by the</span>
 <span class="sd">    columns of 2-dimensional arrays A,B using the algorithm found in</span>
 <span class="sd">    Golub and van Loan (3rd ed) p. 604.  A should be in</span>
@@ -178,11 +178,11 @@
 
 <div class="viewcode-block" id="Cell">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell">[docs]</a>
-<span class="k">class</span> <span class="nc">Cell</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Cell</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for a reference cell.  Provides accessors for</span>
 <span class="sd">    geometry (vertex coordinates) as well as topology (orderings of</span>
 <span class="sd">    vertices that make up edges, faces, etc.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">topology</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">topology</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The constructor takes a shape code, the physical vertices expressed</span>
 <span class="sd">        as a list of tuples of numbers, and the topology of a cell.</span>
 
@@ -233,24 +233,24 @@
                     <span class="n">d01_entities</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">e</span> <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">neighbors</span> <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="n">dim1</span><span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">connectivity</span><span class="p">[(</span><span class="n">dim0</span><span class="p">,</span> <span class="n">dim1</span><span class="p">)]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">d01_entities</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Hashable object key data (excluding type).&quot;&quot;&quot;</span>
         <span class="c1"># Default: only type matters</span>
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="k">def</span> <span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_key</span><span class="p">()))</span>
 
 <div class="viewcode-block" id="Cell.get_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the code for the element&#39;s shape.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span></div>
 
 
 <div class="viewcode-block" id="Cell.get_vertices">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_vertices">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns an iterable of the element&#39;s vertices, each stored as a</span>
 <span class="sd">        tuple.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">vertices</span></div>
@@ -258,14 +258,14 @@
 
 <div class="viewcode-block" id="Cell.get_spatial_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_spatial_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_spatial_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_spatial_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the spatial dimension in which the element lives.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
 
 
 <div class="viewcode-block" id="Cell.get_topology">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_topology">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_topology</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_topology</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dictionary encoding the topology of the element.</span>
 
 <span class="sd">        The dictionary&#39;s keys are the spatial dimensions (0, 1, ...)</span>
@@ -275,7 +275,7 @@
 
 <div class="viewcode-block" id="Cell.get_connectivity">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_connectivity">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a dictionary encoding the connectivity of the element.</span>
 
 <span class="sd">        The dictionary&#39;s keys are the spatial dimensions pairs ((1, 0),</span>
@@ -286,7 +286,7 @@
 
 <div class="viewcode-block" id="Cell.get_vertices_of_subcomplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_vertices_of_subcomplex">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_vertices_of_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_vertices_of_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the tuple of vertex coordinates associated with the labels</span>
 <span class="sd">        contained in the iterable t.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">[</span><span class="n">ti</span><span class="p">]</span> <span class="k">for</span> <span class="n">ti</span> <span class="ow">in</span> <span class="n">t</span><span class="p">)</span></div>
@@ -294,7 +294,7 @@
 
 <div class="viewcode-block" id="Cell.get_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell.  For tensor</span>
 <span class="sd">        product cells, this a tuple of dimensions for each cell in the</span>
 <span class="sd">        product.  For all other cells, this is the same as the spatial</span>
@@ -304,7 +304,7 @@
 
 <div class="viewcode-block" id="Cell.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -315,7 +315,7 @@
 
 <div class="viewcode-block" id="Cell.construct_subcomplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.construct_subcomplex">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference subcomplex of the parent cell subentity</span>
 <span class="sd">        specified by subcomplex dimension.</span>
 
@@ -328,7 +328,7 @@
 
 <div class="viewcode-block" id="Cell.get_entity_transform">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_entity_transform">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
 <span class="sd">        `entity_i`-th subentity of dimension `dim` to the cell.</span>
 
@@ -340,7 +340,7 @@
 
 <div class="viewcode-block" id="Cell.symmetry_group_size">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.symmetry_group_size">[docs]</a>
-    <span class="k">def</span> <span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the size of the symmetry group of an entity of</span>
 <span class="sd">        dimension `dim`.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Should be implemented in a subclass.&quot;</span><span class="p">)</span></div>
@@ -348,14 +348,14 @@
 
 <div class="viewcode-block" id="Cell.cell_orientation_reflection_map">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.cell_orientation_reflection_map">[docs]</a>
-    <span class="k">def</span> <span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Should be implemented in a subclass.&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Cell.extract_extrinsic_orientation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.extract_extrinsic_orientation">[docs]</a>
-    <span class="k">def</span> <span class="nf">extract_extrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_extrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract extrinsic orientation.</span>
 
 <span class="sd">        Parameters</span>
@@ -374,7 +374,7 @@
 
 <div class="viewcode-block" id="Cell.extract_intrinsic_orientation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.extract_intrinsic_orientation">[docs]</a>
-    <span class="k">def</span> <span class="nf">extract_intrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">axis</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_intrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">axis</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract intrinsic orientation.</span>
 
 <span class="sd">        Parameters</span>
@@ -394,7 +394,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">extrinsic_orientation_permutation_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extrinsic_orientation_permutation_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;A map from extrinsic orientations to corresponding axis permutation matrices.</span>
 
 <span class="sd">        Notes</span>
@@ -407,40 +407,40 @@
 
 <div class="viewcode-block" id="Cell.is_simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.is_simplex">[docs]</a>
-    <span class="k">def</span> <span class="nf">is_simplex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_simplex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">False</span></div>
 
 
 <div class="viewcode-block" id="Cell.is_macrocell">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.is_macrocell">[docs]</a>
-    <span class="k">def</span> <span class="nf">is_macrocell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_macrocell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">False</span></div>
 
 
 <div class="viewcode-block" id="Cell.get_interior_facets">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_interior_facets">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_interior_facets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_interior_facets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the interior facets this cell is a split and () otherwise.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="Cell.get_parent">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_parent">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the parent cell if this cell is a split and None otherwise.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">None</span></div>
 
 
 <div class="viewcode-block" id="Cell.get_parent_complex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.get_parent_complex">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_parent_complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_parent_complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the parent complex if this cell is a split and None otherwise.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">None</span></div>
 
 
 <div class="viewcode-block" id="Cell.is_parent">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.is_parent">[docs]</a>
-    <span class="k">def</span> <span class="nf">is_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether this cell is the parent of the other cell.&quot;&quot;&quot;</span>
         <span class="n">parent</span> <span class="o">=</span> <span class="n">other</span>
         <span class="k">if</span> <span class="n">strict</span><span class="p">:</span>
@@ -452,7 +452,7 @@
         <span class="k">return</span> <span class="kc">False</span></div>
 
 
-    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span> <span class="ow">is</span> <span class="n">other</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">True</span>
         <span class="n">A</span><span class="p">,</span> <span class="n">B</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">(),</span> <span class="n">other</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
@@ -465,31 +465,31 @@
                 <span class="k">return</span> <span class="kc">False</span>
         <span class="k">return</span> <span class="kc">True</span>
 
-    <span class="k">def</span> <span class="fm">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">other</span><span class="o">.</span><span class="n">is_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_parent</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">other</span><span class="o">.</span><span class="n">is_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_parent</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="SimplicialComplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex">[docs]</a>
-<span class="k">class</span> <span class="nc">SimplicialComplex</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SimplicialComplex</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Abstract class for a simplicial complex.</span>
 
 <span class="sd">    This consists of list of vertex locations and a topology map defining facets.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">topology</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">topology</span><span class="p">):</span>
         <span class="c1"># Make sure that every facet has the right number of vertices to be</span>
         <span class="c1"># a simplex.</span>
         <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">topology</span><span class="p">:</span>
@@ -500,7 +500,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal vector to facet i of codimension 1.&quot;&quot;&quot;</span>
 
         <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
@@ -575,7 +575,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_tangents">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_tangents">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes tangents in any dimension based on differences</span>
 <span class="sd">        between vertices and the first vertex of the i:th facet</span>
 <span class="sd">        of dimension dim.  Returns a (possibly empty) list.</span>
@@ -587,7 +587,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_normalized_tangents">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_normalized_tangents">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_normalized_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_normalized_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes tangents in any dimension based on differences</span>
 <span class="sd">        between vertices and the first vertex of the i:th facet</span>
 <span class="sd">        of dimension dim.  Returns a (possibly empty) list.</span>
@@ -599,7 +599,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_edge_tangent">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_edge_tangent">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_edge_tangent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">edge_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_edge_tangent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">edge_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the nonnormalized tangent to a 1-dimensional facet.</span>
 <span class="sd">        returns a single vector.&quot;&quot;&quot;</span>
         <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
@@ -609,7 +609,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_normalized_edge_tangent">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_normalized_edge_tangent">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_normalized_edge_tangent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">edge_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_normalized_edge_tangent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">edge_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the unit tangent vector to a 1-dimensional facet&quot;&quot;&quot;</span>
         <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">edge_i</span><span class="p">)</span>
         <span class="n">v</span> <span class="o">/=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
@@ -618,7 +618,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_face_tangents">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_face_tangents">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_face_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">face_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_face_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">face_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the two tangents to a face.  Only implemented</span>
 <span class="sd">        for a tetrahedron.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
@@ -630,7 +630,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_face_edge_tangents">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_face_edge_tangents">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_face_edge_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_face_edge_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes all the edge tangents of any k-face with k&gt;=1.</span>
 <span class="sd">        The result is a array of binom(dim+1,2) vectors.</span>
 <span class="sd">        This agrees with `compute_edge_tangent` when dim=1.</span>
@@ -648,7 +648,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.make_points">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.make_points">[docs]</a>
-    <span class="k">def</span> <span class="nf">make_points</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_points</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs a lattice of points on the entity_id:th</span>
 <span class="sd">        facet of dimension dim.  Order indicates how many points to</span>
 <span class="sd">        include in each direction.&quot;&quot;&quot;</span>
@@ -665,7 +665,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.volume">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.volume">[docs]</a>
-    <span class="k">def</span> <span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the volume of the simplicial complex in the appropriate</span>
 <span class="sd">        dimensional measure.&quot;&quot;&quot;</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -675,14 +675,14 @@
 
 <div class="viewcode-block" id="SimplicialComplex.volume_of_subcomplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.volume_of_subcomplex">[docs]</a>
-    <span class="k">def</span> <span class="nf">volume_of_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">volume_of_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">):</span>
         <span class="n">vids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">facet_no</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">volume</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_vertices_of_subcomplex</span><span class="p">(</span><span class="n">vids</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="SimplicialComplex.compute_scaled_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_scaled_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_scaled_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_scaled_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal to facet_i of scaled by the</span>
 <span class="sd">        volume of that facet.&quot;&quot;&quot;</span>
         <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -692,7 +692,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_reference_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_reference_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal in infinity norm to facet_i.&quot;&quot;&quot;</span>
         <span class="k">assert</span> <span class="n">facet_dim</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">SimplicialComplex</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">)</span>  <span class="c1"># skip UFC overrides</span>
@@ -701,7 +701,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.get_entity_transform">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.get_entity_transform">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
 <span class="sd">        `entity`-th subentity of dimension `dim` to the cell.</span>
 
@@ -736,7 +736,7 @@
 
             <span class="n">offset</span> <span class="o">=</span> <span class="n">v_c</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">v_e</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">C</span><span class="p">)</span>
 
-        <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="n">point</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="n">point</span><span class="p">):</span>
             <span class="n">out</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">C</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">out</span><span class="p">)</span>
 
@@ -745,7 +745,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.get_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.get_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell.  Same as the</span>
 <span class="sd">        spatial dimension.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span></div>
@@ -753,7 +753,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_barycentric_coordinates">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_barycentric_coordinates">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_barycentric_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_barycentric_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the barycentric coordinates of a list of points on the complex.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">points</span>
@@ -786,7 +786,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.compute_bubble">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.compute_bubble">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_bubble</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_bubble</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the lowest-order bubble on an entity evaluated at the given</span>
 <span class="sd">        points on the cell.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
@@ -794,7 +794,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.distance_to_point_l1">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.distance_to_point_l1">[docs]</a>
-    <span class="k">def</span> <span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="c1"># noqa: D301</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the L1 distance (aka &#39;manhatten&#39;, &#39;taxicab&#39; or rectilinear</span>
 <span class="sd">        distance) from an entity to a point with 0.0 if the point is inside the entity.</span>
@@ -928,7 +928,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.contains_point">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.contains_point">[docs]</a>
-    <span class="k">def</span> <span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
 <span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhatten&#39;,</span>
 <span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
@@ -952,7 +952,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.extract_extrinsic_orientation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation">[docs]</a>
-    <span class="k">def</span> <span class="nf">extract_extrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_extrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract extrinsic orientation.</span>
 
 <span class="sd">        Parameters</span>
@@ -973,7 +973,7 @@
 
 <div class="viewcode-block" id="SimplicialComplex.extract_intrinsic_orientation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation">[docs]</a>
-    <span class="k">def</span> <span class="nf">extract_intrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">axis</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_intrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">axis</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract intrinsic orientation.</span>
 
 <span class="sd">        Parameters</span>
@@ -997,7 +997,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">extrinsic_orientation_permutation_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extrinsic_orientation_permutation_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;A map from extrinsic orientations to corresponding axis permutation matrices.</span>
 
 <span class="sd">        Notes</span>
@@ -1012,7 +1012,7 @@
 
 <div class="viewcode-block" id="Simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Simplex">[docs]</a>
-<span class="k">class</span> <span class="nc">Simplex</span><span class="p">(</span><span class="n">SimplicialComplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Simplex</span><span class="p">(</span><span class="n">SimplicialComplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Abstract class for a reference simplex.</span>
 
 <span class="sd">    Orientation of a physical cell is computed systematically</span>
@@ -1048,26 +1048,26 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 <div class="viewcode-block" id="Simplex.is_simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Simplex.is_simplex">[docs]</a>
-    <span class="k">def</span> <span class="nf">is_simplex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_simplex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="kc">True</span></div>
 
 
 <div class="viewcode-block" id="Simplex.symmetry_group_size">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Simplex.symmetry_group_size">[docs]</a>
-    <span class="k">def</span> <span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">factorial</span><span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Simplex.cell_orientation_reflection_map">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Simplex.cell_orientation_reflection_map">[docs]</a>
-    <span class="k">def</span> <span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">make_cell_orientation_reflection_map_simplex</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">())</span></div>
 
 
 <div class="viewcode-block" id="Simplex.get_facet_element">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Simplex.get_facet_element">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span></div>
 </div>
@@ -1080,11 +1080,11 @@
 
 <div class="viewcode-block" id="UFCSimplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCSimplex">[docs]</a>
-<span class="k">class</span> <span class="nc">UFCSimplex</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCSimplex</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
 
 <div class="viewcode-block" id="UFCSimplex.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCSimplex.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -1097,11 +1097,11 @@
 
 <div class="viewcode-block" id="DefaultSimplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.DefaultSimplex">[docs]</a>
-<span class="k">class</span> <span class="nc">DefaultSimplex</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DefaultSimplex</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
 
 <div class="viewcode-block" id="DefaultSimplex.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.DefaultSimplex.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -1114,11 +1114,11 @@
 
 <div class="viewcode-block" id="SymmetricSimplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SymmetricSimplex">[docs]</a>
-<span class="k">class</span> <span class="nc">SymmetricSimplex</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SymmetricSimplex</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
 
 <div class="viewcode-block" id="SymmetricSimplex.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SymmetricSimplex.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -1131,17 +1131,17 @@
 
 <div class="viewcode-block" id="Point">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Point">[docs]</a>
-<span class="k">class</span> <span class="nc">Point</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Point</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference point.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((),)</span>
         <span class="n">topology</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)}}</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">POINT</span><span class="p">,</span> <span class="n">verts</span><span class="p">,</span> <span class="n">topology</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Point.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Point.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -1155,10 +1155,10 @@
 
 <div class="viewcode-block" id="DefaultLine">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.DefaultLine">[docs]</a>
-<span class="k">class</span> <span class="nc">DefaultLine</span><span class="p">(</span><span class="n">DefaultSimplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DefaultLine</span><span class="p">(</span><span class="n">DefaultSimplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference line with vertices (-1.0,) and (1.0,).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,))</span>
         <span class="n">edges</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)}</span>
         <span class="n">topology</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,),</span> <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)},</span>
@@ -1169,10 +1169,10 @@
 
 <div class="viewcode-block" id="UFCInterval">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCInterval">[docs]</a>
-<span class="k">class</span> <span class="nc">UFCInterval</span><span class="p">(</span><span class="n">UFCSimplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCInterval</span><span class="p">(</span><span class="n">UFCSimplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference interval with vertices (0.0,) and (1.0,).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="mf">0.0</span><span class="p">,),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,))</span>
         <span class="n">edges</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)}</span>
         <span class="n">topology</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,),</span> <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)},</span>
@@ -1183,11 +1183,11 @@
 
 <div class="viewcode-block" id="DefaultTriangle">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.DefaultTriangle">[docs]</a>
-<span class="k">class</span> <span class="nc">DefaultTriangle</span><span class="p">(</span><span class="n">DefaultSimplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DefaultTriangle</span><span class="p">(</span><span class="n">DefaultSimplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference triangle with vertices (-1.0,-1.0),</span>
 <span class="sd">    (1.0,-1.0), and (-1.0,1.0).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
         <span class="n">edges</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
                  <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
@@ -1201,11 +1201,11 @@
 
 <div class="viewcode-block" id="UFCTriangle">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCTriangle">[docs]</a>
-<span class="k">class</span> <span class="nc">UFCTriangle</span><span class="p">(</span><span class="n">UFCSimplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCTriangle</span><span class="p">(</span><span class="n">UFCSimplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference triangle with vertices (0.0,0.0),</span>
 <span class="sd">    (1.0,0.0), and (0.0,1.0).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
         <span class="n">edges</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="mi">2</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)}</span>
         <span class="n">faces</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)}</span>
@@ -1215,7 +1215,7 @@
 
 <div class="viewcode-block" id="UFCTriangle.compute_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCTriangle.compute_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
         <span class="s2">&quot;UFC consistent normal&quot;</span>
         <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">((</span><span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">-</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
@@ -1226,10 +1226,10 @@
 
 <div class="viewcode-block" id="IntrepidTriangle">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.IntrepidTriangle">[docs]</a>
-<span class="k">class</span> <span class="nc">IntrepidTriangle</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntrepidTriangle</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the Intrepid triangle with vertices (0,0),(1,0),(0,1)&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
         <span class="n">edges</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
                  <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
@@ -1241,7 +1241,7 @@
 
 <div class="viewcode-block" id="IntrepidTriangle.get_facet_element">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.IntrepidTriangle.get_facet_element">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># I think the UFC interval is equivalent to what the</span>
         <span class="c1"># IntrepidInterval would be.</span>
         <span class="k">return</span> <span class="n">UFCInterval</span><span class="p">()</span></div>
@@ -1251,11 +1251,11 @@
 
 <div class="viewcode-block" id="DefaultTetrahedron">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.DefaultTetrahedron">[docs]</a>
-<span class="k">class</span> <span class="nc">DefaultTetrahedron</span><span class="p">(</span><span class="n">DefaultSimplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DefaultTetrahedron</span><span class="p">(</span><span class="n">DefaultSimplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference tetrahedron with vertices (-1,-1,-1),</span>
 <span class="sd">    (1,-1,-1),(-1,1,-1), and (-1,-1,1).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">),</span>
                  <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">),</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
         <span class="n">vs</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">),</span>
@@ -1280,11 +1280,11 @@
 
 <div class="viewcode-block" id="IntrepidTetrahedron">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.IntrepidTetrahedron">[docs]</a>
-<span class="k">class</span> <span class="nc">IntrepidTetrahedron</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntrepidTetrahedron</span><span class="p">(</span><span class="n">Simplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference tetrahedron with vertices (0,0,0),</span>
 <span class="sd">    (1,0,0),(0,1,0), and (0,0,1) used in the Intrepid project.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
         <span class="n">vs</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">),</span>
               <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">),</span>
@@ -1306,7 +1306,7 @@
 
 <div class="viewcode-block" id="IntrepidTetrahedron.get_facet_element">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.IntrepidTetrahedron.get_facet_element">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">IntrepidTriangle</span><span class="p">()</span></div>
 </div>
 
@@ -1314,11 +1314,11 @@
 
 <div class="viewcode-block" id="UFCTetrahedron">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCTetrahedron">[docs]</a>
-<span class="k">class</span> <span class="nc">UFCTetrahedron</span><span class="p">(</span><span class="n">UFCSimplex</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCTetrahedron</span><span class="p">(</span><span class="n">UFCSimplex</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference tetrahedron with vertices (0,0,0),</span>
 <span class="sd">    (1,0,0),(0,1,0), and (0,0,1).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="p">((</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">))</span>
         <span class="n">vs</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">),</span>
               <span class="mi">1</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="p">),</span>
@@ -1340,7 +1340,7 @@
 
 <div class="viewcode-block" id="UFCTetrahedron.compute_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCTetrahedron.compute_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
         <span class="s2">&quot;UFC consistent normals.&quot;</span>
         <span class="n">t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
         <span class="n">n</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">t</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
@@ -1351,10 +1351,10 @@
 
 <div class="viewcode-block" id="TensorProductCell">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell">[docs]</a>
-<span class="k">class</span> <span class="nc">TensorProductCell</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TensorProductCell</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A cell that is the product of FIAT cells.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">cells</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">cells</span><span class="p">):</span>
         <span class="c1"># Vertices</span>
         <span class="n">vertices</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">coords</span><span class="p">))</span>
                          <span class="k">for</span> <span class="n">coords</span> <span class="ow">in</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">cell</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
@@ -1380,11 +1380,11 @@
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">TENSORPRODUCT</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">topology</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cells</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">cells</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_split_slices</span><span class="p">(</span><span class="n">lengths</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_split_slices</span><span class="p">(</span><span class="n">lengths</span><span class="p">):</span>
         <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">lengths</span><span class="p">)</span>
         <span class="n">delimiter</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
@@ -1394,7 +1394,7 @@
 
 <div class="viewcode-block" id="TensorProductCell.get_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.get_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell, a tuple of</span>
 <span class="sd">        dimensions for each cell in the product.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span></div>
@@ -1402,7 +1402,7 @@
 
 <div class="viewcode-block" id="TensorProductCell.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -1414,7 +1414,7 @@
 
 <div class="viewcode-block" id="TensorProductCell.construct_subcomplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.construct_subcomplex">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference subcomplex of the parent cell subentity</span>
 <span class="sd">        specified by subcomplex dimension.</span>
 
@@ -1426,7 +1426,7 @@
 
 <div class="viewcode-block" id="TensorProductCell.get_entity_transform">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.get_entity_transform">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
 <span class="sd">        `entity_i`-th subentity of dimension `dim` to the cell.</span>
 
@@ -1444,7 +1444,7 @@
 
         <span class="n">slices</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="o">.</span><span class="n">_split_slices</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
 
-        <span class="k">def</span> <span class="nf">transform</span><span class="p">(</span><span class="n">point</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">transform</span><span class="p">(</span><span class="n">point</span><span class="p">):</span>
             <span class="n">point</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">point</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">t</span><span class="p">(</span><span class="n">point</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">s</span><span class="p">])</span>
                                      <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">sct</span><span class="p">,</span> <span class="n">slices</span><span class="p">)),</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
@@ -1454,14 +1454,14 @@
 
 <div class="viewcode-block" id="TensorProductCell.volume">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.volume">[docs]</a>
-    <span class="k">def</span> <span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the volume in the appropriate dimensional measure.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">c</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">])</span></div>
 
 
 <div class="viewcode-block" id="TensorProductCell.compute_reference_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.compute_reference_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal in infinity norm to facet_i of</span>
 <span class="sd">        subelement dimension facet_dim.&quot;&quot;&quot;</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">facet_dim</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">())</span>
@@ -1479,7 +1479,7 @@
 
 <div class="viewcode-block" id="TensorProductCell.contains_point">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.contains_point">[docs]</a>
-    <span class="k">def</span> <span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
 <span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhatten&#39;,</span>
 <span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
@@ -1507,7 +1507,7 @@
 
 <div class="viewcode-block" id="TensorProductCell.distance_to_point_l1">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.distance_to_point_l1">[docs]</a>
-    <span class="k">def</span> <span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the L1 distance (aka &#39;manhatten&#39;, &#39;taxicab&#39; or rectilinear</span>
 <span class="sd">        distance) to a point with 0.0 if the point is inside the cell.</span>
 
@@ -1522,20 +1522,20 @@
 
 <div class="viewcode-block" id="TensorProductCell.symmetry_group_size">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.symmetry_group_size">[docs]</a>
-    <span class="k">def</span> <span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">symmetry_group_size</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="TensorProductCell.cell_orientation_reflection_map">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.cell_orientation_reflection_map">[docs]</a>
-    <span class="k">def</span> <span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">make_cell_orientation_reflection_map_tensorproduct</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TensorProductCell.compare">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.compare">[docs]</a>
-    <span class="k">def</span> <span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="s2">&quot;product&quot;</span><span class="p">):</span>
             <span class="n">other</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">product</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)):</span>
@@ -1544,21 +1544,21 @@
             <span class="k">return</span> <span class="n">op</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span></div>
 
 
-    <span class="k">def</span> <span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">gt</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">ge</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">operator</span><span class="o">.</span><span class="n">le</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 
 <div class="viewcode-block" id="TensorProductCell.extract_extrinsic_orientation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation">[docs]</a>
-    <span class="k">def</span> <span class="nf">extract_extrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_extrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract extrinsic orientation.</span>
 
 <span class="sd">        Parameters</span>
@@ -1586,7 +1586,7 @@
 
 <div class="viewcode-block" id="TensorProductCell.extract_intrinsic_orientation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation">[docs]</a>
-    <span class="k">def</span> <span class="nf">extract_intrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">axis</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extract_intrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">,</span> <span class="n">axis</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract intrinsic orientation.</span>
 
 <span class="sd">        Parameters</span>
@@ -1616,7 +1616,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">extrinsic_orientation_permutation_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">extrinsic_orientation_permutation_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;A map from extrinsic orientations to corresponding axis permutation matrices.</span>
 
 <span class="sd">        Notes</span>
@@ -1635,7 +1635,7 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral">[docs]</a>
-<span class="k">class</span> <span class="nc">UFCQuadrilateral</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCQuadrilateral</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;This is the reference quadrilateral with vertices</span>
 <span class="sd">    (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).</span>
 
@@ -1680,7 +1680,7 @@
 
 <span class="sd">    o = 2 * 1 + 0 = 2</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">product</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="n">UFCInterval</span><span class="p">(),</span> <span class="n">UFCInterval</span><span class="p">())</span>
         <span class="n">pt</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
 
@@ -1694,7 +1694,7 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral.get_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.get_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell.  Same as the</span>
 <span class="sd">        spatial dimension.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span></div>
@@ -1702,7 +1702,7 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -1720,7 +1720,7 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral.get_entity_transform">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.get_entity_transform">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
 <span class="sd">        `entity_i`-th subentity of dimension `dim` to the cell.</span>
 
@@ -1733,14 +1733,14 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral.volume">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.volume">[docs]</a>
-    <span class="k">def</span> <span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the volume in the appropriate dimensional measure.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="UFCQuadrilateral.compute_reference_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.compute_reference_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal in infinity norm to facet_i.&quot;&quot;&quot;</span>
         <span class="k">assert</span> <span class="n">facet_dim</span> <span class="o">==</span> <span class="mi">1</span>
         <span class="n">d</span><span class="p">,</span> <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">)]</span>
@@ -1749,7 +1749,7 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral.contains_point">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.contains_point">[docs]</a>
-    <span class="k">def</span> <span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
 <span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhatten&#39;,</span>
 <span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
@@ -1771,7 +1771,7 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral.distance_to_point_l1">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.distance_to_point_l1">[docs]</a>
-    <span class="k">def</span> <span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the L1 distance (aka &#39;manhatten&#39;, &#39;taxicab&#39; or rectilinear</span>
 <span class="sd">        distance) to a point with 0.0 if the point is inside the cell.</span>
 
@@ -1781,39 +1781,39 @@
 
 <div class="viewcode-block" id="UFCQuadrilateral.symmetry_group_size">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.symmetry_group_size">[docs]</a>
-    <span class="k">def</span> <span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">][</span><span class="n">dim</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="UFCQuadrilateral.cell_orientation_reflection_map">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.cell_orientation_reflection_map">[docs]</a>
-    <span class="k">def</span> <span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cell_orientation_reflection_map</span><span class="p">()</span></div>
 
 
-    <span class="k">def</span> <span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;</span> <span class="n">other</span>
 
-    <span class="k">def</span> <span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;</span> <span class="n">other</span>
 
-    <span class="k">def</span> <span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;=</span> <span class="n">other</span>
 
-    <span class="k">def</span> <span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;=</span> <span class="n">other</span></div>
 
 
 
 <div class="viewcode-block" id="UFCHexahedron">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron">[docs]</a>
-<span class="k">class</span> <span class="nc">UFCHexahedron</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCHexahedron</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference hexahedron with vertices</span>
 <span class="sd">    (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),</span>
 <span class="sd">    (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">product</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="n">UFCInterval</span><span class="p">(),</span> <span class="n">UFCInterval</span><span class="p">(),</span> <span class="n">UFCInterval</span><span class="p">())</span>
         <span class="n">pt</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
 
@@ -1827,7 +1827,7 @@
 
 <div class="viewcode-block" id="UFCHexahedron.get_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.get_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell.  Same as the</span>
 <span class="sd">        spatial dimension.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span></div>
@@ -1835,7 +1835,7 @@
 
 <div class="viewcode-block" id="UFCHexahedron.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.construct_subelement">[docs]</a>
-    <span class="k">def</span> <span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
@@ -1855,7 +1855,7 @@
 
 <div class="viewcode-block" id="UFCHexahedron.get_entity_transform">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.get_entity_transform">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
 <span class="sd">        `entity_i`-th subentity of dimension `dim` to the cell.</span>
 
@@ -1868,14 +1868,14 @@
 
 <div class="viewcode-block" id="UFCHexahedron.volume">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.volume">[docs]</a>
-    <span class="k">def</span> <span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the volume in the appropriate dimensional measure.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="UFCHexahedron.compute_reference_normal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.compute_reference_normal">[docs]</a>
-    <span class="k">def</span> <span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal in infinity norm to facet_i.&quot;&quot;&quot;</span>
         <span class="k">assert</span> <span class="n">facet_dim</span> <span class="o">==</span> <span class="mi">2</span>
         <span class="n">d</span><span class="p">,</span> <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">)]</span>
@@ -1884,7 +1884,7 @@
 
 <div class="viewcode-block" id="UFCHexahedron.contains_point">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.contains_point">[docs]</a>
-    <span class="k">def</span> <span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
 <span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhatten&#39;,</span>
 <span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
@@ -1906,7 +1906,7 @@
 
 <div class="viewcode-block" id="UFCHexahedron.distance_to_point_l1">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.distance_to_point_l1">[docs]</a>
-    <span class="k">def</span> <span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the L1 distance (aka &#39;manhatten&#39;, &#39;taxicab&#39; or rectilinear</span>
 <span class="sd">        distance) to a point with 0.0 if the point is inside the cell.</span>
 
@@ -1916,34 +1916,34 @@
 
 <div class="viewcode-block" id="UFCHexahedron.symmetry_group_size">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.symmetry_group_size">[docs]</a>
-    <span class="k">def</span> <span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">48</span><span class="p">][</span><span class="n">dim</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="UFCHexahedron.cell_orientation_reflection_map">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.cell_orientation_reflection_map">[docs]</a>
-    <span class="k">def</span> <span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cell_orientation_reflection_map</span><span class="p">()</span></div>
 
 
-    <span class="k">def</span> <span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;</span> <span class="n">other</span>
 
-    <span class="k">def</span> <span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;</span> <span class="n">other</span>
 
-    <span class="k">def</span> <span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;=</span> <span class="n">other</span>
 
-    <span class="k">def</span> <span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;=</span> <span class="n">other</span></div>
 
 
 
 <div class="viewcode-block" id="make_affine_mapping">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.make_affine_mapping">[docs]</a>
-<span class="k">def</span> <span class="nf">make_affine_mapping</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_affine_mapping</span><span class="p">(</span><span class="n">xs</span><span class="p">,</span> <span class="n">ys</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs (A,b) such that x --&gt; A * x + b is the affine</span>
 <span class="sd">    mapping from the simplex defined by xs to the simplex defined by ys.&quot;&quot;&quot;</span>
 
@@ -1982,7 +1982,7 @@
 
 <div class="viewcode-block" id="default_simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.default_simplex">[docs]</a>
-<span class="k">def</span> <span class="nf">default_simplex</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">default_simplex</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory function that maps spatial dimension to an instance of</span>
 <span class="sd">    the default reference simplex of that dimension.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -2000,7 +2000,7 @@
 
 <div class="viewcode-block" id="ufc_simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.ufc_simplex">[docs]</a>
-<span class="k">def</span> <span class="nf">ufc_simplex</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">ufc_simplex</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory function that maps spatial dimension to an instance of</span>
 <span class="sd">    the UFC reference simplex of that dimension.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -2018,7 +2018,7 @@
 
 <div class="viewcode-block" id="symmetric_simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.symmetric_simplex">[docs]</a>
-<span class="k">def</span> <span class="nf">symmetric_simplex</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">symmetric_simplex</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
     <span class="n">A</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span>
                      <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="o">/</span><span class="mi">3</span><span class="p">],</span>
                      <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">6</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">/</span><span class="mi">3</span><span class="p">)]])</span>
@@ -2033,7 +2033,7 @@
 
 <div class="viewcode-block" id="ufc_cell">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.ufc_cell">[docs]</a>
-<span class="k">def</span> <span class="nf">ufc_cell</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">ufc_cell</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Handle incoming calls from FFC.&quot;&quot;&quot;</span>
 
     <span class="c1"># celltype could be a string or a cell.</span>
@@ -2064,7 +2064,7 @@
 
 <div class="viewcode-block" id="volume">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.volume">[docs]</a>
-<span class="k">def</span> <span class="nf">volume</span><span class="p">(</span><span class="n">verts</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="n">verts</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs the volume of the simplex spanned by verts&quot;&quot;&quot;</span>
 
     <span class="c1"># use fact that volume of UFC reference element is 1/n!</span>
@@ -2091,7 +2091,7 @@
 
 <div class="viewcode-block" id="tuple_sum">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.tuple_sum">[docs]</a>
-<span class="k">def</span> <span class="nf">tuple_sum</span><span class="p">(</span><span class="n">tree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">tuple_sum</span><span class="p">(</span><span class="n">tree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    This function calculates the sum of elements in a tuple, it is needed to handle nested tuples in TensorProductCell.</span>
 <span class="sd">    Example: tuple_sum(((1, 0), 1)) returns 2</span>
@@ -2106,7 +2106,7 @@
 
 <div class="viewcode-block" id="is_hypercube">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.is_hypercube">[docs]</a>
-<span class="k">def</span> <span class="nf">is_hypercube</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_hypercube</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="p">(</span><span class="n">DefaultLine</span><span class="p">,</span> <span class="n">UFCInterval</span><span class="p">,</span> <span class="n">UFCQuadrilateral</span><span class="p">,</span> <span class="n">UFCHexahedron</span><span class="p">)):</span>
         <span class="k">return</span> <span class="kc">True</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">TensorProductCell</span><span class="p">):</span>
@@ -2118,7 +2118,7 @@
 
 <div class="viewcode-block" id="flatten_reference_cube">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.flatten_reference_cube">[docs]</a>
-<span class="k">def</span> <span class="nf">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This function flattens a Tensor Product hypercube to the corresponding UFC hypercube&quot;&quot;&quot;</span>
     <span class="n">flattened_cube</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2</span><span class="p">:</span> <span class="n">UFCQuadrilateral</span><span class="p">(),</span> <span class="mi">3</span><span class="p">:</span> <span class="n">UFCHexahedron</span><span class="p">()}</span>
     <span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">())</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
@@ -2136,7 +2136,7 @@
 
 <div class="viewcode-block" id="flatten_entities">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.flatten_entities">[docs]</a>
-<span class="k">def</span> <span class="nf">flatten_entities</span><span class="p">(</span><span class="n">topology_dict</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">flatten_entities</span><span class="p">(</span><span class="n">topology_dict</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This function flattens topology dict of TensorProductCell and entity_dofs dict of TensorProductElement&quot;&quot;&quot;</span>
 
     <span class="n">flattened_entities</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
@@ -2151,7 +2151,7 @@
 
 <div class="viewcode-block" id="flatten_permutations">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.flatten_permutations">[docs]</a>
-<span class="k">def</span> <span class="nf">flatten_permutations</span><span class="p">(</span><span class="n">perm_dict</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">flatten_permutations</span><span class="p">(</span><span class="n">perm_dict</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This function flattens permutation dict of TensorProductElement&quot;&quot;&quot;</span>
 
     <span class="n">flattened_permutations</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
@@ -2166,7 +2166,7 @@
 
 <div class="viewcode-block" id="compute_unflattening_map">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.compute_unflattening_map">[docs]</a>
-<span class="k">def</span> <span class="nf">compute_unflattening_map</span><span class="p">(</span><span class="n">topology_dict</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">compute_unflattening_map</span><span class="p">(</span><span class="n">topology_dict</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This function returns unflattening map for the given tensor product topology dict.&quot;&quot;&quot;</span>
 
     <span class="n">counter</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
@@ -2184,7 +2184,7 @@
 
 <div class="viewcode-block" id="max_complex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.max_complex">[docs]</a>
-<span class="k">def</span> <span class="nf">max_complex</span><span class="p">(</span><span class="n">complexes</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">max_complex</span><span class="p">(</span><span class="n">complexes</span><span class="p">):</span>
     <span class="n">max_cell</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">complexes</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">max_cell</span> <span class="o">&gt;=</span> <span class="n">b</span> <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">complexes</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">max_cell</span>
@@ -2228,7 +2228,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

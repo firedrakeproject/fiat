@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.jacobi &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -47,12 +47,12 @@
 <span class="sd">functions over the simplices and in defining quadrature</span>
 <span class="sd">rules over each domain.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
 
 <div class="viewcode-block" id="eval_jacobi">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi">[docs]</a>
-<span class="k">def</span> <span class="nf">eval_jacobi</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the nth jacobi polynomial with weight parameters a,b at a</span>
 <span class="sd">    point x. Recurrence relations implemented from the pseudocode</span>
 <span class="sd">    given in Karniadakis and Sherwin, Appendix B&quot;&quot;&quot;</span>
@@ -87,7 +87,7 @@
 
 <div class="viewcode-block" id="eval_jacobi_batch">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi_batch">[docs]</a>
-<span class="k">def</span> <span class="nf">eval_jacobi_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates all jacobi polynomials with weights a,b</span>
 <span class="sd">    up to degree n.  xs is a numpy.array of points.</span>
 <span class="sd">    Returns a two-dimensional array of points, where the</span>
@@ -123,7 +123,7 @@
 
 <div class="viewcode-block" id="eval_jacobi_deriv">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi_deriv">[docs]</a>
-<span class="k">def</span> <span class="nf">eval_jacobi_deriv</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_deriv</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the first derivative of P_{n}^{a,b} at a point x.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="mf">0.0</span>
@@ -134,7 +134,7 @@
 
 <div class="viewcode-block" id="eval_jacobi_deriv_batch">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi_deriv_batch">[docs]</a>
-<span class="k">def</span> <span class="nf">eval_jacobi_deriv_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_deriv_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the first derivatives of all jacobi polynomials with</span>
 <span class="sd">    weights a,b up to degree n.  xs is a numpy.array of points.</span>
 <span class="sd">    Returns a two-dimensional array of points, where the</span>
@@ -186,7 +186,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

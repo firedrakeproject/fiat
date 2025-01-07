@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.argyris &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -42,21 +42,21 @@
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span>
-<span class="kn">from</span> <span class="nn">FIAT.check_format_variant</span> <span class="kn">import</span> <span class="n">check_format_variant</span>
-<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="p">(</span><span class="n">PointEvaluation</span><span class="p">,</span> <span class="n">PointDerivative</span><span class="p">,</span> <span class="n">PointNormalDerivative</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_format_variant</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">PointEvaluation</span><span class="p">,</span> <span class="n">PointDerivative</span><span class="p">,</span> <span class="n">PointNormalDerivative</span><span class="p">,</span>
                              <span class="n">IntegralMoment</span><span class="p">,</span>
                              <span class="n">IntegralMomentOfNormalDerivative</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">FIAT.jacobi</span> <span class="kn">import</span> <span class="n">eval_jacobi_batch</span><span class="p">,</span> <span class="n">eval_jacobi_deriv_batch</span>
-<span class="kn">from</span> <span class="nn">FIAT.quadrature</span> <span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
-<span class="kn">from</span> <span class="nn">FIAT.quadrature_schemes</span> <span class="kn">import</span> <span class="n">create_quadrature</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">ufc_simplex</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.jacobi</span><span class="w"> </span><span class="kn">import</span> <span class="n">eval_jacobi_batch</span><span class="p">,</span> <span class="n">eval_jacobi_deriv_batch</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">ufc_simplex</span>
 
 
 <div class="viewcode-block" id="ArgyrisDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.argyris.ArgyrisDualSet">[docs]</a>
-<span class="k">class</span> <span class="nc">ArgyrisDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArgyrisDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Argyris only defined on triangles&quot;</span><span class="p">)</span>
 
@@ -128,7 +128,7 @@
 
 <div class="viewcode-block" id="Argyris">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.argyris.Argyris">[docs]</a>
-<span class="k">class</span> <span class="nc">Argyris</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Argyris</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    The Argyris finite element.</span>
 
@@ -144,7 +144,7 @@
 <span class="sd">    degree required for unisolvence plus q.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 
         <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
 
@@ -189,7 +189,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

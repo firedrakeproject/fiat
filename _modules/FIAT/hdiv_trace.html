@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.hdiv_trace &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -42,17 +42,17 @@
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">FIAT.discontinuous_lagrange</span> <span class="kn">import</span> <span class="n">DiscontinuousLagrange</span>
-<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">DualSet</span>
-<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
-<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="n">PointEvaluation</span>
-<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="p">(</span><span class="n">ufc_simplex</span><span class="p">,</span> <span class="n">POINT</span><span class="p">,</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.discontinuous_lagrange</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscontinuousLagrange</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">PointEvaluation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">ufc_simplex</span><span class="p">,</span> <span class="n">POINT</span><span class="p">,</span>
                                     <span class="n">LINE</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">,</span>
                                     <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">TETRAHEDRON</span><span class="p">,</span>
                                     <span class="n">TENSORPRODUCT</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">FIAT.tensor_product</span> <span class="kn">import</span> <span class="n">TensorProductElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.tensor_product</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorProductElement</span>
 
 <span class="c1"># Numerical tolerance for facet-entity identifications</span>
 <span class="n">epsilon</span> <span class="o">=</span> <span class="mf">1e-10</span>
@@ -60,11 +60,11 @@
 
 <div class="viewcode-block" id="TraceError">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.TraceError">[docs]</a>
-<span class="k">class</span> <span class="nc">TraceError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TraceError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Exception caused by tabulating a trace element on the interior of a cell,</span>
 <span class="sd">    or the gradient of a trace element.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">msg</span> <span class="o">=</span> <span class="n">msg</span></div>
 
@@ -72,7 +72,7 @@
 
 <div class="viewcode-block" id="HDivTrace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace">[docs]</a>
-<span class="k">class</span> <span class="nc">HDivTrace</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">HDivTrace</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Class implementing the trace of hdiv elements. This class</span>
 <span class="sd">    is a stand-alone element family that produces a DG-facet field.</span>
 <span class="sd">    This element is what&#39;s produced after performing the trace</span>
@@ -82,7 +82,7 @@
 <span class="sd">    arises in several DG formulations.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructor for the HDivTrace element.</span>
 
 <span class="sd">        :arg ref_el: A reference element, which may be a tensor product</span>
@@ -169,14 +169,14 @@
 
 <div class="viewcode-block" id="HDivTrace.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.degree">[docs]</a>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the degree of the (embedding) polynomial space.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polydegree</span></div>
 
 
 <div class="viewcode-block" id="HDivTrace.get_nodal_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.get_nodal_basis">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
 <span class="sd">        for the finite element.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented for the trace element.&quot;</span><span class="p">)</span></div>
@@ -184,7 +184,7 @@
 
 <div class="viewcode-block" id="HDivTrace.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.get_coeffs">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
 <span class="sd">        finite element.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented for the trace element.&quot;</span><span class="p">)</span></div>
@@ -192,7 +192,7 @@
 
 <div class="viewcode-block" id="HDivTrace.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.tabulate">[docs]</a>
-    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to a given order of</span>
 <span class="sd">        basis functions at given points.</span>
 
@@ -304,14 +304,14 @@
 
 <div class="viewcode-block" id="HDivTrace.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.value_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the value shape of the finite element functions.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="HDivTrace.dmats">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.dmats">[docs]</a>
-    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
 <span class="sd">        derivatives.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;dmats not implemented for the trace element.&quot;</span><span class="p">)</span></div>
@@ -319,7 +319,7 @@
 
 <div class="viewcode-block" id="HDivTrace.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.get_num_members">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return number of members of the expansion set.&quot;&quot;&quot;</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_num_members not implemented for the trace element.&quot;</span><span class="p">)</span></div>
 
@@ -327,7 +327,7 @@
 <div class="viewcode-block" id="HDivTrace.is_nodal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.HDivTrace.is_nodal">[docs]</a>
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">is_nodal</span><span class="p">():</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_nodal</span><span class="p">():</span>
         <span class="k">return</span> <span class="kc">True</span></div>
 </div>
 
@@ -335,7 +335,7 @@
 
 <div class="viewcode-block" id="construct_dg_element">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.construct_dg_element">[docs]</a>
-<span class="k">def</span> <span class="nf">construct_dg_element</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">construct_dg_element</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a discontinuous galerkin element of a given degree</span>
 <span class="sd">    on a particular reference cell.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -376,7 +376,7 @@
 <span class="c1"># The following functions are credited to Marie E. Rognes:</span>
 <div class="viewcode-block" id="extract_unique_facet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.extract_unique_facet">[docs]</a>
-<span class="k">def</span> <span class="nf">extract_unique_facet</span><span class="p">(</span><span class="n">coordinates</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="n">epsilon</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_unique_facet</span><span class="p">(</span><span class="n">coordinates</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="n">epsilon</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Determines whether a set of points (described in its barycentric coordinates)</span>
 <span class="sd">    are all on one of the facet sub-entities, and return the particular facet and</span>
 <span class="sd">    whether the search has been successful.</span>
@@ -404,7 +404,7 @@
 
 <div class="viewcode-block" id="barycentric_coordinates">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.barycentric_coordinates">[docs]</a>
-<span class="k">def</span> <span class="nf">barycentric_coordinates</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">barycentric_coordinates</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Computes the barycentric coordinates for a set of points relative to a</span>
 <span class="sd">    simplex defined by a set of vertices.</span>
 
@@ -425,7 +425,7 @@
 
 <div class="viewcode-block" id="map_from_reference_facet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.map_from_reference_facet">[docs]</a>
-<span class="k">def</span> <span class="nf">map_from_reference_facet</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">map_from_reference_facet</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">vertices</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the physical coordinate of a point using barycentric</span>
 <span class="sd">    coordinates.</span>
 
@@ -446,7 +446,7 @@
 
 <div class="viewcode-block" id="map_to_reference_facet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.map_to_reference_facet">[docs]</a>
-<span class="k">def</span> <span class="nf">map_to_reference_facet</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">map_to_reference_facet</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">facet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Given a set of points and vertices describing a facet of a simplex in n-dimensional</span>
 <span class="sd">    coordinates (where the points lie on the facet), map the points to the reference simplex</span>
 <span class="sd">    of dimension (n-1).</span>
@@ -514,7 +514,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>finat.tensorfiniteelement &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -36,23 +36,23 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.tensorfiniteelement</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">reduce</span>
-<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">reduce</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">import</span> <span class="nn">gem</span>
-<span class="kn">from</span> <span class="nn">gem.optimise</span> <span class="kn">import</span> <span class="n">delta_elimination</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span> <span class="n">traverse_product</span>
-<span class="kn">from</span> <span class="nn">gem.utils</span> <span class="kn">import</span> <span class="n">cached_property</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="n">delta_elimination</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span> <span class="n">traverse_product</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">cached_property</span>
 
-<span class="kn">from</span> <span class="nn">finat.finiteelementbase</span> <span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.finiteelementbase</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElementBase</span>
 
 
 <div class="viewcode-block" id="TensorFiniteElement">
 <a class="viewcode-back" href="../../finat.html#finat.tensorfiniteelement.TensorFiniteElement">[docs]</a>
-<span class="k">class</span> <span class="nc">TensorFiniteElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TensorFiniteElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">transpose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">transpose</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="c1"># TODO: Update docstring for arbitrary rank!</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;A Finite element whose basis functions have the form:</span>
 
@@ -89,33 +89,33 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_transpose</span> <span class="o">=</span> <span class="n">transpose</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">base_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">base_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The base element of this tensor element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">cell</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">complex</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">degree</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">formdegree</span>
 
     <span class="nd">@cached_property</span>
-    <span class="k">def</span> <span class="nf">_entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">dofs</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">base_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
         <span class="n">ndof</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">))</span>
 
-        <span class="k">def</span> <span class="nf">expand</span><span class="p">(</span><span class="n">dofs</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">expand</span><span class="p">(</span><span class="n">dofs</span><span class="p">):</span>
             <span class="n">dofs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">dofs</span><span class="p">)</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transpose</span><span class="p">:</span>
                 <span class="n">space_dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
@@ -134,30 +134,30 @@
 
 <div class="viewcode-block" id="TensorFiniteElement.entity_dofs">
 <a class="viewcode-back" href="../../finat.html#finat.tensorfiniteelement.TensorFiniteElement.entity_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_dofs</span></div>
 
 
 <div class="viewcode-block" id="TensorFiniteElement.space_dimension">
 <a class="viewcode-back" href="../../finat.html#finat.tensorfiniteelement.TensorFiniteElement.space_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index_shape</span><span class="p">))</span></div>
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transpose</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">index_shape</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">index_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">value_shape</span>
 
 <div class="viewcode-block" id="TensorFiniteElement.basis_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.tensorfiniteelement.TensorFiniteElement.basis_evaluation">[docs]</a>
-    <span class="k">def</span> <span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Produce the recipe for basis function evaluation at a set of points :math:`q`:</span>
 
 <span class="sd">        .. math::</span>
@@ -171,12 +171,12 @@
 
 <div class="viewcode-block" id="TensorFiniteElement.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.tensorfiniteelement.TensorFiniteElement.point_evaluation">[docs]</a>
-    <span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">scalar_evaluation</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">point_evaluation</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tensorise</span><span class="p">(</span><span class="n">scalar_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="p">))</span></div>
 
 
-    <span class="k">def</span> <span class="nf">_tensorise</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scalar_evaluation</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_tensorise</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scalar_evaluation</span><span class="p">):</span>
         <span class="c1"># Old basis function and value indices</span>
         <span class="n">scalar_i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
         <span class="n">scalar_vi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
@@ -203,7 +203,7 @@
         <span class="k">return</span> <span class="n">result</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">base</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_element</span>
         <span class="n">Q</span><span class="p">,</span> <span class="n">points</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">dual_basis</span>
 
@@ -228,7 +228,7 @@
 
 <div class="viewcode-block" id="TensorFiniteElement.dual_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation">[docs]</a>
-    <span class="k">def</span> <span class="nf">dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">):</span>
         <span class="n">tQ</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
         <span class="n">expr</span> <span class="o">=</span> <span class="n">fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="c1"># Apply targeted sum factorisation and delta elimination to</span>
@@ -260,7 +260,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">mapping</span></div>
 
 </pre></div>
@@ -300,7 +300,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

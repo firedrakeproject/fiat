@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>finat.element_factory &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -57,14 +57,14 @@
 <span class="c1"># You should have received a copy of the GNU Lesser General Public License</span>
 <span class="c1"># along with FFC. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
-<span class="kn">import</span> <span class="nn">weakref</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">singledispatch</span><span class="p">,</span> <span class="n">cache</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">weakref</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span><span class="p">,</span> <span class="n">cache</span>
 
-<span class="kn">import</span> <span class="nn">finat</span>
-<span class="kn">import</span> <span class="nn">finat.ufl</span>
-<span class="kn">import</span> <span class="nn">ufl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">finat</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">finat.ufl</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ufl</span>
 
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">ufc_cell</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">ufc_cell</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;as_fiat_cell&quot;</span><span class="p">,</span> <span class="s2">&quot;create_base_element&quot;</span><span class="p">,</span>
            <span class="s2">&quot;create_element&quot;</span><span class="p">,</span> <span class="s2">&quot;supported_elements&quot;</span><span class="p">)</span>
@@ -146,7 +146,7 @@
 <div class="viewcode-block" id="as_fiat_cell">
 <a class="viewcode-back" href="../../finat.html#finat.element_factory.as_fiat_cell">[docs]</a>
 <span class="nd">@cache</span>
-<span class="k">def</span> <span class="nf">as_fiat_cell</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">as_fiat_cell</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a ufl cell to a FIAT cell.</span>
 
 <span class="sd">    :arg cell: the :class:`ufl.Cell` to convert.&quot;&quot;&quot;</span>
@@ -157,7 +157,7 @@
 
 
 <span class="nd">@singledispatch</span>
-<span class="k">def</span> <span class="nf">convert</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Handler for converting UFL elements to FInAT elements.</span>
 
 <span class="sd">    :arg element: The UFL element to convert.</span>
@@ -188,7 +188,7 @@
 
 <span class="c1"># Base finite elements first</span>
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">FiniteElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_finiteelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_finiteelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">cell</span> <span class="o">=</span> <span class="n">as_fiat_cell</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Quadrature&quot;</span><span class="p">:</span>
         <span class="n">degree</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span>
@@ -265,27 +265,27 @@
 
 <span class="c1"># Element modifiers and compound element types</span>
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">BrokenElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_brokenelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_brokenelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">finat_elem</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousElement</span><span class="p">(</span><span class="n">finat_elem</span><span class="p">),</span> <span class="n">deps</span>
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_enrichedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_enrichedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">elements</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">_create_element</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
                            <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">_elements</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">(</span><span class="n">elements</span><span class="p">),</span> <span class="nb">set</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="o">*</span><span class="n">deps</span><span class="p">)</span>
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">NodalEnrichedElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_nodalenrichedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_nodalenrichedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">elements</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">_create_element</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
                            <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">_elements</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">NodalEnrichedElement</span><span class="p">(</span><span class="n">elements</span><span class="p">),</span> <span class="nb">set</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="o">*</span><span class="n">deps</span><span class="p">)</span>
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">MixedElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_mixedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_mixedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">elements</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">_create_element</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
                            <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">sub_elements</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">MixedElement</span><span class="p">(</span><span class="n">elements</span><span class="p">),</span> <span class="nb">set</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="o">*</span><span class="n">deps</span><span class="p">)</span>
@@ -293,7 +293,7 @@
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">VectorElement</span><span class="p">)</span>
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">TensorElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_tensorelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_tensorelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">inner_elem</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">sub_elements</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">reference_value_shape</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">inner_elem</span><span class="o">.</span><span class="n">value_shape</span><span class="p">)]</span>
@@ -303,7 +303,7 @@
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">TensorProductElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_tensorproductelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_tensorproductelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">cell</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span>
     <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">cell</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">ufl</span><span class="o">.</span><span class="n">TensorProductCell</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;TensorProductElement not on TensorProductCell?&quot;</span><span class="p">)</span>
@@ -321,24 +321,24 @@
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">HDivElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_hdivelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_hdivelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">finat_elem</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">HDivElement</span><span class="p">(</span><span class="n">finat_elem</span><span class="p">),</span> <span class="n">deps</span>
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">HCurlElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_hcurlelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_hcurlelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">finat_elem</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">HCurlElement</span><span class="p">(</span><span class="n">finat_elem</span><span class="p">),</span> <span class="n">deps</span>
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">WithMapping</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_withmapping</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_withmapping</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="k">return</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">wrapee</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">RestrictedElement</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">convert_restrictedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">convert_restrictedelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">finat_elem</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">RestrictedElement</span><span class="p">(</span><span class="n">finat_elem</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">restriction_domain</span><span class="p">()),</span> <span class="n">deps</span>
 
@@ -350,7 +350,7 @@
 
 <div class="viewcode-block" id="create_element">
 <a class="viewcode-back" href="../../finat.html#finat.element_factory.create_element">[docs]</a>
-<span class="k">def</span> <span class="nf">create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="n">shape_innermost</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">shift_axes</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">restriction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="n">shape_innermost</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">shift_axes</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">restriction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a FInAT element (suitable for tabulating with) given a UFL element.</span>
 
 <span class="sd">    :arg ufl_element: The UFL element to create a FInAT element from.</span>
@@ -366,7 +366,7 @@
 
 
 
-<span class="k">def</span> <span class="nf">_create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A caching wrapper around :py:func:`convert`.</span>
 
 <span class="sd">    Takes a UFL element and an unspecified set of parameter options,</span>
@@ -401,7 +401,7 @@
 
 <div class="viewcode-block" id="create_base_element">
 <a class="viewcode-back" href="../../finat.html#finat.element_factory.create_base_element">[docs]</a>
-<span class="k">def</span> <span class="nf">create_base_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_base_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a &quot;scalar&quot; base FInAT element given a UFL element.</span>
 <span class="sd">    Takes a UFL element and an unspecified set of parameter options,</span>
 <span class="sd">    and returns the converted element.</span>
@@ -448,7 +448,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

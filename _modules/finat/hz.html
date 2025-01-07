@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>finat.hz &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -37,17 +37,17 @@
             
   <h1>Source code for finat.hz</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;Implementation of the Hu-Zhang finite elements.&quot;&quot;&quot;</span>
-<span class="kn">import</span> <span class="nn">FIAT</span>
-<span class="kn">from</span> <span class="nn">gem</span> <span class="kn">import</span> <span class="n">ListTensor</span>
-<span class="kn">from</span> <span class="nn">finat.fiat_elements</span> <span class="kn">import</span> <span class="n">FiatElement</span>
-<span class="kn">from</span> <span class="nn">finat.physically_mapped</span> <span class="kn">import</span> <span class="n">Citations</span><span class="p">,</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
-<span class="kn">from</span> <span class="nn">finat.aw</span> <span class="kn">import</span> <span class="n">_facet_transform</span><span class="p">,</span> <span class="n">_evaluation_transform</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">ListTensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.fiat_elements</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiatElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">Citations</span><span class="p">,</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.aw</span><span class="w"> </span><span class="kn">import</span> <span class="n">_facet_transform</span><span class="p">,</span> <span class="n">_evaluation_transform</span>
 
 
 <div class="viewcode-block" id="HuZhang">
 <a class="viewcode-back" href="../../finat.html#finat.hz.HuZhang">[docs]</a>
-<span class="k">class</span> <span class="nc">HuZhang</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">FiatElement</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">HuZhang</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">FiatElement</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;Hu2015&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">variant</span> <span class="o">=</span> <span class="n">variant</span>
@@ -55,7 +55,7 @@
 
 <div class="viewcode-block" id="HuZhang.basis_transformation">
 <a class="viewcode-back" href="../../finat.html#finat.hz.HuZhang.basis_transformation">[docs]</a>
-    <span class="k">def</span> <span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
         <span class="n">ndofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
         <span class="n">V</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="n">ndofs</span><span class="p">)</span>
 
@@ -127,7 +127,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

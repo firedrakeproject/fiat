@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.discontinuous_lagrange &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -43,20 +43,20 @@
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
-<span class="kn">import</span> <span class="nn">itertools</span>
-<span class="kn">import</span> <span class="nn">math</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span><span class="p">,</span> <span class="n">P0</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">LINE</span><span class="p">,</span> <span class="n">make_lattice</span>
-<span class="kn">from</span> <span class="nn">FIAT.orientation_utils</span> <span class="kn">import</span> <span class="n">make_entity_permutations_simplex</span>
-<span class="kn">from</span> <span class="nn">FIAT.barycentric_interpolation</span> <span class="kn">import</span> <span class="n">LagrangePolynomialSet</span><span class="p">,</span> <span class="n">get_lagrange_points</span>
-<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
-<span class="kn">from</span> <span class="nn">FIAT.check_format_variant</span> <span class="kn">import</span> <span class="n">parse_lagrange_variant</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span><span class="p">,</span> <span class="n">P0</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">LINE</span><span class="p">,</span> <span class="n">make_lattice</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.orientation_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_entity_permutations_simplex</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.barycentric_interpolation</span><span class="w"> </span><span class="kn">import</span> <span class="n">LagrangePolynomialSet</span><span class="p">,</span> <span class="n">get_lagrange_points</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_lagrange_variant</span>
 
 
 <div class="viewcode-block" id="make_entity_permutations">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.make_entity_permutations">[docs]</a>
-<span class="k">def</span> <span class="nf">make_entity_permutations</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">npoints</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_entity_permutations</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">npoints</span><span class="p">):</span>
     <span class="k">if</span> <span class="n">npoints</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="p">{</span><span class="n">o</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">factorial</span><span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))}</span>
     <span class="c1"># DG nodes are numbered, in order of significance,</span>
@@ -187,13 +187,13 @@
 
 <div class="viewcode-block" id="BrokenLagrangeDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.BrokenLagrangeDualSet">[docs]</a>
-<span class="k">class</span> <span class="nc">BrokenLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">BrokenLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Lagrange elements.  This class works for</span>
 <span class="sd">    simplices of any dimension.  Nodes are point evaluation at</span>
 <span class="sd">    equispaced points.  This is the broken version where</span>
 <span class="sd">    all nodes are topologically associated with the cell itself&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
@@ -218,10 +218,10 @@
 
 <div class="viewcode-block" id="DiscontinuousLagrangeDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.DiscontinuousLagrangeDualSet">[docs]</a>
-<span class="k">class</span> <span class="nc">DiscontinuousLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DiscontinuousLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for discontinuous elements with nodes at recursively-defined points.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
@@ -248,7 +248,7 @@
 
 <div class="viewcode-block" id="DiscontinuousLagrange">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.DiscontinuousLagrange">[docs]</a>
-<span class="k">class</span> <span class="nc">DiscontinuousLagrange</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DiscontinuousLagrange</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The discontinuous Lagrange finite element.</span>
 
 <span class="sd">    :arg ref_el:  The reference element, which could be a standard FIAT simplex or a split complex</span>
@@ -263,7 +263,7 @@
 <span class="sd">                           variant=&#39;Alfeld&#39; can be used to obtain a barycentrically refined</span>
 <span class="sd">                              macroelement for Scott-Vogelius.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">splitting</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">discontinuous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
@@ -271,7 +271,7 @@
                 <span class="k">return</span> <span class="n">P0</span><span class="o">.</span><span class="n">P0</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
         <span class="n">splitting</span><span class="p">,</span> <span class="n">point_variant</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">discontinuous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">ref_el</span> <span class="o">=</span> <span class="n">splitting</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
@@ -326,7 +326,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.mardal_tai_winther &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -46,18 +46,18 @@
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
 
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span>
-<span class="kn">from</span> <span class="nn">FIAT.functional</span> <span class="kn">import</span> <span class="p">(</span><span class="n">IntegralMomentOfNormalEvaluation</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">IntegralMomentOfNormalEvaluation</span><span class="p">,</span>
                              <span class="n">IntegralMomentOfTangentialEvaluation</span><span class="p">,</span>
                              <span class="n">IntegralLegendreNormalMoment</span><span class="p">,</span>
                              <span class="n">IntegralMomentOfDivergence</span><span class="p">)</span>
 
-<span class="kn">from</span> <span class="nn">FIAT.quadrature_schemes</span> <span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 
 
 <div class="viewcode-block" id="DivergenceDubinerMoments">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.DivergenceDubinerMoments">[docs]</a>
-<span class="k">def</span> <span class="nf">DivergenceDubinerMoments</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">start_deg</span><span class="p">,</span> <span class="n">stop_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">DivergenceDubinerMoments</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">start_deg</span><span class="p">,</span> <span class="n">stop_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="n">P</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">stop_deg</span><span class="p">)</span>
     <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">comp_deg</span> <span class="o">+</span> <span class="n">stop_deg</span><span class="p">)</span>
@@ -73,9 +73,9 @@
 
 <div class="viewcode-block" id="MardalTaiWintherDual">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.MardalTaiWintherDual">[docs]</a>
-<span class="k">class</span> <span class="nc">MardalTaiWintherDual</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MardalTaiWintherDual</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Degrees of freedom for Mardal-Tai-Winther elements.&quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
 
@@ -137,10 +137,10 @@
 
 <div class="viewcode-block" id="MardalTaiWinther">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.MardalTaiWinther">[docs]</a>
-<span class="k">class</span> <span class="nc">MardalTaiWinther</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MardalTaiWinther</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The definition of the Mardal-Tai-Winther element.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">assert</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;Only defined for degree 3&quot;</span>
         <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Only defined for dimension 2&quot;</span>
@@ -187,7 +187,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

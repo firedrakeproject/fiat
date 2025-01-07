@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.lagrange &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -43,16 +43,16 @@
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
-<span class="kn">from</span> <span class="nn">FIAT</span> <span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span>
-<span class="kn">from</span> <span class="nn">FIAT.orientation_utils</span> <span class="kn">import</span> <span class="n">make_entity_permutations_simplex</span>
-<span class="kn">from</span> <span class="nn">FIAT.barycentric_interpolation</span> <span class="kn">import</span> <span class="n">LagrangePolynomialSet</span><span class="p">,</span> <span class="n">get_lagrange_points</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">LINE</span>
-<span class="kn">from</span> <span class="nn">FIAT.check_format_variant</span> <span class="kn">import</span> <span class="n">parse_lagrange_variant</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.orientation_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_entity_permutations_simplex</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.barycentric_interpolation</span><span class="w"> </span><span class="kn">import</span> <span class="n">LagrangePolynomialSet</span><span class="p">,</span> <span class="n">get_lagrange_points</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">LINE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_lagrange_variant</span>
 
 
 <div class="viewcode-block" id="LagrangeDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.lagrange.LagrangeDualSet">[docs]</a>
-<span class="k">class</span> <span class="nc">LagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Lagrange elements.  This class works for</span>
 <span class="sd">    simplicial complexes of any dimension.  Nodes are point evaluation at</span>
 <span class="sd">    recursively-defined points.</span>
@@ -65,7 +65,7 @@
 <span class="sd">                        entity id. The DOFs are always sorted by the entity ordering</span>
 <span class="sd">                        and then lexicographically by lattice multiindex.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">,</span> <span class="n">sort_entities</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">,</span> <span class="n">sort_entities</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
@@ -96,7 +96,7 @@
 
 <div class="viewcode-block" id="Lagrange">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.lagrange.Lagrange">[docs]</a>
-<span class="k">class</span> <span class="nc">Lagrange</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Lagrange</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The Lagrange finite element.</span>
 
 <span class="sd">    :arg ref_el:  The reference element, which could be a standard FIAT simplex or a split complex</span>
@@ -115,7 +115,7 @@
 <span class="sd">                        entity id. The DOFs are always sorted by the entity ordering</span>
 <span class="sd">                        and then lexicographically by lattice multiindex.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">,</span> <span class="n">sort_entities</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">,</span> <span class="n">sort_entities</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="n">splitting</span><span class="p">,</span> <span class="n">point_variant</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">ref_el</span> <span class="o">=</span> <span class="n">splitting</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
@@ -168,7 +168,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

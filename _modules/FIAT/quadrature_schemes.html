@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.quadrature_schemes &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -70,19 +70,19 @@
 <span class="c1"># First added:  2011-04-19</span>
 <span class="c1"># Last changed: 2011-04-19</span>
 
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">from</span> <span class="nn">FIAT.quadrature</span> <span class="kn">import</span> <span class="p">(</span><span class="n">QuadratureRule</span><span class="p">,</span> <span class="n">FacetQuadratureRule</span><span class="p">,</span> <span class="n">make_quadrature</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">QuadratureRule</span><span class="p">,</span> <span class="n">FacetQuadratureRule</span><span class="p">,</span> <span class="n">make_quadrature</span><span class="p">,</span>
                              <span class="n">make_tensor_product_quadrature</span><span class="p">,</span> <span class="n">map_quadrature</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="p">(</span><span class="n">HEXAHEDRON</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="n">TENSORPRODUCT</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">HEXAHEDRON</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="n">TENSORPRODUCT</span><span class="p">,</span>
                                     <span class="n">TETRAHEDRON</span><span class="p">,</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">UFCTetrahedron</span><span class="p">,</span>
                                     <span class="n">UFCTriangle</span><span class="p">,</span> <span class="n">symmetric_simplex</span><span class="p">)</span>
-<span class="kn">from</span> <span class="nn">FIAT.macro</span> <span class="kn">import</span> <span class="n">MacroQuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.macro</span><span class="w"> </span><span class="kn">import</span> <span class="n">MacroQuadratureRule</span>
 
 
 <div class="viewcode-block" id="create_quadrature">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature_schemes.create_quadrature">[docs]</a>
-<span class="k">def</span> <span class="nf">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Generate quadrature rule for given reference element that will integrate a</span>
 <span class="sd">    polynomial of order &#39;degree&#39; exactly.</span>
@@ -146,7 +146,7 @@
 
 
 
-<span class="k">def</span> <span class="nf">_fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get quadrature scheme from FIAT interface&quot;&quot;&quot;</span>
 
     <span class="c1"># Number of points per axis for exact integration</span>
@@ -156,7 +156,7 @@
     <span class="k">return</span> <span class="n">make_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">num_points_per_axis</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_kmv_lump_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_kmv_lump_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Specialized quadrature schemes for P &lt; 6 for KMV simplical elements.&quot;&quot;&quot;</span>
 
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -466,7 +466,7 @@
 
 <div class="viewcode-block" id="xg_scheme">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature_schemes.xg_scheme">[docs]</a>
-<span class="k">def</span> <span class="nf">xg_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">xg_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A (nearly) Gaussian simplicial quadrature with very few quadrature nodes,</span>
 <span class="sd">    available for low-to-moderate orders.</span>
 
@@ -481,9 +481,9 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">dim</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="kn">from</span> <span class="nn">FIAT.xg_quad_data</span> <span class="kn">import</span> <span class="n">triangle_table</span> <span class="k">as</span> <span class="n">table</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.xg_quad_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">triangle_table</span> <span class="k">as</span> <span class="n">table</span>
     <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-        <span class="kn">from</span> <span class="nn">FIAT.xg_quad_data</span> <span class="kn">import</span> <span class="n">tetrahedron_table</span> <span class="k">as</span> <span class="n">table</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.xg_quad_data</span><span class="w"> </span><span class="kn">import</span> <span class="n">tetrahedron_table</span> <span class="k">as</span> <span class="n">table</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Xiao-Gambutas rule not availale for </span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2"> dimensions.&quot;</span><span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
@@ -499,7 +499,7 @@
 
 
 
-<span class="k">def</span> <span class="nf">_triangle_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_triangle_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a quadrature scheme on a triangle of specified order. Falls</span>
 <span class="sd">    back on canonical rule for higher orders.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -536,7 +536,7 @@
     <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">w</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_tetrahedron_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_tetrahedron_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a quadrature scheme on a tetrahedron of specified</span>
 <span class="sd">    degree. Falls back on canonical rule for higher orders&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -600,7 +600,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gem.impero &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -48,14 +48,14 @@
 <span class="sd">   (Command?) after clicking on them.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span>
 
-<span class="kn">from</span> <span class="nn">gem.node</span> <span class="kn">import</span> <span class="n">Node</span> <span class="k">as</span> <span class="n">NodeBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.node</span><span class="w"> </span><span class="kn">import</span> <span class="n">Node</span> <span class="k">as</span> <span class="n">NodeBase</span>
 
 
 <div class="viewcode-block" id="Node">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Node">[docs]</a>
-<span class="k">class</span> <span class="nc">Node</span><span class="p">(</span><span class="n">NodeBase</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Node</span><span class="p">(</span><span class="n">NodeBase</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class of all Impero nodes&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">()</span></div>
@@ -64,7 +64,7 @@
 
 <div class="viewcode-block" id="Terminal">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Terminal">[docs]</a>
-<span class="k">class</span> <span class="nc">Terminal</span><span class="p">(</span><span class="n">Node</span><span class="p">,</span> <span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Terminal</span><span class="p">(</span><span class="n">Node</span><span class="p">,</span> <span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for terminal Impero nodes&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">()</span>
@@ -74,7 +74,7 @@
 <div class="viewcode-block" id="Terminal.loop_shape">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Terminal.loop_shape">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Gives the loop shape, an ordering of indices for an Impero</span>
 <span class="sd">        terminal.</span>
 
@@ -88,18 +88,18 @@
 
 <div class="viewcode-block" id="Evaluate">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Evaluate">[docs]</a>
-<span class="k">class</span> <span class="nc">Evaluate</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Evaluate</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assign the value of a GEM expression to a temporary.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;expression&#39;</span><span class="p">,)</span>
     <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;expression&#39;</span><span class="p">,)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">expression</span> <span class="o">=</span> <span class="n">expression</span>
 
 <div class="viewcode-block" id="Evaluate.loop_shape">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Evaluate.loop_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">free_indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expression</span><span class="p">)</span></div>
 </div>
 
@@ -107,18 +107,18 @@
 
 <div class="viewcode-block" id="Initialise">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Initialise">[docs]</a>
-<span class="k">class</span> <span class="nc">Initialise</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Initialise</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Initialise an :class:`gem.IndexSum`.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;indexsum&#39;</span><span class="p">,)</span>
     <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;indexsum&#39;</span><span class="p">,)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indexsum</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indexsum</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">indexsum</span> <span class="o">=</span> <span class="n">indexsum</span>
 
 <div class="viewcode-block" id="Initialise.loop_shape">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Initialise.loop_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">free_indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">indexsum</span><span class="p">)</span></div>
 </div>
 
@@ -126,18 +126,18 @@
 
 <div class="viewcode-block" id="Accumulate">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Accumulate">[docs]</a>
-<span class="k">class</span> <span class="nc">Accumulate</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Accumulate</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Accumulate terms into an :class:`gem.IndexSum`.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;indexsum&#39;</span><span class="p">,)</span>
     <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;indexsum&#39;</span><span class="p">,)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indexsum</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indexsum</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">indexsum</span> <span class="o">=</span> <span class="n">indexsum</span>
 
 <div class="viewcode-block" id="Accumulate.loop_shape">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Accumulate.loop_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">free_indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">indexsum</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
 </div>
 
@@ -145,19 +145,19 @@
 
 <div class="viewcode-block" id="Noop">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Noop">[docs]</a>
-<span class="k">class</span> <span class="nc">Noop</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Noop</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;No-op terminal. Does not generate code, but wraps a GEM</span>
 <span class="sd">    expression to have a loop shape, thus affects loop fusion.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;expression&#39;</span><span class="p">,)</span>
     <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;expression&#39;</span><span class="p">,)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">expression</span> <span class="o">=</span> <span class="n">expression</span>
 
 <div class="viewcode-block" id="Noop.loop_shape">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Noop.loop_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">free_indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expression</span><span class="p">)</span></div>
 </div>
 
@@ -165,14 +165,14 @@
 
 <div class="viewcode-block" id="Return">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Return">[docs]</a>
-<span class="k">class</span> <span class="nc">Return</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Return</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Save value of GEM expression into an lvalue. Used to &quot;return&quot;</span>
 <span class="sd">    values from a kernel.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;variable&#39;</span><span class="p">,</span> <span class="s1">&#39;expression&#39;</span><span class="p">)</span>
     <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;variable&#39;</span><span class="p">,</span> <span class="s1">&#39;expression&#39;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">set</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="nb">set</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">variable</span> <span class="o">=</span> <span class="n">variable</span>
@@ -180,7 +180,7 @@
 
 <div class="viewcode-block" id="Return.loop_shape">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Return.loop_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">free_indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">variable</span><span class="p">)</span></div>
 </div>
 
@@ -188,14 +188,14 @@
 
 <div class="viewcode-block" id="ReturnAccumulate">
 <a class="viewcode-back" href="../../gem.html#gem.impero.ReturnAccumulate">[docs]</a>
-<span class="k">class</span> <span class="nc">ReturnAccumulate</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ReturnAccumulate</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Accumulate an :class:`gem.IndexSum` directly into a return</span>
 <span class="sd">    variable.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;variable&#39;</span><span class="p">,</span> <span class="s1">&#39;indexsum&#39;</span><span class="p">)</span>
     <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;variable&#39;</span><span class="p">,</span> <span class="s1">&#39;indexsum&#39;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">indexsum</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">indexsum</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">set</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span> <span class="o">==</span> <span class="nb">set</span><span class="p">(</span><span class="n">indexsum</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">variable</span> <span class="o">=</span> <span class="n">variable</span>
@@ -203,7 +203,7 @@
 
 <div class="viewcode-block" id="ReturnAccumulate.loop_shape">
 <a class="viewcode-back" href="../../gem.html#gem.impero.ReturnAccumulate.loop_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">loop_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">free_indices</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">free_indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">indexsum</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
 </div>
 
@@ -211,27 +211,27 @@
 
 <div class="viewcode-block" id="Block">
 <a class="viewcode-back" href="../../gem.html#gem.impero.Block">[docs]</a>
-<span class="k">class</span> <span class="nc">Block</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Block</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;An ordered set of Impero expressions.  Corresponds to a curly</span>
 <span class="sd">    braces block in C.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">statements</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">statements</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">statements</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="For">
 <a class="viewcode-back" href="../../gem.html#gem.impero.For">[docs]</a>
-<span class="k">class</span> <span class="nc">For</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">For</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;For loop with an index which stores its extent, and a loop body</span>
 <span class="sd">    expression which is usually a :class:`Block`.&quot;&quot;&quot;</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;index&#39;</span><span class="p">,</span> <span class="s1">&#39;children&#39;</span><span class="p">)</span>
     <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;index&#39;</span><span class="p">,)</span>
 
-    <span class="k">def</span> <span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">statement</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">statement</span><span class="p">):</span>
         <span class="c1"># In case of an empty loop, create a Noop instead.</span>
         <span class="c1"># Related: https://github.com/coneoproject/COFFEE/issues/98</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">statement</span><span class="p">,</span> <span class="n">Block</span><span class="p">)</span>
@@ -242,7 +242,7 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">For</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">statement</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">statement</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">index</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="p">(</span><span class="n">statement</span><span class="p">,)</span></div>
 
@@ -283,7 +283,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

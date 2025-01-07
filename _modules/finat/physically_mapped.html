@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>finat.physically_mapped &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -36,13 +36,13 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.physically_mapped</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCMeta</span><span class="p">,</span> <span class="n">abstractmethod</span>
 
-<span class="kn">import</span> <span class="nn">gem</span>
-<span class="kn">import</span> <span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
 <span class="k">try</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">firedrake_citations</span> <span class="kn">import</span> <span class="n">Citations</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">firedrake_citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">Citations</span>
     <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="s2">&quot;Kirby2018zany&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">@Article{Kirby2018zany,</span>
 <span class="s2">  author =       {Robert C. Kirby},</span>
@@ -281,7 +281,7 @@
 
 <div class="viewcode-block" id="NeedsCoordinateMappingElement">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.NeedsCoordinateMappingElement">[docs]</a>
-<span class="k">class</span> <span class="nc">NeedsCoordinateMappingElement</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">NeedsCoordinateMappingElement</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for elements that require physical information</span>
 <span class="sd">    either to map or construct their basis functions.&quot;&quot;&quot;</span>
     <span class="k">pass</span></div>
@@ -290,11 +290,11 @@
 
 <div class="viewcode-block" id="PhysicallyMappedElement">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement">[docs]</a>
-<span class="k">class</span> <span class="nc">PhysicallyMappedElement</span><span class="p">(</span><span class="n">NeedsCoordinateMappingElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PhysicallyMappedElement</span><span class="p">(</span><span class="n">NeedsCoordinateMappingElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A mixin that applies a &quot;physical&quot; transformation to tabulated</span>
 <span class="sd">    basis functions.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;Kirby2018zany&quot;</span><span class="p">)</span>
@@ -303,7 +303,7 @@
 <div class="viewcode-block" id="PhysicallyMappedElement.basis_transformation">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.basis_transformation">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Transformation matrix for the basis functions.</span>
 
 <span class="sd">        :arg coordinate_mapping: Object providing physical geometry.&quot;&quot;&quot;</span>
@@ -312,7 +312,7 @@
 
 <div class="viewcode-block" id="PhysicallyMappedElement.basis_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.basis_evaluation">[docs]</a>
-    <span class="k">def</span> <span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">assert</span> <span class="n">coordinate_mapping</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
         <span class="n">M</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_transformation</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span>
@@ -321,7 +321,7 @@
         <span class="n">csr</span> <span class="o">=</span> <span class="p">[[</span><span class="n">j</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">],</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">)]</span>
                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span>
 
-        <span class="k">def</span> <span class="nf">matvec</span><span class="p">(</span><span class="n">table</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">matvec</span><span class="p">(</span><span class="n">table</span><span class="p">):</span>
             <span class="c1"># basis recombination using hand-rolled sparse-dense matrix multiplication</span>
             <span class="n">table</span> <span class="o">=</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">partial_indexed</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="p">(</span><span class="n">j</span><span class="p">,))</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
             <span class="c1"># the sum approach is faster than calling numpy.dot or gem.IndexSum</span>
@@ -337,7 +337,7 @@
 
 <div class="viewcode-block" id="PhysicallyMappedElement.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.point_evaluation">[docs]</a>
-    <span class="k">def</span> <span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;TODO: not yet thought about it&quot;</span><span class="p">)</span></div>
 </div>
 
@@ -345,7 +345,7 @@
 
 <div class="viewcode-block" id="DirectlyDefinedElement">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.DirectlyDefinedElement">[docs]</a>
-<span class="k">class</span> <span class="nc">DirectlyDefinedElement</span><span class="p">(</span><span class="n">NeedsCoordinateMappingElement</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">DirectlyDefinedElement</span><span class="p">(</span><span class="n">NeedsCoordinateMappingElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for directly defined elements such as direct</span>
 <span class="sd">    serendipity that bypass a coordinate mapping.&quot;&quot;&quot;</span>
     <span class="k">pass</span></div>
@@ -354,12 +354,12 @@
 
 <div class="viewcode-block" id="PhysicalGeometry">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry">[docs]</a>
-<span class="k">class</span> <span class="nc">PhysicalGeometry</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PhysicalGeometry</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
 
 <div class="viewcode-block" id="PhysicalGeometry.cell_size">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.cell_size">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">cell_size</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_size</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The cell size at each vertex.</span>
 
 <span class="sd">        :returns: A GEM expression for the cell size, shape (nvertex, ).</span>
@@ -369,7 +369,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.jacobian_at">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.jacobian_at">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">jacobian_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">jacobian_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The jacobian of the physical coordinates at a point.</span>
 
 <span class="sd">        :arg point: The point in reference space (on the cell) to</span>
@@ -381,7 +381,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.detJ_at">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.detJ_at">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">detJ_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">detJ_at</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The determinant of the jacobian of the physical coordinates at a point.</span>
 
 <span class="sd">        :arg point: The point in reference space to evaluate the Jacobian determinant.</span>
@@ -392,7 +392,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.reference_normals">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.reference_normals">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">reference_normals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reference_normals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The (unit) reference cell normals for each facet.</span>
 
 <span class="sd">        :returns: A GEM expression for the normal to each</span>
@@ -404,7 +404,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.physical_normals">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.physical_normals">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">physical_normals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">physical_normals</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The (unit) physical cell normals for each facet.</span>
 
 <span class="sd">        :returns: A GEM expression for the normal to each</span>
@@ -417,7 +417,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.physical_tangents">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.physical_tangents">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">physical_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">physical_tangents</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The (unit) physical cell tangents on each facet.</span>
 
 <span class="sd">        :returns: A GEM expression for the tangent to each</span>
@@ -430,7 +430,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.physical_edge_lengths">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.physical_edge_lengths">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">physical_edge_lengths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">physical_edge_lengths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The length of each edge of the physical cell.</span>
 
 <span class="sd">        :returns: A GEM expression for the length of each</span>
@@ -442,7 +442,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.physical_points">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.physical_points">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">physical_points</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point_set</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">physical_points</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point_set</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Maps reference element points to GEM for the physical coordinates</span>
 
 <span class="sd">        :arg point_set: A point_set on the reference cell to push forward to physical space.</span>
@@ -456,7 +456,7 @@
 <div class="viewcode-block" id="PhysicalGeometry.physical_vertices">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicalGeometry.physical_vertices">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span> <span class="nf">physical_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">physical_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Physical locations of the cell vertices.</span>
 
 <span class="sd">        :returns: a GEM expression for the physical vertices, shape</span>
@@ -471,7 +471,7 @@
 
 <div class="viewcode-block" id="identity">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.identity">[docs]</a>
-<span class="k">def</span> <span class="nf">identity</span><span class="p">(</span><span class="o">*</span><span class="n">shape</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">identity</span><span class="p">(</span><span class="o">*</span><span class="n">shape</span><span class="p">):</span>
     <span class="n">V</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="o">*</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">multiindex</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">V</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
         <span class="n">V</span><span class="p">[</span><span class="n">multiindex</span><span class="p">]</span> <span class="o">=</span> <span class="n">zero</span> <span class="k">if</span> <span class="n">V</span><span class="p">[</span><span class="n">multiindex</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">one</span>
@@ -514,7 +514,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

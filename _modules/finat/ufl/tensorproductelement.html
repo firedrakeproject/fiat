@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>finat.ufl.tensorproductelement &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../../_static/documentation_options.js?v=e952a2db"></script>
@@ -49,16 +49,16 @@
 <span class="c1"># Modified by Massimiliano Leoni, 2016</span>
 <span class="c1"># Modified by Matthew Scroggs, 2023</span>
 
-<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 
-<span class="kn">from</span> <span class="nn">ufl.cell</span> <span class="kn">import</span> <span class="n">TensorProductCell</span><span class="p">,</span> <span class="n">as_cell</span>
-<span class="kn">from</span> <span class="nn">finat.ufl.finiteelementbase</span> <span class="kn">import</span> <span class="n">FiniteElementBase</span>
-<span class="kn">from</span> <span class="nn">ufl.sobolevspace</span> <span class="kn">import</span> <span class="n">DirectionalSobolevSpace</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ufl.cell</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorProductCell</span><span class="p">,</span> <span class="n">as_cell</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.ufl.finiteelementbase</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ufl.sobolevspace</span><span class="w"> </span><span class="kn">import</span> <span class="n">DirectionalSobolevSpace</span>
 
 
 <div class="viewcode-block" id="TensorProductElement">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.tensorproductelement.TensorProductElement">[docs]</a>
-<span class="k">class</span> <span class="nc">TensorProductElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TensorProductElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;The tensor product of :math:`d` element spaces.</span>
 
 <span class="sd">    .. math:: V = V_1 \otimes V_2 \otimes ...  \otimes V_d</span>
@@ -69,7 +69,7 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;_sub_elements&quot;</span><span class="p">,</span> <span class="s2">&quot;_cell&quot;</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">elements</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">elements</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create TensorProductElement from a given list of elements.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">elements</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot create TensorProductElement from empty list.&quot;</span><span class="p">)</span>
@@ -103,13 +103,13 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span> <span class="o">=</span> <span class="n">elements</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_cell</span> <span class="o">=</span> <span class="n">cell</span>
 
-    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;TensorProductElement(&quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span><span class="p">)</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;, cell=</span><span class="si">{</span><span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cell</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span>
 
 <div class="viewcode-block" id="TensorProductElement.mapping">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.tensorproductelement.TensorProductElement.mapping">[docs]</a>
-    <span class="k">def</span> <span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">mapping</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;identity&quot;</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span><span class="p">):</span>
             <span class="k">return</span> <span class="s2">&quot;identity&quot;</span>
@@ -120,7 +120,7 @@
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">sobolev_space</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sobolev_space</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the underlying Sobolev space of the TensorProductElement.&quot;&quot;&quot;</span>
         <span class="n">elements</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span>
         <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">sobolev_space</span> <span class="o">==</span> <span class="n">elements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">sobolev_space</span>
@@ -138,18 +138,18 @@
             <span class="k">return</span> <span class="n">DirectionalSobolevSpace</span><span class="p">(</span><span class="n">orders</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">num_sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">num_sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return number of subelements.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span><span class="p">)</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return subelements (factors).&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span>
 
 <div class="viewcode-block" id="TensorProductElement.reconstruct">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.tensorproductelement.TensorProductElement.reconstruct">[docs]</a>
-    <span class="k">def</span> <span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
         <span class="n">cell</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;cell&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">TensorProductElement</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub_elements</span><span class="p">],</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span></div>
@@ -157,7 +157,7 @@
 
 <div class="viewcode-block" id="TensorProductElement.variant">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.tensorproductelement.TensorProductElement.variant">[docs]</a>
-    <span class="k">def</span> <span class="nf">variant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">variant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">variant</span><span class="p">,</span> <span class="o">=</span> <span class="p">{</span><span class="n">e</span><span class="o">.</span><span class="n">variant</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sub_elements</span><span class="p">}</span>
@@ -166,26 +166,26 @@
             <span class="k">return</span> <span class="kc">None</span></div>
 
 
-    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Pretty-print.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;TensorProductElement(</span><span class="si">%s</span><span class="s2">, cell=</span><span class="si">%s</span><span class="s2">)&quot;</span> \
             <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span><span class="p">]),</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cell</span><span class="p">))</span>
 
 <div class="viewcode-block" id="TensorProductElement.shortstr">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.tensorproductelement.TensorProductElement.shortstr">[docs]</a>
-    <span class="k">def</span> <span class="nf">shortstr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">shortstr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Short pretty-print.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="s2">&quot;TensorProductElement(</span><span class="si">%s</span><span class="s2">, cell=</span><span class="si">%s</span><span class="s2">)&quot;</span> \
             <span class="o">%</span> <span class="p">(</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">e</span><span class="o">.</span><span class="n">shortstr</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sub_elements</span><span class="p">]),</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_cell</span><span class="p">))</span></div>
 
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">embedded_superdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">embedded_superdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">())</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">embedded_subdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">embedded_subdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">())</span></div>
 
@@ -226,7 +226,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

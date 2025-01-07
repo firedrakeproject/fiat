@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gem.node &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -39,13 +39,13 @@
 <span></span><span class="sd">&quot;&quot;&quot;Generic abstract node class and utility functions for creating</span>
 <span class="sd">expression DAG languages.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">collections</span>
-<span class="kn">import</span> <span class="nn">gem</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
 
 
 <div class="viewcode-block" id="Node">
 <a class="viewcode-back" href="../../gem.html#gem.node.Node">[docs]</a>
-<span class="k">class</span> <span class="nc">Node</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Node</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract node class.</span>
 
 <span class="sd">    Nodes are not meant to be modified.</span>
@@ -70,7 +70,7 @@
     <span class="c1"># To be (potentially) overridden by derived node classes.</span>
     <span class="n">__back__</span> <span class="o">=</span> <span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">_cons_args</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">children</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_cons_args</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">children</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs an argument list for the constructor with</span>
 <span class="sd">        non-child data from &#39;self&#39; and children from &#39;children&#39;.</span>
 
@@ -81,13 +81,13 @@
 
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">front_args</span><span class="p">)</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">children</span><span class="p">)</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">back_args</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">__reduce__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">__reduce__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="c1"># Gold version:</span>
         <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cons_args</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Node.reconstruct">
 <a class="viewcode-back" href="../../gem.html#gem.node.Node.reconstruct">[docs]</a>
-    <span class="k">def</span> <span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Reconstructs the node with new children from</span>
 <span class="sd">        &#39;args&#39;. Non-child data are copied from &#39;self&#39;.</span>
 
@@ -96,11 +96,11 @@
         <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_cons_args</span><span class="p">(</span><span class="n">args</span><span class="p">))</span></div>
 
 
-    <span class="k">def</span> <span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">cons_args</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cons_args</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">children</span><span class="p">)</span>
         <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">repr</span><span class="p">,</span> <span class="n">cons_args</span><span class="p">)))</span>
 
-    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Provides equality testing with quick positive and negative</span>
 <span class="sd">        paths based on :func:`id` and :meth:`__hash__`.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
@@ -111,10 +111,10 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_equal</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ne__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="fm">__eq__</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Provides caching for hash values.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">hash_value</span>
@@ -124,7 +124,7 @@
 
 <div class="viewcode-block" id="Node.is_equal">
 <a class="viewcode-back" href="../../gem.html#gem.node.Node.is_equal">[docs]</a>
-    <span class="k">def</span> <span class="nf">is_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Equality predicate.</span>
 
 <span class="sd">        This is the method to potentially override in derived classes,</span>
@@ -139,7 +139,7 @@
 
 <div class="viewcode-block" id="Node.get_hash">
 <a class="viewcode-back" href="../../gem.html#gem.node.Node.get_hash">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Hash function.</span>
 
 <span class="sd">        This is the method to potentially override in derived classes,</span>
@@ -150,7 +150,7 @@
 
 
 
-<span class="k">def</span> <span class="nf">_make_traversal_children</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_make_traversal_children</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">FlexiblyIndexed</span><span class="p">)):</span>
         <span class="c1"># Include child nodes hidden in index expressions.</span>
         <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span> <span class="o">+</span> <span class="n">node</span><span class="o">.</span><span class="n">indirect_children</span>
@@ -160,7 +160,7 @@
 
 <div class="viewcode-block" id="pre_traversal">
 <a class="viewcode-back" href="../../gem.html#gem.node.pre_traversal">[docs]</a>
-<span class="k">def</span> <span class="nf">pre_traversal</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">pre_traversal</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Pre-order traversal of the nodes of expression DAGs.</span>
 
 <span class="sd">    Notes</span>
@@ -192,7 +192,7 @@
 
 <div class="viewcode-block" id="post_traversal">
 <a class="viewcode-back" href="../../gem.html#gem.node.post_traversal">[docs]</a>
-<span class="k">def</span> <span class="nf">post_traversal</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">post_traversal</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Post-order traversal of the nodes of expression DAGs.</span>
 
 <span class="sd">    Notes</span>
@@ -232,7 +232,7 @@
 
 <div class="viewcode-block" id="collect_refcount">
 <a class="viewcode-back" href="../../gem.html#gem.node.collect_refcount">[docs]</a>
-<span class="k">def</span> <span class="nf">collect_refcount</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">collect_refcount</span><span class="p">(</span><span class="n">expression_dags</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Collects reference counts for a multi-root expression DAG.</span>
 
 <span class="sd">    Notes</span>
@@ -251,7 +251,7 @@
 
 <div class="viewcode-block" id="noop_recursive">
 <a class="viewcode-back" href="../../gem.html#gem.node.noop_recursive">[docs]</a>
-<span class="k">def</span> <span class="nf">noop_recursive</span><span class="p">(</span><span class="n">function</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">noop_recursive</span><span class="p">(</span><span class="n">function</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;No-op wrapper for functions with overridable recursive calls.</span>
 
 <span class="sd">    :arg function: a function with parameters (value, rec), where</span>
@@ -259,7 +259,7 @@
 <span class="sd">                   recursive calls.</span>
 <span class="sd">    :returns: a function with working recursion and nothing fancy</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">recursive</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recursive</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">function</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">recursive</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">recursive</span></div>
 
@@ -267,7 +267,7 @@
 
 <div class="viewcode-block" id="noop_recursive_arg">
 <a class="viewcode-back" href="../../gem.html#gem.node.noop_recursive_arg">[docs]</a>
-<span class="k">def</span> <span class="nf">noop_recursive_arg</span><span class="p">(</span><span class="n">function</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">noop_recursive_arg</span><span class="p">(</span><span class="n">function</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;No-op wrapper for functions with overridable recursive calls</span>
 <span class="sd">    and an argument.</span>
 
@@ -276,7 +276,7 @@
 <span class="sd">                   recursive calls.</span>
 <span class="sd">    :returns: a function with working recursion and nothing fancy</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="nf">recursive</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recursive</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">function</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">recursive</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">recursive</span></div>
 
@@ -284,7 +284,7 @@
 
 <div class="viewcode-block" id="Memoizer">
 <a class="viewcode-back" href="../../gem.html#gem.node.Memoizer">[docs]</a>
-<span class="k">class</span> <span class="nc">Memoizer</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Memoizer</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Caching wrapper for functions with overridable recursive calls.</span>
 <span class="sd">    The lifetime of the cache is the lifetime of the object instance.</span>
 
@@ -293,11 +293,11 @@
 <span class="sd">                   recursive calls.</span>
 <span class="sd">    :returns: a function with working recursion and caching</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cache</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">function</span> <span class="o">=</span> <span class="n">function</span>
 
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache</span><span class="p">[</span><span class="n">node</span><span class="p">]</span>
         <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
@@ -309,7 +309,7 @@
 
 <div class="viewcode-block" id="MemoizerArg">
 <a class="viewcode-back" href="../../gem.html#gem.node.MemoizerArg">[docs]</a>
-<span class="k">class</span> <span class="nc">MemoizerArg</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MemoizerArg</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Caching wrapper for functions with overridable recursive calls</span>
 <span class="sd">    and an argument.  The lifetime of the cache is the lifetime of the</span>
 <span class="sd">    object instance.</span>
@@ -319,11 +319,11 @@
 <span class="sd">                   recursive calls.</span>
 <span class="sd">    :returns: a function with working recursion and caching</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">function</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cache</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">function</span> <span class="o">=</span> <span class="n">function</span>
 
-    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
         <span class="n">cache_key</span> <span class="o">=</span> <span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cache</span><span class="p">[</span><span class="n">cache_key</span><span class="p">]</span>
@@ -336,7 +336,7 @@
 
 <div class="viewcode-block" id="reuse_if_untouched">
 <a class="viewcode-back" href="../../gem.html#gem.node.reuse_if_untouched">[docs]</a>
-<span class="k">def</span> <span class="nf">reuse_if_untouched</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">reuse_if_untouched</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Reuse if untouched recipe&quot;&quot;&quot;</span>
     <span class="n">new_children</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">))</span>
     <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">nc</span> <span class="o">==</span> <span class="n">c</span> <span class="k">for</span> <span class="n">nc</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">new_children</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">)):</span>
@@ -348,7 +348,7 @@
 
 <div class="viewcode-block" id="reuse_if_untouched_arg">
 <a class="viewcode-back" href="../../gem.html#gem.node.reuse_if_untouched_arg">[docs]</a>
-<span class="k">def</span> <span class="nf">reuse_if_untouched_arg</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">reuse_if_untouched_arg</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Reuse if touched recipe propagating an extra argument&quot;&quot;&quot;</span>
     <span class="n">new_children</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">arg</span><span class="p">)</span> <span class="k">for</span> <span class="n">child</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
     <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">nc</span> <span class="o">==</span> <span class="n">c</span> <span class="k">for</span> <span class="n">nc</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">new_children</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">)):</span>
@@ -393,7 +393,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>

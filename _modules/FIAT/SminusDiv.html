@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FIAT.SminusDiv &#8212; FInite element Automatic Tabulator (FIAT) 2024.0.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=fa44fd50" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
     <script src="../../_static/documentation_options.js?v=e952a2db"></script>
@@ -36,12 +36,12 @@
           <div class="body" role="main">
             
   <h1>Source code for FIAT.SminusDiv</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">sympy</span> <span class="kn">import</span> <span class="n">symbols</span><span class="p">,</span> <span class="n">legendre</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">diff</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">FIAT.finite_element</span> <span class="kn">import</span> <span class="n">FiniteElement</span>
-<span class="kn">from</span> <span class="nn">FIAT.dual_set</span> <span class="kn">import</span> <span class="n">make_entity_closure_ids</span>
-<span class="kn">from</span> <span class="nn">FIAT.polynomial_set</span> <span class="kn">import</span> <span class="n">mis</span>
-<span class="kn">from</span> <span class="nn">FIAT.reference_element</span> <span class="kn">import</span> <span class="n">compute_unflattening_map</span><span class="p">,</span> <span class="n">flatten_reference_cube</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">sympy</span><span class="w"> </span><span class="kn">import</span> <span class="n">symbols</span><span class="p">,</span> <span class="n">legendre</span><span class="p">,</span> <span class="n">Array</span><span class="p">,</span> <span class="n">diff</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_entity_closure_ids</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_unflattening_map</span><span class="p">,</span> <span class="n">flatten_reference_cube</span>
 
 <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x y z&#39;</span><span class="p">)</span>
 <span class="n">variables</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
@@ -50,14 +50,14 @@
 
 <div class="viewcode-block" id="triangular_number">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.triangular_number">[docs]</a>
-<span class="k">def</span> <span class="nf">triangular_number</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">triangular_number</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="k">return</span> <span class="nb">int</span><span class="p">((</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">n</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="choose_ijk_total">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.choose_ijk_total">[docs]</a>
-<span class="k">def</span> <span class="nf">choose_ijk_total</span><span class="p">(</span><span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">choose_ijk_total</span><span class="p">(</span><span class="n">degree</span><span class="p">):</span>
     <span class="n">top</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span> <span class="o">+</span> <span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">i</span> <span class="o">*</span> <span class="n">top</span>
@@ -70,8 +70,8 @@
 
 <div class="viewcode-block" id="TrimmedSerendipity">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity">[docs]</a>
-<span class="k">class</span> <span class="nc">TrimmedSerendipity</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TrimmedSerendipity</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed serendipity elements only valid for k &gt;= 1&quot;</span><span class="p">)</span>
 
@@ -150,31 +150,31 @@
 
 <div class="viewcode-block" id="TrimmedSerendipity.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.degree">[docs]</a>
-    <span class="k">def</span> <span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_degree</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.get_nodal_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.get_nodal_basis">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented for trimmed serendipity&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.get_dual_set">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.get_dual_set">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dual_set</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_dual_set is not implemented for trimmed serendipity&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.get_coeffs">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_coeffs not implemented for trimmed serendipity&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.tabulate">[docs]</a>
-    <span class="k">def</span> <span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 
         <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">entity</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
@@ -207,7 +207,7 @@
 
 <div class="viewcode-block" id="TrimmedSerendipity.entity_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.entity_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_ids</span></div>
@@ -215,7 +215,7 @@
 
 <div class="viewcode-block" id="TrimmedSerendipity.entity_closure_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.entity_closure_dofs">[docs]</a>
-    <span class="k">def</span> <span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom on the closure of those entities for the finite element.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_ids</span></div>
@@ -223,25 +223,25 @@
 
 <div class="viewcode-block" id="TrimmedSerendipity.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.value_shape">[docs]</a>
-    <span class="k">def</span> <span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fdim</span><span class="p">,)</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.dmats">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.dmats">[docs]</a>
-    <span class="k">def</span> <span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.get_num_members">[docs]</a>
-    <span class="k">def</span> <span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.space_dimension">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipity.space_dimension">[docs]</a>
-    <span class="k">def</span> <span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[</span><span class="nb">tuple</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">fdim</span><span class="p">)])</span><span class="o">/</span><span class="bp">self</span><span class="o">.</span><span class="n">fdim</span><span class="p">)</span></div>
 </div>
 
@@ -249,8 +249,8 @@
 
 <div class="viewcode-block" id="TrimmedSerendipityDiv">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.TrimmedSerendipityDiv">[docs]</a>
-<span class="k">class</span> <span class="nc">TrimmedSerendipityDiv</span><span class="p">(</span><span class="n">TrimmedSerendipity</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TrimmedSerendipityDiv</span><span class="p">(</span><span class="n">TrimmedSerendipity</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed serendipity face elements only valid for k &gt;= 1&quot;</span><span class="p">)</span>
 
@@ -301,7 +301,7 @@
 
 <div class="viewcode-block" id="f_lambda_2_3d">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.f_lambda_2_3d">[docs]</a>
-<span class="k">def</span> <span class="nf">f_lambda_2_3d</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">f_lambda_2_3d</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
 
     <span class="n">FL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([(</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">a</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">dx</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">degree</span> <span class="o">-</span> <span class="n">k</span><span class="p">)]</span> <span class="o">+</span>
@@ -315,7 +315,7 @@
 
 <div class="viewcode-block" id="I_lambda_2_3d_pieces">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.I_lambda_2_3d_pieces">[docs]</a>
-<span class="k">def</span> <span class="nf">I_lambda_2_3d_pieces</span><span class="p">(</span><span class="n">current_deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">I_lambda_2_3d_pieces</span><span class="p">(</span><span class="n">current_deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
     <span class="k">assert</span> <span class="n">current_deg</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;invalid for i = 1&#39;</span>
     <span class="n">ILpiece</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([])</span>
     <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">current_deg</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
@@ -332,7 +332,7 @@
 
 <div class="viewcode-block" id="I_lambda_2_3d_tilde">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.I_lambda_2_3d_tilde">[docs]</a>
-<span class="k">def</span> <span class="nf">I_lambda_2_3d_tilde</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">I_lambda_2_3d_tilde</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
     <span class="k">assert</span> <span class="n">degree</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">,</span> <span class="s1">&#39;invalid for i = 1&#39;</span>
     <span class="n">IL_tilde</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">leg</span><span class="p">(</span><span class="n">degree</span> <span class="o">-</span> <span class="mi">2</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dz</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">+</span>
                      <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="n">leg</span><span class="p">(</span><span class="n">degree</span> <span class="o">-</span> <span class="mi">2</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)]</span> <span class="o">+</span>
@@ -355,7 +355,7 @@
 
 <div class="viewcode-block" id="I_lambda_2_3d">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.I_lambda_2_3d">[docs]</a>
-<span class="k">def</span> <span class="nf">I_lambda_2_3d</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">I_lambda_2_3d</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">):</span>
     <span class="n">IL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([])</span>
     <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">IL</span> <span class="o">+=</span> <span class="n">I_lambda_2_3d_pieces</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">dz</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">,</span> <span class="n">z_mid</span><span class="p">)</span>
@@ -367,7 +367,7 @@
 <span class="c1"># Everything for 2-d should work already.</span>
 <div class="viewcode-block" id="e_lambda_1_2d_part_one">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.e_lambda_1_2d_part_one">[docs]</a>
-<span class="k">def</span> <span class="nf">e_lambda_1_2d_part_one</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">e_lambda_1_2d_part_one</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="n">EL</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
         <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">deg</span><span class="p">)]</span> <span class="o">+</span>
         <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">deg</span><span class="p">)]</span> <span class="o">+</span>
@@ -380,7 +380,7 @@
 
 <div class="viewcode-block" id="e_lambda_tilde_1_2d_part_two">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.e_lambda_tilde_1_2d_part_two">[docs]</a>
-<span class="k">def</span> <span class="nf">e_lambda_tilde_1_2d_part_two</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">e_lambda_tilde_1_2d_part_two</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="n">ELTilde</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([(</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
                       <span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="p">(</span><span class="n">deg</span><span class="o">+</span><span class="mi">1</span><span class="p">))]</span> <span class="o">+</span>
                     <span class="p">[(</span><span class="o">-</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
@@ -395,7 +395,7 @@
 
 <div class="viewcode-block" id="e_lambda_1_2d">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.e_lambda_1_2d">[docs]</a>
-<span class="k">def</span> <span class="nf">e_lambda_1_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">e_lambda_1_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="n">EL</span> <span class="o">=</span> <span class="n">e_lambda_1_2d_part_one</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span>
     <span class="n">ELTilde</span> <span class="o">=</span> <span class="n">e_lambda_tilde_1_2d_part_two</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span>
 
@@ -406,7 +406,7 @@
 
 <div class="viewcode-block" id="determine_f_lambda_portions_2d">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.determine_f_lambda_portions_2d">[docs]</a>
-<span class="k">def</span> <span class="nf">determine_f_lambda_portions_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">determine_f_lambda_portions_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">):</span>
     <span class="k">if</span> <span class="p">(</span><span class="n">deg</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">):</span>
         <span class="n">DegsOfIteration</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">else</span><span class="p">:</span>
@@ -420,7 +420,7 @@
 
 <div class="viewcode-block" id="f_lambda_1_2d_pieces">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.f_lambda_1_2d_pieces">[docs]</a>
-<span class="k">def</span> <span class="nf">f_lambda_1_2d_pieces</span><span class="p">(</span><span class="n">current_deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">f_lambda_1_2d_pieces</span><span class="p">(</span><span class="n">current_deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="k">if</span> <span class="p">(</span><span class="n">current_deg</span> <span class="o">==</span> <span class="mi">2</span><span class="p">):</span>
         <span class="n">FLpiece</span> <span class="o">=</span> <span class="p">[(</span><span class="n">leg</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)]</span>
         <span class="n">FLpiece</span> <span class="o">+=</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="n">leg</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">leg</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span>
@@ -437,7 +437,7 @@
 
 <div class="viewcode-block" id="f_lambda_1_2d_trim">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.f_lambda_1_2d_trim">[docs]</a>
-<span class="k">def</span> <span class="nf">f_lambda_1_2d_trim</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">f_lambda_1_2d_trim</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="n">DegsOfIteration</span> <span class="o">=</span> <span class="n">determine_f_lambda_portions_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">)</span>
     <span class="n">FL</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">DegsOfIteration</span><span class="p">:</span>
@@ -448,7 +448,7 @@
 
 <div class="viewcode-block" id="f_lambda_1_2d_tilde">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.f_lambda_1_2d_tilde">[docs]</a>
-<span class="k">def</span> <span class="nf">f_lambda_1_2d_tilde</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">f_lambda_1_2d_tilde</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="n">FLTilde</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([])</span>
     <span class="n">FLTilde</span> <span class="o">+=</span> <span class="nb">tuple</span><span class="p">([(</span><span class="n">leg</span><span class="p">(</span><span class="n">deg</span> <span class="o">-</span> <span class="mi">2</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dy</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)])</span>
     <span class="n">FLTilde</span> <span class="o">+=</span> <span class="nb">tuple</span><span class="p">([(</span><span class="mi">0</span><span class="p">,</span> <span class="n">leg</span><span class="p">(</span><span class="n">deg</span> <span class="o">-</span> <span class="mi">2</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">)</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">*</span><span class="n">dx</span><span class="p">[</span><span class="mi">1</span><span class="p">])])</span>
@@ -461,7 +461,7 @@
 
 <div class="viewcode-block" id="F_lambda_1_2d">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.F_lambda_1_2d">[docs]</a>
-<span class="k">def</span> <span class="nf">F_lambda_1_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">F_lambda_1_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="n">FL</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">deg</span><span class="p">):</span>
         <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
@@ -474,7 +474,7 @@
 
 <div class="viewcode-block" id="trimmed_f_lambda_2d">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.SminusDiv.trimmed_f_lambda_2d">[docs]</a>
-<span class="k">def</span> <span class="nf">trimmed_f_lambda_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">trimmed_f_lambda_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">):</span>
     <span class="n">FL</span> <span class="o">=</span> <span class="n">F_lambda_1_2d</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span>
     <span class="n">FLT</span> <span class="o">=</span> <span class="n">f_lambda_1_2d_tilde</span><span class="p">(</span><span class="n">deg</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span><span class="p">,</span> <span class="n">x_mid</span><span class="p">,</span> <span class="n">y_mid</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">FL</span> <span class="o">+</span> <span class="n">FLT</span>
@@ -517,7 +517,7 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2024, FEniCS Project.
+    &#169; Copyright 2025, FEniCS Project.
       Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
     </div>
   </body>
