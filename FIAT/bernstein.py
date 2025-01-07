@@ -55,7 +55,7 @@ class Bernstein(FiniteElement):
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
         super().__init__(ref_el, dual, degree, k)
-        pts = make_lattice(ref_el.vertices, degree)
+        pts = make_lattice(ref_el.vertices, degree, variant="gll")
         newdual = compute_pointwise_dual(self, pts)
         self.dual = newdual
 
