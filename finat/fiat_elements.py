@@ -100,7 +100,7 @@ class FiatElement(FiniteElementBase):
         '''
         space_dimension = self._element.space_dimension()
         value_size = np.prod(self._element.value_shape(), dtype=int)
-        fiat_result = self._element.tabulate(order, ps.points, entity)
+        fiat_result = self._element.tabulate(order, ps.points.reshape(-1, ps.points.shape[-1]), entity)
         result = {}
         # In almost all cases, we have
         # self.space_dimension() == self._element.space_dimension()
@@ -116,9 +116,8 @@ class FiatElement(FiniteElementBase):
                 continue
 
             derivative = sum(alpha)
-            table_roll = fiat_table.reshape(
-                space_dimension, value_size, len(ps.points)
-            ).transpose(1, 2, 0)
+            table = fiat_table.reshape(space_dimension, value_size, *ps.points.shape[:-1])
+            table_roll = np.moveaxis(table, 0, -1)
 
             exprs = []
             for table in table_roll:

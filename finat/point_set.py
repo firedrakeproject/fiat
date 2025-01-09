@@ -24,8 +24,7 @@ class AbstractPointSet(metaclass=ABCMeta):
     @property
     def dimension(self):
         """Point dimension."""
-        _, dim = self.points.shape
-        return dim
+        return self.points.shape[-1]
 
     @abstractproperty
     def indices(self):
@@ -130,7 +129,7 @@ class PointSet(AbstractPointSet):
         :arg points: A vector of N points of shape (N, D) where D is the
             dimension of each point."""
         points = numpy.asarray(points)
-        assert len(points.shape) == 2
+        assert len(points.shape) > 1
         self.points = points
 
     @cached_property
@@ -139,7 +138,7 @@ class PointSet(AbstractPointSet):
 
     @cached_property
     def indices(self):
-        return (gem.Index(extent=len(self.points)),)
+        return tuple(gem.Index(extent=e) for e in self.points.shape[:-1])
 
     @cached_property
     def expression(self):
