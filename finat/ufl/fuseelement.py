@@ -6,6 +6,7 @@
 
 from finat.ufl.finiteelementbase import FiniteElementBase
 
+
 class FuseElement(FiniteElementBase):
     """
     A finite element defined using FUSE.
