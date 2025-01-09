@@ -12,6 +12,8 @@ dependencies = [
   "symengine",
   "sympy",
   "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git",
+  "fuse-element==0.1.dev0",
+  "
 ]
 requires-python = ">=3.10"
 authors = [
