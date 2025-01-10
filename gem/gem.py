@@ -971,6 +971,16 @@ class Delta(Scalar, Terminal):
         if isinstance(i, int) and isinstance(j, int):
             return one if i == j else Zero()
 
+        if isinstance(i, int):
+            expr = numpy.full((j.extent), Zero(), dtype=object)
+            expr[i] = one
+            return Indexed(ListTensor(expr), (j,))
+
+        if isinstance(j, int):
+            expr = numpy.full((i.extent), Zero(), dtype=object)
+            expr[j] = one
+            return Indexed(ListTensor(expr), (i,))
+
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j

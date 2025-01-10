@@ -1,4 +1,4 @@
-from finat.point_set import UnknownPointSet, PointSet
+from finat.point_set import UnknownPointSet, MappedPointSet
 from functools import reduce
 
 import numpy
@@ -91,14 +91,7 @@ class QuadratureElement(FiniteElementBase):
     def _point_set(self):
         ps = self._rule.point_set
         sd = self.cell.get_spatial_dimension()
-        dim = ps.dimension
-        if dim != sd:
-            # Tile the quadrature rule on each subentity
-            entity_ids = self.entity_dofs()
-            pts = [self.cell.get_entity_transform(dim, entity)(ps.points)
-                   for entity in entity_ids[dim]]
-            ps = PointSet(numpy.stack(pts, axis=0))
-        return ps
+        return ps if ps.dimension == sd else MappedPointSet(self.cell, ps)
 
     @property
     def index_shape(self):
@@ -147,16 +140,13 @@ class QuadratureElement(FiniteElementBase):
 
         # Return an outer product of identity matrices
         multiindex = self.get_indices()
+        fid = ps.indices
+        if len(multiindex) > len(fid):
+            fid = (entity_id, *fid)
         product = reduce(gem.Product, [gem.Delta(q, r)
-                                       for q, r in zip(ps.indices, multiindex[-len(ps.indices):])])
+                                       for q, r in zip(fid, multiindex)])
 
         sd = self.cell.get_spatial_dimension()
-        if sd != ps.dimension:
-            data = numpy.zeros(self.index_shape[:-1], dtype=object)
-            data[...] = gem.Zero()
-            data[entity_id] = gem.Literal(1)
-            product = gem.Product(product, gem.Indexed(gem.ListTensor(data), multiindex[:1]))
-
         return {(0,) * sd: gem.ComponentTensor(product, multiindex)}
 
     def point_evaluation(self, order, refcoords, entity=None):

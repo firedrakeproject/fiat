@@ -5,6 +5,7 @@ import numpy
 
 import gem
 from gem.utils import cached_property
+from FIAT.reference_element import make_affine_mapping
 
 
 class AbstractPointSet(metaclass=ABCMeta):
@@ -111,8 +112,7 @@ class UnknownPointSet(AbstractPointSet):
 
     @cached_property
     def indices(self):
-        N, _ = self._points_expr.shape
-        return (gem.Index(extent=N),)
+        return tuple(gem.Index(extent=N) for N in self._points_expr.shape[:-1])
 
     @cached_property
     def expression(self):
@@ -129,7 +129,7 @@ class PointSet(AbstractPointSet):
         :arg points: A vector of N points of shape (N, D) where D is the
             dimension of each point."""
         points = numpy.asarray(points)
-        assert len(points.shape) > 1
+        assert len(points.shape) == 2
         self.points = points
 
     @cached_property
@@ -138,7 +138,7 @@ class PointSet(AbstractPointSet):
 
     @cached_property
     def indices(self):
-        return tuple(gem.Index(extent=e) for e in self.points.shape[:-1])
+        return tuple(gem.Index(extent=N) for N in self.points.shape[:-1])
 
     @cached_property
     def expression(self):
@@ -200,3 +200,54 @@ class TensorPointSet(AbstractPointSet):
             len(self.factors) == len(other.factors) and \
             all(s.almost_equal(o, tolerance=tolerance)
                 for s, o in zip(self.factors, other.factors))
+
+
+class MappedPointSet(AbstractPointSet):
+
+    def __init__(self, cell, ps):
+        self.cell = cell
+        self.ps = ps
+
+    @cached_property
+    def transforms(self):
+        top = self.cell.topology
+        dim = self.ps.dimension
+        sd = self.cell.get_spatial_dimension()
+        A = numpy.zeros((len(top[dim]), sd, dim))
+        b = numpy.zeros((len(top[dim]), sd))
+        ref_verts = self.cell.construct_subelement(dim).vertices
+        for entity in sorted(top[dim]):
+            verts = self.cell.get_vertices_of_subcomplex(top[dim][entity])
+            A[entity], b[entity] = make_affine_mapping(ref_verts, verts)
+        return A, b
+
+    @cached_property
+    def points(self):
+        x = self.ps.points
+        A, b = self.transforms
+        pts = [numpy.add(numpy.dot(x, A[entity].T), b[entity])
+               for entity in range(len(A))]
+        return numpy.concatenate(pts)
+
+    @cached_property
+    def indices(self):
+        num_facets = len(self.cell.topology[self.ps.dimension])
+        return (gem.Index(extent=num_facets), *self.ps.indices)
+
+    @cached_property
+    def expression(self):
+        A, b = self.transforms
+        x = self.ps.expression
+        i, *p = self.indices
+        j, k = (gem.Index(extent=e) for e in A.shape[1:])
+
+        xpk = gem.Indexed(x, (*p, k))
+        Aijk = gem.Indexed(gem.Literal(A), (i, j, k))
+        bij = gem.Indexed(gem.Literal(b), (i, j))
+        return gem.Sum(gem.IndexSum(Aijk, xpk, (k,)), bij)
+
+    def almost_equal(self, other, tolerance=1e-12):
+        """Approximate numerical equality of point sets"""
+        return type(self) is type(other) and \
+            self.cell == other.cell and \
+            self.ps.almost_equal(other.ps, tolerance=tolerance)

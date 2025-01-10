@@ -100,7 +100,7 @@ class FiatElement(FiniteElementBase):
         '''
         space_dimension = self._element.space_dimension()
         value_size = np.prod(self._element.value_shape(), dtype=int)
-        fiat_result = self._element.tabulate(order, ps.points.reshape(-1, ps.points.shape[-1]), entity)
+        fiat_result = self._element.tabulate(order, ps.points, entity)
         result = {}
         # In almost all cases, we have
         # self.space_dimension() == self._element.space_dimension()

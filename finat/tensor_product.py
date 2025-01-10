@@ -13,7 +13,7 @@ import gem
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSingleton, PointSet, TensorPointSet
+from finat.point_set import PointSingleton, PointSet, TensorPointSet, MappedPointSet
 
 
 class TensorProductElement(FiniteElementBase):
@@ -138,6 +138,15 @@ class TensorProductElement(FiniteElementBase):
         return result
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        if isinstance(ps, MappedPointSet):
+            top = self.cell.topology
+            evals = [self.basis_evaluation(order, ps.ps, entity=(dim, entity),
+                                           coordinate_mapping=coordinate_mapping)
+                     for dim in sorted(top)
+                     for entity in sorted(top[dim])
+                     if sum(dim) == ps.ps.dimension]
+            return {key: gem.ListTensor([e[key] for e in evals]) for key in evals[0]}
+
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
 
