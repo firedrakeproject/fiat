@@ -6,8 +6,11 @@
 
 from finat.ufl.finiteelementbase import FiniteElementBase
 
+
 class FuseElement(FiniteElementBase):
     """
+    A finite element defined using FUSE.
+
     TODO: Need to deal with cases where value shape and reference value shape are different
     """
 

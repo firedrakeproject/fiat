@@ -24,7 +24,7 @@ from functools import singledispatch, cache
 
 import finat
 import finat.ufl
-from redefining_fe.cells import CellComplexToUFL as FuseCell
+from fuse.cells import CellComplexToUFL as FuseCell
 import ufl
 
 from FIAT import ufc_cell
