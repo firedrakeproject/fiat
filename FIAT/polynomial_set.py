@@ -194,7 +194,7 @@ def construct_new_coeffs(ref_el, A, B):
     Constructs new coefficients for the set union of A and B
     If A and B are discontinuous and do not have the same degree the smaller one
     is extended to match the larger.
-    
+
     This does not handle the case that A and B have continuity but not the same degree.
     """
 
