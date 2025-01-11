@@ -482,6 +482,6 @@ class NedelecSecondKind(VectorFiatElement):
         super().__init__(FIAT.NedelecSecondKind(cell, degree, variant=variant))
 
 
-class IndiaDefElement(FiatElement):
+class FuseElement(FiatElement):
     def __init__(self, triple):
-        super(IndiaDefElement, self).__init__(triple.to_fiat())
+        super(FuseElement, self).__init__(triple.to_fiat())

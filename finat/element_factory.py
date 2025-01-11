@@ -306,8 +306,8 @@ def convert_restrictedelement(element, **kwargs):
 
 
 @convert.register(finat.ufl.FuseElement)
-def convert_india_def(element, **kwargs):
-    return finat.fiat_elements.IndiaDefElement(element.triple), set()
+def convert_fuse_element(element, **kwargs):
+    return finat.fiat_elements.FuseElement(element.triple), set()
 
 
 hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
