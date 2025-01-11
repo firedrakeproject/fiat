@@ -116,8 +116,8 @@ class FiatElement(FiniteElementBase):
                 continue
 
             derivative = sum(alpha)
-            table = fiat_table.reshape(space_dimension, value_size, *ps.points.shape[:-1])
-            table_roll = np.moveaxis(table, 0, -1)
+            shp = (space_dimension, value_size, *ps.points.shape[:-1])
+            table_roll = np.moveaxis(fiat_table.reshape(shp), 0, -1)
 
             exprs = []
             for table in table_roll:

@@ -1,4 +1,3 @@
-from functools import reduce
 from itertools import chain, product
 from operator import methodcaller
 
@@ -13,7 +12,7 @@ import gem
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSingleton, PointSet, TensorPointSet, MappedPointSet
+from finat.point_set import PointSingleton, PointSet, TensorPointSet
 
 
 class TensorProductElement(FiniteElementBase):
@@ -32,11 +31,11 @@ class TensorProductElement(FiniteElementBase):
 
     @cached_property
     def cell(self):
-        return TensorProductCell(*[fe.cell for fe in self.factors])
+        return TensorProductCell(*(fe.cell for fe in self.factors))
 
     @cached_property
     def complex(self):
-        return TensorProductCell(*[fe.complex for fe in self.factors])
+        return TensorProductCell(*(fe.complex for fe in self.factors))
 
     @property
     def degree(self):
@@ -69,7 +68,7 @@ class TensorProductElement(FiniteElementBase):
 
     @property
     def index_shape(self):
-        return tuple(chain(*[fe.index_shape for fe in self.factors]))
+        return tuple(chain.from_iterable(fe.index_shape for fe in self.factors))
 
     @property
     def value_shape(self):
@@ -117,36 +116,23 @@ class TensorProductElement(FiniteElementBase):
         # multiindex describing the value shape of the subelement.
         zetas = [fe.get_value_indices() for fe in self.factors]
 
+        multiindex = tuple(chain(*alphas, *zetas))
         result = {}
         for derivative in range(order + 1):
             for Delta in mis(dimension, derivative):
                 # Split the multiindex for the subelements
                 deltas = [Delta[s] for s in dim_slices]
-                # GEM scalars (can have free indices) for collecting
-                # the contributions from the subelements.
-                scalars = []
-                for fr, delta, alpha, zeta in zip(factor_results, deltas, alphas, zetas):
-                    # Turn basis shape to free indices, select the
-                    # right derivative entry, and collect the result.
-                    scalars.append(gem.Indexed(fr[delta], alpha + zeta))
-                # Multiply the values from the subelements and wrap up
-                # non-point indices into shape.
-                result[Delta] = gem.ComponentTensor(
-                    reduce(gem.Product, scalars),
-                    tuple(chain(*(alphas + zetas)))
-                )
+                # Multiply the values from the subelements
+                # Turn basis shape to free indices, select the
+                # right derivative entry.
+                scalar = gem.Product(*(gem.Indexed(fr[delta], alpha + zeta)
+                                       for fr, delta, alpha, zeta
+                                       in zip(factor_results, deltas, alphas, zetas)))
+                # Wrap up non-point indices into shape.
+                result[Delta] = gem.ComponentTensor(scalar, multiindex)
         return result
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        if isinstance(ps, MappedPointSet):
-            top = self.cell.topology
-            evals = [self.basis_evaluation(order, ps.ps, entity=(dim, entity),
-                                           coordinate_mapping=coordinate_mapping)
-                     for dim in sorted(top)
-                     for entity in sorted(top[dim])
-                     if sum(dim) == ps.ps.dimension]
-            return {key: gem.ListTensor([e[key] for e in evals]) for key in evals[0]}
-
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
 
@@ -188,12 +174,11 @@ class TensorProductElement(FiniteElementBase):
         # Naming as _merge_evaluations above
         alphas = [factor.get_indices() for factor in self.factors]
         zetas = [factor.get_value_indices() for factor in self.factors]
-        # Index the factors by so that we can reshape into index-shape
-        # followed by value-shape
-        qis = [q[alpha + zeta] for q, alpha, zeta in zip(qs, alphas, zetas)]
         Q = gem.ComponentTensor(
-            reduce(gem.Product, qis),
-            tuple(chain(*(alphas + zetas)))
+            # Index the factors by so that we can reshape into index-shape
+            # followed by value-shape
+            gem.Product(*(q[alpha + zeta] for q, alpha, zeta in zip(qs, alphas, zetas))),
+            tuple(chain(*alphas, *zetas))
         )
         return Q, ps
 

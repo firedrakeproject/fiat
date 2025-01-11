@@ -1,5 +1,4 @@
 from finat.point_set import UnknownPointSet, MappedPointSet
-from functools import reduce
 
 import numpy
 
@@ -28,7 +27,7 @@ def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
     """
     if codim:
         sd = fiat_ref_cell.get_spatial_dimension()
-        rule_ref_cell = fiat_ref_cell.construct_subcomplex(sd - codim)
+        rule_ref_cell = fiat_ref_cell.construct_subelement(sd - codim)
     else:
         rule_ref_cell = fiat_ref_cell
 
@@ -73,12 +72,14 @@ class QuadratureElement(FiniteElementBase):
         entity_dofs = {dim: {entity: [] for entity in entities}
                        for dim, entities in top.items()}
         ps = self._rule.point_set
-        dim = ps.dimension
         num_pts = len(ps.points)
+        to_int = lambda x: sum(x) if isinstance(x, tuple) else x
         cur = 0
-        for entity in sorted(top[dim]):
-            entity_dofs[dim][entity] = list(range(cur, cur + num_pts))
-            cur += num_pts
+        for dim in sorted(top):
+            if to_int(dim) == ps.dimension:
+                for entity in sorted(top[dim]):
+                    entity_dofs[dim][entity].extend(range(cur, cur + num_pts))
+                    cur += num_pts
         return entity_dofs
 
     def entity_dofs(self):
@@ -143,8 +144,7 @@ class QuadratureElement(FiniteElementBase):
         fid = ps.indices
         if len(multiindex) > len(fid):
             fid = (entity_id, *fid)
-        product = reduce(gem.Product, [gem.Delta(q, r)
-                                       for q, r in zip(fid, multiindex)])
+        product = gem.Delta(fid, multiindex)
 
         sd = self.cell.get_spatial_dimension()
         return {(0,) * sd: gem.ComponentTensor(product, multiindex)}
@@ -158,8 +158,7 @@ class QuadratureElement(FiniteElementBase):
         multiindex = self.get_indices()
         # Evaluation matrix is just an outer product of identity
         # matrices, evaluation points are just the quadrature points.
-        Q = reduce(gem.Product, (gem.Delta(q, r)
-                                 for q, r in zip(ps.indices, multiindex)))
+        Q = gem.Delta(ps.indices, multiindex)
         Q = gem.ComponentTensor(Q, multiindex)
         return Q, ps
 

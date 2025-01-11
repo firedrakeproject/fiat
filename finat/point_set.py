@@ -5,7 +5,6 @@ import numpy
 
 import gem
 from gem.utils import cached_property
-from FIAT.reference_element import make_affine_mapping
 
 
 class AbstractPointSet(metaclass=ABCMeta):
@@ -209,42 +208,28 @@ class MappedPointSet(AbstractPointSet):
         self.ps = ps
 
     @cached_property
-    def transforms(self):
+    def entities(self):
+        to_int = lambda x: sum(x) if isinstance(x, tuple) else x
         top = self.cell.topology
-        dim = self.ps.dimension
-        sd = self.cell.get_spatial_dimension()
-        A = numpy.zeros((len(top[dim]), sd, dim))
-        b = numpy.zeros((len(top[dim]), sd))
-        ref_verts = self.cell.construct_subelement(dim).vertices
-        for entity in sorted(top[dim]):
-            verts = self.cell.get_vertices_of_subcomplex(top[dim][entity])
-            A[entity], b[entity] = make_affine_mapping(ref_verts, verts)
-        return A, b
+        return [(dim, entity)
+                for dim in sorted(top)
+                for entity in sorted(top[dim])
+                if to_int(dim) == self.ps.dimension]
 
     @cached_property
     def points(self):
-        x = self.ps.points
-        A, b = self.transforms
-        pts = [numpy.add(numpy.dot(x, A[entity].T), b[entity])
-               for entity in range(len(A))]
+        ref_pts = self.ps.points
+        pts = [self.cell.get_entity_transform(dim, entity)(ref_pts)
+               for dim, entity in self.entities]
         return numpy.concatenate(pts)
 
     @cached_property
     def indices(self):
-        num_facets = len(self.cell.topology[self.ps.dimension])
-        return (gem.Index(extent=num_facets), *self.ps.indices)
+        return (gem.Index(extent=len(self.entities)), *self.ps.indices)
 
     @cached_property
     def expression(self):
-        A, b = self.transforms
-        x = self.ps.expression
-        i, *p = self.indices
-        j, k = (gem.Index(extent=e) for e in A.shape[1:])
-
-        xpk = gem.Indexed(x, (*p, k))
-        Aijk = gem.Indexed(gem.Literal(A), (i, j, k))
-        bij = gem.Indexed(gem.Literal(b), (i, j))
-        return gem.Sum(gem.IndexSum(Aijk, xpk, (k,)), bij)
+        raise NotImplementedError("Should not use MappedPointSet like this")
 
     def almost_equal(self, other, tolerance=1e-12):
         """Approximate numerical equality of point sets"""
