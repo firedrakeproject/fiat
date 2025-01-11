@@ -190,12 +190,18 @@ def polynomial_set_union_normalized(A, B):
 
 
 def construct_new_coeffs(ref_el, A, B):
-    # Constructs new coefficients for the set union of A and B
-    # If A and B do not have the same degree the smaller one
-    # is extended to match the larger
+    """
+    Constructs new coefficients for the set union of A and B
+    If A and B are discontinuous and do not have the same degree the smaller one
+    is extended to match the larger.
+    
+    This does not handle the case that A and B have continuity but not the same degree.
+    """
 
     sd = ref_el.get_spatial_dimension()
-    if A.get_embedded_degree() != B.get_embedded_degree():
+    if A.get_expansion_set().continuity != B.get_expansion_set().continuity:
+        raise ValueError("Continuity of expansion sets does not match.")
+    if A.get_embedded_degree() != B.get_embedded_degree() and A.get_expansion_set().continuity is None:
         higher = A if A.degree > B.degree else B
         lower = B if A.degree > B.degree else A
 
@@ -215,9 +221,9 @@ def construct_new_coeffs(ref_el, A, B):
             else:
                 embedded_coeffs.append(numpy.append(coeff, [0 for i in range(diff)]))
         embedded_coeffs = numpy.array(embedded_coeffs)
-        new_coeffs = numpy.array(list(embedded_coeffs) + list(higher.coeffs))
+        new_coeffs = numpy.concatenate((embedded_coeffs, higher.coeffs), axis=0)
     else:
-        new_coeffs = numpy.array(list(A.coeffs) + list(B.coeffs))
+        new_coeffs = numpy.concatenate((A.coeffs, B.coeffs), axis=0)
     return new_coeffs
 
 
