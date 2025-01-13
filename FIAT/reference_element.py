@@ -181,6 +181,9 @@ class Cell(object):
                     d01_entities = tuple(e for d, e in neighbors if d == dim1)
                     self.connectivity[(dim0, dim1)].append(d01_entities)
 
+        # Dictionary with derived cells
+        self.children = {}
+
     def _key(self):
         """Hashable object key data (excluding type)."""
         # Default: only type matters
