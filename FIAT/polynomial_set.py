@@ -202,18 +202,18 @@ def construct_new_coeffs(ref_el, A, B):
     if A.get_expansion_set().continuity != B.get_expansion_set().continuity:
         raise ValueError("Continuity of expansion sets does not match.")
     if A.get_embedded_degree() != B.get_embedded_degree() and A.get_expansion_set().continuity is None:
-        higher = A if A.degree > B.degree else B
-        lower = B if A.degree > B.degree else A
+        higher = A if A.get_embedded_degree() > B.get_embedded_degree() else B
+        lower = B if A.get_embedded_degree() > B.get_embedded_degree() else A
 
         try:
             sd = lower.get_shape()[0]
         except IndexError:
-            sd = 1
+            sd = -1
 
         embedded_coeffs = []
         diff = higher.coeffs.shape[-1] - lower.coeffs.shape[-1]
         for coeff in lower.coeffs:
-            if sd > 1:
+            if sd != -1:
                 new_coeff = []
                 for row in coeff:
                     new_coeff.append(numpy.append(row, [0 for i in range(diff)]))
