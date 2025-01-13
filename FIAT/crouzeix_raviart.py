@@ -15,6 +15,7 @@ from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.hierarchical import make_dual_bubbles
+from FIAT.reference_element import make_lattice
 
 
 class CrouzeixRaviartDualSet(dual_set.DualSet):
@@ -57,11 +58,13 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
                     continue
                 for i in sorted(top[dim]):
                     cur = len(nodes)
-                    pts = ref_el.make_points(dim, i, degree)
                     if dim == sd-1 and dim != 0:
-                        # Include midpoint on codim 1 facets
-                        pts = [*ref_el.make_points(dim, i, dim+1), *pts]
-                    nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
+                        verts = ref_el.get_vertices_of_subcomplex(top[dim][i])
+                        pts = make_lattice(verts, degree-1, variant="gl")
+                    else:
+                        pts = ref_el.make_points(dim, i, degree, variant="gll")
+
+                    nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts)
                     entity_ids[dim][i].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
