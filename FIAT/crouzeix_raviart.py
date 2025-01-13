@@ -63,7 +63,6 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
                         pts = make_lattice(verts, degree-1, variant="gl")
                     else:
                         pts = ref_el.make_points(dim, i, degree, variant="gll")
-
                     nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts)
                     entity_ids[dim][i].extend(range(cur, len(nodes)))
 

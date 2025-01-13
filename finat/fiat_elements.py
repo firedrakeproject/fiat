@@ -356,8 +356,8 @@ class FacetBubble(ScalarFiatElement):
 
 
 class CrouzeixRaviart(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.CrouzeixRaviart(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.CrouzeixRaviart(cell, degree, variant=variant))
 
 
 class Lagrange(ScalarFiatElement):
