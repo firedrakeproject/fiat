@@ -216,6 +216,9 @@ def convert_finiteelement(element, **kwargs):
             lmbda = finat.DiscontinuousLagrange
             finat_kwargs["variant"] = kind
 
+    elif element.family() == "HDiv Trace":
+        finat_kwargs["variant"] = kind
+
     elif element.variant() is not None:
         finat_kwargs["variant"] = element.variant()
 
