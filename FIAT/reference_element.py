@@ -510,7 +510,7 @@ class SimplicialComplex(Cell):
                 v1.append(dest)
         return vert_coords[v1] - vert_coords[v0]
 
-    def make_points(self, dim, entity_id, order, variant=None):
+    def make_points(self, dim, entity_id, order, variant=None, interior=1):
         """Constructs a lattice of points on the entity_id:th
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
@@ -520,7 +520,7 @@ class SimplicialComplex(Cell):
             entity_verts = \
                 self.get_vertices_of_subcomplex(
                     self.get_topology()[dim][entity_id])
-            return make_lattice(entity_verts, order, 1, variant=variant)
+            return make_lattice(entity_verts, order, interior=interior, variant=variant)
         else:
             raise ValueError("illegal dimension")
 

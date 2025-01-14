@@ -14,7 +14,6 @@ from FIAT import finite_element, polynomial_set, dual_set, functional
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.reference_element import make_lattice
 
 
 class CrouzeixRaviartDualSet(dual_set.DualSet):
@@ -23,6 +22,9 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
         # Get topology dictionary
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
+
+        if degree > 1 and sd != 2:
+            raise NotImplementedError("High-order Crouzeix-Raviart is only implemented on triangles.")
 
         # Initialize empty nodes and entity_ids
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
@@ -61,11 +63,9 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
                 for i in sorted(top[dim]):
                     cur = len(nodes)
                     if dim == sd-1 and dim != 0:
-                        verts = ref_el.get_vertices_of_subcomplex(top[dim][i])
-                        pts = make_lattice(verts, degree-1, variant="gl")
+                        pts = ref_el.make_points(dim, i, degree-1, variant="gl", interior=0)
                     else:
                         pts = ref_el.make_points(dim, i, degree, variant="gll")
-
                     nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts)
                     entity_ids[dim][i].extend(range(cur, len(nodes)))
 
