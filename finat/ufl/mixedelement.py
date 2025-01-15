@@ -81,6 +81,15 @@ class MixedElement(FiniteElementBase):
         """Doc."""
         return all(i._is_linear() for i in self._sub_elements)
 
+    def value_shape(self, domain):
+        """Return the shape of the value space on a physical domain."""
+        # Compute value sizes in global and reference configurations
+        value_size_sum = sum(s.value_size(domain) for s in self._sub_elements)
+
+        # Flattened value shape: Treated simply as all
+        # subelements unpacked in a vector.
+        return (value_size_sum, )
+
     def reconstruct_from_elements(self, *elements):
         """Reconstruct a mixed element from new subelements."""
         if all(a == b for (a, b) in zip(elements, self._sub_elements)):
@@ -149,6 +158,7 @@ class MixedElement(FiniteElementBase):
             # Indexing into a long vector of flattened subelement
             # shapes
             j, = i
+            j = int(j)
 
             # Find subelement for this index
             for sub_element_index, e in enumerate(self._sub_elements):
@@ -323,6 +333,10 @@ class VectorElement(MixedElement):
         # Cache repr string
         self._repr = f"VectorElement({repr(sub_element)}, dim={dim}{var_str})"
 
+    def value_shape(self, domain):
+        """Return the shape of the value space on a physical domain."""
+        return (self.num_sub_elements, *self._sub_element.value_shape(domain))
+
     def __repr__(self):
         """Doc."""
         return self._repr
@@ -453,6 +467,10 @@ class TensorElement(MixedElement):
         # Cache repr string
         self._repr = (f"TensorElement({repr(sub_element)}, shape={shape}, "
                       f"symmetry={symmetry}{var_str})")
+
+    def value_shape(self, domain):
+        """Return the shape of the value space on a physical domain."""
+        return (*self._shape, *self._sub_element.value_shape(domain))
 
     @property
     def pullback(self):

@@ -121,6 +121,14 @@ class FiniteElementBase(AbstractFiniteElement):
         """Return whether the basis functions of this element is spatially constant over each cell."""
         return self._is_globally_constant() or self.degree() == 0
 
+    def value_shape(self, domain):
+        """Return the shape of the value space on a physical domain."""
+        return self.pullback.physical_value_shape(self, domain)
+
+    def value_size(self, domain):
+        """Return the integer product of the value shape on a physical domain."""
+        return product(self.value_shape(domain))
+
     @property
     def reference_value_shape(self):
         """Return the shape of the value space on the reference cell."""
@@ -143,9 +151,9 @@ class FiniteElementBase(AbstractFiniteElement):
 
     def _check_component(self, domain, i):
         """Check that component index i is valid."""
-        sh = self.value_shape(domain.geometric_dimension())
+        sh = self.value_shape(domain)
         r = len(sh)
-        if not (len(i) == r and all(j < k for (j, k) in zip(i, sh))):
+        if not (len(i) == r and all(int(j) < k for (j, k) in zip(i, sh))):
             raise ValueError(
                 f"Illegal component index {i} (value rank {len(i)}) "
                 f"for element (value rank {r}).")
@@ -171,7 +179,7 @@ class FiniteElementBase(AbstractFiniteElement):
         """Check that reference component index i is valid."""
         sh = self.reference_value_shape
         r = len(sh)
-        if not (len(i) == r and all(j < k for (j, k) in zip(i, sh))):
+        if not (len(i) == r and all(int(j) < k for (j, k) in zip(i, sh))):
             raise ValueError(
                 f"Illegal component index {i} (value rank {len(i)}) "
                 f"for element (value rank {r}).")
