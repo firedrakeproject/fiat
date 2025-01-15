@@ -20,6 +20,20 @@ from ufl.finiteelement import AbstractFiniteElement
 from ufl.utils.sequences import product
 
 
+# Dict of supported pullback names and their ufl representation
+supported_pullbacks = {
+    "identity": pullback.identity_pullback,
+    "L2 Piola": pullback.l2_piola,
+    "covariant Piola": pullback.covariant_piola,
+    "contravariant Piola": pullback.contravariant_piola,
+    "double covariant Piola": pullback.double_covariant_piola,
+    "double contravariant Piola": pullback.double_contravariant_piola,
+    "covariant contravariant Piola": pullback.covariant_contravariant_piola,
+    "custom": pullback.custom_pullback,
+    "physical": pullback.physical_pullback,
+}
+
+
 class FiniteElementBase(AbstractFiniteElement):
     """Base class for all finite elements."""
     __slots__ = ("_family", "_cell", "_degree", "_quad_scheme",
@@ -254,23 +268,7 @@ class FiniteElementBase(AbstractFiniteElement):
     @property
     def pullback(self):
         """Get the pull back."""
-        if self.mapping() == "identity":
-            return pullback.identity_pullback
-        elif self.mapping() == "L2 Piola":
-            return pullback.l2_piola
-        elif self.mapping() == "covariant Piola":
-            return pullback.covariant_piola
-        elif self.mapping() == "contravariant Piola":
-            return pullback.contravariant_piola
-        elif self.mapping() == "double covariant Piola":
-            return pullback.double_covariant_piola
-        elif self.mapping() == "double contravariant Piola":
-            return pullback.double_contravariant_piola
-        elif self.mapping() == "covariant contravariant Piola":
-            return pullback.covariant_contravariant_piola
-        elif self.mapping() == "custom":
-            return pullback.custom_pullback
-        elif self.mapping() == "physical":
-            return pullback.physical_pullback
-
-        raise ValueError(f"Unsupported mapping: {self.mapping()}")
+        try:
+            return supported_pullbacks[self.mapping()]
+        except KeyError:
+            raise ValueError(f"Unsupported mapping: {self.mapping()}")
