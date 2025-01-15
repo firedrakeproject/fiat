@@ -233,6 +233,9 @@
                     <span class="n">d01_entities</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">e</span> <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">neighbors</span> <span class="k">if</span> <span class="n">d</span> <span class="o">==</span> <span class="n">dim1</span><span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">connectivity</span><span class="p">[(</span><span class="n">dim0</span><span class="p">,</span> <span class="n">dim1</span><span class="p">)]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">d01_entities</span><span class="p">)</span>
 
+        <span class="c1"># Dictionary with derived cells</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_split_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Hashable object key data (excluding type).&quot;&quot;&quot;</span>
         <span class="c1"># Default: only type matters</span>

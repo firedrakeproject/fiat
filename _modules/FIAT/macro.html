@@ -398,6 +398,13 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a simplicial complex by connecting cell vertices to their</span>
 <span class="sd">    barycenter.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">_split_cache</span><span class="p">[</span><span class="bp">cls</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="bp">self</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">_split_cache</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dimension</span><span class="o">=</span><span class="n">sd</span><span class="p">)</span></div>
@@ -410,6 +417,13 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a simplicial complex by connecting cell and facet vertices to their</span>
 <span class="sd">    barycenter. This reduces to Powell-Sabin on the triangle, and Alfeld on the interval.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">_split_cache</span><span class="p">[</span><span class="bp">cls</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="bp">self</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">_split_cache</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dimension</span><span class="o">=</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span></div>
