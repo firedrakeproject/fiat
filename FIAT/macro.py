@@ -306,10 +306,10 @@ class AlfeldSplit(PowellSabinSplit):
     """
     def __new__(cls, ref_el):
         try:
-            return ref_el.children[cls]
+            return ref_el._split_cache[cls]
         except KeyError:
             self = super().__new__(cls)
-            return ref_el.children.setdefault(cls, self)
+            return ref_el._split_cache.setdefault(cls, self)
 
     def __init__(self, ref_el):
         sd = ref_el.get_spatial_dimension()
@@ -322,10 +322,10 @@ class WorseyFarinSplit(PowellSabinSplit):
     """
     def __new__(cls, ref_el):
         try:
-            return ref_el.children[cls]
+            return ref_el._split_cache[cls]
         except KeyError:
             self = super().__new__(cls)
-            return ref_el.children.setdefault(cls, self)
+            return ref_el._split_cache.setdefault(cls, self)
 
     def __init__(self, ref_el):
         sd = ref_el.get_spatial_dimension()

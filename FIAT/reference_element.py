@@ -182,7 +182,7 @@ class Cell(object):
                     self.connectivity[(dim0, dim1)].append(d01_entities)
 
         # Dictionary with derived cells
-        self.children = {}
+        self._split_cache = {}
 
     def _key(self):
         """Hashable object key data (excluding type)."""
