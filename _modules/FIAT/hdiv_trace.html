@@ -43,6 +43,7 @@
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.barycentric_interpolation</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_lagrange_points</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.discontinuous_lagrange</span><span class="w"> </span><span class="kn">import</span> <span class="n">DiscontinuousLagrange</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElement</span>
@@ -82,7 +83,7 @@
 <span class="sd">    arises in several DG formulations.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructor for the HDivTrace element.</span>
 
 <span class="sd">        :arg ref_el: A reference element, which may be a tensor product</span>
@@ -90,6 +91,7 @@
 <span class="sd">        :arg degree: The degree of approximation. If on a tensor product</span>
 <span class="sd">                     cell, then provide a tuple of degrees if you want</span>
 <span class="sd">                     varying degrees.</span>
+<span class="sd">        :arg variant: The point distribution variant passed on to recursivenodes.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">sd</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
@@ -126,7 +128,7 @@
 
             <span class="c1"># We have a facet entity!</span>
             <span class="k">if</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">==</span> <span class="n">facet_sd</span><span class="p">:</span>
-                <span class="n">dg_elements</span><span class="p">[</span><span class="n">top_dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">construct_dg_element</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+                <span class="n">dg_elements</span><span class="p">[</span><span class="n">top_dim</span><span class="p">]</span> <span class="o">=</span> <span class="n">construct_dg_element</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
             <span class="c1"># Initialize</span>
             <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">:</span>
                 <span class="n">entity_dofs</span><span class="p">[</span><span class="n">top_dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -140,15 +142,14 @@
             <span class="n">nf</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
             <span class="n">num_facets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">topology</span><span class="p">[</span><span class="n">facet_dim</span><span class="p">])</span>
 
+            <span class="n">facet_pts</span> <span class="o">=</span> <span class="n">get_lagrange_points</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">())</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">):</span>
                 <span class="n">entity_dofs</span><span class="p">[</span><span class="n">facet_dim</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">offset</span> <span class="o">+</span> <span class="n">nf</span><span class="p">))</span>
                 <span class="n">offset</span> <span class="o">+=</span> <span class="n">nf</span>
 
                 <span class="c1"># Run over nodes and collect the points for point evaluations</span>
-                <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">():</span>
-                    <span class="n">facet_pt</span><span class="p">,</span> <span class="o">=</span> <span class="n">dof</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
-                    <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
-                    <span class="n">pts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">transform</span><span class="p">(</span><span class="n">facet_pt</span><span class="p">)))</span>
+                <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+                <span class="n">pts</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">transform</span><span class="p">(</span><span class="n">facet_pts</span><span class="p">))</span>
 
         <span class="c1"># Setting up dual basis - only point evaluations</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pt</span><span class="p">)</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">pts</span><span class="p">]</span>
@@ -335,19 +336,18 @@
 
 <div class="viewcode-block" id="construct_dg_element">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hdiv_trace.construct_dg_element">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">construct_dg_element</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">construct_dg_element</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a discontinuous galerkin element of a given degree</span>
 <span class="sd">    on a particular reference cell.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="n">LINE</span><span class="p">,</span> <span class="n">TRIANGLE</span><span class="p">]:</span>
-        <span class="n">dg_element</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dg_element</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
 
     <span class="c1"># Quadrilateral facets could be on a FiredrakeQuadrilateral.</span>
     <span class="c1"># In this case, we treat this as an interval x interval cell:</span>
     <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">QUADRILATERAL</span><span class="p">:</span>
-        <span class="n">dg_a</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">degree</span><span class="p">)</span>
-        <span class="n">dg_b</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">degree</span><span class="p">)</span>
-        <span class="n">dg_element</span> <span class="o">=</span> <span class="n">TensorProductElement</span><span class="p">(</span><span class="n">dg_a</span><span class="p">,</span> <span class="n">dg_b</span><span class="p">)</span>
+        <span class="n">dg_line</span> <span class="o">=</span> <span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
+        <span class="n">dg_element</span> <span class="o">=</span> <span class="n">TensorProductElement</span><span class="p">(</span><span class="n">dg_line</span><span class="p">,</span> <span class="n">dg_line</span><span class="p">)</span>
 
     <span class="c1"># This handles the more general case for facets:</span>
     <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TENSORPRODUCT</span><span class="p">:</span>
@@ -355,7 +355,7 @@
             <span class="s2">&quot;Must provide the same number of degrees as the number &quot;</span>
             <span class="s2">&quot;of cells that make up the tensor product cell.&quot;</span>
         <span class="p">)</span>
-        <span class="n">sub_elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">construct_dg_element</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+        <span class="n">sub_elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">construct_dg_element</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
                         <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
                         <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">POINT</span><span class="p">]</span>
 

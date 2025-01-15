@@ -308,14 +308,6 @@ finat.tensorfiniteelement module
    :undoc-members:
    :show-inheritance:
 
-finat.trace module
-------------------
-
-.. automodule:: finat.trace
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 
