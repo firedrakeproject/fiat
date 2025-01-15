@@ -59,8 +59,6 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">=</span> <span class="n">element</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_unflatten</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">())</span>
 
-<div class="viewcode-block" id="FlattenedDimensions.cell">
-<a class="viewcode-back" href="../../finat.html#finat.cube.FlattenedDimensions.cell">[docs]</a>
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -69,8 +67,7 @@
         <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">UFCHexahedron</span><span class="p">()</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Cannot guess cell for spatial dimension </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">dim</span><span class="p">)</span></div>
-
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Cannot guess cell for spatial dimension </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">dim</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -99,12 +96,9 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_dofs</span></div>
 
 
-<div class="viewcode-block" id="FlattenedDimensions.entity_permutations">
-<a class="viewcode-back" href="../../finat.html#finat.cube.FlattenedDimensions.entity_permutations">[docs]</a>
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">flatten_permutations</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">entity_permutations</span><span class="p">)</span></div>
-
+        <span class="k">return</span> <span class="n">flatten_permutations</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">entity_permutations</span><span class="p">)</span>
 
 <div class="viewcode-block" id="FlattenedDimensions.space_dimension">
 <a class="viewcode-back" href="../../finat.html#finat.cube.FlattenedDimensions.space_dimension">[docs]</a>
@@ -112,12 +106,9 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span></div>
 
 
-<div class="viewcode-block" id="FlattenedDimensions.fiat_equivalent">
-<a class="viewcode-back" href="../../finat.html#finat.cube.FlattenedDimensions.fiat_equivalent">[docs]</a>
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">FIAT_FlattenedDimensions</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">)</span></div>
-
+        <span class="k">return</span> <span class="n">FIAT_FlattenedDimensions</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">fiat_equivalent</span><span class="p">)</span>
 
 <div class="viewcode-block" id="FlattenedDimensions.basis_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.cube.FlattenedDimensions.basis_evaluation">[docs]</a>
