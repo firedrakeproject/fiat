@@ -24,7 +24,6 @@ from functools import singledispatch, cache
 
 import finat
 import finat.ufl
-from fuse.cells import CellComplexToUFL as FuseCell
 import ufl
 
 from FIAT import ufc_cell
@@ -113,9 +112,11 @@ def as_fiat_cell(cell):
     :arg cell: the :class:`ufl.Cell` to convert."""
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
-    if isinstance(cell, FuseCell):
+
+    try:
         return cell.to_fiat()
-    return ufc_cell(cell)
+    except AttributeError:
+        return ufc_cell(cell)
 
 
 @singledispatch
