@@ -153,7 +153,7 @@ class FiniteElementBase(AbstractFiniteElement):
         """Return the integer product of the reference value shape."""
         return product(self.reference_value_shape)
 
-    def symmetry(self):  # FIXME: different approach
+    def symmetry(self, domain=None):
         r"""Return the symmetry dict.
 
         This is a mapping :math:`c_0 \\to c_1`

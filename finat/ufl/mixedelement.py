@@ -60,7 +60,7 @@ class MixedElement(FiniteElementBase):
             if not all(e.quadrature_scheme() == quad_scheme for e in elements):
                 raise ValueError("Quadrature scheme mismatch for sub elements of mixed element.")
 
-        # Compute value sizes in global and reference configurations
+        # Compute value sizes in reference configuration
         reference_value_size_sum = sum(product(s.reference_value_shape) for s in self._sub_elements)
 
         # Default reference value shape: Treated simply as all
@@ -75,20 +75,11 @@ class MixedElement(FiniteElementBase):
 
     def __repr__(self):
         """Doc."""
-        return "MixedElement(" + ", ".join(repr(e) for e in self._sub_elements) + ")"
+        return "MixedElement(" + ", ".join(map(repr, self._sub_elements)) + ")"
 
     def _is_linear(self):
         """Doc."""
         return all(i._is_linear() for i in self._sub_elements)
-
-    def value_shape(self, domain):
-        """Return the shape of the value space on a physical domain."""
-        # Compute value sizes in global and reference configurations
-        value_size_sum = sum(s.value_size(domain) for s in self._sub_elements)
-
-        # Flattened value shape: Treated simply as all
-        # subelements unpacked in a vector.
-        return (value_size_sum, )
 
     def reconstruct_from_elements(self, *elements):
         """Reconstruct a mixed element from new subelements."""
@@ -120,7 +111,7 @@ class MixedElement(FiniteElementBase):
             j += product(sh)
         if j != product(self.value_shape(domain)):
             raise ValueError("Size mismatch in symmetry algorithm.")
-        return sm or {}
+        return sm
 
     @property
     def sobolev_space(self):
@@ -203,6 +194,7 @@ class MixedElement(FiniteElementBase):
         assert len(self.reference_value_shape) == 1
         # Indexing into a long vector of flattened subelement shapes
         j, = i
+        j = int(j)
 
         # Find subelement for this index
         for sub_element_index, e in enumerate(self._sub_elements):
@@ -254,11 +246,12 @@ class MixedElement(FiniteElementBase):
         return max(e.embedded_superdegree for e in self.sub_elements)
 
     def reconstruct(self, **kwargs):
-        """Doc."""
-        return MixedElement(*[e.reconstruct(**kwargs) for e in self.sub_elements])
+        """Construct a new FiniteElement object with some properties replaced with new values."""
+        elements = (e.reconstruct(**kwargs) for e in self.sub_elements)
+        return self.reconstruct_from_elements(*elements)
 
     def variant(self):
-        """Doc."""
+        """Return the common variant to all subelements."""
         try:
             variant, = {e.variant() for e in self.sub_elements}
             return variant
@@ -267,7 +260,7 @@ class MixedElement(FiniteElementBase):
 
     def __str__(self):
         """Format as string for pretty printing."""
-        tmp = ", ".join(str(element) for element in self._sub_elements)
+        tmp = ", ".join(map(str, self._sub_elements))
         return "<Mixed element: (" + tmp + ")>"
 
     def shortstr(self):
@@ -292,7 +285,6 @@ class VectorElement(MixedElement):
         if isinstance(family, FiniteElementBase):
             sub_element = family
             cell = sub_element.cell
-            variant = sub_element.variant()
         else:
             if cell is not None:
                 cell = as_cell(cell)
@@ -325,17 +317,8 @@ class VectorElement(MixedElement):
 
         self._sub_element = sub_element
 
-        if variant is None:
-            var_str = ""
-        else:
-            var_str = ", variant='" + variant + "'"
-
         # Cache repr string
-        self._repr = f"VectorElement({repr(sub_element)}, dim={dim}{var_str})"
-
-    def value_shape(self, domain):
-        """Return the shape of the value space on a physical domain."""
-        return (self.num_sub_elements, *self._sub_element.value_shape(domain))
+        self._repr = f"VectorElement({repr(sub_element)}, dim={dim})"
 
     def __repr__(self):
         """Doc."""
@@ -383,7 +366,6 @@ class TensorElement(MixedElement):
         if isinstance(family, FiniteElementBase):
             sub_element = family
             cell = sub_element.cell
-            variant = sub_element.variant()
         else:
             if cell is not None:
                 cell = as_cell(cell)
@@ -430,7 +412,7 @@ class TensorElement(MixedElement):
             if index in symmetry:
                 continue
             sub_element_mapping[index] = len(sub_elements)
-            sub_elements += [sub_element]
+            sub_elements.append(sub_element)
 
         # Update mapping for symmetry
         for index in indices:
@@ -459,18 +441,9 @@ class TensorElement(MixedElement):
         self._sub_element_mapping = sub_element_mapping
         self._flattened_sub_element_mapping = flattened_sub_element_mapping
 
-        if variant is None:
-            var_str = ""
-        else:
-            var_str = ", variant='" + variant + "'"
-
         # Cache repr string
         self._repr = (f"TensorElement({repr(sub_element)}, shape={shape}, "
-                      f"symmetry={symmetry}{var_str})")
-
-    def value_shape(self, domain):
-        """Return the shape of the value space on a physical domain."""
-        return (*self._shape, *self._sub_element.value_shape(domain))
+                      f"symmetry={symmetry})")
 
     @property
     def pullback(self):
@@ -518,9 +491,9 @@ class TensorElement(MixedElement):
         self._check_component(domain, i)
 
         i = self.symmetry(domain).get(i, i)
-        l = len(self._shape)  # noqa: E741
-        ii = i[:l]
-        jj = i[l:]
+        rank = len(self._shape)
+        ii = i[:rank]
+        jj = i[rank:]
         if ii not in self._sub_element_mapping:
             raise ValueError(f"Illegal component index {i}.")
         k = self._sub_element_mapping[ii]
