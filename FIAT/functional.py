@@ -14,7 +14,6 @@
 
 from itertools import chain
 import numpy
-import sympy
 
 from FIAT import polynomial_set, jacobi, quadrature_schemes
 
@@ -58,9 +57,7 @@ class Functional(object):
         self.deriv_dict = deriv_dict
         self.functional_type = functional_type
         if len(deriv_dict) > 0:
-            per_point = list(chain(*deriv_dict.values()))
-            alphas = [tuple(foo[1]) for foo in per_point]
-            self.max_deriv_order = max([sum(foo) for foo in alphas])
+            self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
             self.max_deriv_order = 0
 
@@ -213,6 +210,7 @@ class PointDerivative(Functional):
     def __call__(self, fn):
         """Evaluate the functional on the function fn. Note that this depends
         on sympy being able to differentiate fn."""
+        import sympy
         x, = self.deriv_dict
 
         X = tuple(sympy.Symbol(f"X[{i}]") for i in range(len(x)))
@@ -224,28 +222,33 @@ class PointDerivative(Functional):
         return df(*x)
 
 
-class PointNormalDerivative(Functional):
-    """Represents d/dn at a point on a facet."""
-    def __init__(self, ref_el, facet_no, pt):
-        n = ref_el.compute_normal(facet_no)
-        self.n = n
+class PointDirectionalDerivative(Functional):
+    """Represents d/ds at a point."""
+    def __init__(self, ref_el, s, pt, comp=(), shp=(), nm=None):
         sd = ref_el.get_spatial_dimension()
+        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
+        dpt_dict = {pt: [(s[i], tuple(alphas[i]), comp) for i in range(sd)]}
 
-        alphas = []
-        for i in range(sd):
-            alpha = [0] * sd
-            alpha[i] = 1
-            alphas.append(alpha)
-        dpt_dict = {pt: [(n[i], tuple(alphas[i]), tuple()) for i in range(sd)]}
-
-        super().__init__(ref_el, tuple(), {}, dpt_dict, "PointNormalDeriv")
+        super().__init__(ref_el, shp, {}, dpt_dict, nm or "PointDirectionalDeriv")
 
 
-class PointNormalSecondDerivative(Functional):
-    """Represents d^/dn^2 at a point on a facet."""
-    def __init__(self, ref_el, facet_no, pt):
+class PointNormalDerivative(PointDirectionalDerivative):
+    """Represents d/dn at a point on a facet."""
+    def __init__(self, ref_el, facet_no, pt, comp=(), shp=()):
         n = ref_el.compute_normal(facet_no)
-        self.n = n
+        super().__init__(ref_el, n, pt, comp=comp, shp=shp, nm="PointNormalDeriv")
+
+
+class PointTangentialDerivative(PointDirectionalDerivative):
+    """Represents d/dt at a point on an edge."""
+    def __init__(self, ref_el, edge_no, pt, comp=(), shp=()):
+        t = ref_el.compute_edge_tangent(edge_no)
+        super().__init__(ref_el, t, pt, comp=comp, shp=shp, nm="PointTangentialDeriv")
+
+
+class PointSecondDerivative(Functional):
+    """Represents d/ds1 d/ds2 at a point."""
+    def __init__(self, ref_el, s1, s2, pt, comp=(), shp=(), nm=None):
         sd = ref_el.get_spatial_dimension()
         tau = numpy.zeros((sd*(sd+1)//2,))
 
@@ -257,14 +260,26 @@ class PointNormalSecondDerivative(Functional):
                 alpha[i] += 1
                 alpha[j] += 1
                 alphas.append(tuple(alpha))
-                tau[cur] = n[i]*n[j]
+                tau[cur] = s1[i] * s2[j] + (i != j) * s2[i] * s1[j]
                 cur += 1
 
-        self.tau = tau
-        self.alphas = alphas
-        dpt_dict = {pt: [(n[i], alphas[i], tuple()) for i in range(sd)]}
+        dpt_dict = {tuple(pt): [(tau[i], alphas[i], comp) for i in range(len(alphas))]}
 
-        super().__init__(ref_el, tuple(), {}, dpt_dict, "PointNormalDeriv")
+        super().__init__(ref_el, shp, {}, dpt_dict, nm or "PointSecondDeriv")
+
+
+class PointNormalSecondDerivative(PointSecondDerivative):
+    """Represents d^/dn^2 at a point on a facet."""
+    def __init__(self, ref_el, facet_no, pt, comp=(), shp=()):
+        n = ref_el.compute_normal(facet_no)
+        super().__init__(ref_el, n, n, pt, comp=comp, shp=shp, nm="PointNormalSecondDeriv")
+
+
+class PointTangentialSecondDerivative(PointSecondDerivative):
+    """Represents d^/dt^2 at a point on an edge."""
+    def __init__(self, ref_el, edge_no, pt, comp=(), shp=()):
+        t = ref_el.compute_edge_tangent(edge_no)
+        super().__init__(ref_el, t, t, pt, comp=comp, shp=shp, nm="PointTangentialSecondDeriv")
 
 
 class PointDivergence(Functional):
@@ -309,6 +324,26 @@ class IntegralMoment(Functional):
         if self.comp:
             result = result[self.comp]
         return result
+
+
+class IntegralMomentOfDerivative(Functional):
+    """Functional giving directional derivative integrated against some function on a facet."""
+
+    def __init__(self, ref_el, s, Q, f_at_qpts, comp=(), shp=()):
+        self.f_at_qpts = f_at_qpts
+        self.Q = Q
+
+        sd = ref_el.get_spatial_dimension()
+
+        points = Q.get_points()
+        weights = numpy.multiply(f_at_qpts, Q.get_weights())
+
+        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
+        dpt_dict = {tuple(pt): [(wt*s[i], alphas[i], comp) for i in range(sd)]
+                    for pt, wt in zip(points, weights)}
+
+        super().__init__(ref_el, shp,
+                         {}, dpt_dict, "IntegralMomentOfDerivative")
 
 
 class IntegralMomentOfNormalDerivative(Functional):
