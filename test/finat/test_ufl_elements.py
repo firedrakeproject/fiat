@@ -16,6 +16,6 @@ def test_extract_subelement_component():
     for i in range(3):
         expr = test[i]
         _, multiindex = expr.ufl_operands
-        subindex, _ = Z.extract_subelement_component(domain, multiindex)
+        subindex, _ = Z.extract_subelement_component(multiindex, domain)
         sub_elem = Z.sub_elements[subindex]
         assert sub_elem is (Q if i == 2 else V)

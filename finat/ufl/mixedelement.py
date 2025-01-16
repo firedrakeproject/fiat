@@ -135,14 +135,14 @@ class MixedElement(FiniteElementBase):
         """Return list of sub elements."""
         return self._sub_elements
 
-    def extract_subelement_component(self, domain, i):
+    def extract_subelement_component(self, i, domain=None):
         """Extract direct subelement index and subelement relative.
 
         component index for a given component index.
         """
         if isinstance(i, int):
             i = (i,)
-        self._check_component(domain, i)
+        self._check_component(i, domain)
 
         # Select between indexing modes
         if len(self.value_shape(domain)) == 1:
@@ -173,13 +173,13 @@ class MixedElement(FiniteElementBase):
             component = i[1:]
         return (sub_element_index, component)
 
-    def extract_component(self, domain, i):
+    def extract_component(self, i, domain=None):
         """Recursively extract component index relative to a (simple) element.
 
         and that element for given value component index.
         """
-        sub_element_index, component = self.extract_subelement_component(domain, i)
-        return self._sub_elements[sub_element_index].extract_component(component)
+        sub_element_index, component = self.extract_subelement_component(i, domain)
+        return self._sub_elements[sub_element_index].extract_component(component, domain)
 
     def extract_subelement_reference_component(self, i):
         """Extract direct subelement index and subelement relative.
@@ -224,7 +224,7 @@ class MixedElement(FiniteElementBase):
         if component is None:
             return all(e.is_cellwise_constant() for e in self.sub_elements)
         else:
-            i, e = self.extract_component(domain, component)
+            i, e = self.extract_component(component, domain)
             return e.is_cellwise_constant()
 
     def degree(self, component=None, domain=None):
@@ -232,7 +232,7 @@ class MixedElement(FiniteElementBase):
         if component is None:
             return self._degree  # from FiniteElementBase, computed as max of subelements in __init__
         else:
-            i, e = self.extract_component(domain, component)
+            i, e = self.extract_component(component, domain)
             return e.degree()
 
     @property
@@ -481,14 +481,14 @@ class TensorElement(MixedElement):
         """Doc."""
         return self._flattened_sub_element_mapping
 
-    def extract_subelement_component(self, domain, i):
+    def extract_subelement_component(self, i, domain=None):
         """Extract direct subelement index and subelement relative.
 
         component index for a given component index.
         """
         if isinstance(i, int):
             i = (i,)
-        self._check_component(domain, i)
+        self._check_component(i, domain)
 
         i = self.symmetry(domain).get(i, i)
         rank = len(self._shape)

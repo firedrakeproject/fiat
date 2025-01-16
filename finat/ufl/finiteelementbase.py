@@ -135,11 +135,11 @@ class FiniteElementBase(AbstractFiniteElement):
         """Return whether the basis functions of this element is spatially constant over each cell."""
         return self._is_globally_constant() or self.degree() == 0
 
-    def value_shape(self, domain):
+    def value_shape(self, domain=None):
         """Return the shape of the value space on a physical domain."""
         return self.pullback.physical_value_shape(self, domain)
 
-    def value_size(self, domain):
+    def value_size(self, domain=None):
         """Return the integer product of the value shape on a physical domain."""
         return product(self.value_shape(domain))
 
@@ -163,7 +163,7 @@ class FiniteElementBase(AbstractFiniteElement):
         """
         return {}
 
-    def _check_component(self, domain, i):
+    def _check_component(self, i, domain=None):
         """Check that component index i is valid."""
         sh = self.value_shape(domain)
         r = len(sh)
@@ -172,21 +172,21 @@ class FiniteElementBase(AbstractFiniteElement):
                 f"Illegal component index {i} (value rank {len(i)}) "
                 f"for element (value rank {r}).")
 
-    def extract_subelement_component(self, domain, i):
+    def extract_subelement_component(self, i, domain=None):
         """Extract direct subelement index and subelement relative component index for a given component index."""
         if isinstance(i, int):
             i = (i,)
-        self._check_component(domain, i)
+        self._check_component(i, domain)
         return (None, i)
 
-    def extract_component(self, domain, i):
+    def extract_component(self, i, domain=None):
         """Recursively extract component index relative to a (simple) element.
 
         and that element for given value component index.
         """
         if isinstance(i, int):
             i = (i,)
-        self._check_component(domain, i)
+        self._check_component(i, domain)
         return (i, self)
 
     def _check_reference_component(self, i):
