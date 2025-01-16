@@ -146,6 +146,13 @@ elements = [
     "CrouzeixRaviart(I, 1)",
     "CrouzeixRaviart(T, 1)",
     "CrouzeixRaviart(S, 1)",
+    "CrouzeixRaviart(T, 3)",
+    "CrouzeixRaviart(T, 5)",
+    "CrouzeixRaviart(I, 1, variant='point')",
+    "CrouzeixRaviart(T, 1, variant='point')",
+    "CrouzeixRaviart(S, 1, variant='point')",
+    "CrouzeixRaviart(T, 3, variant='point')",
+    "CrouzeixRaviart(T, 5, variant='point')",
     "RaviartThomas(I, 1)",
     "RaviartThomas(I, 2)",
     "RaviartThomas(I, 3)",
@@ -552,11 +559,11 @@ def test_nodality_tabulate(element):
     "HDivTrace(T, 0)",
     "HDivTrace(T, 1)",
     "HDivTrace(T, 2)",
-    "HDivTrace(T, 3)",
+    "HDivTrace(T, 3, 'spectral')",
     "HDivTrace(S, 0)",
     "HDivTrace(S, 1)",
     "HDivTrace(S, 2)",
-    "HDivTrace(S, 3)",
+    "HDivTrace(S, 3, 'spectral')",
 ])
 def test_facet_nodality_tabulate(element):
     """Check that certain elements (which do no implement get_nodal_basis)

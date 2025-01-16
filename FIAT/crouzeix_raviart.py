@@ -9,62 +9,84 @@
 #
 # Last changed: 2010-01-28
 
+import numpy
 from FIAT import finite_element, polynomial_set, dual_set, functional
-
-
-def _initialize_entity_ids(topology):
-    entity_ids = {}
-    for (i, entity) in list(topology.items()):
-        entity_ids[i] = {}
-        for j in entity:
-            entity_ids[i][j] = []
-    return entity_ids
+from FIAT.check_format_variant import check_format_variant
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.quadrature import FacetQuadratureRule
 
 
 class CrouzeixRaviartDualSet(dual_set.DualSet):
-    """Dual basis for Crouzeix-Raviart element (linears continuous at
-    boundary midpoints)."""
 
-    def __init__(self, cell, degree):
-
+    def __init__(self, ref_el, degree, variant, interpolant_deg):
         # Get topology dictionary
-        d = cell.get_spatial_dimension()
-        topology = cell.get_topology()
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+
+        if degree > 1 and sd != 2:
+            raise NotImplementedError("High-order Crouzeix-Raviart is only implemented on triangles.")
 
         # Initialize empty nodes and entity_ids
-        entity_ids = _initialize_entity_ids(topology)
-        nodes = [None for i in list(topology[d - 1].keys())]
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
 
         # Construct nodes and entity_ids
-        for i in topology[d - 1]:
+        if variant == "integral":
+            for dim in sorted(top):
+                if dim == 0 and dim != sd-1:
+                    # Skip vertex dofs
+                    continue
+                facet = ref_el.construct_subelement(dim)
+                if dim == 0:
+                    Q_facet = create_quadrature(facet, degree + interpolant_deg-1)
+                    Phis = numpy.ones((1, len(Q_facet.pts)))
+                else:
+                    k = degree - 1 if dim == sd-1 else degree - (1+dim)
+                    if k < 0:
+                        continue
+                    Q_facet = create_quadrature(facet, k + interpolant_deg)
+                    poly_set = polynomial_set.ONPolynomialSet(facet, k)
+                    Phis = poly_set.tabulate(Q_facet.get_points())[(0,) * dim]
 
-            # Construct midpoint
-            x = cell.make_points(d - 1, i, d)[0]
+                for i in sorted(top[dim]):
+                    cur = len(nodes)
+                    Q = FacetQuadratureRule(ref_el, dim, i, Q_facet)
+                    scale = 1 / Q.jacobian_determinant()
+                    phis = scale * Phis
+                    nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis)
+                    entity_ids[dim][i].extend(range(cur, len(nodes)))
+        else:
+            for dim in sorted(top):
+                if dim == 0 and dim != sd-1:
+                    # Skip vertex dofs
+                    continue
+                for i in sorted(top[dim]):
+                    cur = len(nodes)
+                    if dim == sd-1 and dim != 0:
+                        pts = ref_el.make_points(dim, i, degree-1, variant="gl", interior=0)
+                    else:
+                        pts = ref_el.make_points(dim, i, degree, variant="gll")
+                    nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts)
+                    entity_ids[dim][i].extend(range(cur, len(nodes)))
 
-            # Degree of freedom number i is evaluation at midpoint
-            nodes[i] = functional.PointEvaluation(cell, x)
-            entity_ids[d - 1][i] += [i]
-
-        # Initialize super-class
-        super().__init__(nodes, cell, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class CrouzeixRaviart(finite_element.CiarletElement):
     """The Crouzeix-Raviart finite element:
 
     K:                 Triangle/Tetrahedron
-    Polynomial space:  P_1
-    Dual basis:        Evaluation at facet midpoints
+    Polynomial space:  P_k
+    Dual basis:        Evaluation at points or integral moments
     """
 
-    def __init__(self, cell, degree):
+    def __init__(self, ref_el, degree, variant=None):
 
-        # Crouzeix Raviart is only defined for polynomial degree == 1
-        if not (degree == 1):
-            raise Exception("Crouzeix-Raviart only defined for degree 1")
+        variant, interpolant_deg = check_format_variant(variant, degree)
 
-        # Construct polynomial spaces, dual basis and initialize
-        # FiniteElement
-        space = polynomial_set.ONPolynomialSet(cell, 1)
-        dual = CrouzeixRaviartDualSet(cell, 1)
-        super().__init__(space, dual, 1)
+        if degree % 2 != 1:
+            raise ValueError("Crouzeix-Raviart only defined for odd degree")
+
+        space = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
+        dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg)
+        super().__init__(space, dual, degree)

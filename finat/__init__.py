@@ -3,8 +3,9 @@ from .fiat_elements import (Bernstein, Bubble, BrezziDouglasFortinMarini,       
                             BrezziDouglasMariniCubeFace, CrouzeixRaviart,                    # noqa: F401
                             DiscontinuousLagrange, DiscontinuousTaylor, DPC,                 # noqa: F401
                             FacetBubble, GopalakrishnanLedererSchoberlFirstKind,             # noqa: F401
-                            GopalakrishnanLedererSchoberlSecondKind, HellanHerrmannJohnson,  # noqa: F401
-                            KongMulderVeldhuizen, Lagrange, Real, Serendipity,               # noqa: F401
+                            GopalakrishnanLedererSchoberlSecondKind, HDivTrace,              # noqa: F401
+                            HellanHerrmannJohnson, KongMulderVeldhuizen,                     # noqa: F401
+                            Lagrange, Real, Serendipity,                                     # noqa: F401
                             TrimmedSerendipityCurl, TrimmedSerendipityDiv,                   # noqa: F401
                             TrimmedSerendipityEdge, TrimmedSerendipityFace,                  # noqa: F401
                             Nedelec, NedelecSecondKind, RaviartThomas, Regge)                # noqa: F401
@@ -24,9 +25,7 @@ from .hermite import Hermite                                       # noqa: F401
 from .johnson_mercier import JohnsonMercier                        # noqa: F401
 from .mtw import MardalTaiWinther                                  # noqa: F401
 from .morley import Morley                                         # noqa: F401
-from .trace import HDivTrace                                       # noqa: F401
 from .direct_serendipity import DirectSerendipity                  # noqa: F401
-
 from .spectral import GaussLobattoLegendre, GaussLegendre, Legendre, IntegratedLegendre, FDMLagrange, FDMQuadrature, FDMDiscontinuousLagrange, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 from .tensorfiniteelement import TensorFiniteElement               # noqa: F401
 from .tensor_product import TensorProductElement                   # noqa: F401

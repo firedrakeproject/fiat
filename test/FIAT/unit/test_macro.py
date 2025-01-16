@@ -16,6 +16,15 @@ def cell(request):
     return ufc_simplex(dim)
 
 
+def test_split_cache(cell):
+    A = AlfeldSplit(cell)
+    B = AlfeldSplit(cell)
+    assert B is A
+    fe = Lagrange(cell, 1, variant="alfeld")
+    C = fe.ref_complex
+    assert C is A
+
+
 @pytest.mark.parametrize("split", (AlfeldSplit, IsoSplit))
 def test_split_entity_transform(split, cell):
     split_cell = split(cell)
