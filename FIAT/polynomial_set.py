@@ -198,32 +198,24 @@ def construct_new_coeffs(ref_el, A, B):
     This does not handle the case that A and B have continuity but not the same degree.
     """
 
-    sd = ref_el.get_spatial_dimension()
     if A.get_expansion_set().continuity != B.get_expansion_set().continuity:
         raise ValueError("Continuity of expansion sets does not match.")
+
     if A.get_embedded_degree() != B.get_embedded_degree() and A.get_expansion_set().continuity is None:
         higher = A if A.get_embedded_degree() > B.get_embedded_degree() else B
         lower = B if A.get_embedded_degree() > B.get_embedded_degree() else A
 
-        try:
-            sd = lower.get_shape()[0]
-        except IndexError:
-            sd = -1
-
-        embedded_coeffs = []
         diff = higher.coeffs.shape[-1] - lower.coeffs.shape[-1]
-        for coeff in lower.coeffs:
-            if sd != -1:
-                new_coeff = []
-                for row in coeff:
-                    new_coeff.append(numpy.append(row, [0 for i in range(diff)]))
-                embedded_coeffs.append(new_coeff)
-            else:
-                embedded_coeffs.append(numpy.append(coeff, [0 for i in range(diff)]))
-        embedded_coeffs = numpy.array(embedded_coeffs)
+
+        # pad only the 0th axis with the difference in size
+        padding = [(0, 0) for i in range(len(lower.coeffs.shape) - 1)] + [(0, diff)]
+        embedded_coeffs = numpy.pad(lower.coeffs, padding)
+
         new_coeffs = numpy.concatenate((embedded_coeffs, higher.coeffs), axis=0)
-    else:
+    elif A.get_embedded_degree() == B.get_embedded_degree():
         new_coeffs = numpy.concatenate((A.coeffs, B.coeffs), axis=0)
+    else:
+        raise NotImplementedError("Extending of coefficients is not implemented for PolynomialSets with continuity and different degrees")
     return new_coeffs
 
 
