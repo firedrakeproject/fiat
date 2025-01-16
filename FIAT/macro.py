@@ -304,6 +304,13 @@ class AlfeldSplit(PowellSabinSplit):
     """Splits a simplicial complex by connecting cell vertices to their
     barycenter.
     """
+    def __new__(cls, ref_el):
+        try:
+            return ref_el._split_cache[cls]
+        except KeyError:
+            self = super().__new__(cls)
+            return ref_el._split_cache.setdefault(cls, self)
+
     def __init__(self, ref_el):
         sd = ref_el.get_spatial_dimension()
         super().__init__(ref_el, dimension=sd)
@@ -313,6 +320,13 @@ class WorseyFarinSplit(PowellSabinSplit):
     """Splits a simplicial complex by connecting cell and facet vertices to their
     barycenter. This reduces to Powell-Sabin on the triangle, and Alfeld on the interval.
     """
+    def __new__(cls, ref_el):
+        try:
+            return ref_el._split_cache[cls]
+        except KeyError:
+            self = super().__new__(cls)
+            return ref_el._split_cache.setdefault(cls, self)
+
     def __init__(self, ref_el):
         sd = ref_el.get_spatial_dimension()
         super().__init__(ref_el, dimension=sd-1)

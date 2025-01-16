@@ -355,8 +355,8 @@ class FacetBubble(ScalarFiatElement):
 
 
 class CrouzeixRaviart(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.CrouzeixRaviart(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.CrouzeixRaviart(cell, degree, variant=variant))
 
 
 class Lagrange(ScalarFiatElement):
@@ -394,6 +394,11 @@ class DPC(ScalarFiatElement):
 class DiscontinuousTaylor(ScalarFiatElement):
     def __init__(self, cell, degree):
         super().__init__(FIAT.DiscontinuousTaylor(cell, degree))
+
+
+class HDivTrace(ScalarFiatElement):
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.HDivTrace(cell, degree, variant=variant))
 
 
 class VectorFiatElement(FiatElement):
