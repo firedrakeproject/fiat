@@ -515,7 +515,8 @@ class SimplicialComplex(Cell):
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
         if dim == 0:
-            return (self.get_vertices()[entity_id], )
+            return (self.get_vertices()[self.get_topology()[dim][entity_id][0]],)
+            # return (self.get_vertices()[entity_id], )
         elif 0 < dim <= self.get_spatial_dimension():
             entity_verts = \
                 self.get_vertices_of_subcomplex(
