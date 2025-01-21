@@ -101,8 +101,7 @@ def _replace_indices_atomic(i, self, subst):
         new_expr = self(i.expression, subst)
         return i if new_expr == i.expression else VariableIndex(new_expr)
     else:
-        substitute = dict(subst)
-        return substitute.get(i, i)
+        return dict(subst).get(i, i)
 
 
 @replace_indices.register(Delta)
@@ -117,20 +116,18 @@ def replace_indices_delta(node, self, subst):
 
 @replace_indices.register(Indexed)
 def replace_indices_indexed(node, self, subst):
+    multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
     child, = node.children
-    substitute = dict(subst)
-    multiindex = []
-    for i in node.multiindex:
-        multiindex.append(_replace_indices_atomic(i, self, subst))
     if isinstance(child, ComponentTensor):
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
+        substitute = dict(subst)
         substitute.update(zip(child.multiindex, multiindex))
         return self(child.children[0], tuple(sorted(substitute.items())))
     else:
         # Replace indices
         new_child = self(child, subst)
-        if new_child == child and multiindex == node.multiindex:
+        if multiindex == node.multiindex and new_child == child:
             return node
         else:
             return Indexed(new_child, multiindex)
@@ -138,9 +135,6 @@ def replace_indices_indexed(node, self, subst):
 
 @replace_indices.register(FlexiblyIndexed)
 def replace_indices_flexiblyindexed(node, self, subst):
-    child, = node.children
-    assert not child.free_indices
-
     dim2idxs = tuple(
         (
             offset if isinstance(offset, Integral) else _replace_indices_atomic(offset, self, subst),
@@ -149,6 +143,8 @@ def replace_indices_flexiblyindexed(node, self, subst):
         for offset, idxs in node.dim2idxs
     )
 
+    child, = node.children
+    assert not child.free_indices
     if dim2idxs == node.dim2idxs:
         return node
     else:
