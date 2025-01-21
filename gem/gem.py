@@ -689,7 +689,7 @@ class Indexed(Scalar):
                     ll = tuple(rep.get(k, k) for k in kk)
                     return Indexed(C, ll)
 
-        # Simplify Constant and ListTensor
+        # Simplify Literal and ListTensor
         if isinstance(aggregate, (Constant, ListTensor)):
             if all(isinstance(i, int) for i in multiindex):
                 # All indices fixed

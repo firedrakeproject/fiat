@@ -270,15 +270,18 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M = self.basis_transformation(coordinate_mapping)
         # we expect M to be sparse with O(1) nonzeros per row
         # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
+        csr = [[j for j in range(M.shape[1]) if not isinstance(M[i, j], gem.Zero)]
                for i in range(M.shape[0])]
 
         def matvec(table):
             # basis recombination using hand-rolled sparse-dense matrix multiplication
-            table = [gem.partial_indexed(table, (j,)) for j in range(M.shape[1])]
+            ii = gem.indices(len(table.shape)-1)
+            phi = [gem.Indexed(table, (j, *ii)) for j in range(M.shape[1])]
             # the sum approach is faster than calling numpy.dot or gem.IndexSum
-            expressions = [sum(M.array[i, j] * table[j] for j in js) for i, js in enumerate(csr)]
+            expressions = [gem.ComponentTensor(sum(M[i, j] * phi[j] for j in js), ii)
+                           for i, js in enumerate(csr)]
             val = gem.ListTensor(expressions)
+            # val = M @ table
             return gem.optimise.aggressive_unroll(val)
 
         result = super().basis_evaluation(order, ps, entity=entity)
