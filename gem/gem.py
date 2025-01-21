@@ -54,8 +54,8 @@ class NodeMeta(type):
 
         # Set free_indices if not set already
         if not hasattr(obj, 'free_indices'):
-            obj.free_indices = unique(chain(*[c.free_indices
-                                              for c in obj.children]))
+            obj.free_indices = unique(chain.from_iterable(c.free_indices
+                                                          for c in obj.children))
         # Set dtype if not set already.
         if not hasattr(obj, 'dtype'):
             obj.dtype = obj.inherit_dtype_from_children(obj.children)
@@ -306,9 +306,6 @@ class Literal(Constant):
     def shape(self):
         return self.array.shape
 
-    def __getitem__(self, i):
-        return self.array[i]
-
 
 class Variable(Terminal):
     """Symbolic variable tensor"""
@@ -337,7 +334,7 @@ class Sum(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Sum, cls).__new__(cls)
         self.children = a, b
@@ -361,7 +358,7 @@ class Product(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Product, cls).__new__(cls)
         self.children = a, b
@@ -385,7 +382,7 @@ class Division(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Division, cls).__new__(cls)
         self.children = a, b
@@ -398,7 +395,7 @@ class FloorDiv(Scalar):
     def __new__(cls, a, b):
         assert not a.shape
         assert not b.shape
-        dtype = Node.inherit_dtype_from_children([a, b])
+        dtype = Node.inherit_dtype_from_children((a, b))
         if dtype != uint_type:
             raise ValueError(f"dtype ({dtype}) != unit_type ({uint_type})")
         # Constant folding
@@ -421,7 +418,7 @@ class Remainder(Scalar):
     def __new__(cls, a, b):
         assert not a.shape
         assert not b.shape
-        dtype = Node.inherit_dtype_from_children([a, b])
+        dtype = Node.inherit_dtype_from_children((a, b))
         if dtype != uint_type:
             raise ValueError(f"dtype ({dtype}) != uint_type ({uint_type})")
         # Constant folding
@@ -444,7 +441,7 @@ class Power(Scalar):
     def __new__(cls, base, exponent):
         assert not base.shape
         assert not exponent.shape
-        dtype = Node.inherit_dtype_from_children([base, exponent])
+        dtype = Node.inherit_dtype_from_children((base, exponent))
 
         # Constant folding
         if isinstance(base, Zero):
@@ -560,7 +557,7 @@ class Conditional(Node):
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
         self.shape = then.shape
-        self.dtype = Node.inherit_dtype_from_children([then, else_])
+        self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
 
@@ -676,6 +673,19 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
+        # Simplify Literal and ListTensor
+        if isinstance(aggregate, (Constant, ListTensor)):
+            if all(isinstance(i, int) for i in multiindex):
+                # All indices fixed
+                sub = aggregate.array[multiindex]
+                return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
+            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
+                # Some indices fixed
+                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
+                sub = aggregate.array[slices]
+                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
+                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
+
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         if isinstance(aggregate, ComponentTensor):
             B, = aggregate.children
@@ -688,19 +698,6 @@ class Indexed(Scalar):
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     return Indexed(C, ll)
-
-        # Simplify Literal and ListTensor
-        if isinstance(aggregate, (Constant, ListTensor)):
-            if all(isinstance(i, int) for i in multiindex):
-                # All indices fixed
-                sub = aggregate[multiindex]
-                return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
-            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
-                # Some indices fixed
-                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
-                sub = aggregate[slices]
-                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
-                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
@@ -945,9 +942,6 @@ class ListTensor(Node):
     def __reduce__(self):
         return type(self), (self.array,)
 
-    def __getitem__(self, i):
-        return self.array[i]
-
     def reconstruct(self, *args):
         return ListTensor(asarray(args).reshape(self.array.shape))
 
@@ -958,7 +952,7 @@ class ListTensor(Node):
         """Common subexpression eliminating equality predicate."""
         if type(self) is not type(other):
             return False
-        if (self.array == other.array).all():
+        if numpy.array_equal(self.array, other.array):
             self.array = other.array
             return True
         return False

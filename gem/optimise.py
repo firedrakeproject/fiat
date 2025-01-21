@@ -188,7 +188,7 @@ def _constant_fold_zero_listtensor(node, self):
     new_children = list(map(self, node.children))
     if all(isinstance(nc, Zero) for nc in new_children):
         return Zero(node.shape)
-    elif all(nc == c for nc, c in zip(new_children, node.children)):
+    elif new_children == node.children:
         return node
     else:
         return node.reconstruct(*new_children)
@@ -207,7 +207,7 @@ def constant_fold_zero(exprs):
     otherwise Literal `0`s would be reintroduced.
     """
     mapper = Memoizer(_constant_fold_zero)
-    return [mapper(e) for e in exprs]
+    return list(map(mapper, exprs))
 
 
 def _select_expression(expressions, index):
@@ -252,9 +252,9 @@ def _select_expression(expressions, index):
         assert all(len(e.children) == len(expr.children) for e in expressions)
         assert len(expr.children) > 0
 
-        return expr.reconstruct(*[_select_expression(nth_children, index)
-                                  for nth_children in zip(*[e.children
-                                                            for e in expressions])])
+        return expr.reconstruct(*(_select_expression(nth_children, index)
+                                  for nth_children in zip(*(e.children
+                                                            for e in expressions))))
 
     raise NotImplementedError("No rule for factorising expressions of this kind.")
 

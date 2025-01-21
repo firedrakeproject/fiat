@@ -270,7 +270,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M = self.basis_transformation(coordinate_mapping)
         # we expect M to be sparse with O(1) nonzeros per row
         # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M[i, j], gem.Zero)]
+        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
                for i in range(M.shape[0])]
 
         def matvec(table):
@@ -278,9 +278,10 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             ii = gem.indices(len(table.shape)-1)
             phi = [gem.Indexed(table, (j, *ii)) for j in range(M.shape[1])]
             # the sum approach is faster than calling numpy.dot or gem.IndexSum
-            expressions = [gem.ComponentTensor(sum(M[i, j] * phi[j] for j in js), ii)
-                           for i, js in enumerate(csr)]
-            val = gem.ListTensor(expressions)
+            exprs = [gem.ComponentTensor(sum(M.array[i, j] * phi[j] for j in js), ii)
+                     for i, js in enumerate(csr)]
+
+            val = gem.ListTensor(exprs)
             # val = M @ table
             return gem.optimise.aggressive_unroll(val)
 
