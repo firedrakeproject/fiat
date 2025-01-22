@@ -623,7 +623,7 @@ def _replace_delta_delta(node, self):
         return Indexed(Identity(size), (i, j))
     else:
         def expression(index):
-            if isinstance(index, int):
+            if isinstance(index, Integral):
                 return Literal(index)
             elif isinstance(index, VariableIndex):
                 return index.expression
