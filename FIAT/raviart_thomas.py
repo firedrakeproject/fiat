@@ -20,7 +20,7 @@ def RTSpace(ref_el, degree):
     sd = ref_el.get_spatial_dimension()
 
     k = degree - 1
-    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, (sd,), scale="orthonormal")
+    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, (sd,))
 
     dimPkp1 = expansions.polynomial_dimension(ref_el, k + 1)
     dimPk = expansions.polynomial_dimension(ref_el, k)
