@@ -985,6 +985,12 @@ class Delta(Scalar, Terminal):
         if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
 
+        if isinstance(i, Integral):
+            return Indexed(Identity(j.extent), (i, j))
+
+        if isinstance(j, Integral):
+            return Indexed(Identity(i.extent), (i, j))
+
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
