@@ -79,12 +79,12 @@
     <span class="c1"># have to work on this through &quot;tabulate&quot; interface</span>
     <span class="c1"># first, tabulate PkH at quadrature points</span>
     <span class="n">PkH_at_Qpts</span> <span class="o">=</span> <span class="n">PkH</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
+
     <span class="n">Pkp1_at_Qpts</span> <span class="o">=</span> <span class="n">Pkp1</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
 
     <span class="n">x</span> <span class="o">=</span> <span class="n">Qpts</span><span class="o">.</span><span class="n">T</span>
     <span class="n">PkHx_at_Qpts</span> <span class="o">=</span> <span class="n">PkH_at_Qpts</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">*</span> <span class="n">x</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span>
     <span class="n">PkHx_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">PkHx_at_Qpts</span><span class="p">,</span> <span class="n">Qwts</span><span class="p">),</span> <span class="n">Pkp1_at_Qpts</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
-
     <span class="n">PkHx</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span>
                                         <span class="n">k</span><span class="p">,</span>
                                         <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>

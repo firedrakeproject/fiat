@@ -267,13 +267,50 @@
 <span class="sd">    not contain any of the same members of the set, as we construct a</span>
 <span class="sd">    span via SVD.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">A</span><span class="o">.</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">coeffs</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span> <span class="o">==</span> <span class="n">B</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+    <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">construct_new_coeffs</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span> <span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">)</span>
+
+    <span class="n">deg</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">get_degree</span><span class="p">(),</span> <span class="n">B</span><span class="o">.</span><span class="n">get_degree</span><span class="p">())</span>
+    <span class="n">em_deg</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">(),</span> <span class="n">B</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">())</span>
     <span class="n">coeffs</span> <span class="o">=</span> <span class="n">spanning_basis</span><span class="p">(</span><span class="n">new_coeffs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">PolynomialSet</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span>
-                         <span class="n">A</span><span class="o">.</span><span class="n">get_degree</span><span class="p">(),</span>
-                         <span class="n">A</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">(),</span>
+                         <span class="n">deg</span><span class="p">,</span>
+                         <span class="n">em_deg</span><span class="p">,</span>
                          <span class="n">A</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span>
                          <span class="n">coeffs</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="construct_new_coeffs">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.polynomial_set.construct_new_coeffs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">construct_new_coeffs</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Constructs new coefficients for the set union of A and B</span>
+<span class="sd">    If A and B are discontinuous and do not have the same degree the smaller one</span>
+<span class="sd">    is extended to match the larger.</span>
+
+<span class="sd">    This does not handle the case that A and B have continuity but not the same degree.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span><span class="o">.</span><span class="n">continuity</span> <span class="o">!=</span> <span class="n">B</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span><span class="o">.</span><span class="n">continuity</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Continuity of expansion sets does not match.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="o">!=</span> <span class="n">B</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="ow">and</span> <span class="n">A</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span><span class="o">.</span><span class="n">continuity</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">higher</span> <span class="o">=</span> <span class="n">A</span> <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">B</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="k">else</span> <span class="n">B</span>
+        <span class="n">lower</span> <span class="o">=</span> <span class="n">B</span> <span class="k">if</span> <span class="n">A</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="o">&gt;</span> <span class="n">B</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="k">else</span> <span class="n">A</span>
+
+        <span class="n">diff</span> <span class="o">=</span> <span class="n">higher</span><span class="o">.</span><span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">lower</span><span class="o">.</span><span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># pad only the 0th axis with the difference in size</span>
+        <span class="n">padding</span> <span class="o">=</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lower</span><span class="o">.</span><span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span> <span class="o">+</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="n">diff</span><span class="p">)]</span>
+        <span class="n">embedded_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">pad</span><span class="p">(</span><span class="n">lower</span><span class="o">.</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">padding</span><span class="p">)</span>
+
+        <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">embedded_coeffs</span><span class="p">,</span> <span class="n">higher</span><span class="o">.</span><span class="n">coeffs</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">A</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="o">==</span> <span class="n">B</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">():</span>
+        <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">concatenate</span><span class="p">((</span><span class="n">A</span><span class="o">.</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">B</span><span class="o">.</span><span class="n">coeffs</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Extending of coefficients is not implemented for PolynomialSets with continuity and different degrees&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">new_coeffs</span></div>
 
 
 

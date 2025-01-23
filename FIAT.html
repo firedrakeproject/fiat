@@ -4218,6 +4218,15 @@ polynomials on a reference element.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="FIAT.polynomial_set.construct_new_coeffs">
+<span class="sig-prename descclassname"><span class="pre">FIAT.polynomial_set.</span></span><span class="sig-name descname"><span class="pre">construct_new_coeffs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/polynomial_set.html#construct_new_coeffs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.polynomial_set.construct_new_coeffs" title="Link to this definition">¶</a></dt>
+<dd><p>Constructs new coefficients for the set union of A and B
+If A and B are discontinuous and do not have the same degree the smaller one
+is extended to match the larger.</p>
+<p>This does not handle the case that A and B have continuity but not the same degree.</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="FIAT.polynomial_set.form_matrix_product">
 <span class="sig-prename descclassname"><span class="pre">FIAT.polynomial_set.</span></span><span class="sig-name descname"><span class="pre">form_matrix_product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mats</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/polynomial_set.html#form_matrix_product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.polynomial_set.form_matrix_product" title="Link to this definition">¶</a></dt>
 <dd><p>Forms product over mats[i]**alpha[i]</p>
@@ -6899,6 +6908,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.TracelessTensorPolynomialSet"><code class="docutils literal notranslate"><span class="pre">TracelessTensorPolynomialSet</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.polynomial_set.construct_new_coeffs"><code class="docutils literal notranslate"><span class="pre">construct_new_coeffs()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.form_matrix_product"><code class="docutils literal notranslate"><span class="pre">form_matrix_product()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.make_bubbles"><code class="docutils literal notranslate"><span class="pre">make_bubbles()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.polynomial_set.mis"><code class="docutils literal notranslate"><span class="pre">mis()</span></code></a></li>
