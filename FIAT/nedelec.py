@@ -32,7 +32,7 @@ def NedelecSpace2D(ref_el, degree):
                                   for i in range(sd))))
     vec_Pk_from_Pkp1 = vec_Pkp1.take(vec_Pk_indices)
 
-    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, scale="orthonormal")
+    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
     PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
