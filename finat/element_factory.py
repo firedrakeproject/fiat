@@ -112,7 +112,11 @@ def as_fiat_cell(cell):
     :arg cell: the :class:`ufl.Cell` to convert."""
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
-    return ufc_cell(cell)
+
+    try:
+        return cell.to_fiat()
+    except AttributeError:
+        return ufc_cell(cell)
 
 
 @singledispatch
@@ -303,6 +307,11 @@ def convert_withmapping(element, **kwargs):
 def convert_restrictedelement(element, **kwargs):
     finat_elem, deps = _create_element(element._element, **kwargs)
     return finat.RestrictedElement(finat_elem, element.restriction_domain()), deps
+
+
+@convert.register(finat.ufl.FuseElement)
+def convert_fuse_element(element, **kwargs):
+    return finat.fiat_elements.FuseElement(element.triple), set()
 
 
 hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)

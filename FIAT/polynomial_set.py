@@ -176,13 +176,47 @@ def polynomial_set_union_normalized(A, B):
     not contain any of the same members of the set, as we construct a
     span via SVD.
     """
-    new_coeffs = numpy.concatenate((A.coeffs, B.coeffs), axis=0)
+    assert A.get_reference_element() == B.get_reference_element()
+    new_coeffs = construct_new_coeffs(A.get_reference_element(), A, B)
+
+    deg = max(A.get_degree(), B.get_degree())
+    em_deg = max(A.get_embedded_degree(), B.get_embedded_degree())
     coeffs = spanning_basis(new_coeffs)
     return PolynomialSet(A.get_reference_element(),
-                         A.get_degree(),
-                         A.get_embedded_degree(),
+                         deg,
+                         em_deg,
                          A.get_expansion_set(),
                          coeffs)
+
+
+def construct_new_coeffs(ref_el, A, B):
+    """
+    Constructs new coefficients for the set union of A and B
+    If A and B are discontinuous and do not have the same degree the smaller one
+    is extended to match the larger.
+
+    This does not handle the case that A and B have continuity but not the same degree.
+    """
+
+    if A.get_expansion_set().continuity != B.get_expansion_set().continuity:
+        raise ValueError("Continuity of expansion sets does not match.")
+
+    if A.get_embedded_degree() != B.get_embedded_degree() and A.get_expansion_set().continuity is None:
+        higher = A if A.get_embedded_degree() > B.get_embedded_degree() else B
+        lower = B if A.get_embedded_degree() > B.get_embedded_degree() else A
+
+        diff = higher.coeffs.shape[-1] - lower.coeffs.shape[-1]
+
+        # pad only the 0th axis with the difference in size
+        padding = [(0, 0) for i in range(len(lower.coeffs.shape) - 1)] + [(0, diff)]
+        embedded_coeffs = numpy.pad(lower.coeffs, padding)
+
+        new_coeffs = numpy.concatenate((embedded_coeffs, higher.coeffs), axis=0)
+    elif A.get_embedded_degree() == B.get_embedded_degree():
+        new_coeffs = numpy.concatenate((A.coeffs, B.coeffs), axis=0)
+    else:
+        raise NotImplementedError("Extending of coefficients is not implemented for PolynomialSets with continuity and different degrees")
+    return new_coeffs
 
 
 class ONSymTensorPolynomialSet(PolynomialSet):
