@@ -21,6 +21,7 @@ import sympy
 
 from FIAT import expansions, polynomial_set, reference_element
 from FIAT.quadrature_schemes import create_quadrature
+from itertools import chain
 
 
 @pytest.fixture(params=(1, 2, 3))
@@ -107,3 +108,45 @@ def test_bubble_duality(cell, degree):
     results = scale * numpy.dot(numpy.multiply(phi_dual, qwts), phi.T)
     assert numpy.allclose(results, numpy.diag(numpy.diag(results)))
     assert numpy.allclose(numpy.diag(results), 1.0)
+
+
+@pytest.mark.parametrize("degree", [10])
+def test_union_of_polysets(cell, degree):
+    """ demonstrates that polysets don't need to have the same degree for union
+    using RT space as an example"""
+
+    sd = cell.get_spatial_dimension()
+    k = degree
+    vecPk = polynomial_set.ONPolynomialSet(cell, degree, (sd,))
+
+    vec_Pkp1 = polynomial_set.ONPolynomialSet(cell, k + 1, (sd,), scale="orthonormal")
+
+    dimPkp1 = expansions.polynomial_dimension(cell, k + 1)
+    dimPk = expansions.polynomial_dimension(cell, k)
+    dimPkm1 = expansions.polynomial_dimension(cell, k - 1)
+
+    vec_Pk_indices = list(chain(*(range(i * dimPkp1, i * dimPkp1 + dimPk)
+                                  for i in range(sd))))
+    vec_Pk_from_Pkp1 = vec_Pkp1.take(vec_Pk_indices)
+
+    Pkp1 = polynomial_set.ONPolynomialSet(cell, k + 1, scale="orthonormal")
+    PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
+
+    Q = create_quadrature(cell, 2 * (k + 1))
+    Qpts, Qwts = Q.get_points(), Q.get_weights()
+
+    PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
+    Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
+    x = Qpts.T
+    PkHx_at_Qpts = PkH_at_Qpts[:, None, :] * x[None, :, :]
+    PkHx_coeffs = numpy.dot(numpy.multiply(PkHx_at_Qpts, Qwts), Pkp1_at_Qpts.T)
+    PkHx = polynomial_set.PolynomialSet(cell, k, k + 1, vec_Pkp1.get_expansion_set(), PkHx_coeffs)
+
+    same_deg = polynomial_set.polynomial_set_union_normalized(vec_Pk_from_Pkp1, PkHx)
+    different_deg = polynomial_set.polynomial_set_union_normalized(vecPk, PkHx)
+
+    Q = create_quadrature(cell, 2*(degree))
+    Qpts, _ = Q.get_points(), Q.get_weights()
+    same_vals = same_deg.tabulate(Qpts)[(0,) * sd]
+    diff_vals = different_deg.tabulate(Qpts)[(0,) * sd]
+    assert numpy.allclose(same_vals - diff_vals, 0)
