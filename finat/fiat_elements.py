@@ -132,29 +132,25 @@ class FiatElement(FiniteElementBase):
                 else:
                     point_indices = ps.indices
                     point_shape = tuple(index.extent for index in point_indices)
-
                     exprs.append(gem.partial_indexed(
                         gem.Literal(table.reshape(point_shape + index_shape)),
                         point_indices
                     ))
+
             if self.value_shape:
-                # As above, this extent may be different from that
-                # advertised by the finat element.
-                beta = tuple(gem.Index(extent=i) for i in index_shape)
-                assert len(beta) == len(self.get_indices())
+                exprs = np.reshape(exprs, self.value_shape)
+                if self.space_dimension() == space_dimension:
+                    beta = self.get_indices()
+                else:
+                    beta = tuple(gem.Index(extent=i) for i in index_shape)
+                    assert len(beta) == len(self.get_indices())
 
                 zeta = self.get_value_indices()
-                result[alpha] = gem.ComponentTensor(
-                    gem.Indexed(
-                        gem.ListTensor(np.array(
-                            [gem.Indexed(expr, beta) for expr in exprs]
-                        ).reshape(self.value_shape)),
-                        zeta),
-                    beta + zeta
-                )
+                expr = gem.ComponentTensor(gem.Indexed(gem.ListTensor(exprs),
+                                           zeta + beta), beta + zeta)
             else:
                 expr, = exprs
-                result[alpha] = expr
+            result[alpha] = expr
         return result
 
     def point_evaluation(self, order, refcoords, entity=None):
