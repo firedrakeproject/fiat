@@ -142,6 +142,8 @@ class FiatElement(FiniteElementBase):
                 if self.space_dimension() == space_dimension:
                     beta = self.get_indices()
                 else:
+                    # As above, this extent may be different from that
+                    # advertised by the finat element.
                     beta = tuple(gem.Index(extent=i) for i in index_shape)
                     assert len(beta) == len(self.get_indices())
 
