@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
+from functools import reduce
 
 import gem
 import numpy
@@ -267,8 +268,9 @@ class MappedTabulation(Mapping):
         ii = gem.indices(len(table.shape)-1)
         phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
         # the sum approach is faster than calling numpy.dot or gem.IndexSum
-        exprs = [gem.ComponentTensor(sum(self.M.array[i, j] * phi[j] for j in js), ii)
+        exprs = [gem.ComponentTensor(reduce(gem.Sum, (self.M.array[i, j] * phi[j] for j in js)), ii)
                  for i, js in enumerate(self.csr)]
+
         val = gem.ListTensor(exprs)
         # val = self.M @ table
         return gem.optimise.aggressive_unroll(val)
