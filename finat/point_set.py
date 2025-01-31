@@ -1,4 +1,5 @@
-from abc import ABCMeta, abstractproperty
+import abc
+import hashlib
 from itertools import chain, product
 
 import numpy
@@ -7,7 +8,7 @@ import gem
 from gem.utils import cached_property
 
 
-class AbstractPointSet(metaclass=ABCMeta):
+class AbstractPointSet(abc.ABC):
     """A way of specifying a known set of points, perhaps with some
     (tensor) structure.
 
@@ -15,8 +16,15 @@ class AbstractPointSet(metaclass=ABCMeta):
     where point_set_shape is () for scalar, (N,) for N element vector,
     (N, M) for N x M matrix etc.
     """
+    def __hash__(self):
+        return int.from_bytes(hashlib.md5(repr(self).encode()).digest(), byteorder="big")
 
-    @abstractproperty
+    @abc.abstractmethod
+    def __repr__(self):
+        pass
+
+    @property
+    @abc.abstractmethod
     def points(self):
         """A flattened numpy array of points or ``UnknownPointsArray``
         object with shape (# of points, point dimension)."""
@@ -27,12 +35,14 @@ class AbstractPointSet(metaclass=ABCMeta):
         _, dim = self.points.shape
         return dim
 
-    @abstractproperty
+    @property
+    @abc.abstractmethod
     def indices(self):
         """GEM indices with matching shape and extent to the structure of the
         point set."""
 
-    @abstractproperty
+    @property
+    @abc.abstractmethod
     def expression(self):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
@@ -52,6 +62,9 @@ class PointSingleton(AbstractPointSet):
         # 1 point ought to be a 1D array - see docstring above and points method
         assert len(point.shape) == 1
         self.point = point
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.point!r})"
 
     @cached_property
     def points(self):
@@ -106,6 +119,9 @@ class UnknownPointSet(AbstractPointSet):
         assert len(points_expr.shape) == 2
         self._points_expr = points_expr
 
+    def __repr__(self):
+        return f"{type(self).__name__}({self._points_expr!r})"
+
     @cached_property
     def points(self):
         return UnknownPointsArray(self._points_expr.shape)
@@ -132,6 +148,9 @@ class PointSet(AbstractPointSet):
         points = numpy.asarray(points)
         assert len(points.shape) == 2
         self.points = points
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.points!r})"
 
     @cached_property
     def points(self):
@@ -176,6 +195,9 @@ class TensorPointSet(AbstractPointSet):
 
     def __init__(self, factors):
         self.factors = tuple(factors)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.factors!r})"
 
     @cached_property
     def points(self):
