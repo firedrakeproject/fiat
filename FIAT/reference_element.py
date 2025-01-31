@@ -126,7 +126,7 @@ def linalg_subspace_intersection(A, B):
     return U[:, :rank_c]
 
 
-class Cell(object):
+class Cell:
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
     vertices that make up edges, faces, etc."""
@@ -183,6 +183,9 @@ class Cell(object):
 
         # Dictionary with derived cells
         self._split_cache = {}
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.shape!r}, {self.vertices!r}, {self.topology!r})"
 
     def _key(self):
         """Hashable object key data (excluding type)."""
@@ -1129,6 +1132,9 @@ class TensorProductCell(Cell):
 
         super().__init__(TENSORPRODUCT, vertices, topology)
         self.cells = tuple(cells)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.cells!r})"
 
     def _key(self):
         return self.cells
