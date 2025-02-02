@@ -148,11 +148,12 @@ def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
 
 
-@pytest.mark.parametrize("element, degree, variant", [
-    *((finat.HuZhang, k, v) for v in ("integral", "point") for k in range(3, 6)),
+@pytest.mark.parametrize("dimension, element, degree, variant", [
+    *((2, finat.HuZhang, k, v) for v in ("integral", "point") for k in range(3, 6)),
+    *((d, finat.JohnsonMercier, k, None) for d in (2, 3) for k in range(2, 4)),
 ])
-def test_piola_triangle_high_order(ref_to_phys, element, degree, variant):
-    check_zany_mapping(element, ref_to_phys[2], degree, variant)
+def test_piola_triangle_high_order(ref_to_phys, dimension, element, degree, variant):
+    check_zany_mapping(element, ref_to_phys[dimension], degree, variant)
 
 
 @pytest.mark.parametrize("element, degree", [

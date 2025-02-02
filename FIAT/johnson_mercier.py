@@ -7,8 +7,6 @@ import numpy
 
 class JohnsonMercierDualSet(dual_set.DualSet):
     def __init__(self, ref_complex, degree, variant=None):
-        if degree != 1:
-            raise ValueError("Johnson-Mercier only defined for degree=1")
         if variant is not None:
             raise ValueError(f"Johnson-Mercier does not have the {variant} variant")
         ref_el = ref_complex.get_parent()
@@ -17,8 +15,8 @@ class JohnsonMercierDualSet(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
-        # Face dofs: bidirectional (nn and nt) Legendre moments
-        dim = sd - 1
+        # Exterior face dofs: bidirectional (nn and nt) Legendre moments
+        dim = sd-1
         R = numpy.array([[0, 1], [-1, 0]])
         ref_facet = ref_el.construct_subelement(dim)
         Qref = create_quadrature(ref_facet, 2*degree)
@@ -35,13 +33,42 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             entity_ids[dim][f].extend(range(cur, len(nodes)))
 
         cur = len(nodes)
-        # Interior dofs: moments for each independent component
-        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
-        Q = create_quadrature(ref_complex, 2*degree-1)
-        P = polynomial_set.ONPolynomialSet(ref_el, degree-1, scale="L2 piola")
-        phis = P.tabulate(Q.get_points())[(0,) * sd]
-        nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n[i+1], n[j+1], Q, phi)
-                     for phi in phis for i in range(sd) for j in range(i, sd))
+        n = list(map(ref_complex.compute_scaled_normal, sorted(ref_complex.topology[sd-1])))
+
+        # Interior facet dofs: bidirectional (nn and nt) Legendre moments
+        for dim in range(sd):
+            q = 0 if dim == 0 else degree - dim - 1
+            if q < 0:
+                continue
+            ref_facet = ref_el.construct_subelement(dim)
+            Qref = create_quadrature(ref_facet, degree + q)
+            P = polynomial_set.ONPolynomialSet(ref_facet, q)
+            phis = P.tabulate(Qref.get_points())[(0,) * dim]
+            for f in ref_complex.get_interior_facets(dim):
+                Q = FacetQuadratureRule(ref_complex, dim, f, Qref)
+                scale = 1.0 / Q.jacobian_determinant()
+                normals = [n[i] for i in ref_complex.connectivity[(dim, sd-1)][f]]
+                nodes.extend(TensorBidirectionalIntegralMoment(ref_el, nf, nf, Q, phi * scale)
+                             for phi in phis for nf in normals)
+
+                thats = ref_complex.compute_tangents(dim, f)
+                nodes.extend(TensorBidirectionalIntegralMoment(ref_el, nf, tf, Q, phi * scale)
+                             for phi in phis for nf in normals[:sd-dim] for tf in thats)
+
+        # Subcell dofs: Moments of unique components against a basis for P_{k-2}
+        dim = sd
+        q = degree - 2
+        if q >= 0:
+            normals = [n[i] for i in ref_complex.get_interior_facets(sd-1)]
+            ref_facet = ref_el.construct_subelement(dim)
+            Qref = create_quadrature(ref_facet, degree + q)
+            P = polynomial_set.ONPolynomialSet(ref_facet, q)
+            phis = P.tabulate(Qref.get_points())[(0,) * dim]
+            for f in ref_complex.get_interior_facets(dim):
+                Q = FacetQuadratureRule(ref_complex, dim, f, Qref)
+                scale = 1.0 / Q.jacobian_determinant()
+                nodes.extend(TensorBidirectionalIntegralMoment(ref_el, nf, nf, Q, phi * scale)
+                             for phi in phis for nf in normals)
 
         entity_ids[sd][0].extend(range(cur, len(nodes)))
 

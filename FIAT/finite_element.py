@@ -130,6 +130,10 @@ class CiarletElement(FiniteElement):
     """
 
     def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_complex=None):
+        if len(dual) != len(poly_set):
+            raise ValueError("Function space and dual set need to have the same dimension, "
+                             f"got {len(poly_set)} basis functions and {len(dual)} dofs.")
+
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
         super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
