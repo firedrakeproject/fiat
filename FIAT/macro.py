@@ -484,25 +484,26 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
         coeffs = U.get_coeffs()
         expansion_set = U.get_expansion_set()
         k = 1 if expansion_set.continuity == "C0" else 0
-
         sd = ref_el.get_spatial_dimension()
-        facet_el = ref_el.construct_subelement(sd-1)
+        n = list(map(ref_el.compute_normal, sorted(ref_el.topology[sd-1])))
 
-        phi_deg = 0 if sd == 1 else degree - k
-        phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg, shape=(sd,))
-        Q = create_quadrature(facet_el, 2 * phi_deg)
+        dim = sd-1
+        q = degree
+        facet_el = ref_el.construct_subelement(dim)
+        phi = polynomial_set.ONPolynomialSet(facet_el, q, shape=(sd,))
+        Q = create_quadrature(facet_el, degree + q)
         qpts, qwts = Q.get_points(), Q.get_weights()
-        phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
+        phi_at_qpts = phi.tabulate(qpts)[(0,) * dim]
         weights = numpy.multiply(phi_at_qpts, qwts)
 
         rows = []
-        for facet in ref_el.get_interior_facets(sd-1):
-            normal = ref_el.compute_normal(facet)
-            jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
+        for f in ref_el.get_interior_facets(dim):
+            # dot(sigma, n) continuous
+            nf = n[f]
+            jumps = expansion_set.tabulate_normal_jumps(degree, qpts, f, order=order)
             for r in range(k, order+1):
                 jump = numpy.dot(coeffs, jumps[r])
-                # num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
-                wn = weights[:, :, None, :] * normal[None, None, :, None]
+                wn = weights[:, :, None, :] * nf[None, None, :, None]
                 ax = tuple(range(1, len(wn.shape)))
                 rows.append(numpy.tensordot(wn, jump, axes=(ax, ax)))
 
@@ -510,5 +511,38 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
             dual_mat = numpy.vstack(rows)
             nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
             coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
+
+        ldim = 0
+        for dim in range(0, ldim):
+            q = 0 if dim == 0 else degree - (dim+1)
+            if q < 0:
+                continue
+
+            facet_el = ref_el.construct_subelement(dim)
+            phi = polynomial_set.ONPolynomialSet(facet_el, q)
+            Q = create_quadrature(facet_el, q + degree)
+            qpts, qwts = Q.get_points(), Q.get_weights()
+            phi_at_qpts = phi.tabulate(qpts)[(0,) * dim]
+            weights = numpy.multiply(phi_at_qpts, qwts)
+
+            rows = []
+            for f in ref_el.get_interior_facets(dim):
+                # inner(sigma, n n^T) continuous
+                normals = [n[i] for i in ref_el.connectivity[(dim, sd-1)][f]]
+                fpts = ref_el.get_entity_transform(dim, f)(qpts)
+                jumps = expansion_set.tabulate_jumps(degree, fpts, order=order)
+                for r in range(k, order+1):
+                    for normal in normals:
+                        nn = numpy.outer(normal, normal)
+                        nncoeffs = numpy.tensordot(coeffs, nn, axes=((1, 2), (0, 1)))
+                        jump = numpy.tensordot(nncoeffs, jumps[r], (-1, 0))
+                        row = numpy.tensordot(jump, weights.T, axes=(-1, 0)).T
+                        row[abs(row) < 1E-12] = 0
+                        rows.append(row.reshape(-1, row.shape[-1]))
+
+            if len(rows) > 0:
+                dual_mat = numpy.vstack(rows)
+                nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+                coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
 
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)

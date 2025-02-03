@@ -17,10 +17,11 @@ class JohnsonMercierDualSet(dual_set.DualSet):
 
         # Exterior face dofs: bidirectional (nn and nt) Legendre moments
         dim = sd-1
+        q = degree
         R = numpy.array([[0, 1], [-1, 0]])
         ref_facet = ref_el.construct_subelement(dim)
-        Qref = create_quadrature(ref_facet, 2*degree)
-        P = polynomial_set.ONPolynomialSet(ref_facet, degree)
+        Qref = create_quadrature(ref_facet, degree + q)
+        P = polynomial_set.ONPolynomialSet(ref_facet, q)
         phis = P.tabulate(Qref.get_points())[(0,) * dim]
         for f in sorted(top[dim]):
             cur = len(nodes)
