@@ -512,3 +512,40 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
             coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
 
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
+
+
+def supersmooth_constraint(poly_set, order, dim, entity_ids):
+    from FIAT.quadrature_schemes import create_quadrature
+    degree = poly_set.get_degree()
+    expansion_set = poly_set.get_expansion_set()
+    ref_el = poly_set.get_reference_element()
+    facet_el = ref_el.construct_subelement(dim)
+
+    k = 1 if expansion_set.continuity == "C0" else 0
+    q = 0 if dim == 0 else degree - k
+    phi = polynomial_set.ONPolynomialSet(facet_el, q)
+    Q = create_quadrature(facet_el, degree + q)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi_at_qpts = phi.tabulate(qpts)[(0,) * dim]
+    weights = numpy.multiply(phi_at_qpts, qwts)
+
+    coeffs = poly_set.get_coeffs()
+    rows = []
+    for f in entity_ids:
+        fpts = ref_el.get_entity_transform(dim, f)(qpts)
+        jumps = expansion_set.tabulate_jumps(degree, fpts, order=order)
+        for r in range(k, order+1):
+            num_wt = 1 if dim == 0 else expansions.polynomial_dimension(facet_el, degree-r)
+            wt = weights[:num_wt]
+            jump = numpy.tensordot(coeffs, jumps[r], (-1, 0))
+            row = numpy.tensordot(jump, wt.T, axes=(-1, 0)).T
+            if not numpy.allclose(row, 0):
+                print((r, f))
+                rows.append(row.reshape(-1, row.shape[-1]))
+
+    if len(rows) > 0:
+        dual_mat = numpy.vstack(rows)
+        nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+        coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
+
+    return polynomial_set.PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
