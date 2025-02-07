@@ -125,8 +125,8 @@ def _(num: numbers.Integral) -> str:
 
 @safe_repr.register(numbers.Real)
 def _(num: numbers.Real) -> str:
-    # set roundoff to half the significant figures of machine epsilon
-    precision = np.finfo(num).precision // 2
+    # set roundoff to close-to-but-not-exactly machine epsilon
+    precision = np.finfo(num).precision - 2
     return "{:.{prec}}".format(num, prec=precision)
 
 
