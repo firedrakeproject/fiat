@@ -26,6 +26,7 @@ from itertools import chain, count, product
 from math import factorial
 
 import numpy
+from gem.utils import safe_repr
 from recursivenodes.nodes import _decode_family, _recursive
 
 from FIAT.orientation_utils import (
@@ -185,7 +186,7 @@ class Cell:
         self._split_cache = {}
 
     def __repr__(self):
-        return f"{type(self).__name__}({self.shape!r}, {self.vertices!r}, {self.topology!r})"
+        return f"{type(self).__name__}({self.shape!r}, {safe_repr(self.vertices)}, {self.topology!r})"
 
     def _key(self):
         """Hashable object key data (excluding type)."""

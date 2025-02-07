@@ -1,5 +1,11 @@
 import collections
+import functools
+import numbers
 from functools import cached_property  # noqa: F401
+from typing import Any
+
+import numpy as np
+from ufl.constantvalue import format_float
 
 
 def groupby(iterable, key=None):
@@ -88,3 +94,51 @@ class _LetBlock(object):
         assert self.state is variable._head
         value, variable._head = variable._head
         self.state = None
+
+
+@functools.singledispatch
+def safe_repr(obj: Any) -> str:
+    """Return a 'safe' repr for an object, accounting for floating point error.
+
+    Parameters
+    ----------
+    obj :
+        The object to produce a repr for.
+
+    Returns
+    -------
+    str :
+        A repr for the object.
+
+    """
+    raise TypeError(f"Cannot provide a safe repr for {type(obj).__name__}")
+
+
+@safe_repr.register(str)
+def _(text: str) -> str:
+    return text
+
+
+@safe_repr.register(numbers.Integral)
+def _(num: numbers.Integral) -> str:
+    return repr(num)
+
+
+@safe_repr.register(numbers.Real)
+def _(num: numbers.Real) -> str:
+    return format_float(num)
+
+
+@safe_repr.register(np.ndarray)
+def _(array: np.ndarray) -> str:
+    return f"{type(array).__name__}([{', '.join(map(safe_repr, array))}])"
+
+
+@safe_repr.register(list)
+def _(list_: list) -> str:
+    return f"[{', '.join(map(safe_repr, list_))}]"
+
+
+@safe_repr.register(tuple)
+def _(tuple_: tuple) -> str:
+    return f"({', '.join(map(safe_repr, tuple_))})"

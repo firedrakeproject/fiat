@@ -1,11 +1,12 @@
 import abc
 import hashlib
+from functools import cached_property
 from itertools import chain, product
 
 import numpy
 
 import gem
-from gem.utils import cached_property
+from gem.utils import safe_repr
 
 
 class AbstractPointSet(abc.ABC):
@@ -64,7 +65,7 @@ class PointSingleton(AbstractPointSet):
         self.point = point
 
     def __repr__(self):
-        return f"{type(self).__name__}({self.point!r})"
+        return f"{type(self).__name__}({safe_repr(self.point)})"
 
     @cached_property
     def points(self):

@@ -1,13 +1,13 @@
 import hashlib
 from abc import ABCMeta, abstractmethod
-from functools import reduce
+from functools import cached_property, reduce
 
 import gem
 import numpy
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
 from FIAT.reference_element import LINE, QUADRILATERAL, TENSORPRODUCT
-from gem.utils import cached_property
+from gem.utils import safe_repr
 
 from finat.point_set import GaussLegendrePointSet, PointSet, TensorPointSet
 
@@ -65,7 +65,7 @@ class AbstractQuadratureRule(metaclass=ABCMeta):
         return int.from_bytes(hashlib.md5(repr(self).encode()).digest(), byteorder="big")
 
     def __eq__(self, other):
-        return type(other) is type(self) and hash(other) == hash(self)
+        return type(other) is type(self) and repr(other) == repr(self)
 
     @abstractmethod
     def __repr__(self):
@@ -124,7 +124,14 @@ class QuadratureRule(AbstractQuadratureRule):
         self._intrinsic_orientation_permutation_map_tuple = io_ornt_map_tuple
 
     def __repr__(self):
-        return f"{type(self).__name__}({self.point_set!r}, {self.weights!r}, {self.ref_el!r}, {self._intrinsic_orientation_permutation_map_tuple!r})"
+        return (
+            f"{type(self).__name__}("
+                f"{self.point_set!r}, "
+                f"{safe_repr(self.weights)}, "
+                f"{self.ref_el!r}, "
+                f"{self._intrinsic_orientation_permutation_map_tuple!r}"
+            ")"
+        )
 
     @cached_property
     def point_set(self):
