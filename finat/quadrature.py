@@ -126,10 +126,10 @@ class QuadratureRule(AbstractQuadratureRule):
     def __repr__(self):
         return (
             f"{type(self).__name__}("
-                f"{self.point_set!r}, "
-                f"{safe_repr(self.weights)}, "
-                f"{self.ref_el!r}, "
-                f"{self._intrinsic_orientation_permutation_map_tuple!r}"
+            f"{self.point_set!r}, "
+            f"{safe_repr(self.weights)}, "
+            f"{self.ref_el!r}, "
+            f"{self._intrinsic_orientation_permutation_map_tuple!r}"
             ")"
         )
 
