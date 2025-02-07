@@ -5,7 +5,6 @@ from functools import cached_property  # noqa: F401
 from typing import Any
 
 import numpy as np
-from ufl.constantvalue import format_float
 
 
 def groupby(iterable, key=None):
@@ -126,7 +125,9 @@ def _(num: numbers.Integral) -> str:
 
 @safe_repr.register(numbers.Real)
 def _(num: numbers.Real) -> str:
-    return format_float(num)
+    # set roundoff to half the significant figures of machine epsilon
+    precision = np.finfo(num).precision // 2
+    return "{:.{prec}}".format(num, prec=precision)
 
 
 @safe_repr.register(np.ndarray)
