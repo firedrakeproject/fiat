@@ -104,6 +104,9 @@ class PolynomialSet(object):
         return PolynomialSet(self.ref_el, self.degree, self.embedded_degree,
                              self.expansion_set, new_coeffs)
 
+    def __len__(self):
+        return self.num_members
+
 
 class ONPolynomialSet(PolynomialSet):
     """Constructs an orthonormal basis out of expansion set by having an
