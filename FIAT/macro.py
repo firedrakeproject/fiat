@@ -434,56 +434,37 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
         weights = numpy.multiply(phi_at_qpts, qwts)
 
-        i, j = zip(*ref_el.topology[1].values())
-        verts = numpy.asarray(ref_el.get_vertices())
-        h = numpy.linalg.norm(verts[list(j)] - verts[list(i)], axis=1)
-
+        facet_order = order
         if isinstance(order, int):
             facet_order = (order,) * len(ref_el.topology[sd-1])
-        elif isinstance(order, (list, tuple)):
-            facet_order = order
-        else:
-            raise TypeError("Unsupported order type {type(order).__name__}.")
 
+        vertex_order = vorder
         if isinstance(vorder, int):
             vertex_order = (vorder,) * len(ref_el.topology[0])
-        elif isinstance(vorder, (list, tuple)):
-            vertex_order = vorder
-        else:
-            raise TypeError("Unsupported vorder type {type(order).__name__}.")
 
         rows = []
-        facets = ref_el.get_interior_facets(sd-1)
-        for facet in facets:
+        for facet in ref_el.get_interior_facets(sd-1):
             order = facet_order[facet]
             jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
-            hmin = min(h[list(ref_el.connectivity[(sd-1, 1)][facet])])
             for r in range(k, order+1):
                 num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
-                wt = weights[:num_wt] * hmin ** r
-                rows.append(numpy.tensordot(wt, jumps[r], axes=(-1, -1)).reshape(-1, num_members))
+                row = numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1))
+                row *= 1 / max(numpy.max(abs(row)), 1)
+                rows.append(row.reshape(-1, num_members))
 
-        verts = ref_el.get_vertices()
-        interior_vertices = ref_el.get_interior_facets(0)
+        # Impose C^vorder super-smoothness at interior vertices
+        # C^k automatically gives C^{k+dim-1} at the interior vertex
+        verts = numpy.asarray(ref_el.get_vertices())
         for vorder in set(vertex_order):
-            vert_ids = [i for i in interior_vertices if vertex_order[i] == vorder]
-            facets = []
-            for v in vert_ids:
-                facets.extend(ref_el.connectivity[(0, sd-1)][v])
-            if len(facets) == 0:
-                continue
-
-            # Impose C^vorder super-smoothness at interior vertices
-            # C^forder automatically gives C^{forder+dim-1} at the interior vertex
+            vids = [i for i in range(len(verts)) if vertex_order[i] == vorder]
+            facets = chain.from_iterable(ref_el.connectivity[(0, sd-1)][v] for v in vids)
             forder = min(facet_order[f] for f in facets)
             sorder = forder + sd - 1
             if vorder > sorder:
-                points = [verts[i] for i in vert_ids]
-                jumps = expansion_set.tabulate_jumps(degree, points, order=vorder)
-                hmin = min(min(h[list(ref_el.connectivity[(0, 1)][v])]) for n in vert_ids)
+                jumps = expansion_set.tabulate_jumps(degree, verts[vids], order=vorder)
                 for r in range(sorder+1, vorder+1):
                     row = numpy.vstack(jumps[r].T)
-                    row *= hmin ** r
+                    row *= 1 / max(numpy.max(abs(row)), 1)
                     rows.append(row)
 
         if len(rows) > 0:
@@ -545,63 +526,3 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
             coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
 
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
-
-
-def supersmooth_constraint(poly_set, order, dim, entity_ids):
-    from FIAT.quadrature_schemes import create_quadrature
-    degree = poly_set.get_degree()
-    expansion_set = poly_set.get_expansion_set()
-    ref_el = poly_set.get_reference_element()
-    facet_el = ref_el.construct_subelement(dim)
-    if isinstance(order, tuple):
-        sorder, order = order
-    else:
-        sorder = 1 if expansion_set.continuity == "C0" else 0
-
-    q = 0 if dim == 0 else degree - sorder
-    phi = polynomial_set.ONPolynomialSet(facet_el, q)
-    Q = create_quadrature(facet_el, degree + q)
-    qpts, qwts = Q.get_points(), Q.get_weights()
-    phi_at_qpts = phi.tabulate(qpts)[(0,) * dim]
-    weights = numpy.multiply(phi_at_qpts, qwts)
-
-    i, j = zip(*ref_el.topology[1].values())
-    verts = numpy.asarray(ref_el.get_vertices())
-    h = numpy.linalg.norm(verts[list(j)] - verts[list(i)], axis=1)
-
-    coeffs = poly_set.get_coeffs()
-    rows = []
-    for f in entity_ids:
-        fpts = ref_el.get_entity_transform(dim, f)(qpts)
-        jumps = expansion_set.tabulate_jumps(degree, fpts, order=order)
-        hmin = min(h[list(ref_el.connectivity[(dim, 1)][f])])
-        for r in range(sorder, order+1):
-            num_wt = 1 if dim == 0 else expansions.polynomial_dimension(facet_el, degree-r)
-            wt = weights[:num_wt] * (hmin ** r)
-            jump = numpy.tensordot(coeffs, jumps[r], (-1, 0))
-            row = numpy.tensordot(jump, wt.T, axes=(-1, 0)).T
-            if not numpy.allclose(row, 0, atol=1E-10):
-                rows.append(row.reshape(-1, row.shape[-1]))
-
-    if len(rows) > 0:
-        dual_mat = numpy.vstack(rows)
-        nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
-        coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
-
-    return polynomial_set.PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
-
-
-if __name__ == "__main__":
-    from FIAT import ufc_simplex
-
-    K = ufc_simplex(2)
-    DCT = AlfeldSplit(AlfeldSplit(K))
-
-    P = CkPolynomialSet(DCT, 5,
-                        order=[2, 2, 2, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-                        vorder=[2, 2, 2, 3, 4, 4, 4],
-                        variant="bubble")
-
-    # P = supersmooth_constraint(P, (3, 4), 0, [3,4,5,6])
-    # P = supersmooth_constraint(P, (3, 4), 0, [4,5,6])
-    print(P.get_num_members())  # 21
