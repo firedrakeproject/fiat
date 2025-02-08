@@ -456,7 +456,9 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         # C^k automatically gives C^{k+dim-1} at the interior vertex
         verts = numpy.asarray(ref_el.get_vertices())
         for vorder in set(vertex_order):
-            vids = [i for i in range(len(verts)) if vertex_order[i] == vorder]
+            vids = [i for i in ref_el.get_interior_facets(0) if vertex_order[i] == vorder]
+            if len(vids) == 0:
+                continue
             facets = chain.from_iterable(ref_el.connectivity[(0, sd-1)][v] for v in vids)
             forder = min(facet_order[f] for f in facets)
             sorder = forder + sd - 1
