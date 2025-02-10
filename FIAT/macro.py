@@ -412,21 +412,36 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
 
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
-    :kwarg order: The order of continuity across subcells.
+    :kwarg order: The order of continuity across facets or a dict of dicts
+                  mapping dimension and entity_id to the order of continuity
+                  at each entity.
     :kwarg vorder: The order of super-smoothness at interior vertices.
     :kwarg shape: The value shape.
     :kwarg variant: The variant for the underlying ExpansionSet.
     :kwarg scale: The scale for the underlying ExpansionSet.
     """
-    def __init__(self, ref_el, degree, order=1, vorder=0, shape=(), **kwargs):
+    def __init__(self, ref_el, degree, order=1, vorder=None, shape=(), **kwargs):
         from FIAT.quadrature_schemes import create_quadrature
-        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
-        k = 1 if expansion_set.continuity == "C0" else 0
-        num_members = expansion_set.get_num_members(degree)
+
+        if not isinstance(order, (int, dict)):
+            raise TypeError(f"'order' must be either an int or dict, not {type(order).__name__}")
 
         sd = ref_el.get_spatial_dimension()
-        facet_el = ref_el.construct_subelement(sd-1)
+        if isinstance(order, int):
+            order = {sd-1: dict.fromkeys(ref_el.get_interior_facets(sd-1), order)}
+        if vorder is not None:
+            order[0] = dict.fromkeys(ref_el.get_interior_facets(0), vorder)
+        elif 0 not in order:
+            order[0] = {}
 
+        if not all(k in {0, sd-1} for k in order):
+            raise NotImplementedError("Only face or vertex constraints have been implemented.")
+
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
+        k = 1 if expansion_set.continuity == "C0" else 0
+
+        # Impose C^forder continuity across interior facets
+        facet_el = ref_el.construct_subelement(sd-1)
         phi_deg = 0 if sd == 1 else degree - k
         phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg)
         Q = create_quadrature(facet_el, 2 * phi_deg)
@@ -434,42 +449,31 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
         weights = numpy.multiply(phi_at_qpts, qwts)
 
-        facet_order = order
-        if isinstance(order, int):
-            facet_order = (order,) * len(ref_el.topology[sd-1])
-
-        vertex_order = vorder
-        if isinstance(vorder, int):
-            vertex_order = (vorder,) * len(ref_el.topology[0])
-
         rows = []
-        for facet in ref_el.get_interior_facets(sd-1):
-            order = facet_order[facet]
-            jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
-            for r in range(k, order+1):
+        for facet in order[sd-1]:
+            forder = order[sd-1][facet]
+            jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=forder)
+            for r in range(k, forder+1):
                 num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
-                row = numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1))
-                row *= 1 / max(numpy.max(abs(row)), 1)
-                rows.append(row.reshape(-1, num_members))
+                rows.append(numpy.tensordot(weights[:num_wt], jumps[r], axes=(-1, -1)))
 
         # Impose C^vorder super-smoothness at interior vertices
-        # C^k automatically gives C^{k+dim-1} at the interior vertex
+        # C^forder automatically gives C^{forder+dim-1} at the interior vertex
         verts = numpy.asarray(ref_el.get_vertices())
-        for vorder in set(vertex_order):
-            vids = [i for i in ref_el.get_interior_facets(0) if vertex_order[i] == vorder]
+        for vorder in set(order[0].values()):
+            vids = [i for i in order[0] if order[0][i] == vorder]
             if len(vids) == 0:
                 continue
             facets = chain.from_iterable(ref_el.connectivity[(0, sd-1)][v] for v in vids)
-            forder = min(facet_order[f] for f in facets)
+            forder = min(order[sd-1][f] for f in facets)
             sorder = forder + sd - 1
             if vorder > sorder:
                 jumps = expansion_set.tabulate_jumps(degree, verts[vids], order=vorder)
-                for r in range(sorder+1, vorder+1):
-                    row = numpy.vstack(jumps[r].T)
-                    row *= 1 / max(numpy.max(abs(row)), 1)
-                    rows.append(row)
+                rows.extend(numpy.vstack(jumps[r].T) for r in range(sorder+1, vorder+1))
 
         if len(rows) > 0:
+            for row in rows:
+                row *= 1 / max(numpy.max(abs(row)), 1)
             dual_mat = numpy.vstack(rows)
             coeffs = polynomial_set.spanning_basis(dual_mat, nullspace=True)
         else:

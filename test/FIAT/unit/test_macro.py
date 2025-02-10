@@ -376,15 +376,15 @@ def test_C2_double_alfeld():
     degree = 5
 
     # C3 on major split facets, C2 elsewhere
-    order = [2] * len(DCT.topology[1])
-    order[3:6] = [3, 3, 3]
+    order = {}
+    order[1] = dict.fromkeys(DCT.get_interior_facets(1), 2)
+    order[1].update(dict.fromkeys(range(3, 6), 3))
 
-    # C4 at minor split barycenters, C3 at major split barycenter, C2 elsewhere
-    vorder = [2] * len(DCT.topology[0])
-    vorder[3] = 3
-    vorder[4:7] = [4, 4, 4]
+    # C4 at minor split barycenters, C3 at major split barycenter
+    order[0] = dict.fromkeys(DCT.get_interior_facets(0), 4)
+    order[0][3] = 3
 
-    P = CkPolynomialSet(DCT, degree, order=order, vorder=vorder, variant="bubble")
+    P = CkPolynomialSet(DCT, degree, order=order, variant="bubble")
     assert P.get_num_members() == 27
 
 
