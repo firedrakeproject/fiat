@@ -19,13 +19,12 @@ class FuseElement(FiniteElementBase):
         if not cell:
             cell = self.triple.cell.to_ufl()
 
-        # this isn't really correct
-        degree = self.triple.spaces[0].degree()
+        degree = self.triple.degree()
+        self.sobolev_space = self.triple.spaces[1]
         super(FuseElement, self).__init__("IT", cell, degree, None, triple.get_value_shape())
 
     def __repr__(self):
-        return "FiniteElement(%s, %s, (%s, %s, %s), %s)" % (
-               repr(self.triple.DOFGenerator), repr(self.triple.cell), repr(self.triple.spaces[0]), repr(self.triple.spaces[1]), repr(self.triple.spaces[2]), "X")
+        return repr(self.triple)
 
     def __str__(self):
         return "<Fuse%sElem on %s>" % (self.triple.spaces[0], self.triple.cell)
