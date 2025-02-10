@@ -413,8 +413,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
     :arg ref_el: The simplicial complex.
     :arg degree: The polynomial degree.
     :kwarg order: The order of continuity across facets or a dict of dicts
-                  mapping dimension and entity_id to the order of continuity
-                  at each entity.
+        mapping dimension and entity_id to the order of continuity at each entity.
     :kwarg vorder: The order of super-smoothness at interior vertices.
     :kwarg shape: The value shape.
     :kwarg variant: The variant for the underlying ExpansionSet.
@@ -462,8 +461,6 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         verts = numpy.asarray(ref_el.get_vertices())
         for vorder in set(order[0].values()):
             vids = [i for i in order[0] if order[0][i] == vorder]
-            if len(vids) == 0:
-                continue
             facets = chain.from_iterable(ref_el.connectivity[(0, sd-1)][v] for v in vids)
             forder = min(order[sd-1][f] for f in facets)
             sorder = forder + sd - 1
