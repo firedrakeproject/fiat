@@ -42,11 +42,13 @@ class MixedElement(FiniteElementBase):
 
         # Pick the first cell, for now all should be equal
         cells = tuple(sorted(set(element.cell for element in elements)))
-        cell = cells[0]
-        # Require that all elements are defined on the same cell
-        if not all(c == cell for c in cells[1:]):
-            raise ValueError("Sub elements must live on the same cell.")
-
+        if cells:
+            cell = cells[0]
+            # Require that all elements are defined on the same cell
+            if not all(c == cell for c in cells[1:]):
+                raise ValueError("Sub elements must live on the same cell.")
+        else:
+            cell = None
         # Check that all elements use the same quadrature scheme TODO:
         # We can allow the scheme not to be defined.
         if len(elements) == 0:
