@@ -42,14 +42,6 @@ class MixedElement(FiniteElementBase):
 
         cells = tuple(e.cell for e in elements)
         cell = CellSequence(cells)
-        self._cells = cells
-        if cells:
-            cell = cells[0]
-            # Require that all elements are defined on the same cell
-            if not all(c == cell for c in cells[1:]):
-                raise ValueError("Sub elements must live on the same cell.")
-        else:
-            cell = None
 
         # Check that all elements use the same quadrature scheme TODO:
         # We can allow the scheme not to be defined.
