@@ -13,7 +13,7 @@
 
 import numpy as np
 
-from ufl.cell import as_cell
+from ufl.cell import CellSequence, as_cell
 from finat.ufl.finiteelement import FiniteElement
 from finat.ufl.finiteelementbase import FiniteElementBase
 from ufl.permutation import compute_indices
@@ -40,8 +40,8 @@ class MixedElement(FiniteElementBase):
                     for e in elements]
         self._sub_elements = elements
 
-        # Pick the first cell, for now all should be equal
-        cells = tuple(sorted(set(element.cell for element in elements) - set([None])))
+        cells = tuple(e.cell for e in elements)
+        cell = CellSequence(cells)
         self._cells = cells
         if cells:
             cell = cells[0]
