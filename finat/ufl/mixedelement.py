@@ -24,7 +24,7 @@ from ufl.utils.sequences import max_degree, product
 
 class MixedElement(FiniteElementBase):
     """A finite element composed of a nested hierarchy of mixed or simple elements."""
-    __slots__ = ("_sub_elements", "_cells")
+    __slots__ = ("_sub_elements",)
 
     def __init__(self, *elements, **kwargs):
         """Create mixed finite element from given list of elements."""
@@ -41,15 +41,11 @@ class MixedElement(FiniteElementBase):
         self._sub_elements = elements
 
         # Pick the first cell, for now all should be equal
-        cells = tuple(sorted(set(element.cell for element in elements) - set([None])))
-        self._cells = cells
-        if cells:
-            cell = cells[0]
-            # Require that all elements are defined on the same cell
-            if not all(c == cell for c in cells[1:]):
-                raise ValueError("Sub elements must live on the same cell.")
-        else:
-            cell = None
+        cells = tuple(sorted(set(element.cell for element in elements)))
+        cell = cells[0]
+        # Require that all elements are defined on the same cell
+        if not all(c == cell for c in cells[1:]):
+            raise ValueError("Sub elements must live on the same cell.")
 
         # Check that all elements use the same quadrature scheme TODO:
         # We can allow the scheme not to be defined.
