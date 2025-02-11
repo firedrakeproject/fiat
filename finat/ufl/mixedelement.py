@@ -13,7 +13,8 @@
 
 import numpy as np
 
-from ufl.cell import as_cell
+from ufl.cell import CellSequence, as_cell
+from ufl.domain import MeshSequence
 from finat.ufl.finiteelement import FiniteElement
 from finat.ufl.finiteelementbase import FiniteElementBase
 from ufl.permutation import compute_indices
@@ -39,18 +40,11 @@ class MixedElement(FiniteElementBase):
         elements = [MixedElement(e) if isinstance(e, (tuple, list)) else e
                     for e in elements]
         self._sub_elements = elements
-
-        # Pick the first cell, for now all should be equal
-        cells = tuple(sorted(set(element.cell for element in elements) - set([None])))
-        self._cells = cells
+        cells = tuple(e.cell for e in elements)
         if cells:
-            cell = cells[0]
-            # Require that all elements are defined on the same cell
-            if not all(c == cell for c in cells[1:]):
-                raise ValueError("Sub elements must live on the same cell.")
+            cell = CellSequence(cells)
         else:
             cell = None
-
         # Check that all elements use the same quadrature scheme TODO:
         # We can allow the scheme not to be defined.
         if len(elements) == 0:
@@ -94,6 +88,8 @@ class MixedElement(FiniteElementBase):
         :math:`c_1`.
         A component is a tuple of one or more ints.
         """
+        if isinstance(domain, MeshSequence):
+            raise NotImplementedError
         # Build symmetry map from symmetries of subelements
         sm = {}
         # Base index of the current subelement into mixed value
@@ -140,6 +136,8 @@ class MixedElement(FiniteElementBase):
 
         component index for a given component index.
         """
+        if isinstance(domain, MeshSequence):
+            raise NotImplementedError
         if isinstance(i, int):
             i = (i,)
         self._check_component(i)
@@ -245,7 +243,10 @@ class MixedElement(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
-        return MixedElement(*[e.reconstruct(**kwargs) for e in self.sub_elements])
+        cell = kwargs.pop('cell', None)
+        if not isinstance(cell, CellSequence):
+            raise TypeError(f"Expecting a CellSequence: got {cells}")
+        return MixedElement(*[e.reconstruct(cell=c, **kwargs) for c, e in zip(cell.cells, self.sub_elements)])
 
     def variant(self):
         """Doc."""
