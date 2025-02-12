@@ -59,6 +59,11 @@ def tensor_name(request):
                 ids=lambda x: x.cellname(),
                 scope="module")
 def ufl_A(request, tensor_name):
+    if request.param == ufl.quadrilateral:
+        if tensor_name == "DG":
+            tensor_name = "DQ"
+        elif tensor_name == "DG L2":
+            tensor_name = "DQ L2"
     return finat.ufl.FiniteElement(tensor_name, request.param, 1)
 
 
