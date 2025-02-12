@@ -64,6 +64,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">math</span><span class="w"> </span><span class="kn">import</span> <span class="n">factorial</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">safe_repr</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">recursivenodes.nodes</span><span class="w"> </span><span class="kn">import</span> <span class="n">_decode_family</span><span class="p">,</span> <span class="n">_recursive</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.orientation_utils</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -178,7 +179,7 @@
 
 <div class="viewcode-block" id="Cell">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">Cell</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Cell</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for a reference cell.  Provides accessors for</span>
 <span class="sd">    geometry (vertex coordinates) as well as topology (orderings of</span>
 <span class="sd">    vertices that make up edges, faces, etc.&quot;&quot;&quot;</span>
@@ -235,6 +236,9 @@
 
         <span class="c1"># Dictionary with derived cells</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_split_cache</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">safe_repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">topology</span><span class="si">!r}</span><span class="s2">)&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Hashable object key data (excluding type).&quot;&quot;&quot;</span>
@@ -1382,6 +1386,9 @@
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">TENSORPRODUCT</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">topology</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cells</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">cells</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="si">!r}</span><span class="s2">)&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_key</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">cells</span>
