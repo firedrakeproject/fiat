@@ -94,7 +94,7 @@ register_element("Raviart-Thomas", "RT", 1, HDiv, "contravariant Piola", (1, Non
 # Elements not in the periodic table
 # TODO: Implement generic Tear operator for elements instead of this:
 register_element("Brezzi-Douglas-Fortin-Marini", "BDFM", 1, HDiv, "contravariant Piola", (1, None), simplices[1:])
-register_element("Crouzeix-Raviart", "CR", 0, L2, "identity", (1, 1), simplices[1:])
+register_element("Crouzeix-Raviart", "CR", 0, L2, "identity", (1, None), simplices[1:])
 register_element("Discontinuous Raviart-Thomas", "DRT", 1, L2, "contravariant Piola", (1, None), simplices[1:])
 register_element("Kong-Mulder-Veldhuizen", "KMV", 0, H1, "identity", (1, None), simplices[1:])
 
@@ -188,8 +188,8 @@ register_element("NCF", None, 1, HDiv, "contravariant Piola", (1, None), ("hexah
 
 register_element("S", None, 0, H1, "identity", (1, None), cubes)
 register_element("DPC", None, 0, L2, "identity", (0, None), cubes)
-register_element("BDMCE", None, 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
-register_element("BDMCF", None, 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
+register_element("Brezzi-Douglas-Marini Cube Edge", "BDMCE", 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
+register_element("Brezzi-Douglas-Marini Cube Face", "BDMCF", 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
 register_element("SminusE", "SminusE", 1, HCurl, "covariant Piola", (1, None), cubes[1:3])
 register_element("SminusF", "SminusF", 1, HDiv, "contravariant Piola", (1, None), cubes[1:2])
 register_element("SminusDiv", "SminusDiv", 1, HDiv, "contravariant Piola", (1, None), cubes[1:3])
