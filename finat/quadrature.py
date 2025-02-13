@@ -1,6 +1,6 @@
 import hashlib
 from abc import ABCMeta, abstractmethod
-from functools import cached_property, reduce
+from functools import cached_property
 
 import gem
 import numpy
