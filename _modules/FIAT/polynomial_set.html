@@ -178,7 +178,10 @@
         <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">(),</span> <span class="n">items</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">PolynomialSet</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">degree</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">embedded_degree</span><span class="p">,</span>
                              <span class="bp">self</span><span class="o">.</span><span class="n">expansion_set</span><span class="p">,</span> <span class="n">new_coeffs</span><span class="p">)</span></div>
-</div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_members</span></div>
 
 
 
