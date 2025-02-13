@@ -26,6 +26,7 @@ from itertools import chain, count, product
 from math import factorial
 
 import numpy
+from gem.utils import safe_repr
 from recursivenodes.nodes import _decode_family, _recursive
 
 from FIAT.orientation_utils import (
@@ -126,7 +127,7 @@ def linalg_subspace_intersection(A, B):
     return U[:, :rank_c]
 
 
-class Cell(object):
+class Cell:
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
     vertices that make up edges, faces, etc."""
@@ -183,6 +184,9 @@ class Cell(object):
 
         # Dictionary with derived cells
         self._split_cache = {}
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.shape!r}, {safe_repr(self.vertices)}, {self.topology!r})"
 
     def _key(self):
         """Hashable object key data (excluding type)."""
@@ -1129,6 +1133,9 @@ class TensorProductCell(Cell):
 
         super().__init__(TENSORPRODUCT, vertices, topology)
         self.cells = tuple(cells)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.cells!r})"
 
     def _key(self):
         return self.cells
