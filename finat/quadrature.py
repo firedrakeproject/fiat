@@ -1,11 +1,13 @@
-from abc import ABCMeta, abstractproperty
+import hashlib
+from abc import ABCMeta, abstractmethod
+from functools import cached_property, reduce
 
 import gem
 import numpy
 from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
 from FIAT.reference_element import LINE, QUADRILATERAL, TENSORPRODUCT
-from gem.utils import cached_property
+from gem.utils import safe_repr
 
 from finat.point_set import GaussLegendrePointSet, PointSet, TensorPointSet
 
@@ -59,11 +61,23 @@ class AbstractQuadratureRule(metaclass=ABCMeta):
     """Abstract class representing a quadrature rule as point set and a
     corresponding set of weights."""
 
-    @abstractproperty
+    def __hash__(self):
+        return int.from_bytes(hashlib.md5(repr(self).encode()).digest(), byteorder="big")
+
+    def __eq__(self, other):
+        return type(other) is type(self) and repr(other) == repr(self)
+
+    @abstractmethod
+    def __repr__(self):
+        pass
+
+    @property
+    @abstractmethod
     def point_set(self):
         """Point set object representing the quadrature points."""
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def weight_expression(self):
         """GEM expression describing the weights, with the same free indices
         as the point set."""
@@ -109,6 +123,16 @@ class QuadratureRule(AbstractQuadratureRule):
         self.weights = numpy.asarray(weights)
         self._intrinsic_orientation_permutation_map_tuple = io_ornt_map_tuple
 
+    def __repr__(self):
+        return (
+            f"{type(self).__name__}("
+            f"{self.point_set!r}, "
+            f"{safe_repr(self.weights)}, "
+            f"{self.ref_el!r}, "
+            f"{self._intrinsic_orientation_permutation_map_tuple!r}"
+            ")"
+        )
+
     @cached_property
     def point_set(self):
         pass  # set at initialisation
@@ -129,6 +153,9 @@ class TensorProductQuadratureRule(AbstractQuadratureRule):
             for factor in factors
             for m in factor._intrinsic_orientation_permutation_map_tuple
         )
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.factors!r}, {self.ref_el!r})"
 
     @cached_property
     def point_set(self):

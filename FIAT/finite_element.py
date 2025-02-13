@@ -134,6 +134,9 @@ class CiarletElement(FiniteElement):
         ref_complex = ref_complex or poly_set.get_reference_element()
         super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
 
+        if len(poly_set) != len(dual):
+            raise ValueError(f"Dimension of function space is {len(poly_set)}, but got {len(dual)} nodes.")
+
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()
         dualmat = dual.to_riesz(poly_set)
