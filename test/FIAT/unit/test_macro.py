@@ -367,6 +367,27 @@ def test_Ck_basis(cell, order, degree, variant):
         assert numpy.allclose(local_phis, phis[:, ipts])
 
 
+def test_C2_double_alfeld():
+    # Construct the quintic C2 spline on the double Alfeld split
+    # See Section 7.5 of Lai & Schumacher
+    K = ufc_simplex(2)
+    DCT = AlfeldSplit(AlfeldSplit(K))
+
+    degree = 5
+
+    # C3 on major split facets, C2 elsewhere
+    order = {}
+    order[1] = dict.fromkeys(DCT.get_interior_facets(1), 2)
+    order[1].update(dict.fromkeys(range(3, 6), 3))
+
+    # C4 at minor split barycenters, C3 at major split barycenter
+    order[0] = dict.fromkeys(DCT.get_interior_facets(0), 4)
+    order[0][3] = 3
+
+    P = CkPolynomialSet(DCT, degree, order=order, variant="bubble")
+    assert P.get_num_members() == 27
+
+
 def test_distance_to_point_l1(cell):
     A = AlfeldSplit(cell)
     dim = A.get_spatial_dimension()
