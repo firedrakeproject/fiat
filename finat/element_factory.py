@@ -27,6 +27,7 @@ import finat.ufl
 import ufl
 
 from FIAT import ufc_cell
+from FIAT.reference_element import TensorProductCell
 
 __all__ = ("as_fiat_cell", "create_base_element",
            "create_element", "supported_elements")
@@ -112,7 +113,8 @@ def as_fiat_cell(cell):
     :arg cell: the :class:`ufl.Cell` to convert."""
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
-
+    if isinstance(cell, ufl.TensorProductCell) and any([hasattr(c, "to_fiat") for c in cell._cells]):
+        return TensorProductCell(*[c.to_fiat() for c in cell._cells])
     try:
         return cell.to_fiat()
     except AttributeError:
