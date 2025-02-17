@@ -16,11 +16,12 @@ from FIAT.functional import (PointEvaluation,
                              IntegralMomentOfDerivative,
                              IntegralMoment,
                              FrobeniusIntegralMoment)
-from FIAT.polynomial_set import make_bubbles, ONPolynomialSet
+from FIAT.polynomial_set import make_bubbles, ONPolynomialSet, polynomial_set_union_normalized
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.bernstein import Bernstein
 from FIAT.hierarchical import make_dual_bubbles
+from FIAT.restricted import RestrictedElement
 
 
 def eps(table_u):
@@ -35,6 +36,17 @@ def eps(table_u):
 def inner(v, u, Qwts):
     return numpy.tensordot(numpy.multiply(v, Qwts), u,
                            axes=(range(1, v.ndim), range(1, u.ndim)))
+
+
+def project(Psource, Ptarget, Q):
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    sd = ref_el.get_spatial_dimension()
+    S = Psource.tabulate(qpts)[(0,) * sd]
+    T = Ptarget.tabulate(qpts)[(0,) * sd]
+    A = inner(T, T, qwts)
+    B = inner(T, S, qwts)
+    C = numpy.linalg.solve(A, B)
+    return Ptarget.recombine(C.T)
 
 
 def jacobi_duals(ref_el, weight, trial_degree, test_degree):
@@ -87,6 +99,86 @@ def generate_vector_moments(ref_el, dim, entity, Q_ref, Phis):
     for phi in phis[start:]:
         for comp in comps:
             yield IntegralMoment(ref_el, Q, phi, comp=comp, shp=shp)
+
+
+def C0_bubbles(ref_el, degree, shape):
+    if ref_el.is_macrocell():
+        B = ONPolynomialSet(ref_el, degree, shape, variant="bubble")
+        es = B.get_expansion_set()
+        ids = expansions.polynomial_entity_ids(ref_el, degree, continuity=es.continuity)
+        indices = []
+        for dim in sorted(ids):
+            for entity in ref_el.get_interior_facets(dim):
+                indices.extend(ids[dim][entity])
+
+        dimPk = es.get_num_members(degree)
+        ncomp = numpy.prod(shape, dtype=int)
+        indices = [dimPk*k + i for i in indices for k in range(ncomp)]
+        V0 = B.take(indices)
+    else:
+        V0 = make_bubbles(ref_el, degree, shape=shape)
+    return V0
+
+
+def stokes_eigenbasis(V0):
+    ref_el = V0.get_reference_element()
+    Q = create_quadrature(ref_el, 2*V0.degree)
+    Qpts, Qwts = Q.get_points(), Q.get_weights()
+
+    V0_at_qpts = V0.tabulate(Qpts, 1)
+    eps_test = eps(V0_at_qpts)
+    div_test = numpy.trace(eps_test, axis1=1, axis2=2)
+
+    # Build an orthonormal basis that splits in the div kernel
+    B = inner(eps_test, eps_test, Qwts)
+    A = inner(div_test, div_test, Qwts)
+
+    sig, S = scipy.linalg.eigh(A, B)
+    tol = sig[-1] * 1E-12
+    nullspace_dim = len([s for s in sig if abs(s) <= tol])
+
+    S1 = S[:, :nullspace_dim]
+    S2 = S[:, nullspace_dim:]
+    S2 *= numpy.sqrt(1 / sig[None, nullspace_dim:])
+
+    # Apply change of basis
+    eps_test = numpy.tensordot(S1, eps_test, axes=(0, 0))
+    div_test = numpy.tensordot(S2, div_test, axes=(0, 0))
+    return Q, eps_test, div_test, S, nullspace_dim
+
+
+def macro_stokes_space(ref_el, degree, bubble=False):
+    sd = ref_el.get_spatial_dimension()
+    shape = (sd,)
+    K = ref_el.get_parent() or ref_el
+
+    # non-macro space
+    if bubble:
+        V = make_bubbles(K, degree, shape=shape)
+    else:
+        V = ONPolynomialSet(K, degree, shape=shape, variant="bubble")
+    if K == ref_el:
+        return V
+
+    # Macro bubbles
+    V0 = C0_bubbles(ref_el, degree, shape)
+    Q, eps_test, div_test, S, nullspace_dim = stokes_eigenbasis(V0)
+
+    # DG space for divergence of bubbles
+    if degree > sd:
+        dP = RestrictedElement(DivStokes(K, degree-1), restriction_domain="reduced")
+        dP = dP.get_nodal_basis()
+    else:
+        dP = ONPolynomialSet(K, degree-1)
+        dP = dP.take(range(1, len(dP)))
+
+    dP_at_qpts = dP.tabulate(Q.get_points())[(0,) * sd]
+    C = inner(dP_at_qpts, div_test, Q.get_weights())
+    MB = V0.recombine(S[:, nullspace_dim:].T).recombine(C)
+
+    Pmacro = ONPolynomialSet(ref_el, degree, shape=shape, variant="bubble")
+    MV = project(V, Pmacro, Q)
+    return polynomial_set_union_normalized(MV, MB)
 
 
 class StokesDual(dual_set.DualSet):
@@ -169,44 +261,10 @@ class StokesDual(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         shp = (sd,)
 
-        Q = create_quadrature(ref_el, 2*degree)
+        # Test space
+        V0 = macro_stokes_space(ref_el, degree, bubble=True)
+        Q, eps_test, div_test, S, nullspace_dim = stokes_eigenbasis(V0)
         Qpts, Qwts = Q.get_points(), Q.get_weights()
-
-        # Test space: bubbles
-        if ref_el.is_macrocell():
-            B = ONPolynomialSet(ref_el, degree, shp, variant="bubble")
-            es = B.get_expansion_set()
-            ids = expansions.polynomial_entity_ids(ref_el, degree, continuity=es.continuity)
-            indices = []
-            for dim in sorted(ids):
-                for entity in ref_el.get_interior_facets(dim):
-                    indices.extend(ids[dim][entity])
-
-            dimPk = es.get_num_members(degree)
-            indices = [dimPk*k + i for i in indices for k in range(sd)]
-            V0 = B.take(indices)
-        else:
-            V0 = make_bubbles(ref_el, degree, shape=shp)
-
-        V0_at_qpts = V0.tabulate(Qpts, 1)
-        eps_test = eps(V0_at_qpts)
-        div_test = numpy.trace(eps_test, axis1=1, axis2=2)
-
-        # Build an orthonormal basis that splits in the div kernel
-        B = inner(eps_test, eps_test, Qwts)
-        A = inner(div_test, div_test, Qwts)
-
-        sig, S = scipy.linalg.eigh(A, B)
-        tol = sig[-1] * 1E-12
-        nullspace_dim = len([s for s in sig if abs(s) <= tol])
-
-        S1 = S[:, :nullspace_dim]
-        S2 = S[:, nullspace_dim:]
-        S2 *= numpy.sqrt(1 / sig[None, nullspace_dim:])
-
-        # Apply change of basis
-        eps_test = numpy.tensordot(S1, eps_test, axes=(0, 0))
-        div_test = numpy.tensordot(S2, div_test, axes=(0, 0))
 
         # Trial space
         V = ONPolynomialSet(ref_el, degree, shp, scale="orthonormal")
@@ -309,7 +367,7 @@ class MacroStokes(finite_element.CiarletElement):
             raise ValueError(f"{type(self).__name__} elements only valid for k >= {sd}")
 
         ref_complex = macro.AlfeldSplit(ref_el)
-        poly_set = ONPolynomialSet(ref_complex, degree, shape=(sd,), variant="bubble")
+        poly_set = macro_stokes_space(ref_complex, degree)
         dual = MacroStokesDual(ref_complex, degree)
         formdegree = sd-1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
@@ -356,10 +414,12 @@ class DivStokesDual(dual_set.DualSet):
                 start = 1 if dim % sd == 0 else 0
                 indices.extend(ids[dim][entity][start:])
 
-        interior = ids[sd][0][0]
-        phis = B.tabulate(0, Q.get_points())[(0,)*sd]
-        phis -= phis[[interior]]
-        nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis[indices])
+        if len(ids[sd][0]):
+            # FIXME
+            interior = ids[sd][0][0]
+            phis = B.tabulate(0, Q.get_points())[(0,)*sd]
+            phis -= phis[[interior]]
+            nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis[indices])
 
         entity_ids[sd][0] = list(range(len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
@@ -387,8 +447,8 @@ class DivStokesDual(dual_set.DualSet):
 class DivStokes(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         sd = ref_el.get_spatial_dimension()
-        if degree < 2*sd-1:
-            raise ValueError(f"{type(self).__name__} elements only valid for k >= {2*sd-1}")
+        if degree <= sd-1:
+            raise ValueError(f"{type(self).__name__} elements only valid for k > {sd-1}")
 
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = DivStokesDual(ref_el, degree)
@@ -403,7 +463,7 @@ if __name__ == "__main__":
     numpy.set_printoptions(threshold=sys.maxsize)
 
     dim = 2
-    degree = 4
+    degree = 6
     ref_el = FIAT.reference_element.symmetric_simplex(dim)
     # fe = Stokes(ref_el, degree)
     fe = MacroStokes(ref_el, degree)

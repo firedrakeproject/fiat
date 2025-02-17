@@ -104,6 +104,12 @@ class PolynomialSet(object):
         return PolynomialSet(self.ref_el, self.degree, self.embedded_degree,
                              self.expansion_set, new_coeffs)
 
+    def recombine(self, coeffs):
+        """Recombines the members of this PolynomialSet given a matrix of coefficients."""
+        new_coeffs = numpy.tensordot(coeffs, self.get_coeffs(), axes=(-1, 0))
+        return PolynomialSet(self.ref_el, self.degree, self.embedded_degree,
+                             self.expansion_set, new_coeffs)
+
     def __len__(self):
         return self.num_members
 
