@@ -40,7 +40,7 @@ def inner(v, u, Qwts):
 
 def project(Psource, Ptarget, Q):
     qpts, qwts = Q.get_points(), Q.get_weights()
-    sd = ref_el.get_spatial_dimension()
+    sd = Q.ref_el.get_spatial_dimension()
     S = Psource.tabulate(qpts)[(0,) * sd]
     T = Ptarget.tabulate(qpts)[(0,) * sd]
     A = inner(T, T, qwts)
@@ -137,6 +137,7 @@ def stokes_eigenbasis(V0):
     tol = sig[-1] * 1E-12
     nullspace_dim = len([s for s in sig if abs(s) <= tol])
 
+    print(sig[nullspace_dim])
     S1 = S[:, :nullspace_dim]
     S2 = S[:, nullspace_dim:]
     S2 *= numpy.sqrt(1 / sig[None, nullspace_dim:])
@@ -409,18 +410,13 @@ class DivStokesDual(dual_set.DualSet):
         indices = []
         for dim in sorted(top):
             for entity in sorted(top[dim]):
-                if sd == 3 and dim == 1:
+                if dim <= sd-2:
                     continue
-                start = 1 if dim % sd == 0 else 0
-                indices.extend(ids[dim][entity][start:])
+                indices.extend(ids[dim][entity])
 
-        if len(ids[sd][0]):
-            # FIXME
-            interior = ids[sd][0][0]
-            phis = B.tabulate(0, Q.get_points())[(0,)*sd]
-            phis -= phis[[interior]]
-            nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis[indices])
-
+        phis = B.tabulate(0, Q.get_points())[(0,)*sd]
+        phis -= phis[[indices[-1]]]
+        nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis[indices[:-1]])
         entity_ids[sd][0] = list(range(len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -447,8 +443,8 @@ class DivStokesDual(dual_set.DualSet):
 class DivStokes(finite_element.CiarletElement):
     def __init__(self, ref_el, degree):
         sd = ref_el.get_spatial_dimension()
-        if degree <= sd-1:
-            raise ValueError(f"{type(self).__name__} elements only valid for k > {sd-1}")
+        if degree < sd:
+            raise ValueError(f"{type(self).__name__} elements only valid for k >= {sd}")
 
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = DivStokesDual(ref_el, degree)
@@ -463,7 +459,7 @@ if __name__ == "__main__":
     numpy.set_printoptions(threshold=sys.maxsize)
 
     dim = 2
-    degree = 6
+    degree = 8
     ref_el = FIAT.reference_element.symmetric_simplex(dim)
     # fe = Stokes(ref_el, degree)
     fe = MacroStokes(ref_el, degree)
@@ -481,7 +477,7 @@ if __name__ == "__main__":
             if e in int_facets:
                 continue
             ids.extend(entity_ids[dim][e])
-    print(C[:-idofs][:, :, ids])
+    # print(C[:-idofs][:, :, ids])
 
     Q = create_quadrature(fe.ref_complex, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
