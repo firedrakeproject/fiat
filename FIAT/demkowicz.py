@@ -145,7 +145,7 @@ class DemkowiczDual(DualSet):
 
             if dim == 2 and formdegree == 1 and sobolev_space == "HDiv":
                 trial = perp(trial)
-            M = self._bubble_derivative_moments(facet, q, formdegree-1, kind, Qpts, Qwts, trial)
+            M = self._bubble_derivative_moments(facet, q, formdegree-1, 2, Qpts, Qwts, trial)
             K = numpy.vstack((K, M))
 
         duals = numpy.tensordot(K, P_at_qpts[(0,) * dim], axes=(1, 0))
@@ -163,12 +163,12 @@ class DemkowiczDual(DualSet):
             from FIAT.nedelec import Nedelec as N1curl
             from FIAT.raviart_thomas import RaviartThomas as N1div
             fe = (N1curl, N1div)[formdegree-1](facet, degree)
-            B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
+            B = fe.get_nodal_basis().take(fe.get_dual_set().get_indices("interior"))
         else:
             from FIAT.nedelec_second_kind import NedelecSecondKind as N2curl
             from FIAT.brezzi_douglas_marini import BrezziDouglasMarini as N2div
             fe = (N2curl, N2div)[formdegree-1](facet, degree)
-            B = fe.get_nodal_basis().take(fe.entity_dofs()[dim][0])
+            B = fe.get_nodal_basis().take(fe.get_dual_set().get_indices("interior"))
 
         # Tabulate the exterior derivate
         B_at_qpts = B.tabulate(Qpts, 1)
@@ -285,7 +285,7 @@ if __name__ == "__main__":
     from FIAT import BrezziDouglasMarini as N2Div
 
     dim = 3
-    degree = 7
+    degree = 6
     ref_el = symmetric_simplex(dim)
     Q = create_quadrature(ref_el, 2 * degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
