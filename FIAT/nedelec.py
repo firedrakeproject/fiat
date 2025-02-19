@@ -43,8 +43,8 @@ def NedelecSpace2D(ref_el, degree):
 
     CrossX = numpy.dot(numpy.array([[0.0, 1.0], [-1.0, 0.0]]), Qpts.T)
     PkHCrossX_at_Qpts = PkH_at_Qpts[:, None, :] * CrossX[None, :, :]
-    PkHCrossX_coeffs = numpy.dot(numpy.multiply(PkHCrossX_at_Qpts, Qwts), Pkp1_at_Qpts.T)
-
+    PkHCrossX_coeffs = numpy.dot(numpy.multiply(PkHCrossX_at_Qpts, Qwts),
+                                 Pkp1_at_Qpts.T)
     PkHcrossX = polynomial_set.PolynomialSet(ref_el,
                                              k + 1,
                                              k + 1,

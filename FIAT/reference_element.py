@@ -26,6 +26,7 @@ from itertools import chain, count, product
 from math import factorial
 
 import numpy
+from gem.utils import safe_repr
 from recursivenodes.nodes import _decode_family, _recursive
 
 from FIAT.orientation_utils import (
@@ -126,7 +127,7 @@ def linalg_subspace_intersection(A, B):
     return U[:, :rank_c]
 
 
-class Cell(object):
+class Cell:
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
     vertices that make up edges, faces, etc."""
@@ -180,6 +181,12 @@ class Cell(object):
                     neighbors = children if dim1 < dim0 else parents
                     d01_entities = tuple(e for d, e in neighbors if d == dim1)
                     self.connectivity[(dim0, dim1)].append(d01_entities)
+
+        # Dictionary with derived cells
+        self._split_cache = {}
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.shape!r}, {safe_repr(self.vertices)}, {self.topology!r})"
 
     def _key(self):
         """Hashable object key data (excluding type)."""
@@ -510,7 +517,7 @@ class SimplicialComplex(Cell):
                 v1.append(dest)
         return vert_coords[v1] - vert_coords[v0]
 
-    def make_points(self, dim, entity_id, order, variant=None):
+    def make_points(self, dim, entity_id, order, variant=None, interior=1):
         """Constructs a lattice of points on the entity_id:th
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
@@ -520,7 +527,7 @@ class SimplicialComplex(Cell):
             entity_verts = \
                 self.get_vertices_of_subcomplex(
                     self.get_topology()[dim][entity_id])
-            return make_lattice(entity_verts, order, 1, variant=variant)
+            return make_lattice(entity_verts, order, interior=interior, variant=variant)
         else:
             raise ValueError("illegal dimension")
 
@@ -1126,6 +1133,9 @@ class TensorProductCell(Cell):
 
         super().__init__(TENSORPRODUCT, vertices, topology)
         self.cells = tuple(cells)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.cells!r})"
 
     def _key(self):
         return self.cells

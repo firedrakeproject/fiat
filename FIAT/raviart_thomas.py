@@ -39,12 +39,12 @@ def RTSpace(ref_el, degree):
     # have to work on this through "tabulate" interface
     # first, tabulate PkH at quadrature points
     PkH_at_Qpts = PkH.tabulate(Qpts)[(0,) * sd]
+
     Pkp1_at_Qpts = Pkp1.tabulate(Qpts)[(0,) * sd]
 
     x = Qpts.T
     PkHx_at_Qpts = PkH_at_Qpts[:, None, :] * x[None, :, :]
     PkHx_coeffs = numpy.dot(numpy.multiply(PkHx_at_Qpts, Qwts), Pkp1_at_Qpts.T)
-
     PkHx = polynomial_set.PolynomialSet(ref_el,
                                         k,
                                         k + 1,
