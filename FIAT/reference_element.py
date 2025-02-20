@@ -1735,17 +1735,21 @@ def tuple_sum(tree):
 
 
 def is_hypercube(cell):
+    res = False
     if isinstance(cell, (DefaultLine, UFCInterval, UFCQuadrilateral, UFCHexahedron)):
-        return True
+        res = True
     elif isinstance(cell, TensorProductCell):
-        return reduce(lambda a, b: a and b, [is_hypercube(c) for c in cell.cells])
+        res = reduce(lambda a, b: a and b, [is_hypercube(c) for c in cell.cells])
     else:
-        return False
-
+        res = False
+    res2 = len(cell.vertices()) == 2 ** cell.get_dimension()
+    assert res == res2
+    return res
 
 def flatten_reference_cube(ref_el):
     """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
-    flattened_cube = {2: UFCQuadrilateral(), 3: UFCHexahedron()}
+    from finat import as_fiat_cell
+    flattened_cube = {2: as_fiat_cell("quadrilateral"), 3: as_fiat_cell("hexahedron")}
     if numpy.sum(ref_el.get_dimension()) <= 1:
         # Just return point/interval cell arguments
         return ref_el
@@ -1798,6 +1802,7 @@ def compute_unflattening_map(topology_dict):
 
 
 def max_complex(complexes):
+    breakpoint()
     max_cell = max(complexes)
     if all(max_cell >= b for b in complexes):
         return max_cell

@@ -5,7 +5,7 @@ from FIAT.reference_element import (UFCHexahedron, UFCQuadrilateral,
                                     flatten_permutations)
 from FIAT.tensor_product import FlattenedDimensions as FIAT_FlattenedDimensions
 from gem.utils import cached_property
-
+from ufl import as_cell
 from finat.finiteelementbase import FiniteElementBase
 
 
@@ -23,9 +23,9 @@ class FlattenedDimensions(FiniteElementBase):
     def cell(self):
         dim = self.product.cell.get_spatial_dimension()
         if dim == 2:
-            return UFCQuadrilateral()
+            return as_fiat_cell("quadrilateral")
         elif dim == 3:
-            return UFCHexahedron()
+            return as_fiat_cell("hexahedron")
         else:
             raise NotImplementedError("Cannot guess cell for spatial dimension %s" % dim)
 
