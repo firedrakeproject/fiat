@@ -111,10 +111,10 @@ def as_fiat_cell(cell):
     """Convert a ufl cell to a FIAT cell.
 
     :arg cell: the :class:`ufl.Cell` to convert."""
-    if not isinstance(cell, ufl.AbstractCell):
-        raise ValueError("Expecting a UFL Cell")
     if isinstance(cell, str):
         cell = ufl.as_cell(cell)
+    if not isinstance(cell, ufl.AbstractCell):
+        raise ValueError("Expecting a UFL Cell")
     if isinstance(cell, ufl.TensorProductCell) and any([hasattr(c, "to_fiat") for c in cell._cells]):
         return TensorProductCell(*[c.to_fiat() for c in cell._cells])
     try:
@@ -322,8 +322,8 @@ def convert_fuse_element(element, **kwargs):
     return finat.fiat_elements.FuseElement(element.triple), set()
 
 
-hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
-quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
+hexahedron_tpc = ufl.TensorProductCell(ufl.as_cell("interval"), ufl.as_cell("interval"), ufl.as_cell("interval"))
+quadrilateral_tpc = ufl.TensorProductCell(ufl.as_cell("interval"), ufl.as_cell("interval"))
 _cache = weakref.WeakKeyDictionary()
 
 

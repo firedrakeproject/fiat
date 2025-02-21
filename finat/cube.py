@@ -1,12 +1,11 @@
 from __future__ import absolute_import, division, print_function
 
-from FIAT.reference_element import (UFCHexahedron, UFCQuadrilateral,
-                                    compute_unflattening_map, flatten_entities,
+from FIAT.reference_element import (compute_unflattening_map, flatten_entities,
                                     flatten_permutations)
 from FIAT.tensor_product import FlattenedDimensions as FIAT_FlattenedDimensions
 from gem.utils import cached_property
-from ufl import as_cell
 from finat.finiteelementbase import FiniteElementBase
+from finat.element_factory import as_fiat_cell
 
 
 class FlattenedDimensions(FiniteElementBase):
