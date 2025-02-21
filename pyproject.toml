@@ -11,7 +11,6 @@ dependencies = [
   "scipy",
   "symengine",
   "sympy",
-  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git",
 ]
 requires-python = ">=3.10"
 authors = [
