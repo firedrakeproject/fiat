@@ -3,95 +3,100 @@
 
 # Copyright (C) 2016-2018 Lizao Li <lzlarryli@gmail.com>
 #
+# Modified by Pablo D. Brubeck (brubeck@protonmail.com), 2024
+#
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-
-from FIAT.finite_element import CiarletElement
-from FIAT.dual_set import DualSet
-from FIAT.polynomial_set import ONSymTensorPolynomialSet
-from FIAT.functional import PointwiseInnerProductEvaluation as InnerProduct
-import numpy
-
-
-class HellanHerrmannJohnsonDual(DualSet):
-    """Degrees of freedom for Hellan-Herrmann-Johnson elements."""
-    def __init__(self, cell, degree):
-        dim = cell.get_spatial_dimension()
-        if not dim == 2:
-            raise ValueError("Hellan_Herrmann-Johnson elements are only"
-                             "defined in dimension 2.")
-
-        # construct the degrees of freedoms
-        dofs = []               # list of functionals
-        # dof_ids[i][j] contains the indices of dofs that are associated with
-        # entity j in dim i
-        dof_ids = {}
-
-        # no vertex dof
-        dof_ids[0] = {i: [] for i in range(dim + 1)}
-        # edge dofs
-        (_dofs, _dof_ids) = self._generate_edge_dofs(cell, degree, 0)
-        dofs.extend(_dofs)
-        dof_ids[1] = _dof_ids
-        # cell dofs
-        (_dofs, _dof_ids) = self._generate_trig_dofs(cell, degree, len(dofs))
-        dofs.extend(_dofs)
-        dof_ids[dim] = _dof_ids
-
-        super(HellanHerrmannJohnsonDual, self).__init__(dofs, cell, dof_ids)
-
-    @staticmethod
-    def _generate_edge_dofs(cell, degree, offset):
-        """Generate dofs on edges.
-        On each edge, let n be its normal. For degree=r, the scalar function
-              n^T u n
-        is evaluated at points enough to control P(r).
-        """
-        dofs = []
-        dof_ids = {}
-        for entity_id in range(3):                  # a triangle has 3 edges
-            pts = cell.make_points(1, entity_id, degree + 2)  # edges are 1D
-            normal = cell.compute_scaled_normal(entity_id)
-            dofs += [InnerProduct(cell, normal, normal, pt) for pt in pts]
-            num_new_dofs = len(pts)                 # 1 dof per point on edge
-            dof_ids[entity_id] = list(range(offset, offset + num_new_dofs))
-            offset += num_new_dofs
-        return (dofs, dof_ids)
-
-    @staticmethod
-    def _generate_trig_dofs(cell, degree, offset):
-        """Generate dofs on edges.
-        On each triangle, for degree=r, the three components
-              u11, u12, u22
-        are evaluated at points enough to control P(r-1).
-        """
-        dofs = []
-        dof_ids = {}
-        pts = cell.make_points(2, 0, degree + 2)  # 2D trig #0
-        e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
-        e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
-        basis = [(e1, e1), (e1, e2), (e2, e2)]    # basis for symmetric matrix
-        for (v1, v2) in basis:
-            dofs += [InnerProduct(cell, v1, v2, pt) for pt in pts]
-        num_dofs = 3 * len(pts)                   # 3 dofs per trig
-        dof_ids[0] = list(range(offset, offset + num_dofs))
-        return (dofs, dof_ids)
+from FIAT import dual_set, finite_element, polynomial_set
+from FIAT.check_format_variant import check_format_variant
+from FIAT.functional import (PointwiseInnerProductEvaluation,
+                             ComponentPointEvaluation,
+                             TensorBidirectionalIntegralMoment as BidirectionalMoment)
+from FIAT.quadrature import FacetQuadratureRule
+from FIAT.quadrature_schemes import create_quadrature
 
 
-class HellanHerrmannJohnson(CiarletElement):
-    """The definition of Hellan-Herrmann-Johnson element. It is defined only in
-       dimension 2. It consists of piecewise polynomial symmetric-matrix-valued
-       functions of degree r or less with normal-normal continuity.
+class HellanHerrmannJohnsonDual(dual_set.DualSet):
+    def __init__(self, ref_el, degree, variant, qdegree):
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
+        entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
+        nodes = []
+
+        # Face dofs
+        if variant == "point":
+            # n^T u n evaluated on a Pk lattice
+            for f in sorted(top[sd-1]):
+                cur = len(nodes)
+                pts = ref_el.make_points(sd-1, f, degree + sd)
+                nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[f], n[f], pt)
+                             for pt in pts)
+                entity_ids[sd-1][f].extend(range(cur, len(nodes)))
+
+        elif variant == "integral":
+            # n^T u n integrated against a basis for Pk
+            facet = ref_el.construct_subelement(sd-1)
+            Q = create_quadrature(facet, qdegree + degree)
+            P = polynomial_set.ONPolynomialSet(facet, degree)
+            phis = P.tabulate(Q.get_points())[(0,)*(sd-1)]
+            for f in sorted(top[sd-1]):
+                cur = len(nodes)
+                Q_mapped = FacetQuadratureRule(ref_el, sd-1, f, Q)
+                detJ = Q_mapped.jacobian_determinant()
+                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f]/detJ, Q_mapped, phi) for phi in phis)
+                entity_ids[sd-1][f].extend(range(cur, len(nodes)))
+
+        # Interior dofs
+        cur = len(nodes)
+        if sd == 2 and variant == "point":
+            # FIXME Keeping Cartesian dofs in 2D just to make regression test pass
+            pts = ref_el.make_points(sd, 0, degree + sd)
+            nodes.extend(ComponentPointEvaluation(ref_el, (i, j), (sd, sd), pt)
+                         for i in range(sd) for j in range(i, sd) for pt in pts)
+        elif variant == "point":
+            # n[f]^T u n[f] evaluated on a P_{k-1} lattice
+            pts = ref_el.make_points(sd, 0, degree + sd)
+            nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[f], n[f], pt)
+                         for pt in pts for f in sorted(top[sd-1]))
+
+            # n[i+1]^T u n[i+2] evaluated on a Pk lattice
+            pts = ref_el.make_points(sd, 0, degree + sd + 1)
+            nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[i+1], n[i+2], pt)
+                         for pt in pts for i in range((sd-1)*(sd-2)))
+        else:
+            Q = create_quadrature(ref_el, qdegree + degree)
+            P = polynomial_set.ONPolynomialSet(ref_el, degree)
+            phis = P.tabulate(Q.get_points())[(0,)*sd]
+            phis /= ref_el.volume()
+            dimPkm1 = P.expansion_set.get_num_members(degree-1)
+            # n[f]^T u n[f] integrated against a basis for P_{k-1}
+            nodes.extend(BidirectionalMoment(ref_el, n[f], n[f], Q, phi)
+                         for phi in phis[:dimPkm1] for f in sorted(top[sd-1]))
+
+            # n[i+1]^T u n[i+2] integrated against a basis for Pk
+            nodes.extend(BidirectionalMoment(ref_el, n[i+1], n[i+2], Q, phi)
+                         for phi in phis for i in range((sd-1)*(sd-2)))
+
+        entity_ids[sd][0].extend(range(cur, len(nodes)))
+
+        super().__init__(nodes, ref_el, entity_ids)
+
+
+class HellanHerrmannJohnson(finite_element.CiarletElement):
+    """The definition of Hellan-Herrmann-Johnson element.
+       HHJ(k) is the space of symmetric-matrix-valued polynomials of degree k
+       or less with normal-normal continuity.
     """
-    def __init__(self, cell, degree):
-        assert degree >= 0, "Hellan-Herrmann-Johnson starts at degree 0!"
-        # shape functions
-        Ps = ONSymTensorPolynomialSet(cell, degree)
-        # degrees of freedom
-        Ls = HellanHerrmannJohnsonDual(cell, degree)
-        # mapping under affine transformation
-        mapping = "double contravariant piola"
+    def __init__(self, ref_el, degree=0, variant=None):
+        if degree < 0:
+            raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
 
-        super(HellanHerrmannJohnson, self).__init__(Ps, Ls, degree,
-                                                    mapping=mapping)
+        variant, qdegree = check_format_variant(variant, degree)
+        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree)
+        sd = ref_el.get_spatial_dimension()
+        formdegree = (sd-1, sd-1)
+        mapping = "double contravariant piola"
+        super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)

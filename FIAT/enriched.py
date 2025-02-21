@@ -59,7 +59,7 @@ class EnrichedElement(FiniteElement):
         nodes = list(chain.from_iterable(e.dual_basis() for e in elements))
         dual = DualSet(nodes, ref_el, entity_ids)
 
-        super(EnrichedElement, self).__init__(ref_el, dual, order, formdegree, mapping)
+        super().__init__(ref_el, dual, order, formdegree, mapping)
 
         # required degree (for quadrature) is definitely max
         self.polydegree = max(e.degree() for e in elements)

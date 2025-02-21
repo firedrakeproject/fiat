@@ -132,7 +132,10 @@ class CiarletElement(FiniteElement):
     def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_complex=None):
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
-        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+
+        if len(poly_set) != len(dual):
+            raise ValueError(f"Dimension of function space is {len(poly_set)}, but got {len(dual)} nodes.")
 
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()
@@ -148,9 +151,8 @@ class CiarletElement(FiniteElement):
         with warnings.catch_warnings():
             warnings.filterwarnings("error")
             try:
-                LU, piv = scipy.linalg.lu_factor(V)
-                new_coeffs_flat = scipy.linalg.lu_solve((LU, piv), B, trans=1)
-            except scipy.linalg.LinAlgWarning:
+                new_coeffs_flat = scipy.linalg.solve(V, B, transposed=True)
+            except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
                 raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
         new_shp = new_coeffs_flat.shape[:1] + shp[1:]
@@ -192,7 +194,7 @@ class CiarletElement(FiniteElement):
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        return self.poly_set.tabulate(list(map(transform, points)), order)
+        return self.poly_set.tabulate(transform(points), order)
 
     def value_shape(self):
         "Return the value shape of the finite element functions."
@@ -244,10 +246,10 @@ def entity_support_dofs(elem, entity_dim):
     result = {}
     for f in elem.entity_dofs()[entity_dim].keys():
         entity_transform = ref_el.get_entity_transform(entity_dim, f)
-        points = list(map(entity_transform, quad.get_points()))
+        points = entity_transform(quad.get_points())
 
         # Integrate the square of the basis functions on the facet.
-        vals = numpy.double(elem.tabulate(0, points)[(0,) * dim])
+        vals = elem.tabulate(0, points)[(0,) * dim]
         # Ints contains the square of the basis functions
         # integrated over the facet.
         if elem.value_shape():

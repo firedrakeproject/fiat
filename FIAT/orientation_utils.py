@@ -1,6 +1,28 @@
 import itertools
+import math
 from collections.abc import Sequence
 import numpy as np
+
+
+class Orientation(object):
+    """Base class representing unsigned integer orientations.
+
+    Orientations represented by this class are to be consistent with those used in
+    `make_entity_permutations_simplex` and `make_entity_permutations_tensorproduct`.
+
+    """
+
+    def __floordiv__(self, other):
+        raise NotImplementedError("Subclass must implement __floordiv__")
+
+    def __rfloordiv__(self, other):
+        raise NotImplementedError("Subclass must implement __rfloordiv__")
+
+    def __mod__(self, other):
+        raise NotImplementedError("Subclass must implement __mod__")
+
+    def __rmod__(self, other):
+        raise NotImplementedError("Subclass must implement __rmod__")
 
 
 def make_entity_permutations_simplex(dim, npoints):
@@ -53,7 +75,7 @@ def make_entity_permutations_simplex(dim, npoints):
     from FIAT.polynomial_set import mis
 
     if npoints <= 0:
-        return {o: [] for o in range(np.math.factorial(dim + 1))}
+        return {o: [] for o in range(math.factorial(dim + 1))}
     a = np.array(sorted(mis(dim + 1, npoints - 1)), dtype=int)[:, ::-1]
     index_perms = sorted(itertools.permutations(range(dim + 1)))
     perms = {}

@@ -12,6 +12,8 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import mis
+from FIAT.pointwise_dual import compute_pointwise_dual
+from FIAT.reference_element import make_lattice
 
 
 class BernsteinDualSet(DualSet):
@@ -43,7 +45,7 @@ class BernsteinDualSet(DualSet):
             # Leave nodes unimplemented for now
             nodes.append(None)
 
-        super(BernsteinDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Bernstein(FiniteElement):
@@ -52,7 +54,10 @@ class Bernstein(FiniteElement):
     def __init__(self, ref_el, degree):
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
-        super(Bernstein, self).__init__(ref_el, dual, degree, k)
+        super().__init__(ref_el, dual, degree, k)
+        pts = make_lattice(ref_el.vertices, degree, variant="gll")
+        newdual = compute_pointwise_dual(self, pts)
+        self.dual = newdual
 
     def degree(self):
         """The degree of the polynomial space."""
@@ -80,7 +85,7 @@ class Bernstein(FiniteElement):
 
         entity_dim, entity_id = entity
         entity_transform = ref_el.get_entity_transform(entity_dim, entity_id)
-        cell_points = list(map(entity_transform, points))
+        cell_points = entity_transform(points)
 
         # Construct Cartesian to Barycentric coordinate mapping
         vs = numpy.asarray(ref_el.get_vertices())
