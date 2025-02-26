@@ -1257,7 +1257,7 @@ class TensorProductCell(Cell):
     def compare(self, op, other):
         if hasattr(other, "product"):
             other = other.product
-        if isinstance(other, type(self)):
+        if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
             return op(self, other)
@@ -1890,7 +1890,6 @@ def compute_unflattening_map(topology_dict):
 
 
 def max_complex(complexes):
-    breakpoint()
     max_cell = max(complexes)
     if all(max_cell >= b for b in complexes):
         return max_cell
