@@ -15,7 +15,7 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import TRIANGLE, ufc_simplex
 
 
-class ArgyrisDualSet(dual_set.DualSet):
+class C2NonicDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, interpolant_deg):
         if ref_el.get_shape() != TRIANGLE:
             raise ValueError("Argyris only defined on triangles")
@@ -25,8 +25,10 @@ class ArgyrisDualSet(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
-        # get second order jet at each vertex
+        # get fourth jet at each vertex
         verts = ref_el.get_vertices()
+
+        # FIXME: go up to fourth order
         alphas = [(1, 0), (0, 1), (2, 0), (1, 1), (0, 2)]
         for v in sorted(top[0]):
             cur = len(nodes)
