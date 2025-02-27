@@ -1350,9 +1350,11 @@ class TensorProductCell(Cell):
         return a
 
 
-class UFCQuadrilateral(Cell):
-    r"""This is the reference quadrilateral with vertices
-    (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).
+class AbstractQuadrilateral(Cell):
+    r"""This is the base class for quadrilaterals
+
+    The vertices are based on those for the interval element on which
+    a concrete subclass is based.
 
     Orientation of a physical cell is computed systematically
     by comparing the canonical orderings of its facets and
@@ -1396,7 +1398,7 @@ class UFCQuadrilateral(Cell):
     o = 2 * 1 + 0 = 2
     """
     def __init__(self):
-        product = TensorProductCell(UFCInterval(), UFCInterval())
+        product = TensorProductCell(self._interval, self._interval)
         pt = product.get_topology()
 
         verts = product.get_vertices()
@@ -1421,7 +1423,7 @@ class UFCQuadrilateral(Cell):
         if dimension == 2:
             return self
         elif dimension == 1:
-            return UFCInterval()
+            return self._interval
         elif dimension == 0:
             return Point()
         else:
@@ -1493,13 +1495,24 @@ class UFCQuadrilateral(Cell):
         return self.product <= other
 
 
-class UFCHexahedron(Cell):
-    """This is the reference hexahedron with vertices
-    (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
-    (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
+class UFCQuadrilateral(AbstractQuadrilateral):
+    _interval = UFCInterval()
+
+
+class DefaultQuadrilateral(AbstractQuadrilateral):
+    _interval = DefaultLine()
+
+
+class AbstractHexahedron(Cell):
+    """This is the base class for hexahedra
+
+    The vertices are based on those for the interval element on which
+    a concrete subclass is based.
+    """
 
     def __init__(self):
-        product = TensorProductCell(UFCInterval(), UFCInterval(), UFCInterval())
+        product = TensorProductCell(self._interval, self._interval,
+                                    self._interval)
         pt = product.get_topology()
 
         verts = product.get_vertices()
@@ -1524,9 +1537,10 @@ class UFCHexahedron(Cell):
         if dimension == 3:
             return self
         elif dimension == 2:
-            return UFCQuadrilateral()
+            return flatten_reference_cube(TensorProductCell(self._interval,
+                                                            self._interval))
         elif dimension == 1:
-            return UFCInterval()
+            return self._interval
         elif dimension == 0:
             return Point()
         else:
@@ -1596,6 +1610,22 @@ class UFCHexahedron(Cell):
 
     def __le__(self, other):
         return self.product <= other
+
+
+class UFCHexahedron(AbstractHexahedron):
+    """This is the reference hexahedron with vertices
+    (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
+    (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0).
+    """
+    _interval = UFCInterval()
+
+
+class DefaultHexahedron(AbstractHexahedron):
+    """This is the reference hexahedron with vertices
+    (-1.0, -1.0, -1.0), (-1.0, -1.0, 1.0), (-1.0, 1.0, -1.0), (-1.0, 1.0, 1.0),
+    (1.0, -1.0, -1.0), (1.0, -1.0, 1.0), (1.0, 1.0, -1.0) and (1.0, 1.0, 1.0).
+    """
+    _interval = DefaultLine()
 
 
 def make_affine_mapping(xs, ys):
@@ -1741,7 +1771,8 @@ def tuple_sum(tree):
 
 
 def is_hypercube(cell):
-    if isinstance(cell, (DefaultLine, UFCInterval, UFCQuadrilateral, UFCHexahedron)):
+    if isinstance(cell, (DefaultLine, UFCInterval, AbstractQuadrilateral,
+                         AbstractHexahedron)):
         return True
     elif isinstance(cell, TensorProductCell):
         return reduce(lambda a, b: a and b, [is_hypercube(c) for c in cell.cells])
@@ -1751,7 +1782,10 @@ def is_hypercube(cell):
 
 def flatten_reference_cube(ref_el):
     """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
-    flattened_cube = {2: UFCQuadrilateral(), 3: UFCHexahedron()}
+    flattened_cube = {2: {UFCInterval(): UFCQuadrilateral(),
+                          DefaultLine(): DefaultQuadrilateral()},
+                      3: {UFCInterval(): UFCHexahedron(),
+                          DefaultLine(): DefaultHexahedron()}}
     if numpy.sum(ref_el.get_dimension()) <= 1:
         # Just return point/interval cell arguments
         return ref_el
@@ -1759,7 +1793,11 @@ def flatten_reference_cube(ref_el):
         # Handle cases where cell is a quad/cube constructed from a tensor product or
         # an already flattened element
         if is_hypercube(ref_el):
-            return flattened_cube[numpy.sum(ref_el.get_dimension())]
+            if isinstance(ref_el, TensorProductCell):
+                return flattened_cube[numpy.sum(ref_el.get_dimension())][
+                    ref_el.cells[0]]
+            else:
+                return ref_el
         else:
             raise TypeError('Invalid cell type')
 
