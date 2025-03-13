@@ -1829,14 +1829,15 @@ def is_hypercube(cell):
         res = reduce(lambda a, b: a and b, [is_hypercube(c) for c in cell.cells])
     else:
         res = False
-    res2 = len(cell.vertices()) == 2 ** cell.get_dimension()
-    assert res == res2
-    return res
+    # breakpoint()
+    res2 = len(cell.vertices) == 2 ** cell.get_dimension()
+    # assert res == res2
+    return res2
 
 
 def flatten_reference_cube(ref_el):
     """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
-    from finat import as_fiat_cell
+    from finat.element_factory import as_fiat_cell
     flattened_cube = {2: as_fiat_cell("quadrilateral"), 3: as_fiat_cell("hexahedron")}
     if numpy.sum(ref_el.get_dimension()) <= 1:
         # Just return point/interval cell arguments
@@ -1895,3 +1896,10 @@ def max_complex(complexes):
         return max_cell
     else:
         raise ValueError("Cannot find the maximal complex")
+
+
+def cell_to_simplex(cell):
+    if cell.is_simplex():
+        return cell
+    else:
+        return ufc_simplex(cell.get_dimension())

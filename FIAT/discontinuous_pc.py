@@ -15,21 +15,15 @@ from FIAT.reference_element import (Point,
                                     UFCTriangle,
                                     UFCTetrahedron,
                                     make_affine_mapping,
-                                    flatten_reference_cube)
+                                    flatten_reference_cube,
+                                    cell_to_simplex)
 from FIAT.P0 import P0Dual
 import numpy as np
-
-hypercube_simplex_map = {Point(): Point(),
-                         DefaultLine(): DefaultLine(),
-                         UFCInterval(): UFCInterval(),
-                         UFCQuadrilateral(): UFCTriangle(),
-                         UFCHexahedron(): UFCTetrahedron()}
-
 
 class DPC0(finite_element.CiarletElement):
     def __init__(self, ref_el):
         flat_el = flatten_reference_cube(ref_el)
-        poly_set = polynomial_set.ONPolynomialSet(hypercube_simplex_map[flat_el], 0)
+        poly_set = polynomial_set.ONPolynomialSet(cell_to_simplex(flat_el), 0)
         dual = P0Dual(ref_el)
         # Implement entity_permutations when we handle that for HigherOrderDPC.
         # Currently, orientation_tuples in P0Dual(ref_el).entity_permutations
@@ -58,7 +52,7 @@ class DPCDualSet(dual_set.DualSet):
 
         # Change coordinates here.
         # Vertices of the simplex corresponding to the reference element.
-        v_simplex = hypercube_simplex_map[flat_el].get_vertices()
+        v_simplex = cell_to_simplex(flat_el).get_vertices()
         # Vertices of the reference element.
         v_hypercube = flat_el.get_vertices()
         # For the mapping, first two vertices are unchanged in all dimensions.
@@ -74,12 +68,12 @@ class DPCDualSet(dual_set.DualSet):
 
         # make nodes by getting points
         # need to do this dimension-by-dimension, facet-by-facet
-        top = hypercube_simplex_map[flat_el].get_topology()
+        top = cell_to_simplex(flat_el).get_topology()
 
         cur = 0
         for dim in sorted(top):
             for entity in sorted(top[dim]):
-                pts_cur = hypercube_simplex_map[flat_el].make_points(dim, entity, degree)
+                pts_cur = cell_to_simplex(flat_el).make_points(dim, entity, degree)
                 pts_cur = [tuple(np.matmul(A, np.array(x)) + b) for x in pts_cur]
                 nodes_cur = [functional.PointEvaluation(flat_el, x)
                              for x in pts_cur]
@@ -102,7 +96,7 @@ class HigherOrderDPC(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree):
         flat_el = flatten_reference_cube(ref_el)
-        poly_set = polynomial_set.ONPolynomialSet(hypercube_simplex_map[flat_el], degree)
+        poly_set = polynomial_set.ONPolynomialSet(cell_to_simplex(flat_el), degree)
         dual = DPCDualSet(ref_el, flat_el, degree)
         formdegree = flat_el.get_spatial_dimension()  # n-form
         super().__init__(poly_set=poly_set,
