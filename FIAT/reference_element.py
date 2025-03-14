@@ -44,6 +44,8 @@ QUADRILATERAL = 11
 HEXAHEDRON = 111
 TENSORPRODUCT = 99
 
+hypercube_shapes = {2: QUADRILATERAL, 3: HEXAHEDRON}
+
 
 def multiindex_equal(d, isum, imin=0):
     """A generator for d-tuple multi-indices whose sum is isum and minimum is imin.
@@ -1352,21 +1354,26 @@ class TensorProductCell(Cell):
         return a
 
 
-class UFCHypercube(Cell):
-    """Abstract class for a reference unit hypercube [0, 1]^d with vertices in
-    lexicographical order."""
-    dimension = None
-    shape = None
+class Hypercube(Cell):
+    """Abstract class for a reference hypercube
+    
+    if no tensor product is provided, it defaults to the
+    UFCHypercube: [0, 1]^d with vertices in
+    lexicographical order. """
 
-    def __init__(self):
-        cells = [UFCInterval()] * self.dimension
-        product = TensorProductCell(*cells)
+    def __init__(self, dimension, product=None):
+        self.dimension = dimension
+        self.shape = hypercube_shapes[dimension]
+
+        if product is None:
+            cells = [UFCInterval()] * self.dimension
+            product = TensorProductCell(*cells)
+        
         pt = product.get_topology()
-
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super(UFCHypercube, self).__init__(self.shape, verts, topology)
+        super(Hypercube, self).__init__(self.shape, verts, topology)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
@@ -1457,7 +1464,7 @@ class UFCHypercube(Cell):
         return self.product <= other
 
 
-class UFCQuadrilateral(UFCHypercube):
+class UFCQuadrilateral(Hypercube):
     r"""This is the reference quadrilateral with vertices
     (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).
 
@@ -1502,16 +1509,18 @@ class UFCQuadrilateral(UFCHypercube):
 
     o = 2 * 1 + 0 = 2
     """
-    dimension = 2
-    shape = QUADRILATERAL
+
+    def __init__(self):
+        super(UFCQuadrilateral, self).__init__(2)
 
 
-class UFCHexahedron(UFCHypercube):
+class UFCHexahedron(Hypercube):
     """This is the reference hexahedron with vertices
     (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
-    dimension = 3
-    shape = HEXAHEDRON
+    
+    def __init__(self):
+        super(UFCHexahedron, self).__init__(3)
 
 
 def make_affine_mapping(xs, ys):
