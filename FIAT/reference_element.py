@@ -1445,7 +1445,8 @@ class Hypercube(Cell):
         return self.product.distance_to_point_l1(point, rescale=rescale)
 
     def symmetry_group_size(self, dim):
-        return [1, 2, 8, 48][dim]
+        """ Size of hypercube symmetry group is d! * 2**d"""
+        return factorial(dim) * (2**dim)
 
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
