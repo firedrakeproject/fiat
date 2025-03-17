@@ -1704,7 +1704,7 @@ def flatten_reference_cube(ref_el):
         # Handle cases where cell is a quad/cube constructed from a tensor product or
         # an already flattened element
         if isinstance(ref_el, TensorProductCell):
-            return Hypercube(numpy.sum(ref_el.get_dimension()), ref_el)
+            return Hypercube(ref_el.get_spatial_dimension(), ref_el)
         elif is_hypercube(ref_el):
             return ref_el
         else:
