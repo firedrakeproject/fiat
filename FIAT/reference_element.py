@@ -1356,7 +1356,7 @@ class TensorProductCell(Cell):
 
 class Hypercube(Cell):
     """Abstract class for a reference hypercube
-    
+
     if no tensor product is provided, it defaults to the
     UFCHypercube: [0, 1]^d with vertices in
     lexicographical order. """
@@ -1368,7 +1368,7 @@ class Hypercube(Cell):
         if product is None:
             cells = [UFCInterval()] * self.dimension
             product = TensorProductCell(*cells)
-        
+
         pt = product.get_topology()
         verts = product.get_vertices()
         topology = flatten_entities(pt)
@@ -1518,7 +1518,7 @@ class UFCHexahedron(Hypercube):
     """This is the reference hexahedron with vertices
     (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
-    
+
     def __init__(self):
         super(UFCHexahedron, self).__init__(3)
 
