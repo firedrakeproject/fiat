@@ -1444,7 +1444,7 @@ class Hypercube(Cell):
 
 class Hypercube(Cell):
     """Abstract class for a reference hypercube
-    
+
     if no tensor product is provided, it defaults to the
     UFCHypercube: [0, 1]^d with vertices in
     lexicographical order. """
@@ -1452,11 +1452,13 @@ class Hypercube(Cell):
     def __init__(self, dimension, product=None):
         self.dimension = dimension
         self.shape = hypercube_shapes[dimension]
+        self.ufc = False
 
         if product is None:
+            self.ufc = True
             cells = [UFCInterval()] * self.dimension
             product = TensorProductCell(*cells)
-        
+
         pt = product.get_topology()
         verts = product.get_vertices()
         topology = flatten_entities(pt)
@@ -1482,8 +1484,11 @@ class Hypercube(Cell):
             raise ValueError("Invalid dimension: %d" % (dimension,))
         elif dimension == sd:
             return self
-        else:
+        elif self.ufc:
             return ufc_hypercube(dimension)
+        else:
+            sub_element = self.product.construct_subelement((dimension,) + (0,)*(len(self.product.cells) - 1))
+            return flatten_reference_cube(sub_element)
 
     def get_entity_transform(self, dim, entity_i):
         """Returns a mapping of point coordinates from the
@@ -1533,7 +1538,8 @@ class Hypercube(Cell):
         return self.product.distance_to_point_l1(point, rescale=rescale)
 
     def symmetry_group_size(self, dim):
-        return [1, 2, 8, 48][dim]
+        """Size of hypercube symmetry group is d! * 2**d"""
+        return factorial(dim) * (2**dim)
 
     def cell_orientation_reflection_map(self):
         """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
@@ -1665,7 +1671,7 @@ class UFCHexahedron(Hypercube):
     """This is the reference hexahedron with vertices
     (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
-    
+
     def __init__(self):
         super(UFCHexahedron, self).__init__(3)
 
@@ -1828,9 +1834,8 @@ def tuple_sum(tree):
 
 
 def is_hypercube(cell):
-    res = False
-    if isinstance(cell, (DefaultLine, UFCInterval, UFCQuadrilateral, UFCHexahedron)):
-        res = True
+    if isinstance(cell, (DefaultLine, UFCInterval, Hypercube)):
+        return True
     elif isinstance(cell, TensorProductCell):
         res = reduce(lambda a, b: a and b, [is_hypercube(c) for c in cell.cells])
     else:
@@ -1843,16 +1848,16 @@ def is_hypercube(cell):
 
 def flatten_reference_cube(ref_el):
     """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
-    from finat.element_factory import as_fiat_cell
-    flattened_cube = {2: as_fiat_cell("quadrilateral"), 3: as_fiat_cell("hexahedron")}
     if numpy.sum(ref_el.get_dimension()) <= 1:
         # Just return point/interval cell arguments
         return ref_el
     else:
         # Handle cases where cell is a quad/cube constructed from a tensor product or
         # an already flattened element
-        if is_hypercube(ref_el):
-            return flattened_cube[numpy.sum(ref_el.get_dimension())]
+        if isinstance(ref_el, TensorProductCell):
+            return Hypercube(numpy.sum(ref_el.get_dimension()), ref_el)
+        elif is_hypercube(ref_el):
+            return ref_el
         else:
             raise TypeError('Invalid cell type')
 
