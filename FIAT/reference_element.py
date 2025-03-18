@@ -1356,108 +1356,11 @@ class TensorProductCell(Cell):
 
 
 class Hypercube(Cell):
-    """
-    For reference elements based on TensorProductCells"""
-    def __init__(self, product):
-        pt = product.get_topology()
+    """Abstract class for a reference hypercube"""
 
-        verts = product.get_vertices()
-        topology = flatten_entities(pt)
-
-        # TODO this should be generalised ?
-        cube_types = {2: QUADRILATERAL, 3: HEXAHEDRON}
-        super().__init__(cube_types[sum(product.get_dimension())], verts, topology)
-
-        self.product = product
-        self.unflattening_map = compute_unflattening_map(pt)
-
-    def get_dimension(self):
-        """Returns the subelement dimension of the cell.  Same as the
-        spatial dimension."""
-        return self.get_spatial_dimension()
-
-    def get_entity_transform(self, dim, entity_i):
-        """Returns a mapping of point coordinates from the
-        `entity_i`-th subentity of dimension `dim` to the cell.
-
-        :arg dim: entity dimension (integer)
-        :arg entity_i: entity number (integer)
-        """
-        d, e = self.unflattening_map[(dim, entity_i)]
-        return self.product.get_entity_transform(d, e)
-
-    def volume(self):
-        """Computes the volume in the appropriate dimensional measure."""
-        return self.product.volume()
-
-    def compute_reference_normal(self, facet_dim, facet_i):
-        """Returns the unit normal in infinity norm to facet_i."""
-        assert facet_dim == 1
-        d, i = self.unflattening_map[(facet_dim, facet_i)]
-        return self.product.compute_reference_normal(d, i)
-
-    def contains_point(self, point, epsilon=0):
-        """Checks if reference cell contains given point
-        (with numerical tolerance as given by the L1 distance (aka 'manhatten',
-        'taxicab' or rectilinear distance) to the cell.
-
-        Parameters
-        ----------
-        point : numpy.ndarray, list or symbolic expression
-            The coordinates of the point.
-        epsilon : float
-            The tolerance for the check.
-
-        Returns
-        -------
-        bool : True if the point is inside the cell, False otherwise.
-
-        """
-        return self.product.contains_point(point, epsilon=epsilon)
-
-    def distance_to_point_l1(self, point, rescale=False):
-        """Get the L1 distance (aka 'manhatten', 'taxicab' or rectilinear
-        distance) to a point with 0.0 if the point is inside the cell.
-
-        For more information see the docstring for the UFCSimplex method."""
-        return self.product.distance_to_point_l1(point, rescale=rescale)
-
-    def symmetry_group_size(self, dim):
-        return [1, 2, 8][dim]
-
-    def cell_orientation_reflection_map(self):
-        """Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``)."""
-        return self.product.cell_orientation_reflection_map()
-
-    def __gt__(self, other):
-        return self.product > other
-
-    def __lt__(self, other):
-        return self.product < other
-
-    def __ge__(self, other):
-        return self.product >= other
-
-    def __le__(self, other):
-        return self.product <= other
-
-
-class Hypercube(Cell):
-    """Abstract class for a reference hypercube
-
-    if no tensor product is provided, it defaults to the
-    UFCHypercube: [0, 1]^d with vertices in
-    lexicographical order. """
-
-    def __init__(self, dimension, product=None):
+    def __init__(self, dimension, product):
         self.dimension = dimension
         self.shape = hypercube_shapes[dimension]
-        self.ufc = False
-
-        if product is None:
-            self.ufc = True
-            cells = [UFCInterval()] * self.dimension
-            product = TensorProductCell(*cells)
 
         pt = product.get_topology()
         verts = product.get_vertices()
@@ -1484,8 +1387,6 @@ class Hypercube(Cell):
             raise ValueError("Invalid dimension: %d" % (dimension,))
         elif dimension == sd:
             return self
-        elif self.ufc:
-            return ufc_hypercube(dimension)
         else:
             sub_element = self.product.construct_subelement((dimension,) + (0,)*(len(self.product.cells) - 1))
             return flatten_reference_cube(sub_element)
@@ -1558,7 +1459,33 @@ class Hypercube(Cell):
         return self.product <= other
 
 
-class UFCQuadrilateral(Hypercube):
+class UFCHypercube(Hypercube):
+    """Reference UFC Hypercube
+
+    UFCHypercube: [0, 1]^d with vertices in
+    lexicographical order."""
+
+    def __init__(self, dim):
+        cells = [UFCInterval()] * dim
+        product = TensorProductCell(*cells)
+        super(UFCHypercube, self).__init__(dim, product)
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        sd = self.get_spatial_dimension()
+        if dimension > sd:
+            raise ValueError("Invalid dimension: %d" % (dimension,))
+        elif dimension == sd:
+            return self
+        else:
+            return ufc_hypercube(dimension)
+
+
+class UFCQuadrilateral(UFCHypercube):
     r"""This is the reference quadrilateral with vertices
     (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).
 
@@ -1608,7 +1535,7 @@ class UFCQuadrilateral(Hypercube):
         super(UFCQuadrilateral, self).__init__(2)
 
 
-class UFCHexahedron(Hypercube):
+class UFCHexahedron(UFCHypercube):
     """This is the reference hexahedron with vertices
     (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
@@ -1617,7 +1544,33 @@ class UFCHexahedron(Hypercube):
         super(UFCHexahedron, self).__init__(3)
 
 
-class UFCQuadrilateral(Hypercube):
+class UFCHypercube(Hypercube):
+    """Reference UFC Hypercube
+
+    UFCHypercube: [0, 1]^d with vertices in
+    lexicographical order."""
+
+    def __init__(self, dim):
+        cells = [UFCInterval()] * dim
+        product = TensorProductCell(*cells)
+        super(UFCHypercube, self).__init__(dim, product)
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        sd = self.get_spatial_dimension()
+        if dimension > sd:
+            raise ValueError("Invalid dimension: %d" % (dimension,))
+        elif dimension == sd:
+            return self
+        else:
+            return ufc_hypercube(dimension)
+
+
+class UFCQuadrilateral(UFCHypercube):
     r"""This is the reference quadrilateral with vertices
     (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).
 
@@ -1667,7 +1620,7 @@ class UFCQuadrilateral(Hypercube):
         super(UFCQuadrilateral, self).__init__(2)
 
 
-class UFCHexahedron(Hypercube):
+class UFCHexahedron(UFCHypercube):
     """This is the reference hexahedron with vertices
     (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
@@ -1848,14 +1801,14 @@ def is_hypercube(cell):
 
 def flatten_reference_cube(ref_el):
     """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
-    if numpy.sum(ref_el.get_dimension()) <= 1:
+    if ref_el.get_spatial_dimension() <= 1:
         # Just return point/interval cell arguments
         return ref_el
     else:
         # Handle cases where cell is a quad/cube constructed from a tensor product or
         # an already flattened element
         if isinstance(ref_el, TensorProductCell):
-            return Hypercube(numpy.sum(ref_el.get_dimension()), ref_el)
+            return Hypercube(ref_el.get_spatial_dimension(), ref_el)
         elif is_hypercube(ref_el):
             return ref_el
         else:
