@@ -4,7 +4,8 @@ algorithm operating on a GEM representation.
 This file is NOT for code generation as a COFFEE AST.
 """
 
-from itertools import chain, repeat
+from collections import OrderedDict
+import itertools
 import logging
 
 import numpy
@@ -57,10 +58,10 @@ def find_optimal_atomics(monomials, linear_indices):
 
     :returns: list of atomic GEM expressions
     """
-    atomics = tuple(dict.fromkeys(chain.from_iterable(monomial.atomics for monomial in monomials)))
+    atomics = tuple(OrderedDict.fromkeys(itertools.chain(*(monomial.atomics for monomial in monomials))))
 
     def cost(solution):
-        extent = sum(map(index_extent, solution, repeat(linear_indices)))
+        extent = sum(map(lambda atomic: index_extent(atomic, linear_indices), solution))
         # Prefer shorter solutions, but larger extents
         return (len(solution), -extent)
 

@@ -230,9 +230,6 @@ class MappedPointSet(AbstractPointSet):
         self.cell = cell
         self.ps = ps
 
-    def __repr__(self):
-        return f"{type(self).__name__}({self.ps!r})"
-
     @cached_property
     def entities(self):
         to_int = lambda x: sum(x) if isinstance(x, tuple) else x
@@ -255,7 +252,7 @@ class MappedPointSet(AbstractPointSet):
 
     @cached_property
     def expression(self):
-        raise NotImplementedError("The expression for MappedPointSet is not implemented yet.")
+        raise NotImplementedError("Should not use MappedPointSet like this")
 
     def almost_equal(self, other, tolerance=1e-12):
         """Approximate numerical equality of point sets"""

@@ -3,7 +3,6 @@ import finat
 import numpy as np
 import pytest
 from gem.interpreter import evaluate
-from finat.physically_mapped import PhysicallyMappedElement
 
 
 def make_unisolvent_points(element, interior=False):
@@ -66,11 +65,11 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     # Zany map the results
     num_bfs = phys_element.space_dimension()
     num_dofs = finat_element.space_dimension()
-    if isinstance(finat_element, PhysicallyMappedElement):
+    try:
         Mgem = finat_element.basis_transformation(ref_to_phys)
         M = evaluate([Mgem])[0].arr
         ref_vals_zany = np.tensordot(M, ref_vals_piola, (-1, 0))
-    else:
+    except AttributeError:
         M = np.eye(num_dofs, num_bfs)
         ref_vals_zany = ref_vals_piola
 
