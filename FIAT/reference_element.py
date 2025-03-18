@@ -1699,6 +1699,7 @@ def tuple_sum(tree):
     else:
         return tree
 
+
 def is_ufc(cell):
     if isinstance(cell, (Point, UFCInterval, UFCHypercube, UFCSimplex)):
         return True
@@ -1706,6 +1707,7 @@ def is_ufc(cell):
         return reduce(lambda a, b: a and b, [is_ufc(c) for c in cell.cells])
     else:
         return False
+
 
 def is_hypercube(cell):
     if isinstance(cell, (DefaultLine, UFCInterval, Hypercube)):
