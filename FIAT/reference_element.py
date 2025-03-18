@@ -1355,21 +1355,11 @@ class TensorProductCell(Cell):
 
 
 class Hypercube(Cell):
-    """Abstract class for a reference hypercube
+    """Abstract class for a reference hypercube"""
 
-    if no tensor product is provided, it defaults to the
-    UFCHypercube: [0, 1]^d with vertices in
-    lexicographical order. """
-
-    def __init__(self, dimension, product=None):
+    def __init__(self, dimension, product):
         self.dimension = dimension
         self.shape = hypercube_shapes[dimension]
-        self.ufc = False
-
-        if product is None:
-            self.ufc = True
-            cells = [UFCInterval()] * self.dimension
-            product = TensorProductCell(*cells)
 
         pt = product.get_topology()
         verts = product.get_vertices()
@@ -1396,8 +1386,6 @@ class Hypercube(Cell):
             raise ValueError("Invalid dimension: %d" % (dimension,))
         elif dimension == sd:
             return self
-        elif self.ufc:
-            return ufc_hypercube(dimension)
         else:
             sub_element = self.product.construct_subelement((dimension,) + (0,)*(len(self.product.cells) - 1))
             return flatten_reference_cube(sub_element)
@@ -1470,7 +1458,33 @@ class Hypercube(Cell):
         return self.product <= other
 
 
-class UFCQuadrilateral(Hypercube):
+class UFCHypercube(Hypercube):
+    """Reference UFC Hypercube
+
+    UFCHypercube: [0, 1]^d with vertices in
+    lexicographical order."""
+
+    def __init__(self, dim):
+        cells = [UFCInterval()] * dim
+        product = TensorProductCell(*cells)
+        super(UFCHypercube, self).__init__(dim, product)
+
+    def construct_subelement(self, dimension):
+        """Constructs the reference element of a cell subentity
+        specified by subelement dimension.
+
+        :arg dimension: subentity dimension (integer)
+        """
+        sd = self.get_spatial_dimension()
+        if dimension > sd:
+            raise ValueError("Invalid dimension: %d" % (dimension,))
+        elif dimension == sd:
+            return self
+        else:
+            return ufc_hypercube(dimension)
+
+
+class UFCQuadrilateral(UFCHypercube):
     r"""This is the reference quadrilateral with vertices
     (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).
 
@@ -1520,7 +1534,7 @@ class UFCQuadrilateral(Hypercube):
         super(UFCQuadrilateral, self).__init__(2)
 
 
-class UFCHexahedron(Hypercube):
+class UFCHexahedron(UFCHypercube):
     """This is the reference hexahedron with vertices
     (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
@@ -1697,7 +1711,7 @@ def is_hypercube(cell):
 
 def flatten_reference_cube(ref_el):
     """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
-    if numpy.sum(ref_el.get_dimension()) <= 1:
+    if ref_el.get_spatial_dimension() <= 1:
         # Just return point/interval cell arguments
         return ref_el
     else:
