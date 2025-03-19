@@ -1477,7 +1477,7 @@ class UFCHypercube(Hypercube):
         """
         sd = self.get_spatial_dimension()
         if dimension > sd:
-            raise ValueError("Invalid dimension: %d" % (dimension,))
+            raise ValueError(f"Invalid dimension: {dimension}")
         elif dimension == sd:
             return self
         else:
@@ -1606,7 +1606,7 @@ def default_simplex(spatial_dim):
     elif spatial_dim == 3:
         return DefaultTetrahedron()
     else:
-        raise RuntimeError("Can't create default simplex of dimension %s." % str(spatial_dim))
+        raise RuntimeError(f"Can't create default simplex of dimension {spatial_dim}.")
 
 
 def ufc_simplex(spatial_dim):
@@ -1621,7 +1621,7 @@ def ufc_simplex(spatial_dim):
     elif spatial_dim == 3:
         return UFCTetrahedron()
     else:
-        raise RuntimeError("Can't create UFC simplex of dimension %s." % str(spatial_dim))
+        raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
 
 
 def symmetric_simplex(spatial_dim):
@@ -1661,7 +1661,7 @@ def ufc_cell(cell):
     elif celltype == "tetrahedron":
         return ufc_simplex(3)
     else:
-        raise RuntimeError("Don't know how to create UFC cell of type %s" % str(celltype))
+        raise RuntimeError(f"Don't know how to create UFC cell of type {str(celltype)}")
 
 
 def volume(verts):
@@ -1713,7 +1713,7 @@ def is_hypercube(cell):
     if isinstance(cell, (DefaultLine, UFCInterval, Hypercube)):
         return True
     elif isinstance(cell, TensorProductCell):
-        return reduce(lambda a, b: a and b, [is_hypercube(c) for c in cell.cells])
+        return all(is_hypercube(c) for c in cell.cells)
     else:
         return False
 
