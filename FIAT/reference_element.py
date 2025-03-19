@@ -1786,6 +1786,15 @@ def tuple_sum(tree):
         return tree
 
 
+def is_ufc(cell):
+    if isinstance(cell, (Point, UFCInterval, UFCHypercube, UFCSimplex)):
+        return True
+    elif isinstance(cell, TensorProductCell):
+        return reduce(lambda a, b: a and b, [is_ufc(c) for c in cell.cells])
+    else:
+        return False
+
+
 def is_hypercube(cell):
     if isinstance(cell, (DefaultLine, UFCInterval, Hypercube)):
         return True
@@ -1808,6 +1817,8 @@ def flatten_reference_cube(ref_el):
         # Handle cases where cell is a quad/cube constructed from a tensor product or
         # an already flattened element
         if isinstance(ref_el, TensorProductCell):
+            if is_ufc(ref_el):
+                return ufc_hypercube(ref_el.get_spatial_dimension())
             return Hypercube(ref_el.get_spatial_dimension(), ref_el)
         elif is_hypercube(ref_el):
             return ref_el
