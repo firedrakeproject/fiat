@@ -1365,7 +1365,7 @@ class Hypercube(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super(Hypercube, self).__init__(self.shape, verts, topology)
+        super().__init__(self.shape, verts, topology)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
@@ -1383,7 +1383,7 @@ class Hypercube(Cell):
         """
         sd = self.get_spatial_dimension()
         if dimension > sd:
-            raise ValueError("Invalid dimension: %d" % (dimension,))
+            raise ValueError(f"Invalid dimension: {(dimension,)}")
         elif dimension == sd:
             return self
         else:
@@ -1467,7 +1467,7 @@ class UFCHypercube(Hypercube):
     def __init__(self, dim):
         cells = [UFCInterval()] * dim
         product = TensorProductCell(*cells)
-        super(UFCHypercube, self).__init__(dim, product)
+        super().__init__(dim, product)
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -1531,7 +1531,7 @@ class UFCQuadrilateral(UFCHypercube):
     """
 
     def __init__(self):
-        super(UFCQuadrilateral, self).__init__(2)
+        super().__init__(2)
 
 
 class UFCHexahedron(UFCHypercube):
@@ -1540,7 +1540,7 @@ class UFCHexahedron(UFCHypercube):
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
 
     def __init__(self):
-        super(UFCHexahedron, self).__init__(3)
+        super().__init__(3)
 
 
 def make_affine_mapping(xs, ys):
@@ -1704,7 +1704,7 @@ def is_ufc(cell):
     if isinstance(cell, (Point, UFCInterval, UFCHypercube, UFCSimplex)):
         return True
     elif isinstance(cell, TensorProductCell):
-        return reduce(lambda a, b: a and b, [is_ufc(c) for c in cell.cells])
+        return all(is_ufc(c) for c in cell.cells)
     else:
         return False
 
