@@ -80,12 +80,16 @@ class Bernstein(FiniteElement):
         """
         # Transform points to reference cell coordinates
         ref_el = self.get_reference_element()
+        dim = ref_el.get_spatial_dimension()
         if entity is None:
             entity = (ref_el.get_spatial_dimension(), 0)
 
         entity_dim, entity_id = entity
         entity_transform = ref_el.get_entity_transform(entity_dim, entity_id)
+
+        points = numpy.asarray(points)
         cell_points = entity_transform(points)
+        cell_points = cell_points.reshape(-1, dim)
 
         # Construct Cartesian to Barycentric coordinate mapping
         vs = numpy.asarray(ref_el.get_vertices())
@@ -97,7 +101,6 @@ class Bernstein(FiniteElement):
 
         # Evaluate everything
         deg = self.degree()
-        dim = ref_el.get_spatial_dimension()
         raw_result = {(alpha, i): vec
                       for i, ks in enumerate(mis(dim + 1, deg))
                       for o in range(order + 1)
@@ -106,11 +109,11 @@ class Bernstein(FiniteElement):
         # Rearrange result
         space_dim = self.space_dimension()
         dtype = numpy.array(list(raw_result.values())).dtype
-        result = {alpha: numpy.zeros((space_dim, len(cell_points)), dtype=dtype)
+        result = {alpha: numpy.zeros((space_dim, *points.shape[:-1]), dtype=dtype)
                   for o in range(order + 1)
                   for alpha in mis(dim, o)}
         for (alpha, i), vec in raw_result.items():
-            result[alpha][i, :] = vec
+            result[alpha][i] = vec
         return result
 
 

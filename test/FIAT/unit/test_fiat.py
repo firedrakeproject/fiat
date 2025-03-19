@@ -28,6 +28,7 @@ from FIAT.P0 import P0                                          # noqa: F401
 from FIAT.crouzeix_raviart import CrouzeixRaviart               # noqa: F401
 from FIAT.raviart_thomas import RaviartThomas                   # noqa: F401
 from FIAT.discontinuous_raviart_thomas import DiscontinuousRaviartThomas  # noqa: F401
+from FIAT.bernstein import Bernstein  # noqa: F401
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini      # noqa: F401
 from FIAT.mixed import MixedElement
 from FIAT.nedelec import Nedelec                                # noqa: F401
@@ -627,6 +628,8 @@ def test_error_point_high_order(element):
     'DiscontinuousLagrange(T, 1)',
     'Lagrange(I, 1)',
     'Lagrange(T, 1)',
+    'Bernstein(I, 1)',
+    'Bernstein(T, 1)',
 ])
 def test_single_point_tabulation(element):
     L = eval(element)
