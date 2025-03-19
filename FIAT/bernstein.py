@@ -82,22 +82,21 @@ class Bernstein(FiniteElement):
         ref_el = self.get_reference_element()
         dim = ref_el.get_spatial_dimension()
         if entity is None:
-            entity = (ref_el.get_spatial_dimension(), 0)
+            entity = (dim, 0)
 
         entity_dim, entity_id = entity
         entity_transform = ref_el.get_entity_transform(entity_dim, entity_id)
 
         points = numpy.asarray(points)
         cell_points = entity_transform(points)
-        cell_points = cell_points.reshape(-1, dim)
 
         # Construct Cartesian to Barycentric coordinate mapping
         vs = numpy.asarray(ref_el.get_vertices())
         B2R = numpy.vstack([vs.T, numpy.ones(len(vs))])
         R2B = numpy.linalg.inv(B2R)
 
-        B = numpy.hstack([cell_points,
-                          numpy.ones((len(cell_points), 1))]).dot(R2B.T)
+        B = numpy.concatenate([cell_points, numpy.ones((*cell_points.shape[:-1], 1))
+                               ], axis=-1).dot(R2B.T)
 
         # Evaluate everything
         deg = self.degree()
@@ -113,7 +112,7 @@ class Bernstein(FiniteElement):
                   for o in range(order + 1)
                   for alpha in mis(dim, o)}
         for (alpha, i), vec in raw_result.items():
-            result[alpha][i] = vec.reshape(result[alpha].shape[1:])
+            result[alpha][i] = vec
         return result
 
 
@@ -130,7 +129,7 @@ def bernstein_db(points, ks, alpha=None):
     points = numpy.asarray(points)
     ks = numpy.array(tuple(ks))
 
-    N, d_1 = points.shape
+    *shp, d_1 = points.shape
     assert d_1 == len(ks)
 
     if alpha is None:
@@ -149,7 +148,7 @@ def bernstein_db(points, ks, alpha=None):
         coeff = math.factorial(ks.sum())
         for k in ls:
             coeff //= math.factorial(k)
-        return coeff * numpy.prod(points**ls, axis=1)
+        return coeff * numpy.prod(points**ls, axis=-1)
 
 
 def bernstein_Dx(points, ks, order, R2B):
@@ -168,7 +167,7 @@ def bernstein_Dx(points, ks, order, R2B):
     points = numpy.asarray(points)
     ks = tuple(ks)
 
-    N, d_1 = points.shape
+    *shp, d_1 = points.shape
     assert d_1 == len(ks)
 
     # Collect derivatives according to barycentric coordinates
@@ -178,12 +177,10 @@ def bernstein_Dx(points, ks, order, R2B):
     # Arrange derivative tensor (barycentric coordinates)
     dtype = numpy.array(list(Db_map.values())).dtype
     Db_shape = (d_1,) * order
-    Db_tensor = numpy.empty(Db_shape + (N,), dtype=dtype)
+    Db_tensor = numpy.empty(Db_shape + tuple(shp), dtype=dtype)
     for ds in numpy.ndindex(Db_shape):
-        alpha = [0] * d_1
-        for d in ds:
-            alpha[d] += 1
-        Db_tensor[ds + (slice(None),)] = Db_map[tuple(alpha)]
+        alpha = tuple(map(ds.count, range(d_1)))
+        Db_tensor[ds] = Db_map[alpha]
 
     # Coordinate transformation: barycentric -> reference
     result = {}
