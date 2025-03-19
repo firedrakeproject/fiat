@@ -54,7 +54,7 @@ def eval_jacobi_batch(a, b, n, xs):
     result[0] = 1.0
 
     if n > 0:
-        xsnew = xs.reshape((-1,))
+        xsnew = xs.reshape(result.shape[1:])
         result[1] = 0.5 * (a - b + (a + b + 2.0) * xsnew)
 
         apb = a + b

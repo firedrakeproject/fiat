@@ -113,7 +113,7 @@ class Bernstein(FiniteElement):
                   for o in range(order + 1)
                   for alpha in mis(dim, o)}
         for (alpha, i), vec in raw_result.items():
-            result[alpha][i] = vec
+            result[alpha][i] = vec.reshape(result[alpha].shape[1:])
         return result
 
 
