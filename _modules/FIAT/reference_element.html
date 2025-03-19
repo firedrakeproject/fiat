@@ -82,6 +82,8 @@
 <span class="n">HEXAHEDRON</span> <span class="o">=</span> <span class="mi">111</span>
 <span class="n">TENSORPRODUCT</span> <span class="o">=</span> <span class="mi">99</span>
 
+<span class="n">hypercube_shapes</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2</span><span class="p">:</span> <span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="mi">3</span><span class="p">:</span> <span class="n">HEXAHEDRON</span><span class="p">}</span>
+
 
 <div class="viewcode-block" id="multiindex_equal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.multiindex_equal">[docs]</a>
@@ -1491,7 +1493,7 @@
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.contains_point">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
-<span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhatten&#39;,</span>
+<span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhattan&#39;,</span>
 <span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
 
 <span class="sd">        Parameters</span>
@@ -1546,6 +1548,8 @@
 <div class="viewcode-block" id="TensorProductCell.compare">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.compare">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">compare</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Parent-based comparison between simplicial complexes.</span>
+<span class="sd">        This is done dimension by dimension.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="s2">&quot;product&quot;</span><span class="p">):</span>
             <span class="n">other</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">product</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)):</span>
@@ -1643,9 +1647,175 @@
 
 
 
+<div class="viewcode-block" id="Hypercube">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Hypercube</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for a reference hypercube&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">,</span> <span class="n">product</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dimension</span> <span class="o">=</span> <span class="n">dimension</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">hypercube_shapes</span><span class="p">[</span><span class="n">dimension</span><span class="p">]</span>
+
+        <span class="n">pt</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+        <span class="n">topology</span> <span class="o">=</span> <span class="n">flatten_entities</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">verts</span><span class="p">,</span> <span class="n">topology</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">=</span> <span class="n">product</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Hypercube.get_dimension">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.get_dimension">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell.  Same as the</span>
+<span class="sd">        spatial dimension.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.construct_subelement">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.construct_subelement">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
+<span class="sd">        specified by subelement dimension.</span>
+
+<span class="sd">        :arg dimension: subentity dimension (integer)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">dimension</span> <span class="o">&gt;</span> <span class="n">sd</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid dimension: </span><span class="si">{</span><span class="p">(</span><span class="n">dimension</span><span class="p">,)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="n">sd</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sub_element</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">((</span><span class="n">dimension</span><span class="p">,)</span> <span class="o">+</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">sub_element</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.get_entity_transform">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.get_entity_transform">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
+<span class="sd">        `entity_i`-th subentity of dimension `dim` to the cell.</span>
+
+<span class="sd">        :arg dim: entity dimension (integer)</span>
+<span class="sd">        :arg entity_i: entity number (integer)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.volume">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.volume">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the volume in the appropriate dimensional measure.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.compute_reference_normal">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.compute_reference_normal">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal in infinity norm to facet_i.&quot;&quot;&quot;</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">facet_dim</span> <span class="o">==</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">d</span><span class="p">,</span> <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">compute_reference_normal</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.contains_point">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.contains_point">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
+<span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhattan&#39;,</span>
+<span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        point : numpy.ndarray, list or symbolic expression</span>
+<span class="sd">            The coordinates of the point.</span>
+<span class="sd">        epsilon : float</span>
+<span class="sd">            The tolerance for the check.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        bool : True if the point is inside the cell, False otherwise.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">contains_point</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="n">epsilon</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.distance_to_point_l1">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.distance_to_point_l1">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the L1 distance (aka &#39;manhattan&#39;, &#39;taxicab&#39; or rectilinear</span>
+<span class="sd">        distance) to a point with 0.0 if the point is inside the cell.</span>
+
+<span class="sd">        For more information see the docstring for the UFCSimplex method.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="n">rescale</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.symmetry_group_size">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.symmetry_group_size">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Size of hypercube symmetry group is d! * 2**d&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">factorial</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">dim</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.cell_orientation_reflection_map">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.cell_orientation_reflection_map">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cell_orientation_reflection_map</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;</span> <span class="n">other</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;</span> <span class="n">other</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;=</span> <span class="n">other</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;=</span> <span class="n">other</span></div>
+
+
+
+<div class="viewcode-block" id="UFCHypercube">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHypercube">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCHypercube</span><span class="p">(</span><span class="n">Hypercube</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reference UFC Hypercube</span>
+
+<span class="sd">    UFCHypercube: [0, 1]^d with vertices in</span>
+<span class="sd">    lexicographical order.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+        <span class="n">cells</span> <span class="o">=</span> <span class="p">[</span><span class="n">UFCInterval</span><span class="p">()]</span> <span class="o">*</span> <span class="n">dim</span>
+        <span class="n">product</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="o">*</span><span class="n">cells</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">product</span><span class="p">)</span>
+
+<div class="viewcode-block" id="UFCHypercube.construct_subelement">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHypercube.construct_subelement">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
+<span class="sd">        specified by subelement dimension.</span>
+
+<span class="sd">        :arg dimension: subentity dimension (integer)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">dimension</span> <span class="o">&gt;</span> <span class="n">sd</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid dimension: </span><span class="si">{</span><span class="n">dimension</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="n">sd</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ufc_hypercube</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span></div>
+</div>
+
+
+
 <div class="viewcode-block" id="UFCQuadrilateral">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">UFCQuadrilateral</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCQuadrilateral</span><span class="p">(</span><span class="n">UFCHypercube</span><span class="p">):</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;This is the reference quadrilateral with vertices</span>
 <span class="sd">    (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).</span>
 
@@ -1690,264 +1860,21 @@
 
 <span class="sd">    o = 2 * 1 + 0 = 2</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">product</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="n">UFCInterval</span><span class="p">(),</span> <span class="n">UFCInterval</span><span class="p">())</span>
-        <span class="n">pt</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
-
-        <span class="n">verts</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
-        <span class="n">topology</span> <span class="o">=</span> <span class="n">flatten_entities</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="n">verts</span><span class="p">,</span> <span class="n">topology</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">=</span> <span class="n">product</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
-
-<div class="viewcode-block" id="UFCQuadrilateral.get_dimension">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.get_dimension">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell.  Same as the</span>
-<span class="sd">        spatial dimension.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.construct_subelement">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.construct_subelement">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
-<span class="sd">        specified by subelement dimension.</span>
-
-<span class="sd">        :arg dimension: subentity dimension (integer)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span>
-        <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">UFCInterval</span><span class="p">()</span>
-        <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">Point</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid dimension: </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dimension</span><span class="p">,))</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.get_entity_transform">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.get_entity_transform">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
-<span class="sd">        `entity_i`-th subentity of dimension `dim` to the cell.</span>
-
-<span class="sd">        :arg dim: entity dimension (integer)</span>
-<span class="sd">        :arg entity_i: entity number (integer)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">)]</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.volume">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.volume">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the volume in the appropriate dimensional measure.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.compute_reference_normal">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.compute_reference_normal">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal in infinity norm to facet_i.&quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="n">facet_dim</span> <span class="o">==</span> <span class="mi">1</span>
-        <span class="n">d</span><span class="p">,</span> <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">)]</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">compute_reference_normal</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.contains_point">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.contains_point">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
-<span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhatten&#39;,</span>
-<span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        point : numpy.ndarray, list or symbolic expression</span>
-<span class="sd">            The coordinates of the point.</span>
-<span class="sd">        epsilon : float</span>
-<span class="sd">            The tolerance for the check.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        bool : True if the point is inside the cell, False otherwise.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">contains_point</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="n">epsilon</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.distance_to_point_l1">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.distance_to_point_l1">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the L1 distance (aka &#39;manhatten&#39;, &#39;taxicab&#39; or rectilinear</span>
-<span class="sd">        distance) to a point with 0.0 if the point is inside the cell.</span>
-
-<span class="sd">        For more information see the docstring for the UFCSimplex method.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="n">rescale</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.symmetry_group_size">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.symmetry_group_size">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">][</span><span class="n">dim</span><span class="p">]</span></div>
-
-
-<div class="viewcode-block" id="UFCQuadrilateral.cell_orientation_reflection_map">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCQuadrilateral.cell_orientation_reflection_map">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cell_orientation_reflection_map</span><span class="p">()</span></div>
-
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;</span> <span class="n">other</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;</span> <span class="n">other</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;=</span> <span class="n">other</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;=</span> <span class="n">other</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="UFCHexahedron">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">UFCHexahedron</span><span class="p">(</span><span class="n">Cell</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">UFCHexahedron</span><span class="p">(</span><span class="n">UFCHypercube</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This is the reference hexahedron with vertices</span>
 <span class="sd">    (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),</span>
 <span class="sd">    (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0).&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">product</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="p">(</span><span class="n">UFCInterval</span><span class="p">(),</span> <span class="n">UFCInterval</span><span class="p">(),</span> <span class="n">UFCInterval</span><span class="p">())</span>
-        <span class="n">pt</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
-
-        <span class="n">verts</span> <span class="o">=</span> <span class="n">product</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
-        <span class="n">topology</span> <span class="o">=</span> <span class="n">flatten_entities</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">HEXAHEDRON</span><span class="p">,</span> <span class="n">verts</span><span class="p">,</span> <span class="n">topology</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">=</span> <span class="n">product</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span>
-
-<div class="viewcode-block" id="UFCHexahedron.get_dimension">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.get_dimension">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the subelement dimension of the cell.  Same as the</span>
-<span class="sd">        spatial dimension.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.construct_subelement">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.construct_subelement">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
-<span class="sd">        specified by subelement dimension.</span>
-
-<span class="sd">        :arg dimension: subentity dimension (integer)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span>
-        <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">UFCQuadrilateral</span><span class="p">()</span>
-        <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">UFCInterval</span><span class="p">()</span>
-        <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">Point</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid dimension: </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">dimension</span><span class="p">,))</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.get_entity_transform">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.get_entity_transform">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_transform</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a mapping of point coordinates from the</span>
-<span class="sd">        `entity_i`-th subentity of dimension `dim` to the cell.</span>
-
-<span class="sd">        :arg dim: entity dimension (integer)</span>
-<span class="sd">        :arg entity_i: entity number (integer)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity_i</span><span class="p">)]</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.volume">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.volume">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">volume</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Computes the volume in the appropriate dimensional measure.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.compute_reference_normal">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.compute_reference_normal">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">compute_reference_normal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the unit normal in infinity norm to facet_i.&quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="n">facet_dim</span> <span class="o">==</span> <span class="mi">2</span>
-        <span class="n">d</span><span class="p">,</span> <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">facet_dim</span><span class="p">,</span> <span class="n">facet_i</span><span class="p">)]</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">compute_reference_normal</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.contains_point">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.contains_point">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">contains_point</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Checks if reference cell contains given point</span>
-<span class="sd">        (with numerical tolerance as given by the L1 distance (aka &#39;manhatten&#39;,</span>
-<span class="sd">        &#39;taxicab&#39; or rectilinear distance) to the cell.</span>
-
-<span class="sd">        Parameters</span>
-<span class="sd">        ----------</span>
-<span class="sd">        point : numpy.ndarray, list or symbolic expression</span>
-<span class="sd">            The coordinates of the point.</span>
-<span class="sd">        epsilon : float</span>
-<span class="sd">            The tolerance for the check.</span>
-
-<span class="sd">        Returns</span>
-<span class="sd">        -------</span>
-<span class="sd">        bool : True if the point is inside the cell, False otherwise.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">contains_point</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="n">epsilon</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.distance_to_point_l1">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.distance_to_point_l1">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">distance_to_point_l1</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the L1 distance (aka &#39;manhatten&#39;, &#39;taxicab&#39; or rectilinear</span>
-<span class="sd">        distance) to a point with 0.0 if the point is inside the cell.</span>
-
-<span class="sd">        For more information see the docstring for the UFCSimplex method.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="n">rescale</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.symmetry_group_size">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.symmetry_group_size">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">48</span><span class="p">][</span><span class="n">dim</span><span class="p">]</span></div>
-
-
-<div class="viewcode-block" id="UFCHexahedron.cell_orientation_reflection_map">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.UFCHexahedron.cell_orientation_reflection_map">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">cell_orientation_reflection_map</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the map indicating whether each possible cell orientation causes reflection (``1``) or not (``0``).&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">cell_orientation_reflection_map</span><span class="p">()</span></div>
-
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;</span> <span class="n">other</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;</span> <span class="n">other</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&gt;=</span> <span class="n">other</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span> <span class="o">&lt;=</span> <span class="n">other</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span></div>
 
 
 
@@ -1990,6 +1917,24 @@
 
 
 
+<div class="viewcode-block" id="ufc_hypercube">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.ufc_hypercube">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">ufc_hypercube</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory function that maps spatial dimension to an instance of</span>
+<span class="sd">    the UFC reference hypercube of that dimension.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Point</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">UFCInterval</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">UFCQuadrilateral</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">UFCHexahedron</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Can&#39;t create UFC hypercube of dimension </span><span class="si">{</span><span class="n">spatial_dim</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="default_simplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.default_simplex">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">default_simplex</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">):</span>
@@ -2004,7 +1949,7 @@
     <span class="k">elif</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">DefaultTetrahedron</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Can&#39;t create default simplex of dimension </span><span class="si">%s</span><span class="s2">.&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">))</span></div>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Can&#39;t create default simplex of dimension </span><span class="si">{</span><span class="n">spatial_dim</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
 
 
 
@@ -2022,7 +1967,7 @@
     <span class="k">elif</span> <span class="n">spatial_dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">UFCTetrahedron</span><span class="p">()</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Can&#39;t create UFC simplex of dimension </span><span class="si">%s</span><span class="s2">.&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">spatial_dim</span><span class="p">))</span></div>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Can&#39;t create UFC simplex of dimension </span><span class="si">{</span><span class="n">spatial_dim</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span></div>
 
 
 
@@ -2068,7 +2013,7 @@
     <span class="k">elif</span> <span class="n">celltype</span> <span class="o">==</span> <span class="s2">&quot;tetrahedron&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Don&#39;t know how to create UFC cell of type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">str</span><span class="p">(</span><span class="n">celltype</span><span class="p">))</span></div>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Don&#39;t know how to create UFC cell of type </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">celltype</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 
 
@@ -2114,13 +2059,25 @@
 
 
 
+<div class="viewcode-block" id="is_ufc">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.is_ufc">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_ufc</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="p">(</span><span class="n">Point</span><span class="p">,</span> <span class="n">UFCInterval</span><span class="p">,</span> <span class="n">UFCHypercube</span><span class="p">,</span> <span class="n">UFCSimplex</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">TensorProductCell</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">is_ufc</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cell</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span></div>
+
+
+
 <div class="viewcode-block" id="is_hypercube">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.is_hypercube">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">is_hypercube</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="p">(</span><span class="n">DefaultLine</span><span class="p">,</span> <span class="n">UFCInterval</span><span class="p">,</span> <span class="n">UFCQuadrilateral</span><span class="p">,</span> <span class="n">UFCHexahedron</span><span class="p">)):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="p">(</span><span class="n">DefaultLine</span><span class="p">,</span> <span class="n">UFCInterval</span><span class="p">,</span> <span class="n">Hypercube</span><span class="p">)):</span>
         <span class="k">return</span> <span class="kc">True</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">TensorProductCell</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">a</span> <span class="ow">and</span> <span class="n">b</span><span class="p">,</span> <span class="p">[</span><span class="n">is_hypercube</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cell</span><span class="o">.</span><span class="n">cells</span><span class="p">])</span>
+        <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">is_hypercube</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">cell</span><span class="o">.</span><span class="n">cells</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">False</span></div>
 
@@ -2130,15 +2087,18 @@
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.flatten_reference_cube">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;This function flattens a Tensor Product hypercube to the corresponding UFC hypercube&quot;&quot;&quot;</span>
-    <span class="n">flattened_cube</span> <span class="o">=</span> <span class="p">{</span><span class="mi">2</span><span class="p">:</span> <span class="n">UFCQuadrilateral</span><span class="p">(),</span> <span class="mi">3</span><span class="p">:</span> <span class="n">UFCHexahedron</span><span class="p">()}</span>
-    <span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">())</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
         <span class="c1"># Just return point/interval cell arguments</span>
         <span class="k">return</span> <span class="n">ref_el</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Handle cases where cell is a quad/cube constructed from a tensor product or</span>
         <span class="c1"># an already flattened element</span>
-        <span class="k">if</span> <span class="n">is_hypercube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">flattened_cube</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">())]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">TensorProductCell</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">is_ufc</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">ufc_hypercube</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">())</span>
+            <span class="k">return</span> <span class="n">Hypercube</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),</span> <span class="n">ref_el</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">is_hypercube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ref_el</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s1">&#39;Invalid cell type&#39;</span><span class="p">)</span></div>
 
@@ -2239,7 +2199,7 @@
     </div>
     <div class="footer" role="contentinfo">
     &#169; Copyright 2025, FEniCS Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
     </div>
   </body>
 </html>
