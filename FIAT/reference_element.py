@@ -1591,7 +1591,7 @@ def ufc_hypercube(spatial_dim):
     elif spatial_dim == 3:
         return UFCHexahedron()
     else:
-        raise RuntimeError("Can't create UFC hypercube of dimension %s." % str(spatial_dim))
+        raise RuntimeError(f"Can't create UFC hypercube of dimension {spatial_dim}.")
 
 
 def default_simplex(spatial_dim):
