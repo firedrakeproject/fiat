@@ -1366,7 +1366,7 @@ class Hypercube(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super(Hypercube, self).__init__(self.shape, verts, topology)
+        super().__init__(self.shape, verts, topology)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
@@ -1384,7 +1384,7 @@ class Hypercube(Cell):
         """
         sd = self.get_spatial_dimension()
         if dimension > sd:
-            raise ValueError("Invalid dimension: %d" % (dimension,))
+            raise ValueError(f"Invalid dimension: {(dimension,)}")
         elif dimension == sd:
             return self
         else:
@@ -1468,7 +1468,7 @@ class UFCHypercube(Hypercube):
     def __init__(self, dim):
         cells = [UFCInterval()] * dim
         product = TensorProductCell(*cells)
-        super(UFCHypercube, self).__init__(dim, product)
+        super().__init__(dim, product)
 
     def construct_subelement(self, dimension):
         """Constructs the reference element of a cell subentity
@@ -1478,7 +1478,7 @@ class UFCHypercube(Hypercube):
         """
         sd = self.get_spatial_dimension()
         if dimension > sd:
-            raise ValueError("Invalid dimension: %d" % (dimension,))
+            raise ValueError(f"Invalid dimension: {dimension}")
         elif dimension == sd:
             return self
         else:
@@ -1532,92 +1532,7 @@ class UFCQuadrilateral(UFCHypercube):
     """
 
     def __init__(self):
-        super(UFCQuadrilateral, self).__init__(2)
-
-
-class UFCHexahedron(UFCHypercube):
-    """This is the reference hexahedron with vertices
-    (0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (0.0, 1.0, 0.0), (0.0, 1.0, 1.0),
-    (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
-    
-    def __init__(self):
-        super(UFCHexahedron, self).__init__(3)
-
-
-class UFCHypercube(Hypercube):
-    """Reference UFC Hypercube
-
-    UFCHypercube: [0, 1]^d with vertices in
-    lexicographical order."""
-
-    def __init__(self, dim):
-        cells = [UFCInterval()] * dim
-        product = TensorProductCell(*cells)
-        super(UFCHypercube, self).__init__(dim, product)
-
-    def construct_subelement(self, dimension):
-        """Constructs the reference element of a cell subentity
-        specified by subelement dimension.
-
-        :arg dimension: subentity dimension (integer)
-        """
-        sd = self.get_spatial_dimension()
-        if dimension > sd:
-            raise ValueError("Invalid dimension: %d" % (dimension,))
-        elif dimension == sd:
-            return self
-        else:
-            return ufc_hypercube(dimension)
-
-
-class UFCQuadrilateral(UFCHypercube):
-    r"""This is the reference quadrilateral with vertices
-    (0.0, 0.0), (0.0, 1.0), (1.0, 0.0) and (1.0, 1.0).
-
-    Orientation of a physical cell is computed systematically
-    by comparing the canonical orderings of its facets and
-    the facets in the FIAT reference cell.
-
-    As an example, we compute the orientation of a
-    quadrilateral cell:
-
-       +---3---+           +--57---+
-       |       |           |       |
-       0       1          43       55
-       |       |           |       |
-       +---2---+           +--42---+
-    FIAT canonical     Mapped example physical cell
-
-    Suppose that the facets of the physical cell
-    are canonically ordered as:
-
-    C = [55, 42, 43, 57]
-
-    FIAT index to Physical index map must be such that
-    C[0] = 55 is mapped to a vertical facet; in this
-    example it is:
-
-    M = [43, 55, 42, 57]
-
-    C and M are decomposed into "vertical" and "horizontal"
-    parts, keeping the relative orders of numbers:
-
-    C -> C0 = [55, 43], C1 = [42, 57]
-    M -> M0 = [43, 55], M1 = [42, 57]
-
-    Then the orientation of the cell is computed as the
-    following:
-
-    C0.index(M0[0]) = 1; C0.remove(M0[0])
-    C0.index(M0[1]) = 0; C0.remove(M0[1])
-    C1.index(M1[0]) = 0; C1.remove(M1[0])
-    C1.index(M1[1]) = 0; C1.remove(M1[1])
-
-    o = 2 * 1 + 0 = 2
-    """
-
-    def __init__(self):
-        super(UFCQuadrilateral, self).__init__(2)
+        super().__init__(2)
 
 
 class UFCHexahedron(UFCHypercube):
@@ -1626,7 +1541,7 @@ class UFCHexahedron(UFCHypercube):
     (1.0, 0.0, 0.0), (1.0, 0.0, 1.0), (1.0, 1.0, 0.0) and (1.0, 1.0, 1.0)."""
 
     def __init__(self):
-        super(UFCHexahedron, self).__init__(3)
+        super().__init__(3)
 
 
 def make_affine_mapping(xs, ys):
@@ -1677,7 +1592,7 @@ def ufc_hypercube(spatial_dim):
     elif spatial_dim == 3:
         return UFCHexahedron()
     else:
-        raise RuntimeError("Can't create UFC hypercube of dimension %s." % str(spatial_dim))
+        raise RuntimeError(f"Can't create UFC hypercube of dimension {spatial_dim}.")
 
 
 def default_simplex(spatial_dim):
@@ -1692,7 +1607,7 @@ def default_simplex(spatial_dim):
     elif spatial_dim == 3:
         return DefaultTetrahedron()
     else:
-        raise RuntimeError("Can't create default simplex of dimension %s." % str(spatial_dim))
+        raise RuntimeError(f"Can't create default simplex of dimension {spatial_dim}.")
 
 
 def ufc_simplex(spatial_dim):
@@ -1707,7 +1622,7 @@ def ufc_simplex(spatial_dim):
     elif spatial_dim == 3:
         return UFCTetrahedron()
     else:
-        raise RuntimeError("Can't create UFC simplex of dimension %s." % str(spatial_dim))
+        raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
 
 
 def symmetric_simplex(spatial_dim):
@@ -1747,7 +1662,7 @@ def ufc_cell(cell):
     elif celltype == "tetrahedron":
         return ufc_simplex(3)
     else:
-        raise RuntimeError("Don't know how to create UFC cell of type %s" % str(celltype))
+        raise RuntimeError(f"Don't know how to create UFC cell of type {str(celltype)}")
 
 
 def volume(verts):
@@ -1790,7 +1705,16 @@ def is_ufc(cell):
     if isinstance(cell, (Point, UFCInterval, UFCHypercube, UFCSimplex)):
         return True
     elif isinstance(cell, TensorProductCell):
-        return reduce(lambda a, b: a and b, [is_ufc(c) for c in cell.cells])
+        return all(is_ufc(c) for c in cell.cells)
+    else:
+        return False
+
+
+def is_hypercube(cell):
+    if isinstance(cell, (DefaultLine, UFCInterval, Hypercube)):
+        return True
+    elif isinstance(cell, TensorProductCell):
+        return all(is_hypercube(c) for c in cell.cells)
     else:
         return False
 

@@ -21,7 +21,7 @@ import sys
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT.reference_element import Point, TensorProductCell, UFCQuadrilateral, UFCHexahedron
-from FIAT.reference_element import is_ufc, default_simplex, flatten_reference_cube, Hypercube
+from FIAT.reference_element import is_ufc, is_hypercube, default_simplex, flatten_reference_cube, Hypercube
 
 point = Point()
 interval = UFCInterval()
@@ -419,6 +419,24 @@ def test_distance_to_point_l1(cell, point, expected):
                           (default_hypercube, False),])
 def test_is_ufc(cell, expected):
     assert is_ufc(cell) == expected
+
+
+@pytest.mark.parametrize(('cell', 'expected'),
+                         [(interval, True),
+                          (triangle, False),
+                          (quadrilateral, True),
+                          (tetrahedron, False),
+                          (interval_x_interval, True),
+                          (triangle_x_interval, False),
+                          (quadrilateral_x_interval, True),
+                          (hexahedron, True),
+                          (default_interval, True),
+                          (default_triangle, False),
+                          (default_tetrahedron, False),
+                          (default_interval_x_interval, True),
+                          (default_hypercube, True),])
+def test_is_hypercube(cell, expected):
+    assert is_hypercube(cell) == expected
 
 
 @pytest.mark.parametrize(('cell'),
