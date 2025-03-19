@@ -47,18 +47,15 @@ def eval_jacobi(a, b, n, x):
 def eval_jacobi_batch(a, b, n, xs):
     """Evaluates all jacobi polynomials with weights a,b
     up to degree n.  xs is a numpy.array of points.
-    Returns a two-dimensional array of points, where the
+    Returns a two-dimensional array of tabulations, where the
     rows correspond to the Jacobi polynomials and the
     columns correspond to the points."""
-    result = numpy.zeros((n + 1, len(xs)), xs.dtype)
-    # hack to make sure AD type is propogated through
-    for ii in range(result.shape[1]):
-        result[0, ii] = 1.0 + xs[ii, 0] - xs[ii, 0]
-
-    xsnew = xs.reshape((-1,))
+    result = numpy.zeros((n + 1, *xs.shape[:-1]), xs.dtype)
+    result[0] = 1.0
 
     if n > 0:
-        result[1, :] = 0.5 * (a - b + (a + b + 2.0) * xsnew)
+        xsnew = xs.reshape((-1,))
+        result[1] = 0.5 * (a - b + (a + b + 2.0) * xsnew)
 
         apb = a + b
         for k in range(2, n + 1):
@@ -72,8 +69,8 @@ def eval_jacobi_batch(a, b, n, xs):
             a2 = a2 / a1
             a3 = a3 / a1
             a4 = a4 / a1
-            result[k, :] = (a2 + a3 * xsnew) * result[k-1, :] \
-                - a4 * result[k-2, :]
+            result[k] = (a2 + a3 * xsnew) * result[k-1] \
+                - a4 * result[k-2]
     return result
 
 

@@ -564,7 +564,7 @@ class LineExpansionSet(ExpansionSet):
         results = {}
         scale = self.get_scale(n, cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
-            v = numpy.zeros((n + 1, len(xs)), xs.dtype)
+            v = numpy.zeros((n + 1, *xs.shape[:-1]), xs.dtype)
             if n >= k:
                 v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
             for p in range(n + 1):

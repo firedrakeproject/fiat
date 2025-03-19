@@ -620,6 +620,26 @@ def test_error_point_high_order(element):
         eval(element)
 
 
+@pytest.mark.parametrize('element', [
+    'DiscontinuousLagrange(I, 0)',
+    'DiscontinuousLagrange(T, 0)',
+    'DiscontinuousLagrange(I, 1)',
+    'DiscontinuousLagrange(T, 1)',
+    'Lagrange(I, 1)',
+    'Lagrange(T, 1)',
+])
+def test_single_point_tabulation(element):
+    L = eval(element)
+    sd = L.ref_el.get_spatial_dimension()
+    point = (0.0,) * sd
+
+    T1 = L.tabulate(0, point)[(0,) * sd]
+    assert T1.shape == (L.space_dimension(),)
+
+    T2 = L.tabulate(0, [point])[(0,) * sd]
+    assert T2.shape == (L.space_dimension(), 1)
+
+
 if __name__ == '__main__':
     import os
     pytest.main(os.path.abspath(__file__))
