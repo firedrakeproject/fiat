@@ -1,6 +1,6 @@
 import hashlib
 from abc import ABCMeta, abstractmethod
-from functools import cached_property, reduce
+from functools import cached_property
 
 import gem
 import numpy
@@ -163,4 +163,4 @@ class TensorProductQuadratureRule(AbstractQuadratureRule):
 
     @cached_property
     def weight_expression(self):
-        return reduce(gem.Product, (q.weight_expression for q in self.factors))
+        return gem.Product(*(q.weight_expression for q in self.factors))

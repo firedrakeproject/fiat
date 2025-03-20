@@ -1,4 +1,3 @@
-from functools import reduce
 from itertools import chain
 
 import numpy
@@ -134,8 +133,7 @@ class TensorFiniteElement(FiniteElementBase):
         tensor_vi = tuple(gem.Index(extent=d) for d in self._shape)
 
         # Couple new basis function and value indices
-        deltas = reduce(gem.Product, (gem.Delta(j, k)
-                                      for j, k in zip(tensor_i, tensor_vi)))
+        deltas = gem.Delta(tensor_i, tensor_vi)
 
         if self._transpose:
             index_ordering = tensor_i + scalar_i + tensor_vi + scalar_vi
@@ -163,8 +161,7 @@ class TensorFiniteElement(FiniteElementBase):
         tensor_i = tuple(gem.Index(extent=d) for d in self._shape)
         tensor_vi = tuple(gem.Index(extent=d) for d in self._shape)
         # Couple new basis function and value indices
-        deltas = reduce(gem.Product, (gem.Delta(j, k)
-                                      for j, k in zip(tensor_i, tensor_vi)))
+        deltas = gem.Delta(tensor_i, tensor_vi)
         if self._transpose:
             index_ordering = tensor_i + scalar_i + tensor_vi + scalar_vi
         else:

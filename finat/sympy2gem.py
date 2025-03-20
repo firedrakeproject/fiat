@@ -27,13 +27,13 @@ def sympy2gem_expr(node, self):
 @sympy2gem.register(sympy.Add)
 @sympy2gem.register(symengine.Add)
 def sympy2gem_add(node, self):
-    return reduce(gem.Sum, map(self, node.args))
+    return gem.Sum(*map(self, node.args))
 
 
 @sympy2gem.register(sympy.Mul)
 @sympy2gem.register(symengine.Mul)
 def sympy2gem_mul(node, self):
-    return reduce(gem.Product, map(self, node.args))
+    return gem.Product(*map(self, node.args))
 
 
 @sympy2gem.register(sympy.Pow)
