@@ -42,7 +42,7 @@
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">CiarletElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">CiarletElement</span><span class="p">,</span> <span class="n">FiniteElement</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
 
 
@@ -53,8 +53,12 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_element</span> <span class="o">=</span> <span class="n">element</span>
+        <span class="n">ref_el</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+        <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">()</span>
+        <span class="n">mapping</span><span class="p">,</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">mapping</span><span class="p">())</span>
+
         <span class="n">new_entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">topology</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="p">):</span>
             <span class="n">new_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">for</span> <span class="n">ent</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
@@ -62,23 +66,20 @@
 
         <span class="n">new_entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()))</span>
         <span class="c1"># re-initialise the dual, so entity_closure_dofs is recalculated</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dual</span> <span class="o">=</span> <span class="n">DualSet</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span> <span class="n">new_entity_ids</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">DualSet</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">(),</span> <span class="n">new_entity_ids</span><span class="p">)</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_order</span><span class="p">()</span>
 
         <span class="c1"># fully discontinuous</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">formdegree</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+
+        <span class="n">FiniteElement</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="n">formdegree</span><span class="p">,</span>
+                               <span class="n">mapping</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">ref_complex</span><span class="o">=</span><span class="n">ref_complex</span><span class="p">)</span>
 
 <div class="viewcode-block" id="DiscontinuousElement.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.degree">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="s2">&quot;Return the degree of the (embedding) polynomial space.&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="DiscontinuousElement.get_reference_element">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_reference_element">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_reference_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s2">&quot;Return the reference element for the finite element.&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.get_nodal_basis">
@@ -89,13 +90,6 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span></div>
 
 
-<div class="viewcode-block" id="DiscontinuousElement.get_order">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_order">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_order</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s2">&quot;Return the order of the element (may be different from the degree)&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_order</span><span class="p">()</span></div>
-
-
 <div class="viewcode-block" id="DiscontinuousElement.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_coeffs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -104,27 +98,11 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span></div>
 
 
-<div class="viewcode-block" id="DiscontinuousElement.mapping">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.mapping">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a list of appropriate mappings from the reference</span>
-<span class="sd">        element to a physical element for each basis function of the</span>
-<span class="sd">        finite element.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">mapping</span><span class="p">()</span></div>
-
-
 <div class="viewcode-block" id="DiscontinuousElement.num_sub_elements">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.num_sub_elements">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">num_sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="s2">&quot;Return the number of sub-elements.&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">num_sub_elements</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="DiscontinuousElement.space_dimension">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.space_dimension">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s2">&quot;Return the dimension of the finite element space.&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.tabulate">
