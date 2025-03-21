@@ -1719,19 +1719,6 @@ def is_hypercube(cell):
         return False
 
 
-def is_hypercube(cell):
-    if isinstance(cell, (DefaultLine, UFCInterval, Hypercube)):
-        return True
-    elif isinstance(cell, TensorProductCell):
-        res = reduce(lambda a, b: a and b, [is_hypercube(c) for c in cell.cells])
-    else:
-        res = False
-    # breakpoint()
-    res2 = len(cell.vertices) == 2 ** cell.get_dimension()
-    # assert res == res2
-    return res2
-
-
 def flatten_reference_cube(ref_el):
     """This function flattens a Tensor Product hypercube to the corresponding UFC hypercube"""
     if ref_el.get_spatial_dimension() <= 1:
