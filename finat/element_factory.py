@@ -179,7 +179,7 @@ def convert_finiteelement(element, **kwargs):
         kind = 'spectral'  # default variant
 
     if element.family() == "Lagrange":
-        if kind == 'spectral':
+        if kind in ['spectral', 'mimetic']:
             lmbda = finat.GaussLobattoLegendre
         elif element.cell.cellname() == "interval" and kind in cg_interval_variants:
             lmbda = cg_interval_variants[kind]
@@ -200,6 +200,8 @@ def convert_finiteelement(element, **kwargs):
     elif element.family() in ["Discontinuous Lagrange", "Discontinuous Lagrange L2"]:
         if kind == 'spectral':
             lmbda = finat.GaussLegendre
+        elif kind == 'mimetic':
+            lmbda = finat.Histopolation
         elif element.cell.cellname() == "interval" and kind in dg_interval_variants:
             lmbda = dg_interval_variants[kind]
         elif any(map(kind.startswith, ['integral', 'demkowicz', 'fdm'])):
