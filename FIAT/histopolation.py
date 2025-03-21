@@ -17,11 +17,11 @@ from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 
 
 class HistopolationDualSet(dual_set.DualSet):
-    """The dual basis for 1D histopolation elements.
+    r"""The dual basis for 1D histopolation elements.
 
     We define window functions w_j that satisfy
 
-    \int_{K} w_j v dx = \ell_j(v)   for all v in P_{k}
+    \int_K w_j v dx = \ell_j(v)   for all v in P_{k}
 
     where
 
