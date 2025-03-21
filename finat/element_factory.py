@@ -27,6 +27,7 @@ import finat.ufl
 import ufl
 
 from FIAT import ufc_cell
+from FIAT.reference_element import TensorProductCell
 
 __all__ = ("as_fiat_cell", "create_base_element",
            "create_element", "supported_elements")
@@ -110,9 +111,16 @@ def as_fiat_cell(cell):
     """Convert a ufl cell to a FIAT cell.
 
     :arg cell: the :class:`ufl.Cell` to convert."""
+    if isinstance(cell, str):
+        cell = ufl.as_cell(cell)
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
-    return ufc_cell(cell)
+    if isinstance(cell, ufl.TensorProductCell) and any([hasattr(c, "to_fiat") for c in cell._cells]):
+        return TensorProductCell(*[c.to_fiat() for c in cell._cells])
+    try:
+        return cell.to_fiat()
+    except AttributeError:
+        return ufc_cell(cell)
 
 
 @singledispatch
@@ -305,8 +313,17 @@ def convert_restrictedelement(element, **kwargs):
     return finat.RestrictedElement(finat_elem, element.restriction_domain()), deps
 
 
-hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
-quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
+@convert.register(finat.ufl.FuseElement)
+def convert_fuse_element(element, **kwargs):
+    if element.triple.flat:
+        new_elem = element.triple.unflatten()
+        finat_elem, deps = _create_element(new_elem.to_ufl(), **kwargs)
+        return finat.FlattenedDimensions(finat_elem), deps
+    return finat.fiat_elements.FuseElement(element.triple), set()
+
+
+hexahedron_tpc = ufl.TensorProductCell(ufl.as_cell("interval"), ufl.as_cell("interval"), ufl.as_cell("interval"))
+quadrilateral_tpc = ufl.TensorProductCell(ufl.as_cell("interval"), ufl.as_cell("interval"))
 _cache = weakref.WeakKeyDictionary()
 
 
