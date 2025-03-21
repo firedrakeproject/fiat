@@ -3,8 +3,8 @@ from .fiat_elements import (Bernstein, Bubble, BrezziDouglasFortinMarini,       
                             BrezziDouglasMariniCubeFace, CrouzeixRaviart,                    # noqa: F401
                             DiscontinuousLagrange, DiscontinuousTaylor, DPC,                 # noqa: F401
                             FacetBubble, GopalakrishnanLedererSchoberlFirstKind,             # noqa: F401
-                            GopalakrishnanLedererSchoberlSecondKind, HDivTrace,              # noqa: F401
-                            HellanHerrmannJohnson, KongMulderVeldhuizen,                     # noqa: F401
+                            GopalakrishnanLedererSchoberlSecondKind, Histopolation,          # noqa: F401
+                            HDivTrace, HellanHerrmannJohnson, KongMulderVeldhuizen,          # noqa: F401
                             Lagrange, Real, Serendipity,                                     # noqa: F401
                             TrimmedSerendipityCurl, TrimmedSerendipityDiv,                   # noqa: F401
                             TrimmedSerendipityEdge, TrimmedSerendipityFace,                  # noqa: F401

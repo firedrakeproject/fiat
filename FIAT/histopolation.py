@@ -12,7 +12,7 @@ import numpy
 from FIAT import finite_element, dual_set, functional, quadrature
 from FIAT.reference_element import LINE
 from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.barycentric_interpolation import LagrangePolynomialSet
+from FIAT.barycentric_interpolation import LagrangePolynomialSet, get_lagrange_points
 from FIAT.gauss_lobatto_legendre import GaussLobattoLegendre
 
 
@@ -21,34 +21,30 @@ class HistopolationDualSet(dual_set.DualSet):
 
     We define window functions w_j that satisfy
 
-    int_{K} w_j v dx = phi_j(v)   for all v in P_{k}
+    \int_{K} w_j v dx = \ell_j(v)   for all v in P_{k}
 
     where
 
-    phi_j(v) = 1/h_j int_{x_j}^{x_{j+1}} v dx
+    \ell_j(v) = 1/h_j \int_{[x_j, x_{j+1}]} v dx
 
     is the usual histopolation dual basis.
 
-    The DOFs are defined as integral moments against the window functions.
+    The DOFs are defined as integral moments against w_j.
     """
     def __init__(self, ref_el, degree):
         entity_ids = {0: {0: [], 1: []},
                       1: {0: list(range(0, degree+1))}}
 
-        embedded = GaussLobattoLegendre(ref_el, degree+1)
-        points = []
-        for node in embedded.dual_basis():
-            # Assert singleton point for each node.
-            pt, = node.get_point_dict().keys()
-            points.append(pt[0])
-        h = numpy.diff(numpy.array(points))
+        fe = GaussLobattoLegendre(ref_el, degree+1)
+        points = get_lagrange_points(fe.dual_basis())
+        h = numpy.diff(numpy.reshape(points, (-1,)))
         B = numpy.diag(1.0 / h[:-1], k=-1)
         numpy.fill_diagonal(B, -1.0 / h)
 
         rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
         self.rule = rule
 
-        phi = embedded.tabulate(1, rule.get_points())
+        phi = fe.tabulate(1, rule.get_points())
         wts = rule.get_weights()
         D = phi[(1, )][:-1]
         A = numpy.dot(numpy.multiply(D, wts), D.T)
@@ -61,7 +57,7 @@ class HistopolationDualSet(dual_set.DualSet):
         entity_permutations[0] = {0: {0: []}, 1: {0: []}}
         entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree + 1)}
 
-        super(HistopolationDualSet, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class Histopolation(finite_element.CiarletElement):
@@ -73,4 +69,4 @@ class Histopolation(finite_element.CiarletElement):
         dual = HistopolationDualSet(ref_el, degree)
         poly_set = LagrangePolynomialSet(ref_el, dual.rule.pts)
         formdegree = ref_el.get_spatial_dimension()  # n-form
-        super(Histopolation, self).__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree)
