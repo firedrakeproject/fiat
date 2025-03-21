@@ -35,6 +35,9 @@ class DualSet(object):
     def __iter__(self):
         return iter(self.nodes)
 
+    def __len__(self):
+        return len(self.nodes)
+
     def get_nodes(self):
         return self.nodes
 

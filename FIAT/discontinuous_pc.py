@@ -7,18 +7,12 @@
 # Modified by David A. Ham (david.ham@imperial.ac.uk), 2018
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import (Point,
-                                    DefaultLine,
-                                    UFCInterval,
-                                    UFCQuadrilateral,
-                                    UFCHexahedron,
-                                    UFCTriangle,
-                                    UFCTetrahedron,
-                                    make_affine_mapping,
+from FIAT.reference_element import (make_affine_mapping,
                                     flatten_reference_cube,
                                     cell_to_simplex)
 from FIAT.P0 import P0Dual
 import numpy as np
+
 
 class DPC0(finite_element.CiarletElement):
     def __init__(self, ref_el):
