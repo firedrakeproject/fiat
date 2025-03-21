@@ -8,16 +8,44 @@
 # Modified by David A. Ham (david.ham@imperial.ac.uk), 2015
 
 import itertools
-import math
+from math import factorial
 import numpy
+from recursivenodes.quadrature import gaussjacobi, lobattogaussjacobi, simplexgausslegendre
 
-from FIAT import reference_element, expansions, jacobi, orthopoly
+from FIAT import reference_element
+from FIAT.orientation_utils import make_entity_permutations_simplex
+
+
+def pseudo_determinant(A):
+    return numpy.sqrt(abs(numpy.linalg.det(numpy.dot(A.T, A))))
+
+
+def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
+    """Map quadrature points and weights defined on source_cell to target_cell.
+    """
+    while source_cell.get_parent():
+        source_cell = source_cell.get_parent()
+    A, b = reference_element.make_affine_mapping(source_cell.get_vertices(),
+                                                 target_cell.get_vertices())
+    if len(pts_ref.shape) != 2:
+        pts_ref = pts_ref.reshape(-1, A.shape[1])
+    scale = pseudo_determinant(A)
+    pts = numpy.dot(pts_ref, A.T)
+    pts = numpy.add(pts, b, out=pts)
+    wts = scale * wts_ref
+
+    # return immutable types
+    pts = tuple(map(tuple, pts))
+    wts = tuple(wts.flat)
+    if jacobian:
+        return pts, wts, A
+    return pts, wts
 
 
 class QuadratureRule(object):
     """General class that models integration over a reference element
-    as the weighted sum of a function evaluated at a set of points."""
-
+    as the weighted sum of a function evaluated at a set of points.
+    """
     def __init__(self, ref_el, pts, wts):
         if len(wts) != len(pts):
             raise ValueError("Have %d weights, but %d points" % (len(wts), len(pts)))
@@ -25,6 +53,7 @@ class QuadratureRule(object):
         self.ref_el = ref_el
         self.pts = pts
         self.wts = wts
+        self._intrinsic_orientation_permutation_map_tuple = (None, )
 
     def get_points(self):
         return numpy.array(self.pts)
@@ -33,36 +62,54 @@ class QuadratureRule(object):
         return numpy.array(self.wts)
 
     def integrate(self, f):
-        return sum([w * f(x) for (x, w) in zip(self.pts, self.wts)])
+        return sum(w * f(x) for x, w in zip(self.pts, self.wts))
+
+    @property
+    def extrinsic_orientation_permutation_map(self):
+        """A map from extrinsic orientations to corresponding axis permutation matrices.
+
+        Notes
+        -----
+        result[eo] gives the physical axis-reference axis permutation matrix corresponding to
+        eo (extrinsic orientation).
+
+        """
+        return self.ref_el.extrinsic_orientation_permutation_map
+
+    @property
+    def intrinsic_orientation_permutation_map_tuple(self):
+        """A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.
+
+        Notes
+        -----
+        result[axis][io] gives the physical point-reference point permutation array corresponding to
+        io (intrinsic orientation) on ``axis``.
+
+        """
+        if any(m is None for m in self._intrinsic_orientation_permutation_map_tuple):
+            raise ValueError("Must set _intrinsic_orientation_permutation_map_tuple")
+        return self._intrinsic_orientation_permutation_map_tuple
 
 
 class GaussJacobiQuadratureLineRule(QuadratureRule):
     """Gauss-Jacobi quadature rule determined by Jacobi weights a and b
     using m roots of m:th order Jacobi polynomial."""
 
-    def __init__(self, ref_el, m):
-        # this gives roots on the default (-1,1) reference element
-        #        (xs_ref, ws_ref) = compute_gauss_jacobi_rule(a, b, m)
-        (xs_ref, ws_ref) = compute_gauss_jacobi_rule(0., 0., m)
-
+    def __init__(self, ref_el, m, a=0, b=0):
         Ref1 = reference_element.DefaultLine()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        pts_ref, wts_ref = gaussjacobi(m, a, b)
+        pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+        QuadratureRule.__init__(self, ref_el, pts, wts)
+        # Set _intrinsic_orientation_permutation_map_tuple.
+        dim = 1
+        a = numpy.zeros((factorial(dim + 1), m), dtype=int)
+        for io, perm in make_entity_permutations_simplex(dim, m).items():
+            a[io, perm] = range(m)
+        self._intrinsic_orientation_permutation_map_tuple = (a, )
 
 
 class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
-    """Implement the Gauss-Lobatto-Legendre quadrature rules on the interval using
-    Greg von Winckel's implementation. This facilitates implementing
-    spectral elements.
+    """Gauss-Lobatto-Legendre quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-3.
     """
@@ -70,211 +117,109 @@ class GaussLobattoLegendreQuadratureLineRule(QuadratureRule):
         if m < 2:
             raise ValueError(
                 "Gauss-Labotto-Legendre quadrature invalid for fewer than 2 points")
-
         Ref1 = reference_element.DefaultLine()
-        verts = Ref1.get_vertices()
-
-        if m > 2:
-            # Calculate the recursion coefficients.
-            alpha, beta = orthopoly.rec_jacobi(m, 0, 0)
-            xs_ref, ws_ref = orthopoly.lobatto(alpha, beta, verts[0][0], verts[1][0])
-        else:
-            # Special case for lowest order.
-            xs_ref = [v[0] for v in verts[:]]
-            ws_ref = (0.5 * (xs_ref[1] - xs_ref[0]), ) * 2
-
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        pts_ref, wts_ref = lobattogaussjacobi(m, 0, 0)
+        pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+        QuadratureRule.__init__(self, ref_el, pts, wts)
 
 
-class GaussLegendreQuadratureLineRule(QuadratureRule):
-    """Produce the Gauss--Legendre quadrature rules on the interval using
-    the implementation in numpy. This facilitates implementing
-    discontinuous spectral elements.
+class GaussLegendreQuadratureLineRule(GaussJacobiQuadratureLineRule):
+    """Gauss--Legendre quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m):
-        if m < 1:
-            raise ValueError(
-                "Gauss-Legendre quadrature invalid for fewer than 2 points")
-
-        xs_ref, ws_ref = numpy.polynomial.legendre.leggauss(m)
-
-        A, b = reference_element.make_affine_mapping(((-1.,), (1.)),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
-
-        QuadratureRule.__init__(self, ref_el, xs, ws)
+        super().__init__(ref_el, m)
 
 
 class RadauQuadratureLineRule(QuadratureRule):
-    """Produce the Gauss--Radau quadrature rules on the interval using
-    an adaptation of Winkel's Matlab code.
+    """Gauss--Radau quadrature rule on the interval.
 
     The quadrature rule uses m points for a degree of precision of 2m-1.
     """
     def __init__(self, ref_el, m, right=True):
-        assert m >= 1
-        N = m - 1
-        # Use Chebyshev-Gauss-Radau nodes as initial guess for LGR nodes
-        x = -numpy.cos(2 * numpy.pi * numpy.linspace(0, N, m) / (2 * N + 1))
+        if m < 1:
+            raise ValueError(
+                "Gauss-Radau quadrature invalid for fewer than 1 points")
 
-        P = numpy.zeros((N + 1, N + 2))
+        right = int(right)
+        x0 = ref_el.vertices[right]
+        volume = ref_el.volume()
+        if m > 1:
+            # Make the interior points and weights
+            rule = GaussJacobiQuadratureLineRule(ref_el, m-1, right, 1-right)
+            # Remove the hat weight from the quadrature weights
+            x = rule.get_points().reshape((-1,))
+            hat = (2.0 / volume) * abs(x0[0] - x)
+            wts = rule.get_weights() / hat
+            pts = rule.pts
+        else:
+            # Special case for lowest order.
+            wts = ()
+            pts = ()
 
-        xold = 2
-
-        free = numpy.arange(1, N + 1, dtype='int')
-
-        while numpy.max(numpy.abs(x - xold)) > 5e-16:
-            xold = x.copy()
-
-            P[0, :] = (-1) ** numpy.arange(0, N + 2)
-            P[free, 0] = 1
-            P[free, 1] = x[free]
-
-            for k in range(2, N + 2):
-                P[free, k] = ((2 * k - 1) * x[free] * P[free, k - 1] - (k - 1) * P[free, k - 2]) / k
-
-            x[free] = xold[free] - ((1 - xold[free]) / (N + 1)) * (P[free, N] + P[free, N + 1]) / (P[free, N] - P[free, N + 1])
-
-        # The Legendre-Gauss-Radau Vandermonde
-        P = P[:, :-1]
-        # Compute the weights
-        w = numpy.zeros(N + 1)
-        w[0] = 2 / (N + 1) ** 2
-        w[free] = (1 - x[free])/((N + 1) * P[free, -1])**2
-
-        if right:
-            x = numpy.flip(-x)
-            w = numpy.flip(w)
-
-        xs_ref = x
-        ws_ref = w
-
-        A, b = reference_element.make_affine_mapping(((-1.,), (1.)),
-                                                     ref_el.get_vertices())
-
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        xs = tuple([tuple(mapping(x_ref)[0]) for x_ref in xs_ref])
-        ws = tuple([scale * w for w in ws_ref])
+        # Get the weight at the endpoint via sum(ws) == volume
+        w0 = volume - sum(wts)
+        xs = (*pts, x0) if right else (x0, *pts)
+        ws = (*wts, w0) if right else (w0, *wts)
 
         QuadratureRule.__init__(self, ref_el, xs, ws)
 
 
-class CollapsedQuadratureTriangleRule(QuadratureRule):
+class CollapsedQuadratureSimplexRule(QuadratureRule):
+    """Implements the collapsed quadrature rules defined in
+    Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
+    from the hypercube to the simplex."""
+
+    def __init__(self, ref_el, m):
+        dim = ref_el.get_spatial_dimension()
+        Ref1 = reference_element.default_simplex(dim)
+        pts_ref, wts_ref = simplexgausslegendre(dim, m)
+        pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+        QuadratureRule.__init__(self, ref_el, pts, wts)
+
+
+class CollapsedQuadratureTriangleRule(CollapsedQuadratureSimplexRule):
     """Implements the collapsed quadrature rules defined in
     Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
     from the square to the triangle."""
-
-    def __init__(self, ref_el, m):
-        ptx, wx = compute_gauss_jacobi_rule(0., 0., m)
-        pty, wy = compute_gauss_jacobi_rule(1., 0., m)
-
-        # map ptx , pty
-        pts_ref = [expansions.xi_triangle((x, y))
-                   for x in ptx for y in pty]
-
-        Ref1 = reference_element.DefaultTriangle()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        pts = tuple([tuple(mapping(x)) for x in pts_ref])
-
-        wts = [0.5 * scale * w1 * w2 for w1 in wx for w2 in wy]
-
-        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+    pass
 
 
-class CollapsedQuadratureTetrahedronRule(QuadratureRule):
+class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
     """Implements the collapsed quadrature rules defined in
     Karniadakis & Sherwin by mapping products of Gauss-Jacobi rules
     from the cube to the tetrahedron."""
-
-    def __init__(self, ref_el, m):
-        ptx, wx = compute_gauss_jacobi_rule(0., 0., m)
-        pty, wy = compute_gauss_jacobi_rule(1., 0., m)
-        ptz, wz = compute_gauss_jacobi_rule(2., 0., m)
-
-        # map ptx , pty
-        pts_ref = [expansions.xi_tetrahedron((x, y, z))
-                   for x in ptx for y in pty for z in ptz]
-
-        Ref1 = reference_element.DefaultTetrahedron()
-        A, b = reference_element.make_affine_mapping(Ref1.get_vertices(),
-                                                     ref_el.get_vertices())
-        mapping = lambda x: numpy.dot(A, x) + b
-
-        scale = numpy.linalg.det(A)
-
-        pts = tuple([tuple(mapping(x)) for x in pts_ref])
-
-        wts = [scale * 0.125 * w1 * w2 * w3
-               for w1 in wx for w2 in wy for w3 in wz]
-
-        QuadratureRule.__init__(self, ref_el, tuple(pts), tuple(wts))
+    pass
 
 
-class UFCTetrahedronFaceQuadratureRule(QuadratureRule):
-    """Highly specialized quadrature rule for the face of a
-    tetrahedron, mapped from a reference triangle, used for higher
-    order Nedelecs"""
+class FacetQuadratureRule(QuadratureRule):
+    """A quadrature rule on a facet mapped from a reference quadrature rule.
+    """
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref):
+        # Construct the facet of interest
+        facet = ref_el.construct_subelement(entity_dim)
+        facet_topology = ref_el.get_topology()[entity_dim][entity_id]
+        facet.vertices = ref_el.get_vertices_of_subcomplex(facet_topology)
 
-    def __init__(self, face_number, degree):
-
-        # Create quadrature rule on reference triangle
-        reference_triangle = reference_element.UFCTriangle()
-        reference_rule = make_quadrature(reference_triangle, degree)
-        ref_points = reference_rule.get_points()
-        ref_weights = reference_rule.get_weights()
-
-        # Get geometry information about the face of interest
-        reference_tet = reference_element.UFCTetrahedron()
-        face = reference_tet.get_topology()[2][face_number]
-        vertices = reference_tet.get_vertices_of_subcomplex(face)
-
-        # Use tet to map points and weights on the appropriate face
-        vertices = [numpy.array(list(vertex)) for vertex in vertices]
-        x0 = vertices[0]
-        J = numpy.vstack([vertices[1] - x0, vertices[2] - x0]).T
-        # This is just a very numpyfied way of writing J*p + x0:
-        points = numpy.einsum("ij,kj->ki", J, ref_points) + x0
-
-        # Map weights: multiply reference weights by sqrt(|J^T J|)
-        detJTJ = numpy.linalg.det(numpy.dot(J.T, J))
-        weights = numpy.sqrt(detJTJ) * ref_weights
+        # Map reference points and weights on the appropriate facet
+        pts_ref = Q_ref.get_points()
+        wts_ref = Q_ref.get_weights()
+        pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, facet, jacobian=True)
 
         # Initialize super class with new points and weights
-        QuadratureRule.__init__(self, reference_tet, points, weights)
-        self._reference_rule = reference_rule
+        QuadratureRule.__init__(self, facet, pts, wts)
         self._J = J
+        self._reference_rule = Q_ref
 
     def reference_rule(self):
         return self._reference_rule
 
     def jacobian(self):
         return self._J
+
+    def jacobian_determinant(self):
+        return pseudo_determinant(self._J)
 
 
 def make_quadrature(ref_el, m):
@@ -319,53 +264,3 @@ def make_tensor_product_quadrature(*quad_rules):
     wts = [numpy.prod(wt_tuple)
            for wt_tuple in itertools.product(*[q.wts for q in quad_rules])]
     return QuadratureRule(ref_el, pts, wts)
-
-
-# rule to get Gauss-Jacobi points
-def compute_gauss_jacobi_points(a, b, m):
-    """Computes the m roots of P_{m}^{a,b} on [-1,1] by Newton's method.
-    The initial guesses are the Chebyshev points.  Algorithm
-    implemented in Python from the pseudocode given by Karniadakis and
-    Sherwin"""
-    x = []
-    eps = 1.e-8
-    max_iter = 100
-    for k in range(0, m):
-        r = -math.cos((2.0 * k + 1.0) * math.pi / (2.0 * m))
-        if k > 0:
-            r = 0.5 * (r + x[k - 1])
-        j = 0
-        delta = 2 * eps
-        while j < max_iter:
-            s = 0
-            for i in range(0, k):
-                s = s + 1.0 / (r - x[i])
-            f = jacobi.eval_jacobi(a, b, m, r)
-            fp = jacobi.eval_jacobi_deriv(a, b, m, r)
-            delta = f / (fp - f * s)
-
-            r = r - delta
-
-            if math.fabs(delta) < eps:
-                break
-            else:
-                j = j + 1
-
-        x.append(r)
-    return x
-
-
-def compute_gauss_jacobi_rule(a, b, m):
-    xs = compute_gauss_jacobi_points(a, b, m)
-
-    a1 = math.pow(2, a + b + 1)
-    a2 = math.gamma(a + m + 1)
-    a3 = math.gamma(b + m + 1)
-    a4 = math.gamma(a + b + m + 1)
-    a5 = math.factorial(m)
-    a6 = a1 * a2 * a3 / a4 / a5
-
-    ws = [a6 / (1.0 - x**2.0) / jacobi.eval_jacobi_deriv(a, b, m, x)**2.0
-          for x in xs]
-
-    return xs, ws

@@ -9,10 +9,12 @@
 # Modified by Thomas H. Gibson (t.gibson15@imperial.ac.uk), 2016
 
 import numpy
+import scipy
+import warnings
 
+from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.dual_set import DualSet
 
 
 class FiniteElement(object):
@@ -21,7 +23,7 @@ class FiniteElement(object):
     this class are non-nodal unless they are CiarletElement subclasses.
     """
 
-    def __init__(self, ref_el, dual, order, formdegree=None, mapping="affine"):
+    def __init__(self, ref_el, dual, order, formdegree=None, mapping="affine", ref_complex=None):
         # Relevant attributes that do not necessarily depend on a PolynomialSet object:
         # The order (degree) of the polynomial basis
         self.order = order
@@ -31,12 +33,21 @@ class FiniteElement(object):
         self.ref_el = ref_el
         self.dual = dual
 
+        # when the finite element is a macro-element, the basis will be defined over
+        # a partition of the reference element into some complex.
+        self.ref_complex = ref_complex or ref_el
+
         # The appropriate mapping for the finite element space
         self._mapping = mapping
 
     def get_reference_element(self):
         """Return the reference element for the finite element."""
         return self.ref_el
+
+    def get_reference_complex(self):
+        """Return the reference element complex, which is either the reference element or
+        its subdivision in the case of a macro element."""
+        return self.ref_complex
 
     def get_dual_set(self):
         """Return the dual for the finite element."""
@@ -106,6 +117,9 @@ class FiniteElement(object):
         """
         return False
 
+    def is_macroelement(self):
+        return self.ref_el is not self.ref_complex
+
 
 class CiarletElement(FiniteElement):
     """Class implementing Ciarlet's abstraction of a finite element
@@ -115,40 +129,40 @@ class CiarletElement(FiniteElement):
     basis generated from polynomials encoded in a `PolynomialSet`.
     """
 
-    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_el=None):
-        ref_el = ref_el or poly_set.get_reference_element()
-        super(CiarletElement, self).__init__(ref_el, dual, order, formdegree, mapping)
+    def __init__(self, poly_set, dual, order, formdegree=None, mapping="affine", ref_complex=None):
+        ref_el = dual.get_reference_element()
+        ref_complex = ref_complex or poly_set.get_reference_element()
+        super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
+
+        if len(poly_set) != len(dual):
+            raise ValueError(f"Dimension of function space is {len(poly_set)}, but got {len(dual)} nodes.")
 
         # build generalized Vandermonde matrix
         old_coeffs = poly_set.get_coeffs()
         dualmat = dual.to_riesz(poly_set)
 
         shp = dualmat.shape
-        if len(shp) > 2:
-            num_cols = numpy.prod(shp[1:])
-
-            A = numpy.reshape(dualmat, (dualmat.shape[0], num_cols))
-            B = numpy.reshape(old_coeffs, (old_coeffs.shape[0], num_cols))
-        else:
-            A = dualmat
-            B = old_coeffs
-
+        A = dualmat.reshape((shp[0], -1))
+        B = old_coeffs.reshape((shp[0], -1))
         V = numpy.dot(A, numpy.transpose(B))
         self.V = V
 
-        Vinv = numpy.linalg.inv(V)
+        # new_coeffs_flat = numpy.linalg.solve(V.T, B)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error")
+            try:
+                new_coeffs_flat = scipy.linalg.solve(V, B, transposed=True)
+            except (scipy.linalg.LinAlgWarning, scipy.linalg.LinAlgError):
+                raise numpy.linalg.LinAlgError("Singular Vandermonde matrix")
 
-        new_coeffs_flat = numpy.dot(numpy.transpose(Vinv), B)
+        new_shp = new_coeffs_flat.shape[:1] + shp[1:]
+        new_coeffs = new_coeffs_flat.reshape(new_shp)
 
-        new_shp = tuple([new_coeffs_flat.shape[0]] + list(shp[1:]))
-        new_coeffs = numpy.reshape(new_coeffs_flat, new_shp)
-
-        self.poly_set = PolynomialSet(ref_el,
+        self.poly_set = PolynomialSet(poly_set.get_reference_element(),
                                       poly_set.get_degree(),
                                       poly_set.get_embedded_degree(),
                                       poly_set.get_expansion_set(),
-                                      new_coeffs,
-                                      poly_set.get_dmats())
+                                      new_coeffs)
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."
@@ -180,7 +194,7 @@ class CiarletElement(FiniteElement):
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        return self.poly_set.tabulate(list(map(transform, points)), order)
+        return self.poly_set.tabulate(transform(points), order)
 
     def value_shape(self):
         "Return the value shape of the finite element functions."
@@ -232,10 +246,10 @@ def entity_support_dofs(elem, entity_dim):
     result = {}
     for f in elem.entity_dofs()[entity_dim].keys():
         entity_transform = ref_el.get_entity_transform(entity_dim, f)
-        points = list(map(entity_transform, quad.get_points()))
+        points = entity_transform(quad.get_points())
 
         # Integrate the square of the basis functions on the facet.
-        vals = numpy.double(elem.tabulate(0, points)[(0,) * dim])
+        vals = elem.tabulate(0, points)[(0,) * dim]
         # Ints contains the square of the basis functions
         # integrated over the facet.
         if elem.value_shape():

@@ -1,3 +1,0 @@
-numpy
-sympy
-sphinx==1.7.0

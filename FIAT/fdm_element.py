@@ -9,12 +9,12 @@
 import abc
 import numpy
 
-from FIAT import finite_element, dual_set, functional, quadrature
-from FIAT.reference_element import LINE
-from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.hierarchical import IntegratedLegendre
+from FIAT import dual_set, finite_element, functional, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
+from FIAT.hierarchical import IntegratedLegendre
+from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.P0 import P0Dual
+from FIAT.reference_element import LINE
 
 
 def sym_eig(A, B):
@@ -53,7 +53,10 @@ class FDMDual(dual_set.DualSet):
         self.embedded = embedded
 
         vertices = ref_el.get_vertices()
-        rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
+        if bc_order == 1 and formdegree == 0:
+            rule = quadrature.GaussLobattoLegendreQuadratureLineRule(ref_el, edim+1)
+        else:
+            rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
         self.rule = rule
 
         solve_eig = sym_eig
@@ -137,7 +140,7 @@ class FDMDual(dual_set.DualSet):
             entity_permutations = {}
             entity_permutations[0] = {0: {0: []}, 1: {0: []}}
             entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree + 1)}
-        super(FDMDual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
@@ -163,13 +166,12 @@ class FDMFiniteElement(finite_element.CiarletElement):
         else:
             dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
                            formdegree=self._formdegree, orthogonalize=self._orthogonalize)
-
         if self._formdegree == 0:
             poly_set = dual.embedded.poly_set
         else:
             lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
             poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
-        super(FDMFiniteElement, self).__init__(poly_set, dual, degree, self._formdegree)
+        super().__init__(poly_set, dual, degree, self._formdegree)
 
 
 class FDMLagrange(FDMFiniteElement):

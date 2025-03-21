@@ -5,18 +5,21 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import numpy as np
+import math
 
+from FIAT.expansions import polynomial_entity_ids
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
+from FIAT.barycentric_interpolation import LagrangeLineExpansionSet
 
 __all__ = ['NodalEnrichedElement']
 
 
 class NodalEnrichedElement(CiarletElement):
     """NodalEnriched element is a direct sum of a sequence of
-    finite elements. Dual basis is reorthogonalized to the
-    primal basis for nodality.
+    finite elements. Primal basis is reorthogonalized to the
+    dual basis for nodality.
 
     The following is equivalent:
         * the constructor is well-defined,
@@ -35,35 +38,39 @@ class NodalEnrichedElement(CiarletElement):
                              "of NodalEnrichedElement are nodal")
 
         # Extract common data
-        ref_el = elements[0].get_reference_element()
-        expansion_set = elements[0].get_nodal_basis().get_expansion_set()
-        degree = min(e.get_nodal_basis().get_degree() for e in elements)
-        embedded_degree = max(e.get_nodal_basis().get_embedded_degree()
-                              for e in elements)
+        embedded_degrees = [e.get_nodal_basis().get_embedded_degree() for e in elements]
+        embedded_degree = max(embedded_degrees)
+        degree = max(e.degree() for e in elements)
         order = max(e.get_order() for e in elements)
-        mapping = elements[0].mapping()[0]
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
-        value_shape = elements[0].value_shape()
+        # LagrangeExpansionSet has fixed degree, ensure we grab the highest one
+        elem = elements[embedded_degrees.index(embedded_degree)]
+        ref_el = elem.get_reference_complex()
+        expansion_set = elem.get_nodal_basis().get_expansion_set()
+        mapping = elem.mapping()[0]
+        value_shape = elem.value_shape()
 
         # Sanity check
-        assert all(e.get_nodal_basis().get_reference_element() ==
-                   ref_el for e in elements)
-        assert all(type(e.get_nodal_basis().get_expansion_set()) ==
-                   type(expansion_set) for e in elements)
-        assert all(e_mapping == mapping for e in elements
-                   for e_mapping in e.mapping())
+        assert all(e.get_reference_complex() == ref_el for e in elements)
+        assert all(set(e.mapping()) == {mapping, } for e in elements)
         assert all(e.value_shape() == value_shape for e in elements)
 
         # Merge polynomial sets
-        coeffs = _merge_coeffs([e.get_coeffs() for e in elements])
-        dmats = _merge_dmats([e.dmats() for e in elements])
+        if isinstance(expansion_set, LagrangeLineExpansionSet):
+            # Obtain coefficients via interpolation
+            points = expansion_set.get_points()
+            coeffs = np.vstack([e.tabulate(0, points)[(0,)] for e in elements])
+        else:
+            assert all(e.get_nodal_basis().get_expansion_set() == expansion_set
+                       for e in elements)
+            coeffs = [e.get_coeffs() for e in elements]
+            coeffs = _merge_coeffs(coeffs, ref_el, embedded_degrees, expansion_set.continuity)
         poly_set = PolynomialSet(ref_el,
                                  degree,
                                  embedded_degree,
                                  expansion_set,
-                                 coeffs,
-                                 dmats)
+                                 coeffs)
 
         # Renumber dof numbers
         offsets = np.cumsum([0] + [e.space_dimension() for e in elements[:-1]])
@@ -72,15 +79,18 @@ class NodalEnrichedElement(CiarletElement):
 
         # Merge dual bases
         nodes = [node for e in elements for node in e.dual_basis()]
+        ref_el = ref_el.get_parent() or ref_el
         dual_set = DualSet(nodes, ref_el, entity_ids)
 
         # CiarletElement constructor adjusts poly_set coefficients s.t.
         # dual_set is really dual to poly_set
-        super(NodalEnrichedElement, self).__init__(poly_set, dual_set, order,
-                                                   formdegree=formdegree, mapping=mapping)
+        super().__init__(poly_set, dual_set, order, formdegree=formdegree, mapping=mapping)
 
 
-def _merge_coeffs(coeffss):
+def _merge_coeffs(coeffss, ref_el, degrees, continuity):
+    # Indices of the hierachical expansion set on each facet
+    entity_ids = polynomial_entity_ids(ref_el, max(degrees), continuity)
+
     # Number of bases members
     total_dim = sum(c.shape[0] for c in coeffss)
 
@@ -92,39 +102,38 @@ def _merge_coeffs(coeffss):
     max_expansion_dim = max(c.shape[-1] for c in coeffss)
 
     # Compose new coeffs
-    shape = (total_dim,) + value_shape + (max_expansion_dim,)
+    shape = (total_dim, *value_shape, max_expansion_dim)
     new_coeffs = np.zeros(shape, dtype=coeffss[0].dtype)
     counter = 0
-    for c in coeffss:
-        dim = c.shape[0]
-        expansion_dim = c.shape[-1]
-        new_coeffs[counter:counter+dim, ..., :expansion_dim] = c
-        counter += dim
+    for c, degree in zip(coeffss, degrees):
+        ids = []
+        if continuity == "C0":
+            dims = sorted(entity_ids)
+        else:
+            dims = (ref_el.get_spatial_dimension(),)
+        for dim in dims:
+            if continuity == "C0":
+                dimPk = math.comb(degree - 1, dim)
+            else:
+                dimPk = math.comb(degree + dim, dim)
+            for entity in sorted(entity_ids[dim]):
+                ids.extend(entity_ids[dim][entity][:dimPk])
+
+        num_members = c.shape[0]
+        new_coeffs[counter:counter+num_members, ..., ids] = c
+        counter += num_members
     assert counter == total_dim
     return new_coeffs
-
-
-def _merge_dmats(dmatss):
-    shape, arg = max((dmats[0].shape, args) for args, dmats in enumerate(dmatss))
-    assert len(shape) == 2 and shape[0] == shape[1]
-    new_dmats = []
-    for dim in range(len(dmatss[arg])):
-        new_dmats.append(dmatss[arg][dim].copy())
-        for dmats in dmatss:
-            sl = slice(0, dmats[dim].shape[0]), slice(0, dmats[dim].shape[1])
-            assert np.allclose(dmats[dim], new_dmats[dim][sl]), \
-                "dmats of elements to be directly summed are not matching!"
-    return new_dmats
 
 
 def _merge_entity_ids(entity_ids, offsets):
     ret = {}
     for i, ids in enumerate(entity_ids):
         for dim in ids:
-            if not ret.get(dim):
+            if dim not in ret:
                 ret[dim] = {}
             for entity in ids[dim]:
-                if not ret[dim].get(entity):
+                if entity not in ret[dim]:
                     ret[dim][entity] = []
-                ret[dim][entity] += (np.array(ids[dim][entity]) + offsets[i]).tolist()
+                ret[dim][entity].extend(np.array(ids[dim][entity]) + offsets[i])
     return ret

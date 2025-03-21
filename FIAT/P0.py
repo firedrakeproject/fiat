@@ -17,36 +17,30 @@ import numpy
 class P0Dual(dual_set.DualSet):
     def __init__(self, ref_el):
         entity_ids = {}
-        nodes = []
         entity_permutations = {}
-        vs = numpy.array(ref_el.get_vertices())
-        if ref_el.get_dimension() == 0:
-            bary = ()
-        else:
-            bary = tuple(numpy.average(vs, 0))
-
-        nodes = [functional.PointEvaluation(ref_el, bary)]
-        entity_ids = {}
+        sd = ref_el.get_dimension()
         top = ref_el.get_topology()
+        if sd == 0:
+            pts = [tuple() for entity in sorted(top[sd])]
+        else:
+            pts = [tuple(numpy.average(ref_el.get_vertices_of_subcomplex(top[sd][entity]), 0))
+                   for entity in sorted(top[sd])]
+        nodes = [functional.PointEvaluation(ref_el, pt) for pt in pts]
         for dim in sorted(top):
             entity_ids[dim] = {}
             entity_permutations[dim] = {}
             sym_size = ref_el.symmetry_group_size(dim)
+            num_points = 1 if dim == sd else 0
             if isinstance(dim, tuple):
                 assert isinstance(sym_size, tuple)
-                perms = {o: [] for o in numpy.ndindex(sym_size)}
+                perms = {o: list(range(num_points)) for o in numpy.ndindex(sym_size)}
             else:
-                perms = {o: [] for o in range(sym_size)}
+                perms = {o: list(range(num_points)) for o in range(sym_size)}
             for entity in sorted(top[dim]):
-                entity_ids[dim][entity] = []
+                entity_ids[dim][entity] = [entity] if dim == sd else []
                 entity_permutations[dim][entity] = perms
-        entity_ids[dim] = {0: [0]}
-        if isinstance(dim, tuple):
-            entity_permutations[dim][0] = {o: [0] for o in numpy.ndindex(sym_size)}
-        else:
-            entity_permutations[dim][0] = {o: [0] for o in range(sym_size)}
 
-        super(P0Dual, self).__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
 
 
 class P0(finite_element.CiarletElement):
@@ -55,4 +49,4 @@ class P0(finite_element.CiarletElement):
         dual = P0Dual(ref_el)
         degree = 0
         formdegree = ref_el.get_spatial_dimension()  # n-form
-        super(P0, self).__init__(poly_set, dual, degree, formdegree)
+        super().__init__(poly_set, dual, degree, formdegree)

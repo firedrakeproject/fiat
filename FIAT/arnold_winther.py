@@ -9,158 +9,125 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 
-from FIAT.finite_element import CiarletElement
-from FIAT.dual_set import DualSet
-from FIAT.polynomial_set import ONSymTensorPolynomialSet, ONPolynomialSet
-from FIAT.functional import (
-    PointwiseInnerProductEvaluation as InnerProduct,
-    FrobeniusIntegralMoment as FIM,
-    IntegralMomentOfTensorDivergence,
-    IntegralLegendreNormalNormalMoment,
-    IntegralLegendreNormalTangentialMoment)
-
-from FIAT.quadrature import make_quadrature
+from FIAT import finite_element, dual_set, polynomial_set
+from FIAT.reference_element import TRIANGLE
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.functional import (ComponentPointEvaluation,
+                             TensorBidirectionalIntegralMoment,
+                             IntegralMomentOfTensorDivergence,
+                             IntegralLegendreNormalNormalMoment,
+                             IntegralLegendreNormalTangentialMoment)
 
 import numpy
 
 
-class ArnoldWintherNCDual(DualSet):
-    def __init__(self, cell, degree):
-        if not degree == 2:
-            raise ValueError("Nonconforming Arnold-Winther elements are"
-                             "only defined for degree 2.")
-        dofs = []
-        dof_ids = {}
-        dof_ids[0] = {0: [], 1: [], 2: []}
-        dof_ids[1] = {0: [], 1: [], 2: []}
-        dof_ids[2] = {0: []}
+class ArnoldWintherNCDual(dual_set.DualSet):
+    def __init__(self, ref_el, degree=2):
+        if degree != 2:
+            raise ValueError("Nonconforming Arnold-Winther elements are only defined for degree 2.")
+        top = ref_el.get_topology()
+        sd = ref_el.get_spatial_dimension()
+        entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
+        nodes = []
 
-        dof_cur = 0
         # no vertex dofs
         # proper edge dofs now (not the contraints)
-        # moments of normal . sigma against constants and linears.
-        for entity_id in range(3):                  # a triangle has 3 edges
-            for order in (0, 1):
-                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
-                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
-            dof_ids[1][entity_id] = list(range(dof_cur, dof_cur+4))
-            dof_cur += 4
+        # edge dofs: bidirectional nn and nt moments against P1.
+        qdegree = degree + 2
+        for entity in sorted(top[1]):
+            cur = len(nodes)
+            for order in range(2):
+                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, order, qdegree))
+                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity, order, qdegree))
+            entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # internal dofs: constant moments of three unique components
-        Q = make_quadrature(cell, 2)
-
-        e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
-        e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
-        basis = [(e1, e1), (e1, e2), (e2, e2)]    # basis for symmetric matrices
-        for (v1, v2) in basis:
-            v1v2t = numpy.outer(v1, v2)
-            fatqp = numpy.zeros((2, 2, len(Q.pts)))
-            for i, y in enumerate(v1v2t):
-                for j, x in enumerate(y):
-                    for k in range(len(Q.pts)):
-                        fatqp[i, j, k] = x
-            dofs.append(FIM(cell, Q, fatqp))
-        dof_ids[2][0] = list(range(dof_cur, dof_cur + 3))
-        dof_cur += 3
+        cur = len(nodes)
+        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
+        Q = create_quadrature(ref_el, degree)
+        phi = numpy.full(Q.get_weights().shape, 1/ref_el.volume())
+        nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n[i+1], n[j+1], Q, phi)
+                     for i in range(sd) for j in range(i, sd))
+        entity_ids[2][0].extend(range(cur, len(nodes)))
 
         # put the constraint dofs last.
-        for entity_id in range(3):
-            dof = IntegralLegendreNormalNormalMoment(cell, entity_id, 2, 6)
-            dofs.append(dof)
-            dof_ids[1][entity_id].append(dof_cur)
-            dof_cur += 1
+        for entity in sorted(top[1]):
+            cur = len(nodes)
+            nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, 2, qdegree))
+            entity_ids[1][entity].append(cur)
 
-        super(ArnoldWintherNCDual, self).__init__(dofs, cell, dof_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
-class ArnoldWintherNC(CiarletElement):
+class ArnoldWintherNC(finite_element.CiarletElement):
     """The definition of the nonconforming Arnold-Winther element.
     """
-    def __init__(self, cell, degree):
-        assert degree == 2, "Only defined for degree 2"
-        Ps = ONSymTensorPolynomialSet(cell, degree)
-        Ls = ArnoldWintherNCDual(cell, degree)
+    def __init__(self, ref_el, degree=2):
+        if ref_el.shape != TRIANGLE:
+            raise ValueError(f"{type(self).__name__} only defined on triangles")
+        Ps = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        Ls = ArnoldWintherNCDual(ref_el, degree)
+        formdegree = ref_el.get_spatial_dimension() - 1
         mapping = "double contravariant piola"
-
-        super(ArnoldWintherNC, self).__init__(Ps, Ls, degree,
-                                              mapping=mapping)
+        super().__init__(Ps, Ls, degree, formdegree, mapping=mapping)
 
 
-class ArnoldWintherDual(DualSet):
-    def __init__(self, cell, degree):
-        if not degree == 3:
-            raise ValueError("Arnold-Winther elements are"
-                             "only defined for degree 3.")
-        dofs = []
-        dof_ids = {}
-        dof_ids[0] = {0: [], 1: [], 2: []}
-        dof_ids[1] = {0: [], 1: [], 2: []}
-        dof_ids[2] = {0: []}
-
-        dof_cur = 0
+class ArnoldWintherDual(dual_set.DualSet):
+    def __init__(self, ref_el, degree=3):
+        if degree != 3:
+            raise ValueError("Arnold-Winther elements are only defined for degree 3.")
+        top = ref_el.get_topology()
+        sd = ref_el.get_spatial_dimension()
+        shp = (sd, sd)
+        entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
+        nodes = []
 
         # vertex dofs
-        vs = cell.get_vertices()
-        e1 = numpy.array([1.0, 0.0])
-        e2 = numpy.array([0.0, 1.0])
-        basis = [(e1, e1), (e1, e2), (e2, e2)]
+        for v in sorted(top[0]):
+            cur = len(nodes)
+            pt, = ref_el.make_points(0, v, degree)
+            nodes.extend(ComponentPointEvaluation(ref_el, (i, j), shp, pt)
+                         for i in range(sd) for j in range(i, sd))
+            entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        dof_cur = 0
+        # edge dofs: bidirectional nn and nt moments against P_{k-2}
+        max_order = degree - 2
+        qdegree = degree + max_order
+        for entity in sorted(top[1]):
+            cur = len(nodes)
+            for order in range(max_order+1):
+                nodes.append(IntegralLegendreNormalNormalMoment(ref_el, entity, order, qdegree))
+                nodes.append(IntegralLegendreNormalTangentialMoment(ref_el, entity, order, qdegree))
+            entity_ids[1][entity].extend(range(cur, len(nodes)))
 
-        for entity_id in range(3):
-            node = tuple(vs[entity_id])
-            for (v1, v2) in basis:
-                dofs.append(InnerProduct(cell, v1, v2, node))
-            dof_ids[0][entity_id] = list(range(dof_cur, dof_cur + 3))
-            dof_cur += 3
+        # internal dofs: moments of unique components against P_{k-3}
+        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
+        Q = create_quadrature(ref_el, 2*(degree-1))
+        P = polynomial_set.ONPolynomialSet(ref_el, degree-3, scale="L2 piola")
+        phis = P.tabulate(Q.get_points())[(0,)*sd]
+        nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n[i+1], n[j+1], Q, phi)
+                     for phi in phis for i in range(sd) for j in range(i, sd))
 
-        # edge dofs now
-        # moments of normal . sigma against constants and linears.
-        for entity_id in range(3):
-            for order in (0, 1):
-                dofs += [IntegralLegendreNormalNormalMoment(cell, entity_id, order, 6),
-                         IntegralLegendreNormalTangentialMoment(cell, entity_id, order, 6)]
-            dof_ids[1][entity_id] = list(range(dof_cur, dof_cur+4))
-            dof_cur += 4
+        # constraint dofs: moments of divergence against P_{k-1} \ P_{k-2}
+        P = polynomial_set.ONPolynomialSet(ref_el, degree-1, shape=(sd,))
+        dimPkm1 = P.expansion_set.get_num_members(degree-1)
+        dimPkm2 = P.expansion_set.get_num_members(degree-2)
+        PH = P.take([i + j * dimPkm1 for j in range(sd) for i in range(dimPkm2, dimPkm1)])
+        phis = PH.tabulate(Q.get_points())[(0,)*sd]
+        nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
 
-        # internal dofs: constant moments of three unique components
-        Q = make_quadrature(cell, 3)
-
-        e1 = numpy.array([1.0, 0.0])              # euclidean basis 1
-        e2 = numpy.array([0.0, 1.0])              # euclidean basis 2
-        basis = [(e1, e1), (e1, e2), (e2, e2)]    # basis for symmetric matrices
-        for (v1, v2) in basis:
-            v1v2t = numpy.outer(v1, v2)
-            fatqp = numpy.zeros((2, 2, len(Q.pts)))
-            for k in range(len(Q.pts)):
-                fatqp[:, :, k] = v1v2t
-            dofs.append(FIM(cell, Q, fatqp))
-        dof_ids[2][0] = list(range(dof_cur, dof_cur + 3))
-        dof_cur += 3
-
-        # Constraint dofs
-
-        Q = make_quadrature(cell, 5)
-
-        onp = ONPolynomialSet(cell, 2, (2,))
-        pts = Q.get_points()
-        onpvals = onp.tabulate(pts)[0, 0]
-
-        for i in list(range(3, 6)) + list(range(9, 12)):
-            dofs.append(IntegralMomentOfTensorDivergence(cell, Q,
-                                                         onpvals[i, :, :]))
-
-        dof_ids[2][0] += list(range(dof_cur, dof_cur+6))
-
-        super(ArnoldWintherDual, self).__init__(dofs, cell, dof_ids)
+        entity_ids[2][0].extend(range(cur, len(nodes)))
+        super().__init__(nodes, ref_el, entity_ids)
 
 
-class ArnoldWinther(CiarletElement):
+class ArnoldWinther(finite_element.CiarletElement):
     """The definition of the conforming Arnold-Winther element.
     """
-    def __init__(self, cell, degree):
-        assert degree == 3, "Only defined for degree 3"
-        Ps = ONSymTensorPolynomialSet(cell, degree)
-        Ls = ArnoldWintherDual(cell, degree)
+    def __init__(self, ref_el, degree=3):
+        if ref_el.shape != TRIANGLE:
+            raise ValueError(f"{type(self).__name__} only defined on triangles")
+        Ps = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        Ls = ArnoldWintherDual(ref_el, degree)
+        formdegree = ref_el.get_spatial_dimension() - 1
         mapping = "double contravariant piola"
-        super(ArnoldWinther, self).__init__(Ps, Ls, degree, mapping=mapping)
+        super().__init__(Ps, Ls, degree, formdegree, mapping=mapping)

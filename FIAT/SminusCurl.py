@@ -88,11 +88,11 @@ class TrimmedSerendipity(FiniteElement):
 
         entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
 
-        super(TrimmedSerendipity, self).__init__(ref_el=ref_el,
-                                                 dual=None,
-                                                 order=degree,
-                                                 formdegree=formdegree,
-                                                 mapping=mapping)
+        super().__init__(ref_el=ref_el,
+                         dual=None,
+                         order=degree,
+                         formdegree=formdegree,
+                         mapping=mapping)
 
         topology = ref_el.get_topology()
         unflattening_map = compute_unflattening_map(topology)
@@ -131,7 +131,7 @@ class TrimmedSerendipity(FiniteElement):
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        points = list(map(transform, points))
+        points = transform(points)
 
         phivals = {}
 
@@ -231,7 +231,7 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
 
             Sminus_list = EL + FL
             self.basis = {(0, 0): Array(Sminus_list)}
-            super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
+            super().__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
 
 
 def e_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):

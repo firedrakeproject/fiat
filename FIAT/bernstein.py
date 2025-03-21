@@ -12,6 +12,8 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import mis
+from FIAT.pointwise_dual import compute_pointwise_dual
+from FIAT.reference_element import make_lattice
 
 
 class BernsteinDualSet(DualSet):
@@ -43,7 +45,7 @@ class BernsteinDualSet(DualSet):
             # Leave nodes unimplemented for now
             nodes.append(None)
 
-        super(BernsteinDualSet, self).__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Bernstein(FiniteElement):
@@ -52,7 +54,10 @@ class Bernstein(FiniteElement):
     def __init__(self, ref_el, degree):
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
-        super(Bernstein, self).__init__(ref_el, dual, degree, k)
+        super().__init__(ref_el, dual, degree, k)
+        pts = make_lattice(ref_el.vertices, degree, variant="gll")
+        newdual = compute_pointwise_dual(self, pts)
+        self.dual = newdual
 
     def degree(self):
         """The degree of the polynomial space."""
@@ -75,24 +80,26 @@ class Bernstein(FiniteElement):
         """
         # Transform points to reference cell coordinates
         ref_el = self.get_reference_element()
+        dim = ref_el.get_spatial_dimension()
         if entity is None:
-            entity = (ref_el.get_spatial_dimension(), 0)
+            entity = (dim, 0)
 
         entity_dim, entity_id = entity
         entity_transform = ref_el.get_entity_transform(entity_dim, entity_id)
-        cell_points = list(map(entity_transform, points))
+
+        points = numpy.asarray(points)
+        cell_points = entity_transform(points)
 
         # Construct Cartesian to Barycentric coordinate mapping
         vs = numpy.asarray(ref_el.get_vertices())
         B2R = numpy.vstack([vs.T, numpy.ones(len(vs))])
         R2B = numpy.linalg.inv(B2R)
 
-        B = numpy.hstack([cell_points,
-                          numpy.ones((len(cell_points), 1))]).dot(R2B.T)
+        B = numpy.concatenate([cell_points, numpy.ones((*cell_points.shape[:-1], 1))
+                               ], axis=-1).dot(R2B.T)
 
         # Evaluate everything
         deg = self.degree()
-        dim = ref_el.get_spatial_dimension()
         raw_result = {(alpha, i): vec
                       for i, ks in enumerate(mis(dim + 1, deg))
                       for o in range(order + 1)
@@ -101,11 +108,11 @@ class Bernstein(FiniteElement):
         # Rearrange result
         space_dim = self.space_dimension()
         dtype = numpy.array(list(raw_result.values())).dtype
-        result = {alpha: numpy.zeros((space_dim, len(cell_points)), dtype=dtype)
+        result = {alpha: numpy.zeros((space_dim, *points.shape[:-1]), dtype=dtype)
                   for o in range(order + 1)
                   for alpha in mis(dim, o)}
         for (alpha, i), vec in raw_result.items():
-            result[alpha][i, :] = vec
+            result[alpha][i] = vec
         return result
 
 
@@ -122,7 +129,7 @@ def bernstein_db(points, ks, alpha=None):
     points = numpy.asarray(points)
     ks = numpy.array(tuple(ks))
 
-    N, d_1 = points.shape
+    *shp, d_1 = points.shape
     assert d_1 == len(ks)
 
     if alpha is None:
@@ -141,7 +148,7 @@ def bernstein_db(points, ks, alpha=None):
         coeff = math.factorial(ks.sum())
         for k in ls:
             coeff //= math.factorial(k)
-        return coeff * numpy.prod(points**ls, axis=1)
+        return coeff * numpy.prod(points**ls, axis=-1)
 
 
 def bernstein_Dx(points, ks, order, R2B):
@@ -160,7 +167,7 @@ def bernstein_Dx(points, ks, order, R2B):
     points = numpy.asarray(points)
     ks = tuple(ks)
 
-    N, d_1 = points.shape
+    *shp, d_1 = points.shape
     assert d_1 == len(ks)
 
     # Collect derivatives according to barycentric coordinates
@@ -170,12 +177,10 @@ def bernstein_Dx(points, ks, order, R2B):
     # Arrange derivative tensor (barycentric coordinates)
     dtype = numpy.array(list(Db_map.values())).dtype
     Db_shape = (d_1,) * order
-    Db_tensor = numpy.empty(Db_shape + (N,), dtype=dtype)
+    Db_tensor = numpy.empty(Db_shape + tuple(shp), dtype=dtype)
     for ds in numpy.ndindex(Db_shape):
-        alpha = [0] * d_1
-        for d in ds:
-            alpha[d] += 1
-        Db_tensor[ds + (slice(None),)] = Db_map[tuple(alpha)]
+        alpha = tuple(map(ds.count, range(d_1)))
+        Db_tensor[ds] = Db_map[alpha]
 
     # Coordinate transformation: barycentric -> reference
     result = {}
