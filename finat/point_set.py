@@ -224,8 +224,13 @@ class TensorPointSet(AbstractPointSet):
                 for s, o in zip(self.factors, other.factors))
 
 
-class MappedPointSet(AbstractPointSet):
+class FacetPointSet(AbstractPointSet):
+    """A point set constructed by mapping a lower-dimensional point set onto all facets
+    of a higher-dimensional cell.
 
+    :arg cell: The FIAT.Cell.`
+    :arg ps: The reference PointSet.
+    """
     def __init__(self, cell, ps):
         self.cell = cell
         self.ps = ps
@@ -235,6 +240,7 @@ class MappedPointSet(AbstractPointSet):
 
     @cached_property
     def entities(self):
+        """The list of all cell entites matching the reference point set dimension."""
         to_int = lambda x: sum(x) if isinstance(x, tuple) else x
         top = self.cell.topology
         return [(dim, entity)
@@ -244,6 +250,7 @@ class MappedPointSet(AbstractPointSet):
 
     @cached_property
     def points(self):
+        """The array with the reference points mapped onto each facet."""
         ref_pts = self.ps.points
         pts = [self.cell.get_entity_transform(dim, entity)(ref_pts)
                for dim, entity in self.entities]
@@ -251,11 +258,12 @@ class MappedPointSet(AbstractPointSet):
 
     @cached_property
     def indices(self):
+        """An Index tuple of the facet index and the reference point indices."""
         return (gem.Index(extent=len(self.entities)), *self.ps.indices)
 
     @cached_property
     def expression(self):
-        raise NotImplementedError("Should not use MappedPointSet like this")
+        raise NotImplementedError("Symbolic point expression is not yet implemented for FacetPointSet.")
 
     def almost_equal(self, other, tolerance=1e-12):
         """Approximate numerical equality of point sets"""

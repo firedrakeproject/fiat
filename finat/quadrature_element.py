@@ -1,4 +1,4 @@
-from finat.point_set import UnknownPointSet, MappedPointSet
+from finat.point_set import UnknownPointSet, FacetPointSet
 
 import numpy
 
@@ -92,7 +92,7 @@ class QuadratureElement(FiniteElementBase):
     def _point_set(self):
         ps = self._rule.point_set
         sd = self.cell.get_spatial_dimension()
-        return ps if ps.dimension == sd else MappedPointSet(self.cell, ps)
+        return ps if ps.dimension == sd else FacetPointSet(self.cell, ps)
 
     @property
     def index_shape(self):
@@ -140,14 +140,14 @@ class QuadratureElement(FiniteElementBase):
             raise ValueError("Mismatch of quadrature points!")
 
         # Return an outer product of identity matrices
-        multiindex = self.get_indices()
-        fid = ps.indices
-        if len(multiindex) > len(fid):
-            fid = (entity_id, *fid)
-        product = gem.Delta(fid, multiindex)
+        basis_indices = self.get_indices()
+        point_indices = ps.indices
+        if len(basis_indices) > len(point_indices):
+            point_indices = (entity_id, *point_indices)
+        delta = gem.Delta(point_indices, basis_indices)
 
         sd = self.cell.get_spatial_dimension()
-        return {(0,) * sd: gem.ComponentTensor(product, multiindex)}
+        return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
 
     def point_evaluation(self, order, refcoords, entity=None):
         raise NotImplementedError("QuadratureElement cannot do point evaluation!")
