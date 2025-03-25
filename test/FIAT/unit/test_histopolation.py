@@ -27,6 +27,7 @@ from FIAT.barycentric_interpolation import get_lagrange_points
 from FIAT.macro import IsoSplit
 from FIAT.quadrature_schemes import create_quadrature
 
+
 @pytest.fixture
 def interval():
     return ufc_simplex(1)
