@@ -225,11 +225,17 @@ class TensorPointSet(AbstractPointSet):
 
 
 class FacetPointSet(AbstractPointSet):
-    """A point set constructed by mapping a lower-dimensional point set onto all facets
-    of a higher-dimensional cell.
+    """A point set on facets.
 
-    :arg cell: The FIAT.Cell.`
-    :arg ps: The reference PointSet.
+    A FacetPointSet is constructed by mapping a lower-dimensional PointSet
+    onto all facets of a higher-dimensional cell.
+
+    Parameters
+    ----------
+    cell : FIAT.Cell
+        The cell.
+    ps : PointSet
+        A lower-dimensional point set.
     """
     def __init__(self, cell, ps):
         self.cell = cell
