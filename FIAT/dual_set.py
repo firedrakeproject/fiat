@@ -281,8 +281,7 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     parent_permutations = None
     parent_to_children = ref_el.get_parent_to_children()
 
-    sd = parent_cell.get_spatial_dimension()
-    if sd > 1 and all(isinstance(node, functional.PointEvaluation) for node in nodes):
+    if all(isinstance(node, functional.PointEvaluation) for node in nodes):
         # Merge Lagrange dual with lexicographical reordering
         parent_nodes = []
         for dim in sorted(parent_to_children):
