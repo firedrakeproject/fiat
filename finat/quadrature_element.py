@@ -25,7 +25,7 @@ def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
     :param codim: The codimension of the quadrature scheme.
     :returns: The appropriate :class:`QuadratureElement`
     """
-    if codim:
+    if codim > 0:
         sd = fiat_ref_cell.get_spatial_dimension()
         rule_ref_cell = fiat_ref_cell.construct_subelement(sd - codim)
     else:

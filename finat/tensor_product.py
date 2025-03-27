@@ -176,7 +176,7 @@ class TensorProductElement(FiniteElementBase):
         zetas = [factor.get_value_indices() for factor in self.factors]
         Q = gem.ComponentTensor(
             # Index the factors by so that we can reshape into index-shape
-            # followed by value-shape
+            # into index-shape followed by value-shape
             gem.Product(*(q[alpha + zeta] for q, alpha, zeta in zip(qs, alphas, zetas))),
             tuple(chain(*alphas, *zetas))
         )
