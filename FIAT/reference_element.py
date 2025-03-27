@@ -94,7 +94,7 @@ def make_lattice(verts, n, interior=0, variant=None):
     family = _decode_family(family)
     D = len(verts)
     X = numpy.array(verts)
-    get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
+    get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X).tolist())
     return list(map(get_point, multiindex_equal(D, n, interior)))
 
 

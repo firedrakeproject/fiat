@@ -265,8 +265,11 @@ def lexsort_nodes(ref_el, nodes, entity=None, offset=0):
         for node in nodes:
             pt, = node.get_point_dict()
             pts.append(pt)
+
         bary = ref_el.compute_barycentric_coordinates(pts)
-        order = list(offset + numpy.lexsort(bary.T))
+        order = numpy.lexsort(bary.T)
+        order += offset
+        order = order.tolist()
     else:
         order = list(range(offset, offset + len(nodes)))
     return order
@@ -277,29 +280,40 @@ def merge_entities(nodes, ref_el, entity_ids, entity_permutations):
     parent_cell = ref_el.get_parent()
     if parent_cell is None:
         return nodes, ref_el, entity_ids, entity_permutations
-    parent_ids = {}
-    parent_permutations = None
     parent_to_children = ref_el.get_parent_to_children()
+    parent_ids = {dim: {} for dim in sorted(parent_to_children)}
+    parent_permutations = None
+
+    unsorted_ids = {}
+    for dim in sorted(parent_to_children):
+        for entity in sorted(parent_to_children[dim]):
+            unsorted_ids[dim, entity] = []
+            for child_dim, child_entity in sorted(parent_to_children[dim][entity]):
+                unsorted_ids[dim, entity].extend(entity_ids[child_dim][child_entity])
 
     if all(isinstance(node, functional.PointEvaluation) for node in nodes):
         # Merge Lagrange dual with lexicographical reordering
         parent_nodes = []
-        for dim in sorted(parent_to_children):
-            parent_ids[dim] = {}
-            for entity in sorted(parent_to_children[dim]):
-                cur = len(parent_nodes)
-                for child_dim, child_entity in parent_to_children[dim][entity]:
-                    parent_nodes.extend(nodes[i] for i in entity_ids[child_dim][child_entity])
-                ids = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
-                parent_ids[dim][entity] = ids
+        for dim, entity in sorted(unsorted_ids, key=lambda k: min(unsorted_ids[k])):
+            cur = len(parent_nodes)
+            parent_nodes.extend(nodes[i] for i in unsorted_ids[dim, entity])
+            parent_ids[dim][entity] = lexsort_nodes(parent_cell, parent_nodes[cur:], entity=(dim, entity), offset=cur)
     else:
         # Merge everything else with the same node ordering
         parent_nodes = nodes
-        for dim in sorted(parent_to_children):
-            parent_ids[dim] = {}
-            for entity in sorted(parent_to_children[dim]):
-                parent_ids[dim][entity] = []
-                for child_dim, child_entity in parent_to_children[dim][entity]:
-                    parent_ids[dim][entity].extend(entity_ids[child_dim][child_entity])
+        for dim, entity in unsorted_ids:
+            parent_ids[dim][entity] = unsorted_ids[dim, entity]
 
     return parent_nodes, parent_cell, parent_ids, parent_permutations
+
+
+if __name__ == "__main__":
+
+    from FIAT import *
+
+    for t in (True, False):
+        fe = Lagrange(ufc_simplex(2), degree=3, sort_entities=t)
+        print(fe.entity_dofs())
+
+        fe = Lagrange(ufc_simplex(2), degree=1, variant="iso(3)", sort_entities=t)
+        print(fe.entity_dofs())
