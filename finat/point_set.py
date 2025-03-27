@@ -236,6 +236,7 @@ class FacetPointSet(AbstractPointSet):
         The cell.
     ps : PointSet
         A lower-dimensional point set.
+        
     """
     def __init__(self, cell, ps):
         self.cell = cell
