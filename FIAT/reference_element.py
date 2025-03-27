@@ -524,7 +524,8 @@ class SimplicialComplex(Cell):
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
         if dim == 0:
-            return (self.get_vertices()[entity_id], )
+            return (self.get_vertices()[self.get_topology()[dim][entity_id][0]],)
+            # return (self.get_vertices()[entity_id], )
         elif 0 < dim <= self.get_spatial_dimension():
             entity_verts = \
                 self.get_vertices_of_subcomplex(
@@ -1267,7 +1268,7 @@ class TensorProductCell(Cell):
         This is done dimension by dimension."""
         if hasattr(other, "product"):
             other = other.product
-        if isinstance(other, type(self)):
+        if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
             return op(self, other)
@@ -1781,3 +1782,10 @@ def max_complex(complexes):
         return max_cell
     else:
         raise ValueError("Cannot find the maximal complex")
+
+
+def cell_to_simplex(cell):
+    if cell.is_simplex():
+        return cell
+    else:
+        return ufc_simplex(cell.get_dimension())
