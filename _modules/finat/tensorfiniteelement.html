@@ -36,8 +36,7 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.tensorfiniteelement</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">reduce</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
@@ -186,8 +185,7 @@
         <span class="n">tensor_vi</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">)</span>
 
         <span class="c1"># Couple new basis function and value indices</span>
-        <span class="n">deltas</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">,</span> <span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
-                                      <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">tensor_i</span><span class="p">,</span> <span class="n">tensor_vi</span><span class="p">)))</span>
+        <span class="n">deltas</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="n">tensor_i</span><span class="p">,</span> <span class="n">tensor_vi</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transpose</span><span class="p">:</span>
             <span class="n">index_ordering</span> <span class="o">=</span> <span class="n">tensor_i</span> <span class="o">+</span> <span class="n">scalar_i</span> <span class="o">+</span> <span class="n">tensor_vi</span> <span class="o">+</span> <span class="n">scalar_vi</span>
@@ -215,8 +213,7 @@
         <span class="n">tensor_i</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">)</span>
         <span class="n">tensor_vi</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">)</span>
         <span class="c1"># Couple new basis function and value indices</span>
-        <span class="n">deltas</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">,</span> <span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
-                                      <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">tensor_i</span><span class="p">,</span> <span class="n">tensor_vi</span><span class="p">)))</span>
+        <span class="n">deltas</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="n">tensor_i</span><span class="p">,</span> <span class="n">tensor_vi</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transpose</span><span class="p">:</span>
             <span class="n">index_ordering</span> <span class="o">=</span> <span class="n">tensor_i</span> <span class="o">+</span> <span class="n">scalar_i</span> <span class="o">+</span> <span class="n">tensor_vi</span> <span class="o">+</span> <span class="n">scalar_vi</span>
         <span class="k">else</span><span class="p">:</span>

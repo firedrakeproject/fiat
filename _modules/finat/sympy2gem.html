@@ -73,7 +73,7 @@
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Add</span><span class="p">)</span>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">symengine</span><span class="o">.</span><span class="n">Add</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_add</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Sum</span><span class="p">,</span> <span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Sum</span><span class="p">(</span><span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 
@@ -82,7 +82,7 @@
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Mul</span><span class="p">)</span>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">symengine</span><span class="o">.</span><span class="n">Mul</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_mul</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">,</span> <span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 

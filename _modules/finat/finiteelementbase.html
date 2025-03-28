@@ -123,6 +123,12 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_closure_dofs</span></div>
 
 
+<div class="viewcode-block" id="FiniteElementBase.is_dg">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.is_dg">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_dg</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_closure_dofs</span><span class="p">()</span></div>
+
+
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">esd</span> <span class="o">=</span> <span class="p">{}</span>

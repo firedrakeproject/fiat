@@ -40,7 +40,7 @@
 <span class="sd">expressions.&quot;&quot;&quot;</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span><span class="p">,</span> <span class="n">defaultdict</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span><span class="p">,</span> <span class="n">partial</span><span class="p">,</span> <span class="n">reduce</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span><span class="p">,</span> <span class="n">partial</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">combinations</span><span class="p">,</span> <span class="n">permutations</span><span class="p">,</span> <span class="n">zip_longest</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">numbers</span><span class="w"> </span><span class="kn">import</span> <span class="n">Integral</span>
 
@@ -456,7 +456,7 @@
 
     <span class="c1"># Form groups by free indices</span>
     <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
-    <span class="n">groups</span> <span class="o">=</span> <span class="p">[</span><span class="n">reduce</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">terms</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">terms</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
+    <span class="n">groups</span> <span class="o">=</span> <span class="p">[</span><span class="n">Product</span><span class="p">(</span><span class="o">*</span><span class="n">terms</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">terms</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
 
     <span class="c1"># Sum factorisation</span>
     <span class="n">expression</span> <span class="o">=</span> <span class="kc">None</span>
@@ -499,7 +499,7 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">make_sum</span><span class="p">(</span><span class="n">summands</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs an operation-minimal sum of GEM expressions.&quot;&quot;&quot;</span>
     <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">summands</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
-    <span class="n">summands</span> <span class="o">=</span> <span class="p">[</span><span class="n">reduce</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="n">terms</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">terms</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
+    <span class="n">summands</span> <span class="o">=</span> <span class="p">[</span><span class="n">Sum</span><span class="p">(</span><span class="o">*</span><span class="n">terms</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">terms</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
     <span class="n">result</span><span class="p">,</span> <span class="n">flops</span> <span class="o">=</span> <span class="n">associate</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="n">summands</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">result</span></div>
 
@@ -727,7 +727,7 @@
         <span class="k">return</span> <span class="n">Indexed</span><span class="p">(</span><span class="n">Identity</span><span class="p">(</span><span class="n">size</span><span class="p">),</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">))</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">def</span><span class="w"> </span><span class="nf">expression</span><span class="p">(</span><span class="n">index</span><span class="p">):</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
             <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">VariableIndex</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">index</span><span class="o">.</span><span class="n">expression</span>
@@ -767,10 +767,8 @@
         <span class="c1"># Unrolling</span>
         <span class="n">summand</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="n">shape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">unroll</span><span class="p">)</span>
-        <span class="n">unrolled</span> <span class="o">=</span> <span class="n">reduce</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span>
-                          <span class="p">(</span><span class="n">Indexed</span><span class="p">(</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">summand</span><span class="p">,</span> <span class="n">unroll</span><span class="p">),</span> <span class="n">alpha</span><span class="p">)</span>
-                           <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">)),</span>
-                          <span class="n">Zero</span><span class="p">())</span>
+        <span class="n">unrolled</span> <span class="o">=</span> <span class="n">Sum</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">Indexed</span><span class="p">(</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">summand</span><span class="p">,</span> <span class="n">unroll</span><span class="p">),</span> <span class="n">alpha</span><span class="p">)</span>
+                         <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">)))</span>
         <span class="k">return</span> <span class="n">IndexSum</span><span class="p">(</span><span class="n">unrolled</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index</span> <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">multiindex</span>
                                         <span class="k">if</span> <span class="n">index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">unroll</span><span class="p">))</span>
     <span class="k">else</span><span class="p">:</span>
