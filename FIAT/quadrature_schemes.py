@@ -423,6 +423,12 @@ def _kmv_lump_scheme(ref_el, degree):
     return QuadratureRule(T, x, w)
 
 
+def gen_quad_simplex(dim):
+    ref_el = symmetric_simplex(dim)
+    ref_el.vertices = tuple(tuple(float(i > j) for j in range(dim)) for i in range(dim+1))
+    return ref_el
+
+
 def xg_scheme(ref_el, degree):
     """A (nearly) Gaussian simplicial quadrature with very few quadrature nodes,
     available for low-to-moderate orders.
@@ -437,10 +443,14 @@ def xg_scheme(ref_el, degree):
         http://dx.doi.org/10.1016/j.camwa.2009.10.027
     """
     dim = ref_el.get_spatial_dimension()
+    backend = "xg"
     if dim == 2:
         from FIAT.xg_quad_data import triangle_table as table
-    elif dim == 3:
+    elif dim == 3 and degree <= 15:
         from FIAT.xg_quad_data import tetrahedron_table as table
+    elif dim == 3:
+        from FIAT.gen_quad_data import tetrahedron_table as table
+        backend = "gen-quad"
     else:
         raise ValueError(f"Xiao-Gambutas rule not availale for {dim} dimensions.")
     try:
@@ -448,10 +458,11 @@ def xg_scheme(ref_el, degree):
     except KeyError:
         raise ValueError(f"Xiao-Gambutas rule not availale for degree {degree}.")
 
-    pts_ref = order_table["points"]
-    wts_ref = order_table["weights"]
-    Ref1 = symmetric_simplex(dim)
-    pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)
+    ref_pts = order_table["points"]
+    ref_wts = order_table["weights"]
+    make_ref_el = {"xg": symmetric_simplex, "gen-quad": gen_quad_simplex}
+    Ref_el = make_ref_el[backend](dim)
+    pts, wts = map_quadrature(ref_pts, ref_wts, Ref_el, ref_el)
     return QuadratureRule(ref_el, pts, wts)
 
 
