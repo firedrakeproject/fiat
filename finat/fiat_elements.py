@@ -119,7 +119,7 @@ class FiatElement(FiniteElementBase):
             assert len(beta) == len(self.get_indices())
 
         zeta = self.get_value_indices()
-        result_indices = beta + zeta
+        basis_indices = beta + zeta
 
         for alpha, fiat_table in fiat_result.items():
             if isinstance(fiat_table, Exception):
@@ -142,10 +142,10 @@ class FiatElement(FiniteElementBase):
 
             point_shape = tuple(index.extent for index in point_indices)
             table_shape = index_shape + value_shape + point_shape
-            table_indices = beta + zeta + point_indices
+            table_indices = basis_indices + point_indices
 
             expr = gem.Indexed(gem.Literal(fiat_table.reshape(table_shape)), table_indices)
-            expr = gem.ComponentTensor(expr, result_indices)
+            expr = gem.ComponentTensor(expr, basis_indices)
             result[alpha] = expr
         return result
 

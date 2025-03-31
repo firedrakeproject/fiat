@@ -77,6 +77,9 @@ class FiniteElementBase(metaclass=ABCMeta):
         element.'''
         return self._entity_closure_dofs
 
+    def is_dg(self):
+        return self.entity_dofs() == self.entity_closure_dofs()
+
     @cached_property
     def _entity_support_dofs(self):
         esd = {}
