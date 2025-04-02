@@ -377,6 +377,11 @@ class DiscontinuousLagrange(ScalarFiatElement):
         super().__init__(FIAT.DiscontinuousLagrange(cell, degree, variant=variant))
 
 
+class Histopolation(ScalarFiatElement):
+    def __init__(self, cell, degree):
+        super().__init__(FIAT.Histopolation(cell, degree))
+
+
 class Real(DiscontinuousLagrange):
     ...
 
