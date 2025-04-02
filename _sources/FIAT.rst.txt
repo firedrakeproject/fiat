@@ -332,6 +332,14 @@ FIAT.hierarchical module
    :show-inheritance:
    :undoc-members:
 
+FIAT.histopolation module
+-------------------------
+
+.. automodule:: FIAT.histopolation
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 FIAT.hu\_zhang module
 ---------------------
 

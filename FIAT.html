@@ -3061,6 +3061,29 @@ equispaced points.</p>
 </dd></dl>
 
 </section>
+<section id="module-FIAT.histopolation">
+<span id="fiat-histopolation-module"></span><h2>FIAT.histopolation module<a class="headerlink" href="#module-FIAT.histopolation" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.histopolation.Histopolation">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.histopolation.</span></span><span class="sig-name descname"><span class="pre">Histopolation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/histopolation.html#Histopolation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.histopolation.Histopolation" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
+<p>1D discontinuous element with integral DOFs on GLL subgrid.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.histopolation.HistopolationDualSet">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.histopolation.</span></span><span class="sig-name descname"><span class="pre">HistopolationDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/histopolation.html#HistopolationDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.histopolation.HistopolationDualSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
+<p>The dual basis for 1D histopolation elements.</p>
+<p>We define window functions w_j that satisfy</p>
+<p>int_K w_j v dx = ell_j(v)   for all v in P_{k}</p>
+<p>where</p>
+<p>ell_j(v) = 1/h_j int_{[x_j, x_{j+1}]} v dx</p>
+<p>is the usual histopolation dual basis.</p>
+<p>The DOFs are defined as integral moments against w_j.</p>
+</dd></dl>
+
+</section>
 <section id="module-FIAT.hu_zhang">
 <span id="fiat-hu-zhang-module"></span><h2>FIAT.hu_zhang module<a class="headerlink" href="#module-FIAT.hu_zhang" title="Link to this heading">¶</a></h2>
 <p>Implementation of the Hu-Zhang finite elements.</p>
@@ -6677,6 +6700,11 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.hierarchical.Legendre"><code class="docutils literal notranslate"><span class="pre">Legendre</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.hierarchical.LegendreDual"><code class="docutils literal notranslate"><span class="pre">LegendreDual</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.hierarchical.make_dual_bubbles"><code class="docutils literal notranslate"><span class="pre">make_dual_bubbles()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-FIAT.histopolation">FIAT.histopolation module</a><ul>
+<li><a class="reference internal" href="#FIAT.histopolation.Histopolation"><code class="docutils literal notranslate"><span class="pre">Histopolation</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.histopolation.HistopolationDualSet"><code class="docutils literal notranslate"><span class="pre">HistopolationDualSet</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.hu_zhang">FIAT.hu_zhang module</a><ul>
