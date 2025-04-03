@@ -63,6 +63,7 @@ from FIAT.bubble import Bubble
 from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
+from FIAT.histopolation import Histopolation                    # noqa: F401
 
 P = Point()
 I = UFCInterval()  # noqa: E741
@@ -315,6 +316,9 @@ elements = [
     "GaussLobattoLegendre(S, 1)",
     "GaussLobattoLegendre(S, 2)",
     "GaussLobattoLegendre(S, 3)",
+    "Histopolation(I, 0)",
+    "Histopolation(I, 1)",
+    "Histopolation(I, 2)",
     "Bubble(I, 2)",
     "Bubble(T, 3)",
     "Bubble(S, 4)",
