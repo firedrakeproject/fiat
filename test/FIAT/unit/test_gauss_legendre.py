@@ -18,6 +18,7 @@
 # Authors:
 #
 # David Ham
+# Pablo Brubeck
 
 import pytest
 import numpy as np

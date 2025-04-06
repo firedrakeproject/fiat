@@ -116,9 +116,8 @@ class FiatElement(FiniteElementBase):
                 continue
 
             derivative = sum(alpha)
-            table_roll = fiat_table.reshape(
-                space_dimension, value_size, len(ps.points)
-            ).transpose(1, 2, 0)
+            shp = (space_dimension, value_size, *ps.points.shape[:-1])
+            table_roll = np.moveaxis(fiat_table.reshape(shp), 0, -1)
 
             exprs = []
             for table in table_roll:
@@ -376,6 +375,11 @@ class KongMulderVeldhuizen(ScalarFiatElement):
 class DiscontinuousLagrange(ScalarFiatElement):
     def __init__(self, cell, degree, variant=None):
         super().__init__(FIAT.DiscontinuousLagrange(cell, degree, variant=variant))
+
+
+class Histopolation(ScalarFiatElement):
+    def __init__(self, cell, degree):
+        super().__init__(FIAT.Histopolation(cell, degree))
 
 
 class Real(DiscontinuousLagrange):
