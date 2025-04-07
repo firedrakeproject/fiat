@@ -3,7 +3,6 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-# TODO: is this the name we want to pip install? 'fiat' is taken already
 name = "fenics-fiat"
 version = "2024.04.0"
 dependencies = [
@@ -12,7 +11,6 @@ dependencies = [
   "scipy",
   "symengine",
   "sympy",
-  # TODO: do we want this release first?
   "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git",
 ]
 requires-python = ">=3.10"
