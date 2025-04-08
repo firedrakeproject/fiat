@@ -94,7 +94,7 @@ class RuntimeTabulated(FiniteElementBase):
                 result[alpha] = gem.partial_indexed(gem.Variable(name, shape), ps.indices)
         return result
 
-    def point_evaluation(self, order, point, entity=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         raise NotImplementedError("Point evaluation not supported for runtime tabulated elements")
 
     @property
