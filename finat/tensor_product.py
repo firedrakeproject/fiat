@@ -143,7 +143,7 @@ class TensorProductElement(FiniteElementBase):
 
         return self._merge_evaluations(factor_results)
 
-    def point_evaluation(self, order, point, entity=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
 

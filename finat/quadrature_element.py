@@ -149,7 +149,7 @@ class QuadratureElement(FiniteElementBase):
         sd = self.cell.get_spatial_dimension()
         return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
 
-    def point_evaluation(self, order, refcoords, entity=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         raise NotImplementedError("QuadratureElement cannot do point evaluation!")
 
     @property

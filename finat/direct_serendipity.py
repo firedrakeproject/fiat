@@ -122,7 +122,7 @@ class DirectSerendipity(DirectlyDefinedElement, FiniteElementBase):
 
         return result
 
-    def point_evaluation(self, order, refcoords, entity=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         raise NotImplementedError("Not done yet, sorry!")
 
     def mapping(self):
