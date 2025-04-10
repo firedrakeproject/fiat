@@ -176,7 +176,7 @@
 
 <div class="viewcode-block" id="EnrichedElement.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.enriched.EnrichedElement.point_evaluation">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at an arbitrary points on</span>
 <span class="sd">        the reference element.</span>
 
@@ -187,7 +187,7 @@
 <span class="sd">                          free indices are arbitrary.</span>
 <span class="sd">        :param entity: the cell entity on which to tabulate.</span>
 <span class="sd">        &#39;&#39;&#39;</span>
-        <span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">point_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">point_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">)</span>
                    <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">elements</span><span class="p">]</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compose_evaluations</span><span class="p">(</span><span class="n">results</span><span class="p">)</span></div>
 

@@ -588,7 +588,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.cube.FlattenedDimensions.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/cube.html#FlattenedDimensions.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.cube.FlattenedDimensions.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/cube.html#FlattenedDimensions.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.cube.FlattenedDimensions.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -600,6 +600,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -693,7 +696,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.direct_serendipity.DirectSerendipity.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#DirectSerendipity.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.DirectSerendipity.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#DirectSerendipity.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.DirectSerendipity.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -705,6 +708,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -977,7 +983,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.discontinuous.DiscontinuousElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/discontinuous.html#DiscontinuousElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/discontinuous.html#DiscontinuousElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.discontinuous.DiscontinuousElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -989,6 +995,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -1149,7 +1158,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.enriched.EnrichedElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -1495,7 +1504,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.fiat_elements.FiatElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/fiat_elements.html#FiatElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.fiat_elements.FiatElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/fiat_elements.html#FiatElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.fiat_elements.FiatElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -1507,6 +1516,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -1959,7 +1971,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.finiteelementbase.FiniteElementBase.point_evaluation">
-<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#FiniteElementBase.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.FiniteElementBase.point_evaluation" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#FiniteElementBase.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.FiniteElementBase.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -1971,6 +1983,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -2291,7 +2306,7 @@ would return (6, 2)</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.hdivcurl.WrapperElementBase.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/hdivcurl.html#WrapperElementBase.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.hdivcurl.WrapperElementBase.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/hdivcurl.html#WrapperElementBase.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.hdivcurl.WrapperElementBase.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -2303,6 +2318,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -2512,7 +2530,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.mixed.MixedSubElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/mixed.html#MixedSubElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.mixed.MixedSubElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/mixed.html#MixedSubElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.mixed.MixedSubElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -2524,6 +2542,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -2779,8 +2800,13 @@ basis functions.</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.map_tabulation">
+<span class="sig-name descname"><span class="pre">map_tabulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tabulation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.map_tabulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.map_tabulation" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -3376,7 +3402,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.quadrature_element.QuadratureElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/quadrature_element.html#QuadratureElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature_element.QuadratureElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/quadrature_element.html#QuadratureElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature_element.QuadratureElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -3388,6 +3414,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -3653,7 +3682,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.runtime_tabulated.RuntimeTabulated.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/runtime_tabulated.html#RuntimeTabulated.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/runtime_tabulated.html#RuntimeTabulated.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.runtime_tabulated.RuntimeTabulated.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -3665,6 +3694,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -4132,7 +4164,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.tensor_product.TensorProductElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensor_product.html#TensorProductElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensor_product.TensorProductElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -4144,6 +4176,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -4422,7 +4457,7 @@ all basis functions of the finite element.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.tensorfiniteelement.TensorFiniteElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensorfiniteelement.html#TensorFiniteElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensorfiniteelement.TensorFiniteElement.point_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensorfiniteelement.html#TensorFiniteElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensorfiniteelement.TensorFiniteElement.point_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Return code for evaluating the element at an arbitrary points on
 the reference element.</p>
 <dl class="field-list simple">
@@ -4434,6 +4469,9 @@ on the reference entity.  Its shape must be
 a vector with the correct dimension, its
 free indices are arbitrary.</p></li>
 <li><p><strong>entity</strong> – the cell entity on which to tabulate.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 </dl>
@@ -4856,6 +4894,7 @@ free indices are arbitrary.</p></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement</span></code></a><ul>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.basis_evaluation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.basis_evaluation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.basis_transformation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.basis_transformation()</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.map_tabulation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.map_tabulation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.point_evaluation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.point_evaluation()</span></code></a></li>
 </ul>
 </li>

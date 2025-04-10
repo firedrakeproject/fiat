@@ -310,9 +310,9 @@
         <span class="k">pass</span></div>
 
 
-<div class="viewcode-block" id="PhysicallyMappedElement.basis_evaluation">
-<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.basis_evaluation">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="PhysicallyMappedElement.map_tabulation">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.map_tabulation">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">map_tabulation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tabulation</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
         <span class="k">assert</span> <span class="n">coordinate_mapping</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
 
         <span class="n">M</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">basis_transformation</span><span class="p">(</span><span class="n">coordinate_mapping</span><span class="p">)</span>
@@ -329,16 +329,21 @@
             <span class="n">val</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">optimise</span><span class="o">.</span><span class="n">aggressive_unroll</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
 
-        <span class="n">result</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">basis_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="n">entity</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">matvec</span><span class="p">(</span><span class="n">tabulation</span><span class="p">[</span><span class="n">alpha</span><span class="p">])</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">tabulation</span><span class="p">}</span></div>
 
-        <span class="k">return</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">matvec</span><span class="p">(</span><span class="n">table</span><span class="p">)</span>
-                <span class="k">for</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span></div>
+
+<div class="viewcode-block" id="PhysicallyMappedElement.basis_evaluation">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.basis_evaluation">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">basis_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="n">entity</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_tabulation</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="PhysicallyMappedElement.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.physically_mapped.PhysicallyMappedElement.point_evaluation">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;TODO: not yet thought about it&quot;</span><span class="p">)</span></div>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">point_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="n">entity</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">map_tabulation</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">)</span></div>
 </div>
 
 
