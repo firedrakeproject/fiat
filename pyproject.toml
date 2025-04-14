@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fenics-fiat"
+name = "firedrake-fiat"
 version = "2025.04.0"
 dependencies = [
   "numpy>=1.16",
