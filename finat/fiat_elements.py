@@ -156,7 +156,7 @@ class FiatElement(FiniteElementBase):
                 result[alpha] = expr
         return result
 
-    def point_evaluation(self, order, refcoords, entity=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -166,6 +166,9 @@ class FiatElement(FiniteElementBase):
                           a vector with the correct dimension, its
                           free indices are arbitrary.
         :param entity: the cell entity on which to tabulate.
+        :param coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
         '''
         if entity is None:
             entity = (self.cell.get_dimension(), 0)
