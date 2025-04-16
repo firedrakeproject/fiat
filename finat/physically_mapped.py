@@ -306,16 +306,18 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         :arg coordinate_mapping: Object providing physical geometry."""
         pass
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
-
-        ref_tabulation = super().basis_evaluation(order, ps, entity=entity)
-
         M = self.basis_transformation(coordinate_mapping)
         return MappedTabulation(M, ref_tabulation)
 
-    def point_evaluation(self, order, refcoords, entity=None):
-        raise NotImplementedError("TODO: not yet thought about it")
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        result = super().basis_evaluation(order, ps, entity=entity)
+        return self.map_tabulation(result, coordinate_mapping)
+
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
+        result = super().point_evaluation(order, refcoords, entity=entity)
+        return self.map_tabulation(result, coordinate_mapping)
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):

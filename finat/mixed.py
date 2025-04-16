@@ -91,7 +91,7 @@ class MixedSubElement(FiniteElementBase):
         core_eval = self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping)
         return self._transform_evaluation(core_eval)
 
-    def point_evaluation(self, order, refcoords, entity=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         core_eval = self.element.point_evaluation(order, refcoords, entity)
         return self._transform_evaluation(core_eval)
 
