@@ -55,8 +55,8 @@ class NodeMeta(type):
 
         # Set free_indices if not set already
         if not hasattr(obj, 'free_indices'):
-            obj.free_indices = unique(chain(*[c.free_indices
-                                              for c in obj.children]))
+            obj.free_indices = unique(chain.from_iterable(c.free_indices
+                                                          for c in obj.children))
         # Set dtype if not set already.
         if not hasattr(obj, 'dtype'):
             obj.dtype = obj.inherit_dtype_from_children(obj.children)
@@ -118,9 +118,8 @@ class Node(NodeBase, metaclass=NodeMeta):
             raise ValueError(f"Mismatching shapes {self.shape} and {other.shape} in matmul")
         *i, k = indices(len(self.shape))
         _, *j = indices(len(other.shape))
-        expr = Product(Indexed(self, tuple(i) + (k, )),
-                       Indexed(other, (k, ) + tuple(j)))
-        return ComponentTensor(IndexSum(expr, (k, )), tuple(i) + tuple(j))
+        expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
+        return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
 
     def __rmatmul__(self, other):
         return as_gem(other).__matmul__(self)
@@ -341,7 +340,7 @@ class Sum(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Sum, cls).__new__(cls)
         self.children = a, b
@@ -370,7 +369,7 @@ class Product(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Product, cls).__new__(cls)
         self.children = a, b
@@ -394,7 +393,7 @@ class Division(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Division, cls).__new__(cls)
         self.children = a, b
@@ -407,7 +406,7 @@ class FloorDiv(Scalar):
     def __new__(cls, a, b):
         assert not a.shape
         assert not b.shape
-        dtype = Node.inherit_dtype_from_children([a, b])
+        dtype = Node.inherit_dtype_from_children((a, b))
         if dtype != uint_type:
             raise ValueError(f"dtype ({dtype}) != unit_type ({uint_type})")
         # Constant folding
@@ -430,7 +429,7 @@ class Remainder(Scalar):
     def __new__(cls, a, b):
         assert not a.shape
         assert not b.shape
-        dtype = Node.inherit_dtype_from_children([a, b])
+        dtype = Node.inherit_dtype_from_children((a, b))
         if dtype != uint_type:
             raise ValueError(f"dtype ({dtype}) != uint_type ({uint_type})")
         # Constant folding
@@ -453,7 +452,7 @@ class Power(Scalar):
     def __new__(cls, base, exponent):
         assert not base.shape
         assert not exponent.shape
-        dtype = Node.inherit_dtype_from_children([base, exponent])
+        dtype = Node.inherit_dtype_from_children((base, exponent))
 
         # Constant folding
         if isinstance(base, Zero):
@@ -569,7 +568,7 @@ class Conditional(Node):
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
         self.shape = then.shape
-        self.dtype = Node.inherit_dtype_from_children([then, else_])
+        self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
 
@@ -685,12 +684,31 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
-        # All indices fixed
-        if all(isinstance(i, int) for i in multiindex):
-            if isinstance(aggregate, Constant):
-                return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
-            elif isinstance(aggregate, ListTensor):
-                return aggregate.array[multiindex]
+        # Simplify Literal and ListTensor
+        if isinstance(aggregate, (Constant, ListTensor)):
+            if all(isinstance(i, int) for i in multiindex):
+                # All indices fixed
+                sub = aggregate.array[multiindex]
+                return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
+            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
+                # Some indices fixed
+                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
+                sub = aggregate.array[slices]
+                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
+                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
+
+        # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
+        if isinstance(aggregate, ComponentTensor):
+            B, = aggregate.children
+            jj = aggregate.multiindex
+            if isinstance(B, Indexed):
+                C, = B.children
+                kk = B.multiindex
+                if all(j in kk for j in jj):
+                    ii = tuple(multiindex)
+                    rep = dict(zip(jj, ii))
+                    ll = tuple(rep.get(k, k) for k in kk)
+                    return Indexed(C, ll)
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
@@ -836,6 +854,11 @@ class ComponentTensor(Node):
         if isinstance(expression, Zero):
             return Zero(shape, dtype=expression.dtype)
 
+        # Index folding
+        if isinstance(expression, Indexed):
+            if multiindex == expression.multiindex:
+                return expression.children[0]
+
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
         self.multiindex = multiindex
@@ -892,8 +915,16 @@ class ListTensor(Node):
         dtype = Node.inherit_dtype_from_children(tuple(array.flat))
 
         # Handle children with shape
-        child_shape = array.flat[0].shape
+        e0 = array.flat[0]
+        child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
+
+        # Index folding
+        if child_shape == array.shape:
+            if all(isinstance(elem, Indexed) for elem in array.flat):
+                if all(elem.children == e0.children for elem in array.flat[1:]):
+                    if all(elem.multiindex == idx for elem, idx in zip(array.flat, numpy.ndindex(array.shape))):
+                        return e0.children[0]
 
         if child_shape:
             # Destroy structure
@@ -932,7 +963,7 @@ class ListTensor(Node):
         """Common subexpression eliminating equality predicate."""
         if type(self) is not type(other):
             return False
-        if (self.array == other.array).all():
+        if numpy.array_equal(self.array, other.array):
             self.array = other.array
             return True
         return False
