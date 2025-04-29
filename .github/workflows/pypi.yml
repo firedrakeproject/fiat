@@ -14,7 +14,7 @@ on:
         description: Publish to PyPI
         default: false
         type: boolean
-      test_pypi:
+      testpypi:
         description: Publish to TestPyPI
         default: false
         type: boolean
@@ -29,7 +29,7 @@ on:
         description: Publish to PyPI
         default: false
         type: boolean
-      test_pypi:
+      testpypi:
         description: Publish to TestPyPI
         default: false
         type: boolean
@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.ref }}
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-python@v5
         with:
@@ -60,7 +60,7 @@ jobs:
 
   upload_pypi:
     name: Upload to PyPI (optional)
-    if: github.event.inputs.pypi == 'true'
+    if: inputs.pypi
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -78,7 +78,7 @@ jobs:
 
   upload_test_pypi:
     name: Upload to TestPyPI (optional)
-    if: github.event.inputs.test_pypi == 'true'
+    if: inputs.testpypi
     needs: build
     runs-on: ubuntu-latest
     environment:
