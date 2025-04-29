@@ -3,13 +3,12 @@ name: Publish release on PyPI
 on:
   release:
     types: [published]
-  workflow_dispatch:
 
 jobs:
   pypi_publish:
     name: Publish release on PyPI
     uses: ./.github/workflows/pypi.yml
     with:
-      ref: master
+      ref: ${{ github.ref }}
       pypi: true
     secrets: inherit
