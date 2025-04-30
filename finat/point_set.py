@@ -33,8 +33,7 @@ class AbstractPointSet(abc.ABC):
     @property
     def dimension(self):
         """Point dimension."""
-        _, dim = self.points.shape
-        return dim
+        return self.points.shape[-1]
 
     @property
     @abc.abstractmethod
@@ -129,8 +128,7 @@ class UnknownPointSet(AbstractPointSet):
 
     @cached_property
     def indices(self):
-        N, _ = self._points_expr.shape
-        return (gem.Index(extent=N),)
+        return tuple(gem.Index(extent=N) for N in self._points_expr.shape[:-1])
 
     @cached_property
     def expression(self):
@@ -159,7 +157,7 @@ class PointSet(AbstractPointSet):
 
     @cached_property
     def indices(self):
-        return (gem.Index(extent=len(self.points)),)
+        return tuple(gem.Index(extent=N) for N in self.points.shape[:-1])
 
     @cached_property
     def expression(self):
@@ -224,3 +222,58 @@ class TensorPointSet(AbstractPointSet):
             len(self.factors) == len(other.factors) and \
             all(s.almost_equal(o, tolerance=tolerance)
                 for s, o in zip(self.factors, other.factors))
+
+
+class FacetPointSet(AbstractPointSet):
+    """A point set on facets.
+
+    A FacetPointSet is constructed by mapping a lower-dimensional PointSet
+    onto all facets of a higher-dimensional cell.
+
+    Parameters
+    ----------
+    cell : FIAT.Cell
+        The cell.
+    ps : PointSet
+        A lower-dimensional point set.
+
+    """
+    def __init__(self, cell, ps):
+        self.cell = cell
+        self.ps = ps
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.ps!r})"
+
+    @cached_property
+    def entities(self):
+        """The list of all cell entites matching the reference point set dimension."""
+        to_int = lambda x: sum(x) if isinstance(x, tuple) else x
+        top = self.cell.topology
+        return [(dim, entity)
+                for dim in sorted(top)
+                for entity in sorted(top[dim])
+                if to_int(dim) == self.ps.dimension]
+
+    @cached_property
+    def points(self):
+        """The array with the reference points mapped onto each facet."""
+        ref_pts = self.ps.points
+        pts = [self.cell.get_entity_transform(dim, entity)(ref_pts)
+               for dim, entity in self.entities]
+        return numpy.concatenate(pts)
+
+    @cached_property
+    def indices(self):
+        """An Index tuple of the facet index and the reference point indices."""
+        return (gem.Index(extent=len(self.entities)), *self.ps.indices)
+
+    @cached_property
+    def expression(self):
+        raise NotImplementedError("Symbolic point expression is not yet implemented for FacetPointSet.")
+
+    def almost_equal(self, other, tolerance=1e-12):
+        """Approximate numerical equality of point sets"""
+        return type(self) is type(other) and \
+            self.cell == other.cell and \
+            self.ps.almost_equal(other.ps, tolerance=tolerance)

@@ -1,0 +1,14 @@
+name: Publish release on PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  pypi_publish:
+    name: Publish release on PyPI
+    uses: ./.github/workflows/pypi.yml
+    with:
+      ref: ${{ github.ref }}
+      pypi: true
+    secrets: inherit

@@ -76,11 +76,12 @@ class FlattenedDimensions(FiniteElementBase):
 
         return self.product.basis_evaluation(order, ps, self._unflatten[entity])
 
-    def point_evaluation(self, order, point, entity=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         if entity is None:
             entity = (self.cell.get_spatial_dimension(), 0)
 
-        return self.product.point_evaluation(order, point, self._unflatten[entity])
+        return self.product.point_evaluation(order, point, self._unflatten[entity],
+                                             coordinate_mapping)
 
     @property
     def dual_basis(self):
