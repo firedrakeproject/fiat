@@ -148,20 +148,37 @@ class Cell:
         # Given the topology, work out for each entity in the cell,
         # which other entities it contains.
         self.sub_entities = {}
+        self.sub_entities_old = {}
         for dim, entities in topology.items():
             self.sub_entities[dim] = {}
+            self.sub_entities_old[dim] = {}
 
             for e, v in entities.items():
                 vertices = frozenset(v)
                 sub_entities = []
-
+                sub_entities_old = []
                 for dim_, entities_ in topology.items():
                     for e_, vertices_ in entities_.items():
                         if vertices.issuperset(vertices_):
-                            sub_entities.append((dim_, e_))
+                            sub_entities_old.append((dim_, e_))
 
-                # Sort for the sake of determinism and by UFC conventions
-                self.sub_entities[dim][e] = sorted(sub_entities)
+                    for e_ in topology[dim].keys():
+                        # if dim == self.get_spatial_dimension():
+                        #     # if dimension is whole cell, sub entities have a fixed order
+                        #     sub_entities.extend([(dim_, e_)])
+                        if vertices.issuperset(topology[dim][e_]):
+                            # in order to maintain ordering, extract subentities from vertex numbering
+                            top_val_list = list(topology[dim_].values())
+                            num_verts_dim = len(list(topology[dim].values())[0])
+                            for i in range(0, num_verts_dim):
+                                indices = list(range(i, len(top_val_list[0]) + i))
+                                sub_list = tuple(numpy.take(numpy.array(topology[dim][e_]), indices, mode="wrap").tolist())
+                                for i, val in topology[dim_].items():
+                                    if set(sub_list) == set(val) and (dim_, i) not in sub_entities:
+                                        sub_entities.append((dim_, i))
+
+                self.sub_entities[dim][e] = list(sub_entities)
+                self.sub_entities_old[dim][e] = list(sub_entities_old)
 
         # Build super-entity dictionary by inverting the sub-entity dictionary
         self.super_entities = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
@@ -183,7 +200,7 @@ class Cell:
                     neighbors = children if dim1 < dim0 else parents
                     d01_entities = tuple(e for d, e in neighbors if d == dim1)
                     self.connectivity[(dim0, dim1)].append(d01_entities)
-
+        print(self.connectivity)
         # Dictionary with derived cells
         self._split_cache = {}
 
@@ -1271,7 +1288,11 @@ class TensorProductCell(Cell):
         if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
-            return op(self, other)
+            if op == operator.gt or op == operator.lt or operator.ne:
+                return not op(other, self)
+            if op == operator.ge or op == operator.le:
+                return not op(other, self) or operator.eq(self, other)
+            raise ValueError("Unknown operator in cell comparison")
 
     def __gt__(self, other):
         return self.compare(operator.gt, other)
