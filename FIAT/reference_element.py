@@ -162,20 +162,17 @@ class Cell:
                         if vertices.issuperset(vertices_):
                             sub_entities_old.append((dim_, e_))
 
-                    for e_ in topology[dim].keys():
-                        # if dim == self.get_spatial_dimension():
-                        #     # if dimension is whole cell, sub entities have a fixed order
-                        #     sub_entities.extend([(dim_, e_)])
-                        if vertices.issuperset(topology[dim][e_]):
-                            # in order to maintain ordering, extract subentities from vertex numbering
-                            top_val_list = list(topology[dim_].values())
-                            num_verts_dim = len(list(topology[dim].values())[0])
-                            for i in range(0, num_verts_dim):
-                                indices = list(range(i, len(top_val_list[0]) + i))
-                                sub_list = tuple(numpy.take(numpy.array(topology[dim][e_]), indices, mode="wrap").tolist())
-                                for i, val in topology[dim_].items():
-                                    if set(sub_list) == set(val) and (dim_, i) not in sub_entities:
-                                        sub_entities.append((dim_, i))
+                    # in order to maintain ordering, extract subentities from vertex numbering
+                    entities_of_dim_ = list(entities_.values())
+
+                    from itertools import permutations
+                    # generate all possible sub entities
+                    sub_list = permutations(v, len(entities_of_dim_[0]))
+                    for s in sub_list:
+                        # add the sub entities in the same order as in topology
+                        for i, val in entities_.items():
+                            if set(s) == set(val) and (dim_, i) not in sub_entities:
+                                sub_entities.append((dim_, i))
 
                 self.sub_entities[dim][e] = list(sub_entities)
                 self.sub_entities_old[dim][e] = list(sub_entities_old)
