@@ -8,7 +8,8 @@ from .fiat_elements import (Bernstein, Bubble, BrezziDouglasFortinMarini,       
                             Lagrange, Real, Serendipity,                                     # noqa: F401
                             TrimmedSerendipityCurl, TrimmedSerendipityDiv,                   # noqa: F401
                             TrimmedSerendipityEdge, TrimmedSerendipityFace,                  # noqa: F401
-                            Nedelec, NedelecSecondKind, RaviartThomas, Regge)                # noqa: F401
+                            Nedelec, NedelecSecondKind, RaviartThomas, Regge,                # noqa: F401
+                            FuseElement)                                                     # noqa: F401
 
 from .argyris import Argyris                                       # noqa: F401
 from .aw import ArnoldWinther, ArnoldWintherNC                     # noqa: F401
