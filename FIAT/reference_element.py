@@ -197,7 +197,6 @@ class Cell:
                     neighbors = children if dim1 < dim0 else parents
                     d01_entities = tuple(e for d, e in neighbors if d == dim1)
                     self.connectivity[(dim0, dim1)].append(d01_entities)
-        print(self.connectivity)
         # Dictionary with derived cells
         self._split_cache = {}
 
