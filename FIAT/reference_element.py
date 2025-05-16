@@ -203,7 +203,6 @@ class Cell:
                     self.connectivity[(dim0, dim1)].append(d01_entities)
         # Dictionary with derived cells
         self._split_cache = {}
-        print("connectivity", self.connectivity)
 
     def __repr__(self):
         return f"{type(self).__name__}({self.shape!r}, {safe_repr(self.vertices)}, {self.topology!r})"
