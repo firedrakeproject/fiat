@@ -133,7 +133,7 @@ class Cell:
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
     vertices that make up edges, faces, etc."""
-    def __init__(self, shape, vertices, topology):
+    def __init__(self, shape, vertices, topology, sub_entities=None):
         """The constructor takes a shape code, the physical vertices expressed
         as a list of tuples of numbers, and the topology of a cell.
 
@@ -145,38 +145,42 @@ class Cell:
         self.vertices = vertices
         self.topology = topology
 
-        # Given the topology, work out for each entity in the cell,
-        # which other entities it contains.
-        self.sub_entities = {}
-        self.sub_entities_old = {}
-        for dim, entities in topology.items():
-            self.sub_entities[dim] = {}
-            self.sub_entities_old[dim] = {}
+        if sub_entities:
+            self.sub_entities = sub_entities
+        else:
+            # If sub entity list not provided
+            # Given the topology, work out for each entity in the cell,
+            # which other entities it contains.
+            self.sub_entities = {}
+            self.sub_entities_old = {}
+            for dim, entities in topology.items():
+                self.sub_entities[dim] = {}
+                self.sub_entities_old[dim] = {}
 
-            for e, v in entities.items():
-                vertices = frozenset(v)
-                sub_entities = []
-                sub_entities_old = []
-                for dim_, entities_ in topology.items():
-                    for e_, vertices_ in entities_.items():
-                        if vertices.issuperset(vertices_):
-                            sub_entities_old.append((dim_, e_))
+                for e, v in entities.items():
+                    vertices = frozenset(v)
+                    sub_entities = []
+                    sub_entities_old = []
+                    for dim_, entities_ in topology.items():
+                        for e_, vertices_ in entities_.items():
+                            if vertices.issuperset(vertices_):
+                                sub_entities_old.append((dim_, e_))
 
-                    # in order to maintain ordering, extract subentities from vertex numbering
-                    entities_of_dim_ = list(entities_.values())
+                        # in order to maintain ordering, extract subentities from vertex numbering
+                        entities_of_dim_ = list(entities_.values())
 
-                    from itertools import permutations
-                    # generate all possible sub entities
-                    sub_list = permutations(v, len(entities_of_dim_[0]))
-                    for s in sub_list:
-                        # add the sub entities in the same order as in topology
-                        for i, val in entities_.items():
-                            if set(s) == set(val) and (dim_, i) not in sub_entities:
-                                sub_entities.append((dim_, i))
+                        from itertools import permutations
+                        # generate all possible sub entities
+                        sub_list = permutations(v, len(entities_of_dim_[0]))
+                        for s in sub_list:
+                            # add the sub entities in the same order as in topology
+                            for i, val in entities_.items():
+                                if set(s) == set(val) and (dim_, i) not in sub_entities:
+                                    sub_entities.append((dim_, i))
 
-                self.sub_entities[dim][e] = list(sub_entities)
-                self.sub_entities_old[dim][e] = list(sub_entities_old)
-
+                    self.sub_entities[dim][e] = list(sub_entities)
+                    self.sub_entities_old[dim][e] = list(sub_entities_old)
+                self.sub_entities = self.sub_entities_old
         # Build super-entity dictionary by inverting the sub-entity dictionary
         self.super_entities = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
         for dim0 in topology:
@@ -199,6 +203,7 @@ class Cell:
                     self.connectivity[(dim0, dim1)].append(d01_entities)
         # Dictionary with derived cells
         self._split_cache = {}
+        print("connectivity", self.connectivity)
 
     def __repr__(self):
         return f"{type(self).__name__}({self.shape!r}, {safe_repr(self.vertices)}, {self.topology!r})"
@@ -396,14 +401,14 @@ class SimplicialComplex(Cell):
 
     This consists of list of vertex locations and a topology map defining facets.
     """
-    def __init__(self, shape, vertices, topology):
+    def __init__(self, shape, vertices, topology, sub_ents=None):
         # Make sure that every facet has the right number of vertices to be
         # a simplex.
         for dim in topology:
             for entity in topology[dim]:
                 assert len(topology[dim][entity]) == dim + 1
 
-        super().__init__(shape, vertices, topology)
+        super().__init__(shape, vertices, topology, sub_ents)
 
     def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
@@ -1124,7 +1129,7 @@ class UFCTetrahedron(UFCSimplex):
 class TensorProductCell(Cell):
     """A cell that is the product of FIAT cells."""
 
-    def __init__(self, *cells):
+    def __init__(self, *cells, sub_entities=None):
         # Vertices
         vertices = tuple(tuple(chain(*coords))
                          for coords in product(*[cell.get_vertices()
@@ -1147,7 +1152,7 @@ class TensorProductCell(Cell):
             topology[dim] = dict(enumerate(topology[dim][key]
                                            for key in sorted(topology[dim])))
 
-        super().__init__(TENSORPRODUCT, vertices, topology)
+        super().__init__(TENSORPRODUCT, vertices, topology, sub_entities)
         self.cells = tuple(cells)
 
     def __repr__(self):
@@ -1375,7 +1380,7 @@ class TensorProductCell(Cell):
 class Hypercube(Cell):
     """Abstract class for a reference hypercube"""
 
-    def __init__(self, dimension, product):
+    def __init__(self, dimension, product, sub_entities=None):
         self.dimension = dimension
         self.shape = hypercube_shapes[dimension]
 
@@ -1383,7 +1388,7 @@ class Hypercube(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super().__init__(self.shape, verts, topology)
+        super().__init__(self.shape, verts, topology, sub_entities)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
