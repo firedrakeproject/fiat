@@ -125,7 +125,7 @@ class EnrichedElement(FiniteElementBase):
                    for element in self.elements]
         return self._compose_evaluations(results)
 
-    def point_evaluation(self, order, refcoords, entity=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -136,7 +136,7 @@ class EnrichedElement(FiniteElementBase):
                           free indices are arbitrary.
         :param entity: the cell entity on which to tabulate.
         '''
-        results = [element.point_evaluation(order, refcoords, entity)
+        results = [element.point_evaluation(order, refcoords, entity, coordinate_mapping)
                    for element in self.elements]
         return self._compose_evaluations(results)
 

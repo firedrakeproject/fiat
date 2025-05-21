@@ -1,4 +1,3 @@
-from functools import reduce
 from itertools import chain
 
 import numpy
@@ -120,9 +119,9 @@ class TensorFiniteElement(FiniteElementBase):
         scalar_evaluation = self._base_element.basis_evaluation
         return self._tensorise(scalar_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping))
 
-    def point_evaluation(self, order, point, entity=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         scalar_evaluation = self._base_element.point_evaluation
-        return self._tensorise(scalar_evaluation(order, point, entity))
+        return self._tensorise(scalar_evaluation(order, point, entity, coordinate_mapping))
 
     def _tensorise(self, scalar_evaluation):
         # Old basis function and value indices
@@ -134,8 +133,7 @@ class TensorFiniteElement(FiniteElementBase):
         tensor_vi = tuple(gem.Index(extent=d) for d in self._shape)
 
         # Couple new basis function and value indices
-        deltas = reduce(gem.Product, (gem.Delta(j, k)
-                                      for j, k in zip(tensor_i, tensor_vi)))
+        deltas = gem.Delta(tensor_i, tensor_vi)
 
         if self._transpose:
             index_ordering = tensor_i + scalar_i + tensor_vi + scalar_vi
@@ -163,8 +161,7 @@ class TensorFiniteElement(FiniteElementBase):
         tensor_i = tuple(gem.Index(extent=d) for d in self._shape)
         tensor_vi = tuple(gem.Index(extent=d) for d in self._shape)
         # Couple new basis function and value indices
-        deltas = reduce(gem.Product, (gem.Delta(j, k)
-                                      for j, k in zip(tensor_i, tensor_vi)))
+        deltas = gem.Delta(tensor_i, tensor_vi)
         if self._transpose:
             index_ordering = tensor_i + scalar_i + tensor_vi + scalar_vi
         else:

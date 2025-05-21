@@ -2,7 +2,7 @@
 expressions."""
 
 from collections import OrderedDict, defaultdict
-from functools import singledispatch, partial, reduce
+from functools import singledispatch, partial
 from itertools import combinations, permutations, zip_longest
 from numbers import Integral
 
@@ -370,7 +370,7 @@ def sum_factorise(sum_indices, factors):
 
     # Form groups by free indices
     groups = groupby(factors, key=lambda f: f.free_indices)
-    groups = [reduce(Product, terms) for _, terms in groups]
+    groups = [Product(*terms) for _, terms in groups]
 
     # Sum factorisation
     expression = None
@@ -410,7 +410,7 @@ def sum_factorise(sum_indices, factors):
 def make_sum(summands):
     """Constructs an operation-minimal sum of GEM expressions."""
     groups = groupby(summands, key=lambda f: f.free_indices)
-    summands = [reduce(Sum, terms) for _, terms in groups]
+    summands = [Sum(*terms) for _, terms in groups]
     result, flops = associate(Sum, summands)
     return result
 
@@ -619,7 +619,7 @@ def _replace_delta_delta(node, self):
         return Indexed(Identity(size), (i, j))
     else:
         def expression(index):
-            if isinstance(index, int):
+            if isinstance(index, Integral):
                 return Literal(index)
             elif isinstance(index, VariableIndex):
                 return index.expression
@@ -656,10 +656,8 @@ def _(node, self):
         # Unrolling
         summand = self(node.children[0])
         shape = tuple(index.extent for index in unroll)
-        unrolled = reduce(Sum,
-                          (Indexed(ComponentTensor(summand, unroll), alpha)
-                           for alpha in numpy.ndindex(shape)),
-                          Zero())
+        unrolled = Sum(*(Indexed(ComponentTensor(summand, unroll), alpha)
+                         for alpha in numpy.ndindex(shape)))
         return IndexSum(unrolled, tuple(index for index in node.multiindex
                                         if index not in unroll))
     else:

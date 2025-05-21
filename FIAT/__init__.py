@@ -63,6 +63,7 @@ from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
+from FIAT.histopolation import Histopolation
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 
 # List of supported elements and mapping to element classes
@@ -102,6 +103,7 @@ supported_elements = {"Argyris": Argyris,
                       "Gauss-Lobatto-Legendre": GaussLobattoLegendre,
                       "Gauss-Legendre": GaussLegendre,
                       "Gauss-Radau": GaussRadau,
+                      "Histopolation": Histopolation,
                       "Legendre": Legendre,
                       "Integrated Legendre": IntegratedLegendre,
                       "Morley": Morley,

@@ -28,6 +28,7 @@ from FIAT.P0 import P0                                          # noqa: F401
 from FIAT.crouzeix_raviart import CrouzeixRaviart               # noqa: F401
 from FIAT.raviart_thomas import RaviartThomas                   # noqa: F401
 from FIAT.discontinuous_raviart_thomas import DiscontinuousRaviartThomas  # noqa: F401
+from FIAT.bernstein import Bernstein  # noqa: F401
 from FIAT.brezzi_douglas_marini import BrezziDouglasMarini      # noqa: F401
 from FIAT.mixed import MixedElement
 from FIAT.nedelec import Nedelec                                # noqa: F401
@@ -62,6 +63,7 @@ from FIAT.bubble import Bubble
 from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
+from FIAT.histopolation import Histopolation                    # noqa: F401
 
 P = Point()
 I = UFCInterval()  # noqa: E741
@@ -314,6 +316,9 @@ elements = [
     "GaussLobattoLegendre(S, 1)",
     "GaussLobattoLegendre(S, 2)",
     "GaussLobattoLegendre(S, 3)",
+    "Histopolation(I, 0)",
+    "Histopolation(I, 1)",
+    "Histopolation(I, 2)",
     "Bubble(I, 2)",
     "Bubble(T, 3)",
     "Bubble(S, 4)",
@@ -618,6 +623,28 @@ def test_error_quadrature_degree(element):
 def test_error_point_high_order(element):
     with pytest.raises(ValueError):
         eval(element)
+
+
+@pytest.mark.parametrize('element', [
+    'DiscontinuousLagrange(I, 0)',
+    'DiscontinuousLagrange(T, 0)',
+    'DiscontinuousLagrange(I, 1)',
+    'DiscontinuousLagrange(T, 1)',
+    'Lagrange(I, 1)',
+    'Lagrange(T, 1)',
+    'Bernstein(I, 1)',
+    'Bernstein(T, 1)',
+])
+def test_single_point_tabulation(element):
+    L = eval(element)
+    sd = L.ref_el.get_spatial_dimension()
+    point = (0.0,) * sd
+
+    T1 = L.tabulate(0, point)[(0,) * sd]
+    assert T1.shape == (L.space_dimension(),)
+
+    T2 = L.tabulate(0, [point])[(0,) * sd]
+    assert T2.shape == (L.space_dimension(), 1)
 
 
 if __name__ == '__main__':

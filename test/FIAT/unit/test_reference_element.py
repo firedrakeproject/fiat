@@ -21,6 +21,7 @@ import sys
 
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT.reference_element import Point, TensorProductCell, UFCQuadrilateral, UFCHexahedron
+from FIAT.reference_element import is_ufc, is_hypercube, default_simplex, flatten_reference_cube, Hypercube
 
 point = Point()
 interval = UFCInterval()
@@ -31,6 +32,12 @@ tetrahedron = UFCTetrahedron()
 interval_x_interval = TensorProductCell(interval, interval)
 triangle_x_interval = TensorProductCell(triangle, interval)
 quadrilateral_x_interval = TensorProductCell(quadrilateral, interval)
+
+default_interval = default_simplex(1)
+default_triangle = default_simplex(2)
+default_tetrahedron = default_simplex(3)
+default_interval_x_interval = TensorProductCell(default_interval, default_interval)
+default_hypercube = Hypercube(2, default_interval_x_interval)
 
 ufc_tetrahedron_21connectivity = [(0, 1, 2), (0, 3, 4), (1, 3, 5), (2, 4, 5)]
 ufc_hexahedron_21connectivity = [(0, 1, 4, 5), (2, 3, 6, 7), (0, 2, 8, 9),
@@ -394,6 +401,58 @@ def test_contains_point(cell, point, epsilon, expected):
                           (quadrilateral_x_interval, [0.0, 0.0, 1+1e-12], 1e-12)])
 def test_distance_to_point_l1(cell, point, expected):
     assert np.isclose(cell.distance_to_point_l1(point), expected, rtol=1e-3)
+
+
+@pytest.mark.parametrize(('cell', 'expected'),
+                         [(interval, True),
+                          (triangle, True),
+                          (quadrilateral, True),
+                          (tetrahedron, True),
+                          (interval_x_interval, True),
+                          (triangle_x_interval, True),
+                          (quadrilateral_x_interval, True),
+                          (hexahedron, True),
+                          (default_interval, False),
+                          (default_triangle, False),
+                          (default_tetrahedron, False),
+                          (default_interval_x_interval, False),
+                          (default_hypercube, False),])
+def test_is_ufc(cell, expected):
+    assert is_ufc(cell) == expected
+
+
+@pytest.mark.parametrize(('cell', 'expected'),
+                         [(interval, True),
+                          (triangle, False),
+                          (quadrilateral, True),
+                          (tetrahedron, False),
+                          (interval_x_interval, True),
+                          (triangle_x_interval, False),
+                          (quadrilateral_x_interval, True),
+                          (hexahedron, True),
+                          (default_interval, True),
+                          (default_triangle, False),
+                          (default_tetrahedron, False),
+                          (default_interval_x_interval, True),
+                          (default_hypercube, True),])
+def test_is_hypercube(cell, expected):
+    assert is_hypercube(cell) == expected
+
+
+@pytest.mark.parametrize(('cell'),
+                         [interval,
+                          quadrilateral,
+                          interval_x_interval,
+                          triangle_x_interval,
+                          quadrilateral_x_interval,
+                          hexahedron,
+                          default_interval,
+                          default_interval_x_interval,
+                          default_hypercube])
+def test_flatten_maintains_ufc_status(cell):
+    ufc_status = is_ufc(cell)
+    flat_cell = flatten_reference_cube(cell)
+    assert ufc_status == is_ufc(flat_cell)
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-from FIAT.finite_element import CiarletElement
+from FIAT.finite_element import CiarletElement, FiniteElement
 from FIAT.dual_set import DualSet
 
 
@@ -13,8 +13,12 @@ class DiscontinuousElement(CiarletElement):
 
     def __init__(self, element):
         self._element = element
+        ref_el = element.get_reference_element()
+        ref_complex = element.get_reference_complex()
+        mapping, = set(element.mapping())
+
         new_entity_ids = {}
-        topology = element.get_reference_element().get_topology()
+        topology = ref_el.get_topology()
         for dim in sorted(topology):
             new_entity_ids[dim] = {}
             for ent in sorted(topology[dim]):
@@ -22,46 +26,32 @@ class DiscontinuousElement(CiarletElement):
 
         new_entity_ids[dim][0] = list(range(element.space_dimension()))
         # re-initialise the dual, so entity_closure_dofs is recalculated
-        self.dual = DualSet(element.dual_basis(), element.get_reference_element(), new_entity_ids)
+        dual = DualSet(element.dual_basis(), element.get_reference_element(), new_entity_ids)
+        order = element.get_order()
 
         # fully discontinuous
-        self.formdegree = element.get_reference_element().get_spatial_dimension()
+        formdegree = element.get_reference_element().get_spatial_dimension()
+
+        FiniteElement.__init__(self, ref_el, dual, order, formdegree=formdegree,
+                               mapping=mapping, ref_complex=ref_complex)
 
     def degree(self):
         "Return the degree of the (embedding) polynomial space."
         return self._element.degree()
-
-    def get_reference_element(self):
-        "Return the reference element for the finite element."
-        return self._element.get_reference_element()
 
     def get_nodal_basis(self):
         """Return the nodal basis, encoded as a PolynomialSet object,
         for the finite element."""
         return self._element.get_nodal_basis()
 
-    def get_order(self):
-        "Return the order of the element (may be different from the degree)"
-        return self._element.get_order()
-
     def get_coeffs(self):
         """Return the expansion coefficients for the basis of the
         finite element."""
         return self._element.get_coeffs()
 
-    def mapping(self):
-        """Return a list of appropriate mappings from the reference
-        element to a physical element for each basis function of the
-        finite element."""
-        return self._element.mapping()
-
     def num_sub_elements(self):
         "Return the number of sub-elements."
         return self._element.num_sub_elements()
-
-    def space_dimension(self):
-        "Return the dimension of the finite element space."
-        return self._element.space_dimension()
 
     def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to given order of
