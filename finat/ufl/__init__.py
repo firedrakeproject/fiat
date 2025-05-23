@@ -19,3 +19,4 @@ from finat.ufl.hdivcurl import HCurlElement, HDivElement, WithMapping, HDiv, HCu
 from finat.ufl.mixedelement import MixedElement, TensorElement, VectorElement  # noqa: F401
 from finat.ufl.restrictedelement import RestrictedElement  # noqa: F401
 from finat.ufl.tensorproductelement import TensorProductElement  # noqa: F401
+from finat.ufl.fuseelement import FuseElement  # noqa: F401
