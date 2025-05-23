@@ -137,7 +137,6 @@ def stokes_eigenbasis(V0):
     tol = sig[-1] * 1E-12
     nullspace_dim = len([s for s in sig if abs(s) <= tol])
 
-    print(sig[nullspace_dim])
     S1 = S[:, :nullspace_dim]
     S2 = S[:, nullspace_dim:]
     S2 *= numpy.sqrt(1 / sig[None, nullspace_dim:])

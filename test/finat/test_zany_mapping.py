@@ -168,9 +168,9 @@ def test_piola(ref_to_phys, element, dimension):
                          *((2, finat.Stokes, k) for k in range(4, 6)),
                          *((3, finat.Stokes, k) for k in range(6, 8)),
                          ])
-def test_stokes(ref_el, phys_el, element, degree, dimension):
+def test_stokes(ref_to_phys, element, degree, dimension):
     r = lambda *args, **kwargs: finat.RestrictedElement(element(*args, **kwargs), restriction_domain="facet")
-    check_zany_mapping(r, ref_el[dimension], phys_el[dimension], degree)
+    check_zany_mapping(r, ref_to_phys[dimension], degree)
 
 
 @pytest.mark.parametrize("element, degree, variant", [
