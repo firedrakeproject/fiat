@@ -151,10 +151,11 @@ def macro_stokes_space(ref_el, degree, bubble=False):
     sd = ref_el.get_spatial_dimension()
     shape = (sd,)
     K = ref_el.get_parent() or ref_el
+    # K = ref_el
 
     # non-macro space
     if bubble:
-        V = make_bubbles(K, degree, shape=shape)
+        V = C0_bubbles(K, degree, shape)
     else:
         V = ONPolynomialSet(K, degree, shape=shape, variant="bubble")
     if K == ref_el:
