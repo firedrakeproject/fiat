@@ -276,7 +276,7 @@ def convert_tensorproductelement(element, **kwargs):
     dim_offset = 0
     elements = []
     deps = set()
-    for elem in element.sub_elements:
+    for elem in element.factor_elements:
         kwargs["shift_axes"] = shift_axes + dim_offset
         dim_offset += elem.cell.topological_dimension()
         finat_elem, ds = _create_element(elem, **kwargs)
