@@ -950,6 +950,12 @@ A component is a tuple of one or more ints.</p>
 <dd><p>Doc.</p>
 </dd></dl>
 
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.ufl.tensorproductelement.TensorProductElement.factor_elements">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">factor_elements</span></span><a class="headerlink" href="#finat.ufl.tensorproductelement.TensorProductElement.factor_elements" title="Link to this definition">¶</a></dt>
+<dd><p>Return tensor product components (factors).</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.tensorproductelement.TensorProductElement.mapping">
 <span class="sig-name descname"><span class="pre">mapping</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/tensorproductelement.html#TensorProductElement.mapping"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.tensorproductelement.TensorProductElement.mapping" title="Link to this definition">¶</a></dt>
@@ -957,9 +963,9 @@ A component is a tuple of one or more ints.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="finat.ufl.tensorproductelement.TensorProductElement.num_sub_elements">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">num_sub_elements</span></span><a class="headerlink" href="#finat.ufl.tensorproductelement.TensorProductElement.num_sub_elements" title="Link to this definition">¶</a></dt>
-<dd><p>Return number of subelements.</p>
+<dt class="sig sig-object py" id="finat.ufl.tensorproductelement.TensorProductElement.num_factor_elements">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">num_factor_elements</span></span><a class="headerlink" href="#finat.ufl.tensorproductelement.TensorProductElement.num_factor_elements" title="Link to this definition">¶</a></dt>
+<dd><p>Return number of tensor product components.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -978,12 +984,6 @@ A component is a tuple of one or more ints.</p>
 <dt class="sig sig-object py" id="finat.ufl.tensorproductelement.TensorProductElement.sobolev_space">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">sobolev_space</span></span><a class="headerlink" href="#finat.ufl.tensorproductelement.TensorProductElement.sobolev_space" title="Link to this definition">¶</a></dt>
 <dd><p>Return the underlying Sobolev space of the TensorProductElement.</p>
-</dd></dl>
-
-<dl class="py property">
-<dt class="sig sig-object py" id="finat.ufl.tensorproductelement.TensorProductElement.sub_elements">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">sub_elements</span></span><a class="headerlink" href="#finat.ufl.tensorproductelement.TensorProductElement.sub_elements" title="Link to this definition">¶</a></dt>
-<dd><p>Return subelements (factors).</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1197,12 +1197,12 @@ A component is a tuple of one or more ints.</p>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement"><code class="docutils literal notranslate"><span class="pre">TensorProductElement</span></code></a><ul>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.embedded_subdegree"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.embedded_subdegree</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.embedded_superdegree"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.embedded_superdegree</span></code></a></li>
+<li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.factor_elements"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.factor_elements</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.mapping"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.mapping()</span></code></a></li>
-<li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.num_sub_elements"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.num_sub_elements</span></code></a></li>
+<li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.num_factor_elements"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.num_factor_elements</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.reconstruct"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.reconstruct()</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.shortstr"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.shortstr()</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.sobolev_space"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.sobolev_space</span></code></a></li>
-<li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.sub_elements"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.sub_elements</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.tensorproductelement.TensorProductElement.variant"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.variant()</span></code></a></li>
 </ul>
 </li>
