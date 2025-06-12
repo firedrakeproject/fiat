@@ -116,6 +116,8 @@ def as_fiat_cell(cell):
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
     if isinstance(cell, ufl.TensorProductCell) and any([hasattr(c, "to_fiat") for c in cell._cells]):
+        if not all([hasattr(c, "to_fiat") for c in cell._cells]):
+            raise NotImplementedError("FUSE defined cells cannot be tensor producted with FIAT defined cells")
         return TensorProductCell(*[c.to_fiat() for c in cell._cells])
     try:
         return cell.to_fiat()
