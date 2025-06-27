@@ -11,7 +11,7 @@ from FIAT.discontinuous_lagrange import DiscontinuousLagrange
 from FIAT.hierarchical import Legendre
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import FiniteElement
-from FIAT.functional import PointEvaluation
+from FIAT.functional import IntegralMoment, PointEvaluation
 from FIAT.polynomial_set import mis
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.reference_element import (ufc_simplex, POINT,
@@ -76,22 +76,18 @@ class HDivTrace(FiniteElement):
             if isinstance(degree, tuple):
                 raise ValueError("Must have a tensor product cell if providing multiple degrees")
 
-        # Initialize entity dofs and construct the DG elements
-        # for the facets
+        # Initialize entity dofs
         facet_sd = sd - 1
-        dg_elements = {}
-        entity_dofs = {}
         topology = ref_el.get_topology()
-        for top_dim, entities in topology.items():
-            cell = ref_el.construct_subelement(top_dim)
-            entity_dofs[top_dim] = {}
+        entity_dofs = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
 
-            # We have a facet entity!
-            if cell.get_spatial_dimension() == facet_sd:
-                dg_elements[top_dim] = construct_dg_element(cell, degree, variant)
-            # Initialize
-            for entity in entities:
-                entity_dofs[top_dim][entity] = []
+        as_int = lambda x: sum(x) if isinstance(x, tuple) else x
+        # construct the DG element for the facets
+        dg_elements = {}
+        for dim in topology:
+            if as_int(dim) == facet_sd:
+                cell = ref_el.construct_subelement(dim)
+                dg_elements[dim] = construct_dg_element(cell, degree, variant)
 
         # Compute the dof numbering for all facet entities
         # and extract nodes
@@ -185,17 +181,21 @@ class HDivTrace(FiniteElement):
             # Attempt to identify which facet (if any) the given points are on
             vertices = self.ref_el.vertices
             coordinates = barycentric_coordinates(points, vertices)
-            bins, success = extract_facets(coordinates)
+            facet_to_pts, success = extract_facets(coordinates)
 
             # If not successful, return NaNs
             if not success:
                 for key in phivals:
-                    phivals[key] = np.nan(shape=(self.space_dimension(), len(points)))
+                    if entity is None:
+                        phivals[key].fill(np.nan)
+                    else:
+                        msg = "The HDivTrace element can only be tabulated on facets."
+                        phivals[key] = TraceError(msg)
 
             # Otherwise, extract non-zero values and insertion indices
-            for facet, ids in bins.items():
+            for facet, ipts in facet_to_pts.items():
                 # Map points to the reference facet
-                new_points = map_to_reference_facet(points[ids], vertices, facet)
+                new_points = map_to_reference_facet(points[ipts], vertices, facet)
 
                 # Retrieve values by tabulating the DG element
                 element = self.dg_elements[facet_sd]
@@ -204,7 +204,7 @@ class HDivTrace(FiniteElement):
                 indices = slice(nf * facet, nf * (facet + 1))
 
                 # Insert non-zero values in appropriate place
-                phivals[evalkey][indices, ids] = nonzerovals
+                phivals[evalkey][indices, ipts] = nonzerovals
 
         else:
             entity_dim, _ = entity
@@ -222,16 +222,14 @@ class HDivTrace(FiniteElement):
                 for facet_dim in sorted(self.dg_elements):
                     element = self.dg_elements[facet_dim]
                     nf = element.space_dimension()
-                    num_facets = len(self.ref_el.get_topology()[facet_dim])
 
                     # Loop over the number of facets until we find a facet
                     # with matching dimension and id
-                    for i in range(num_facets):
+                    for i in self.ref_el.get_topology()[facet_dim]:
                         # Found it! Grab insertion indices
                         if (facet_dim, i) == entity:
-                            nonzerovals, = element.tabulate(0, points).values()
+                            nonzerovals = element.tabulate(0, points)[(0,)*facet_sd]
                             indices = slice(offset, offset + nf)
-
                         offset += nf
 
                 # Insert non-zero values in appropriate place
@@ -306,19 +304,19 @@ def transform_nodes(ells, ref_el, facet_dim, facet_id):
         Q_ref, = set(ell.Q for ell in ells)
         Q = FacetQuadratureRule(ref_el, facet_dim, facet_id, Q_ref)
         for ell in ells:
-            yield type(ell)(ref_el, Q, ell.f_at_qpts)
+            yield IntegralMoment(ref_el, Q, ell.f_at_qpts)
 
 
 # The following functions are credited to Marie E. Rognes:
 def extract_facets(coordinates, tolerance=epsilon):
     """Determines whether a set of points (described in barycentric coordinates)
-    are on facet sub-entities, and return a dict mapping facets to
+    are all on facet sub-entities, and return a dict mapping facets to
     point indices and whether the search has been successful.
 
     :arg coordinates: A set of points described in barycentric coordinates.
     :arg tolerance: A fixed tolerance for geometric identifications.
     """
-    bins = defaultdict(list)
+    facet_to_pts = defaultdict(list)
     for ipt, c in enumerate(coordinates):
         on_facet = set(i for (i, l) in enumerate(c) if abs(l) < tolerance)
         try:
@@ -326,10 +324,10 @@ def extract_facets(coordinates, tolerance=epsilon):
         except ValueError:
             # Handle coordinates not on facets
             return ({}, False)
-        bins[f].append(ipt)
+        facet_to_pts[f].append(ipt)
 
-    # If all points are on facets, return bins and success
-    return (bins, True)
+    # If all points are on facets, return indices and success
+    return (facet_to_pts, True)
 
 
 def barycentric_coordinates(points, vertices):
