@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "firedrake-fiat"
 version = "2025.7.0.dev0"
 dependencies = [
-  "fenics-ufl @ git+https://github.com/FEniCS/ufl.git",
+  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git@ksagiyam/simplify_more",
   "numpy>=1.16",
   "recursivenodes",
   "scipy",
