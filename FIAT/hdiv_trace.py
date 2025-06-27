@@ -13,6 +13,7 @@ from FIAT.dual_set import DualSet
 from FIAT.finite_element import FiniteElement
 from FIAT.functional import PointEvaluation
 from FIAT.polynomial_set import mis
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.reference_element import (ufc_simplex, POINT,
                                     LINE, QUADRILATERAL,
                                     TRIANGLE, TETRAHEDRON,
@@ -95,28 +96,22 @@ class HDivTrace(FiniteElement):
         # Compute the dof numbering for all facet entities
         # and extract nodes
         offset = 0
-        pts = []
+        nodes = []
         for facet_dim in sorted(dg_elements):
             element = dg_elements[facet_dim]
             nf = element.space_dimension()
             num_facets = len(topology[facet_dim])
 
-            # FIXME non PointEvaluation dofs
-            facet_pts = get_lagrange_points(element.dual_basis())
             for i in range(num_facets):
                 entity_dofs[facet_dim][i] = list(range(offset, offset + nf))
                 offset += nf
-
-                # Run over nodes and collect the points for point evaluations
-                transform = ref_el.get_entity_transform(facet_dim, i)
-                pts.extend(transform(facet_pts))
+                nodes.extend(transform_nodes(element.dual_basis(), ref_el, facet_dim, i))
 
         # Setting up dual basis - only point evaluations
-        nodes = [PointEvaluation(ref_el, pt) for pt in pts]
         dual = DualSet(nodes, ref_el, entity_dofs)
 
         # Degree of the element
-        deg = max([e.degree() for e in dg_elements.values()])
+        deg = max(e.degree() for e in dg_elements.values())
 
         super().__init__(ref_el, dual, order=deg,
                          formdegree=facet_sd,
@@ -297,6 +292,21 @@ def construct_dg_element(ref_el, degree, variant):
         )
 
     return dg_element
+
+
+def transform_nodes(ells, ref_el, facet_dim, facet_id):
+    """Map functionals into a given facet."""
+    try:
+        facet_pts = get_lagrange_points(ells)
+        transform = ref_el.get_entity_transform(facet_dim, facet_id)
+        pts = transform(facet_pts)
+        for pt in pts:
+            yield PointEvaluation(ref_el, pt)
+    except ValueError:
+        Q_ref, = set(ell.Q for ell in ells)
+        Q = FacetQuadratureRule(ref_el, facet_dim, facet_id, Q_ref)
+        for ell in ells:
+            yield type(ell)(ref_el, Q, ell.f_at_qpts)
 
 
 # The following functions are credited to Marie E. Rognes:
