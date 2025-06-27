@@ -14,8 +14,8 @@ from itertools import chain
 class CodimBubble(RestrictedElement):
     """Bubbles of a certain codimension."""
 
-    def __init__(self, ref_el, degree, codim):
-        element = Lagrange(ref_el, degree)
+    def __init__(self, ref_el, degree, codim, variant=None):
+        element = Lagrange(ref_el, degree, variant=variant)
 
         cell_dim = ref_el.get_dimension()
         assert cell_dim == max(element.entity_dofs().keys())
@@ -29,12 +29,12 @@ class CodimBubble(RestrictedElement):
 class Bubble(CodimBubble):
     """The bubble finite element: the dofs of the Lagrange FE in the interior of the cell"""
 
-    def __init__(self, ref_el, degree):
-        super().__init__(ref_el, degree, codim=0)
+    def __init__(self, ref_el, degree, variant=None):
+        super().__init__(ref_el, degree, codim=0, variant=variant)
 
 
 class FacetBubble(CodimBubble):
     """The facet bubble finite element: the dofs of the Lagrange FE in the interior of the facets"""
 
-    def __init__(self, ref_el, degree):
-        super().__init__(ref_el, degree, codim=1)
+    def __init__(self, ref_el, degree, variant=None):
+        super().__init__(ref_el, degree, codim=1, variant=variant)
