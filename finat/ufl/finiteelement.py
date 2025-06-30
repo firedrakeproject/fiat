@@ -94,6 +94,21 @@ class FiniteElement(FiniteElementBase):
                 return EnrichedElement(HCurl(TensorProductElement(Qc_elt, Id_elt, cell=cell)),
                                        HCurl(TensorProductElement(Qd_elt, Ic_elt, cell=cell)))
 
+            elif family == "HDiv Trace":
+                cell_h, cell_v = cell.sub_cells()
+                cell_h, cell_v = cell.sub_cells()
+
+                hdegree = 0 if cell_h.cellname() == "interval" else degree
+                vdegree = 0 if cell_v.cellname() == "interval" else degree
+                tr_h = FiniteElement("HDiv Trace", cell_h, hdegree, variant=variant)
+                tr_v = FiniteElement("HDiv Trace", cell_v, vdegree, variant=variant)
+
+                dg_h = FiniteElement("DG", cell_h, degree, variant=variant)
+                dg_v = FiniteElement("DG", cell_v, degree, variant=variant)
+
+                return EnrichedElement(TensorProductElement(tr_h, dg_v, cell=cell),
+                                       TensorProductElement(dg_h, tr_v, cell=cell))
+
             elif family == "Q":
                 return TensorProductElement(*[FiniteElement("CG", c, degree, variant=variant)
                                               for c in cell.sub_cells()],

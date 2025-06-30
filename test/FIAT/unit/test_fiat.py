@@ -34,7 +34,7 @@ from FIAT.mixed import MixedElement
 from FIAT.nedelec import Nedelec                                # noqa: F401
 from FIAT.nedelec_second_kind import NedelecSecondKind          # noqa: F401
 from FIAT.regge import Regge                                    # noqa: F401
-from FIAT.hdiv_trace import HDivTrace, map_to_reference_facet   # noqa: F401
+from FIAT.hdiv_trace import HDivTrace                           # noqa: F401
 from FIAT.hellan_herrmann_johnson import HellanHerrmannJohnson  # noqa: F401
 from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlFirstKind  # noqa: F401
 from FIAT.gopalakrishnan_lederer_schoberl import GopalakrishnanLedererSchoberlSecondKind  # noqa: F401
@@ -400,7 +400,6 @@ elements = [
     xfail_impl("TensorProductElement(DiscontinuousLagrange(I, 1), Lagrange(I, 2))"),
     xfail_impl("Hdiv(TensorProductElement(DiscontinuousLagrange(I, 1), Lagrange(I, 2)))"),
     xfail_impl("Hcurl(TensorProductElement(DiscontinuousLagrange(I, 1), Lagrange(I, 2)))"),
-    xfail_impl("HDivTrace(T, 1)"),
     xfail_impl("EnrichedElement("
                "Hdiv(TensorProductElement(Lagrange(I, 1), DiscontinuousLagrange(I, 0))), "
                "Hdiv(TensorProductElement(DiscontinuousLagrange(I, 0), Lagrange(I, 1)))"
@@ -409,15 +408,16 @@ elements = [
                "Hcurl(TensorProductElement(Lagrange(I, 1), DiscontinuousLagrange(I, 0))), "
                "Hcurl(TensorProductElement(DiscontinuousLagrange(I, 0), Lagrange(I, 1)))"
                ")"),
+    "HDivTrace(I, 0)",
+    "HDivTrace(T, 0)",
+    "HDivTrace(T, 1)",
+    "HDivTrace(T, 2)",
+    "HDivTrace(T, 3)",
+    "HDivTrace(S, 0)",
+    "HDivTrace(S, 1)",
+    "HDivTrace(S, 2)",
+    "HDivTrace(S, 3)",
     # Following elements are checked using tabulate
-    xfail_impl("HDivTrace(T, 0)"),
-    xfail_impl("HDivTrace(T, 1)"),
-    xfail_impl("HDivTrace(T, 2)"),
-    xfail_impl("HDivTrace(T, 3)"),
-    xfail_impl("HDivTrace(S, 0)"),
-    xfail_impl("HDivTrace(S, 1)"),
-    xfail_impl("HDivTrace(S, 2)"),
-    xfail_impl("HDivTrace(S, 3)"),
     xfail_impl("TensorProductElement(Lagrange(I, 1), Lagrange(I, 1))"),
     xfail_impl("TensorProductElement(Lagrange(I, 2), Lagrange(I, 2))"),
     xfail_impl("TensorProductElement(TensorProductElement(Lagrange(I, 1), Lagrange(I, 1)), Lagrange(I, 1))"),
@@ -593,7 +593,6 @@ def test_facet_nodality_tabulate(element):
     facet_dim = sorted(entity_dofs.keys())[-2]
     facet_dofs = entity_dofs[facet_dim]
     dofs = element.dual_basis()
-    vertices = element.ref_el.vertices
 
     for (facet, indices) in facet_dofs.items():
         for i in indices:
@@ -602,16 +601,13 @@ def test_facet_nodality_tabulate(element):
             (coords, weights), = node.get_point_dict().items()
             assert weights == [(1.0, ())]
 
-            # Map dof coordinates to reference element due to
-            # HdivTrace interface peculiarity
-            ref_coords, = map_to_reference_facet((coords,), vertices, facet)
-            nodes_coords.append((facet, ref_coords))
+            nodes_coords.append(coords)
 
     # Check nodality
-    for j, (facet, x) in enumerate(nodes_coords):
-        basis, = element.tabulate(0, (x,), entity=(facet_dim, facet)).values()
-        for i in range(len(basis)):
-            assert np.isclose(basis[i], 1.0 if i == j else 0.0)
+    expected = np.eye(len(dofs))
+    for j, x in enumerate(nodes_coords):
+        basis, = element.tabulate(0, (x,)).values()
+        assert np.allclose(basis.T, expected[j])
 
 
 @pytest.mark.parametrize('element', [

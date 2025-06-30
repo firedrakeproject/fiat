@@ -14,6 +14,7 @@ from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet, get_lagrange_points
 from FIAT.polynomial_set import mis
 from FIAT.check_format_variant import parse_lagrange_variant
+from FIAT.hierarchical import Legendre
 
 
 def make_entity_permutations(dim, npoints):
@@ -215,6 +216,8 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
                               macroelement for Scott-Vogelius.
     """
     def __new__(cls, ref_el, degree, variant="equispaced"):
+        if variant and variant.startswith("integral"):
+            return Legendre(ref_el, degree, variant=variant)
         if degree == 0:
             splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
             if splitting is None and not ref_el.is_macrocell():
@@ -230,7 +233,7 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
             dual = BrokenLagrangeDualSet(ref_el, degree, point_variant=point_variant)
         else:
             dual = DiscontinuousLagrangeDualSet(ref_el, degree, point_variant=point_variant)
-        if ref_el.shape == LINE:
+        if ref_el.shape == LINE and not ref_el.is_trace():
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
             points = get_lagrange_points(dual)

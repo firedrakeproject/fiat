@@ -7,7 +7,6 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT.lagrange import Lagrange
-from FIAT.hierarchical import IntegratedLegendre
 from FIAT.restricted import RestrictedElement
 from itertools import chain
 
@@ -16,11 +15,7 @@ class CodimBubble(RestrictedElement):
     """Bubbles of a certain codimension."""
 
     def __init__(self, ref_el, degree, codim, variant=None):
-        if variant and variant.startswith("integral"):
-            CG = IntegratedLegendre
-        else:
-            CG = Lagrange
-        element = CG(ref_el, degree, variant=variant)
+        element = Lagrange(ref_el, degree, variant=variant)
 
         cell_dim = ref_el.get_dimension()
         assert cell_dim == max(element.entity_dofs().keys())

@@ -158,19 +158,21 @@ def convert_finiteelement(element, **kwargs):
         codim = 1 if element.family() == "Boundary Quadrature" else 0
         return finat.make_quadrature_element(cell, degree, scheme, codim), set()
     lmbda = supported_elements[element.family()]
-    if element.family() == "Real" and element.cell.cellname() in {"quadrilateral", "hexahedron"}:
-        lmbda = None
-        element = finat.ufl.FiniteElement("DQ", element.cell, 0)
+    if element.cell.cellname() in supported_tensor_product_cells:
+        if element.family() == "Real":
+            lmbda = None
+            element = finat.ufl.FiniteElement("DQ", element.cell, 0)
+        elif element.family() == "HDiv Trace":
+            lmbda = None
+
     if lmbda is None:
-        if element.cell.cellname() == "quadrilateral":
-            # Handle quadrilateral short names like RTCF and RTCE.
-            element = element.reconstruct(cell=quadrilateral_tpc)
-        elif element.cell.cellname() == "hexahedron":
-            # Handle hexahedron short names like NCF and NCE.
-            element = element.reconstruct(cell=hexahedron_tpc)
-        else:
+        # Handle quadrilateral short names like RTCE/F and NCE/F.
+        try:
+            tpc = supported_tensor_product_cells[element.cell.cellname()]
+        except ValueError:
             raise ValueError("%s is supported, but handled incorrectly" %
                              element.family())
+        element = element.reconstruct(cell=tpc)
         finat_elem, deps = _create_element(element, **kwargs)
         return finat.FlattenedDimensions(finat_elem), deps
 
@@ -310,6 +312,11 @@ def convert_restrictedelement(element, **kwargs):
 
 hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
 quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
+supported_tensor_product_cells = {
+    "quadrilateral": quadrilateral_tpc,
+    "hexahedron": hexahedron_tpc,
+}
+
 _cache = weakref.WeakKeyDictionary()
 
 

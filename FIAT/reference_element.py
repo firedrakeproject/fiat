@@ -94,6 +94,8 @@ def make_lattice(verts, n, interior=0, variant=None):
     family = _decode_family(family)
     D = len(verts)
     X = numpy.array(verts)
+    if D == 1 and n == 0:
+        return list(map(tuple, X))
     get_point = lambda alpha: tuple(numpy.dot(_recursive(D - 1, n, alpha, family), X))
     return list(map(get_point, multiindex_equal(D, n, interior)))
 
@@ -323,6 +325,9 @@ class Cell:
     def is_simplex(self):
         return False
 
+    def is_trace(self):
+        return False
+
     def is_macrocell(self):
         return False
 
@@ -341,6 +346,10 @@ class Cell:
     def is_parent(self, other, strict=False):
         """Return whether this cell is the parent of the other cell."""
         parent = other
+        while self.is_trace():
+            self = self.get_parent_complex()
+        while parent.is_trace():
+            parent = parent.get_parent_complex()
         if strict:
             parent = parent.get_parent_complex()
         while parent is not None:
@@ -357,6 +366,8 @@ class Cell:
             return False
         atop = self.get_topology()
         btop = other.get_topology()
+        if max(atop) != max(btop):
+            return False
         for dim in atop:
             if set(atop[dim].values()) != set(btop[dim].values()):
                 return False
@@ -566,7 +577,6 @@ class SimplicialComplex(Cell):
         """
         topology = self.get_topology()
         celldim = self.get_spatial_dimension()
-        codim = celldim - dim
         if dim == 0:
             # Special case vertices.
             i, = topology[dim][entity]
@@ -578,7 +588,7 @@ class SimplicialComplex(Cell):
         else:
             subcell = self.construct_subelement(dim)
             subdim = subcell.get_spatial_dimension()
-            assert subdim == celldim - codim
+            assert subdim == dim
 
             # Entity vertices in entity space.
             v_e = numpy.asarray(subcell.get_vertices())
@@ -610,19 +620,31 @@ class SimplicialComplex(Cell):
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         entity_dim, entity_id = entity
-        top = self.get_topology()
-        sd = self.get_spatial_dimension()
+        sd = len(self.vertices[0])
 
         # get a subcell containing the entity and the restriction indices of the entity
+        outside = None
         indices = slice(None)
+        top = self.get_topology()
         subcomplex = top[entity_dim][entity_id]
         if entity_dim != sd:
-            cell_id = self.connectivity[(entity_dim, sd)][0][0]
-            indices = [i for i, v in enumerate(top[sd][cell_id]) if v in subcomplex]
-            subcomplex = top[sd][cell_id]
+            parent = self.get_parent() if self.is_trace() else self
+            cell_id = parent.connectivity[(entity_dim, sd)][0][0]
+            top = parent.get_topology()
+            subcell = top[sd][cell_id]
+            while len(subcell) > sd + 1:
+                # construct a simplex if we have a hypercube
+                k = max(set(subcell) - set(subcomplex))
+                subcell = subcell[:k] + subcell[k+1:]
+
+            indices = [i for i, v in enumerate(subcell) if v in subcomplex]
+            subcomplex = subcell
+
+            outside = [i for i in range(len(subcomplex)) if i not in indices]
+            indices.extend(outside)
 
         cell_verts = self.get_vertices_of_subcomplex(subcomplex)
-        ref_verts = numpy.eye(sd + 1)
+        ref_verts = numpy.eye(len(cell_verts))
         A, b = make_affine_mapping(cell_verts, ref_verts)
         A, b = A[indices], b[indices]
         if rescale:
@@ -630,8 +652,12 @@ class SimplicialComplex(Cell):
             h = 1 / numpy.linalg.norm(A, axis=1)
             b *= h
             A *= h[:, None]
-        out = numpy.dot(points, A.T)
-        return numpy.add(out, b, out=out)
+        bary = numpy.dot(points, A.T)
+        numpy.add(bary, b, out=bary)
+
+        if outside is not None:
+            bary[:, -len(outside):] = -abs(bary[:, -len(outside):])
+        return bary
 
     def compute_bubble(self, points, entity=None):
         """Returns the lowest-order bubble on an entity evaluated at the given
@@ -1249,9 +1275,9 @@ class TensorProductCell(Cell):
 
         For more information see the docstring for the UFCSimplex method."""
         subcell_dimensions = self.get_dimension()
-        assert len(point) == sum(subcell_dimensions)
-        point_slices = TensorProductCell._split_slices(subcell_dimensions)
         point = numpy.asarray(point)
+        assert point.shape[-1] == sum(subcell_dimensions)
+        point_slices = TensorProductCell._split_slices(subcell_dimensions)
         return sum(c.distance_to_point_l1(point[..., s], rescale=rescale)
                    for c, s in zip(self.cells, point_slices))
 
@@ -1389,6 +1415,17 @@ class Hypercube(Cell):
         else:
             sub_element = self.product.construct_subelement((dimension,) + (0,)*(len(self.product.cells) - 1))
             return flatten_reference_cube(sub_element)
+
+    def get_facet_element(self):
+        sd = self.get_spatial_dimension()
+        return self.construct_subelement(sd-1)
+
+    def make_points(self, dim, entity, order, variant=None, interior=1):
+        if dim == 1:
+            entity_verts = self.get_vertices_of_subcomplex(self.topology[dim][entity])
+            return make_lattice(entity_verts, order, interior=interior, variant=variant)
+        else:
+            raise NotImplementedError("Cannot make points on non-simplex facets yet.")
 
     def get_entity_transform(self, dim, entity_i):
         """Returns a mapping of point coordinates from the
