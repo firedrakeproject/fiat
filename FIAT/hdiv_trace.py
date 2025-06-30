@@ -81,29 +81,26 @@ class HDivTrace(FiniteElement):
         topology = ref_el.get_topology()
         entity_dofs = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
 
-        as_int = lambda x: sum(x) if isinstance(x, tuple) else x
-        # construct the DG element for the facets
+        # Construct the DG element for the facets
         dg_elements = {}
         for dim in topology:
-            if as_int(dim) == facet_sd:
+            fdim = sum(dim) if isinstance(dim, tuple) else dim
+            if fdim == facet_sd:
                 cell = ref_el.construct_subelement(dim)
                 dg_elements[dim] = construct_dg_element(cell, degree, variant)
 
         # Compute the dof numbering for all facet entities
         # and extract nodes
-        offset = 0
         nodes = []
         for facet_dim in sorted(dg_elements):
             element = dg_elements[facet_dim]
-            nf = element.space_dimension()
-            num_facets = len(topology[facet_dim])
+            facet_nodes = element.dual_basis()
+            for i in sorted(topology[facet_dim]):
+                cur = len(nodes)
+                nodes.extend(transform_nodes(facet_nodes, ref_el, facet_dim, i))
+                entity_dofs[facet_dim][i] = list(range(cur, len(nodes)))
 
-            for i in range(num_facets):
-                entity_dofs[facet_dim][i] = list(range(offset, offset + nf))
-                offset += nf
-                nodes.extend(transform_nodes(element.dual_basis(), ref_el, facet_dim, i))
-
-        # Setting up dual basis - only point evaluations
+        # Setting up dual basis
         dual = DualSet(nodes, ref_el, entity_dofs)
 
         # Degree of the element
@@ -193,13 +190,13 @@ class HDivTrace(FiniteElement):
                         phivals[key] = TraceError(msg)
 
             # Otherwise, extract non-zero values and insertion indices
+            element = self.dg_elements[facet_sd]
+            nf = element.space_dimension()
             for facet, ipts in facet_to_pts.items():
                 # Map points to the reference facet
                 new_points = map_to_reference_facet(points[ipts], vertices, facet)
 
                 # Retrieve values by tabulating the DG element
-                element = self.dg_elements[facet_sd]
-                nf = element.space_dimension()
                 nonzerovals = element.tabulate(order, new_points)[(0,)*facet_sd]
                 indices = slice(nf * facet, nf * (facet + 1))
 
@@ -220,12 +217,11 @@ class HDivTrace(FiniteElement):
                 # Retrieve function evaluations (order = 0 case)
                 offset = 0
                 for facet_dim in sorted(self.dg_elements):
-                    element = self.dg_elements[facet_dim]
-                    nf = element.space_dimension()
-
                     # Loop over the number of facets until we find a facet
                     # with matching dimension and id
-                    for i in self.ref_el.get_topology()[facet_dim]:
+                    element = self.dg_elements[facet_dim]
+                    nf = element.space_dimension()
+                    for i in sorted(self.ref_el.get_topology()[facet_dim]):
                         # Found it! Grab insertion indices
                         if (facet_dim, i) == entity:
                             nonzerovals = element.tabulate(0, points)[(0,)*facet_sd]
@@ -259,7 +255,10 @@ def construct_dg_element(ref_el, degree, variant):
     """Constructs a discontinuous galerkin element of a given degree
     on a particular reference cell.
     """
-    DG = Legendre if variant == "integral" else DiscontinuousLagrange
+    if variant and variant.startswith("integral"):
+        DG = Legendre
+    else:
+        DG = DiscontinuousLagrange
     if ref_el.get_shape() in [LINE, TRIANGLE]:
         dg_element = DG(ref_el, degree, variant)
 

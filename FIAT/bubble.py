@@ -16,7 +16,10 @@ class CodimBubble(RestrictedElement):
     """Bubbles of a certain codimension."""
 
     def __init__(self, ref_el, degree, codim, variant=None):
-        CG = IntegratedLegendre if variant == "integral" else Lagrange
+        if variant and variant.startswith("integral"):
+            CG = IntegratedLegendre
+        else:
+            CG = Lagrange
         element = CG(ref_el, degree, variant=variant)
 
         cell_dim = ref_el.get_dimension()
