@@ -371,7 +371,7 @@ class ExpansionSet(object):
             if tdim == 0 and len(phis) == 0:
                 # Hack for TensorProduct HDivTrace: do not raise TraceError on the interval
                 for cell in parent.topology[gdim]:
-                    phis[cell] = {(0,)*gdim: numpy.zeros((1, 1))}
+                    phis[cell] = {(0,)*gdim: numpy.zeros(())}
             elif sum(len(cell_point_map[cell]) for cell in cell_point_map) < len(pts):
                 # Raise TraceError when interior points fail to be binned on facets
                 for cell in parent.topology[gdim]:
@@ -626,14 +626,14 @@ def get_affine_mapping(xs, ys):
     """
     X = numpy.asarray(xs)
     Y = numpy.asarray(ys)
-    A = X[1:] - X[:1]
-    B = Y[1:] - Y[:1]
-    if A.shape[0] == A.shape[1]:
-        C = numpy.linalg.solve(A, B)
+    DX = X[1:] - X[:1]
+    DY = Y[1:] - Y[:1]
+    if DX.shape[0] == DX.shape[1]:
+        AT = numpy.linalg.solve(DX, DY)
     else:
-        C, *_ = numpy.linalg.lstsq(A, B)
-    b = Y[0] - numpy.dot(X[0], C)
-    return C.T, b
+        AT, *_ = numpy.linalg.lstsq(DX, DY)
+    b = Y[0] - numpy.dot(X[0], AT)
+    return AT.T, b
 
 
 def polynomial_dimension(ref_el, n, continuity=None):

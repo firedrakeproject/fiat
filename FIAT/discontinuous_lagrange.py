@@ -233,7 +233,7 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
             dual = BrokenLagrangeDualSet(ref_el, degree, point_variant=point_variant)
         else:
             dual = DiscontinuousLagrangeDualSet(ref_el, degree, point_variant=point_variant)
-        if ref_el.shape == LINE and not ref_el.is_trace():
+        if ref_el.shape == LINE:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
             points = get_lagrange_points(dual)

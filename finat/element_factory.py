@@ -169,7 +169,7 @@ def convert_finiteelement(element, **kwargs):
         # Handle quadrilateral short names like RTCE/F and NCE/F.
         try:
             tpc = supported_tensor_product_cells[element.cell.cellname()]
-        except ValueError:
+        except KeyError:
             raise ValueError("%s is supported, but handled incorrectly" %
                              element.family())
         element = element.reconstruct(cell=tpc)
