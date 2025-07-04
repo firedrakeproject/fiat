@@ -35,40 +35,38 @@ HCurl = CallableSobolevSpace(HCurlSobolevSpace.name, HCurlSobolevSpace.parents)
 HDiv = CallableSobolevSpace(HDivSobolevSpace.name, HDivSobolevSpace.parents)
 
 
-class HDivElement(FiniteElementBase):
-    """A div-conforming version of an outer product element, assuming this makes mathematical sense."""
+class WrapperElementBase(FiniteElementBase):
+    """A modified version of a tensor product element."""
     __slots__ = ("_element", )
 
-    def __init__(self, element):
-        """Doc."""
+    def __init__(self, element, reference_value_shape, sobolev_space, mapping):
         self._element = element
+        self._sobolev_space = sobolev_space
+        self._mapping = mapping
 
-        family = "TensorProductElement"
+        family = element.family()
         cell = element.cell
         degree = element.degree()
         quad_scheme = element.quadrature_scheme()
-        reference_value_shape = (element.cell.topological_dimension(),)
 
-        # Skipping TensorProductElement constructor! Bad code smell, refactor to avoid this non-inheritance somehow.
-        FiniteElementBase.__init__(self, family, cell, degree,
-                                   quad_scheme, reference_value_shape)
+        super().__init__(family, cell, degree, quad_scheme, reference_value_shape)
 
     def __repr__(self):
         """Doc."""
-        return f"HDivElement({repr(self._element)})"
+        return f"{type(self).__name__}({repr(self._element)})"
 
     def mapping(self):
         """Doc."""
-        return "contravariant Piola"
+        return self._mapping
 
     @property
     def sobolev_space(self):
         """Return the underlying Sobolev space."""
-        return HDivSobolevSpace
+        return self._sobolev_space
 
     def reconstruct(self, **kwargs):
         """Doc."""
-        return HDivElement(self._element.reconstruct(**kwargs))
+        return type(self)(self._element.reconstruct(**kwargs))
 
     def variant(self):
         """Doc."""
@@ -76,11 +74,11 @@ class HDivElement(FiniteElementBase):
 
     def __str__(self):
         """Doc."""
-        return f"HDivElement({repr(self._element)})"
+        return f"{type(self).__name__}({repr(self._element)})"
 
     def shortstr(self):
         """Format as string for pretty printing."""
-        return f"HDivElement({self._element.shortstr()})"
+        return f"HDivTraceElement({self._element.shortstr()})"
 
     @property
     def embedded_subdegree(self):
@@ -93,63 +91,32 @@ class HDivElement(FiniteElementBase):
         return self._element.embedded_superdegree
 
 
-class HCurlElement(FiniteElementBase):
-    """A curl-conforming version of an outer product element, assuming this makes mathematical sense."""
+class HDivTraceElement(WrapperElementBase):
+    """A HDiv Trace version of a tensor product element, assuming this makes mathematical sense."""
+    __slots__ = ("_element", )
+
+    def __init__(self, element):
+        reference_value_shape = ()
+        super().__init__(element, reference_value_shape, L2, "identity")
+
+
+class HDivElement(WrapperElementBase):
+    """A div-conforming version of a tensor product element, assuming this makes mathematical sense."""
+    __slots__ = ("_element", )
+
+    def __init__(self, element):
+        reference_value_shape = (element.cell.topological_dimension(),)
+        super().__init__(element, reference_value_shape, HDiv, "contravariant Piola")
+
+
+class HCurlElement(WrapperElementBase):
+    """A curl-conforming version of a tensor product element, assuming this makes mathematical sense."""
     __slots__ = ("_element",)
 
     def __init__(self, element):
         """Doc."""
-        self._element = element
-
-        family = "TensorProductElement"
-        cell = element.cell
-        degree = element.degree()
-        quad_scheme = element.quadrature_scheme()
-        cell = element.cell
-        reference_value_shape = (cell.topological_dimension(),)  # TODO: Is this right?
-        # Skipping TensorProductElement constructor! Bad code smell,
-        # refactor to avoid this non-inheritance somehow.
-        FiniteElementBase.__init__(self, family, cell, degree, quad_scheme,
-                                   reference_value_shape)
-
-    def __repr__(self):
-        """Doc."""
-        return f"HCurlElement({repr(self._element)})"
-
-    def mapping(self):
-        """Doc."""
-        return "covariant Piola"
-
-    @property
-    def sobolev_space(self):
-        """Return the underlying Sobolev space."""
-        return HCurlSobolevSpace
-
-    def reconstruct(self, **kwargs):
-        """Doc."""
-        return HCurlElement(self._element.reconstruct(**kwargs))
-
-    def variant(self):
-        """Doc."""
-        return self._element.variant()
-
-    def __str__(self):
-        """Doc."""
-        return f"HCurlElement({repr(self._element)})"
-
-    def shortstr(self):
-        """Format as string for pretty printing."""
-        return f"HCurlElement({self._element.shortstr()})"
-
-    @property
-    def embedded_subdegree(self):
-        """Return embedded subdegree."""
-        return self._element.embedded_subdegree
-
-    @property
-    def embedded_superdegree(self):
-        """Return embedded superdegree."""
-        return self._element.embedded_superdegree
+        reference_value_shape = (element.cell.topological_dimension(),)
+        super().__init__(element, reference_value_shape, HCurl, "covariant Piola")
 
 
 class WithMapping(FiniteElementBase):

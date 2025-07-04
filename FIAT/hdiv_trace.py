@@ -100,11 +100,8 @@ class HDivTrace(DiscontinuousLagrange):
     def __new__(cls, ref_el, degree, variant="equispaced_interior"):
         """Constructor for the HDivTrace element.
 
-        :arg ref_el: A reference element, which may be a tensor product
-                     cell.
-        :arg degree: The degree of approximation. If on a tensor product
-                     cell, then provide a tuple of degrees if you want
-                     varying degrees.
+        :arg ref_el: A reference element.
+        :arg degree: The degree of approximation.
         :arg variant: The point distribution variant passed on to recursivenodes.
         """
         facets = TraceSimplicialComplex(ref_el)

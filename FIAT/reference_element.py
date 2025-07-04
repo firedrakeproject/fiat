@@ -618,7 +618,7 @@ class SimplicialComplex(Cell):
         if len(points) == 0:
             return points
         if entity is None:
-            entity = (self.get_spatial_dimension(), 0)
+            entity = (self.get_dimension(), 0)
         entity_dim, entity_id = entity
         sd = len(self.vertices[0])
 
@@ -628,10 +628,9 @@ class SimplicialComplex(Cell):
         top = self.get_topology()
         subcomplex = top[entity_dim][entity_id]
         if entity_dim != sd:
-            parent = self.get_parent() if self.is_trace() else self
-            cell_id = parent.connectivity[(entity_dim, sd)][0][0]
-            top = parent.get_topology()
-            subcell = top[sd][cell_id]
+            parent = self.get_parent_complex() if self.is_trace() else self
+            cell_id = min(parent.connectivity[(entity_dim, sd)][entity_id])
+            subcell = parent.topology[sd][cell_id]
             while len(subcell) > sd + 1:
                 # construct a simplex if we have a hypercube
                 k = max(set(subcell) - set(subcomplex))
@@ -648,7 +647,7 @@ class SimplicialComplex(Cell):
         A, b = make_affine_mapping(cell_verts, ref_verts)
         A, b = A[indices], b[indices]
         if rescale:
-            # rescale barycentric coordinates by the height wrt. to the facet
+            # rescale barycentric coordinates by the height w.r.t. the facet
             h = 1 / numpy.linalg.norm(A, axis=1)
             b *= h
             A *= h[:, None]

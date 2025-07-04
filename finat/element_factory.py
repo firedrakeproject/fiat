@@ -287,6 +287,12 @@ def convert_tensorproductelement(element, **kwargs):
     return finat.TensorProductElement(elements), deps
 
 
+@convert.register(finat.ufl.HDivTraceElement)
+def convert_hdivtraceelement(element, **kwargs):
+    finat_elem, deps = _create_element(element._element, **kwargs)
+    return finat.HDivTraceElement(finat_elem), deps
+
+
 @convert.register(finat.ufl.HDivElement)
 def convert_hdivelement(element, **kwargs):
     finat_elem, deps = _create_element(element._element, **kwargs)

@@ -345,8 +345,6 @@ class ExpansionSet(object):
 
     def _tabulate(self, n, pts, order=0):
         """A version of tabulate() that also works for a single point."""
-        from FIAT.hdiv_trace import TraceError
-        from FIAT.polynomial_set import mis
         pts = numpy.asarray(pts)
         unique = self.continuity is not None and order == 0
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=unique)
@@ -357,26 +355,7 @@ class ExpansionSet(object):
             return phis[0]
 
         if self.ref_el.is_trace():
-            parent = self.ref_el.get_parent()
-            tdim = self.ref_el.get_spatial_dimension()
-            gdim = parent.get_spatial_dimension()
-            for cell in phis:
-                # Promote facet keys to cell keys
-                phi = phis[cell][(0,) * tdim]
-                # Raise TraceError on gradient tabulations
-                msg = "Gradients on trace elements are not well-defined."
-                phis[cell] = {alpha: phi if sum(alpha) == 0 else TraceError(msg)
-                              for i in range(order+1)
-                              for alpha in mis(gdim, i)}
-            if tdim == 0 and len(phis) == 0:
-                # Hack for TensorProduct HDivTrace: do not raise TraceError on the interval
-                for cell in parent.topology[gdim]:
-                    phis[cell] = {(0,)*gdim: numpy.zeros(())}
-            elif sum(len(cell_point_map[cell]) for cell in cell_point_map) < len(pts):
-                # Raise TraceError when interior points fail to be binned on facets
-                for cell in parent.topology[gdim]:
-                    msg = "The HDivTrace element can only be tabulated on facets."
-                    phis[cell] = {(0,)*gdim: TraceError(msg)}
+            phis = trace_tabulation(self.ref_el, cell_point_map, order, pts, phis)
 
         if pts.dtype == object:
             # If binning is undefined, scale by the characteristic function of each subcell
@@ -402,7 +381,7 @@ class ExpansionSet(object):
         result = {}
         base_phi = tuple(phis.values())[0]
         for alpha in base_phi:
-            if isinstance(base_phi[alpha], TraceError):
+            if isinstance(base_phi[alpha], Exception):
                 result[alpha] = base_phi[alpha]
                 continue
             dtype = base_phi[alpha].dtype
@@ -723,7 +702,10 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
     # The distance to the nearest cell is equal to the distance to the parent cell
-    best = ref_el.get_parent().distance_to_point_l1(pts, rescale=True)
+    parent = ref_el
+    while parent.get_parent() is not None:
+        parent = parent.get_parent()
+    best = parent.distance_to_point_l1(pts, rescale=True)
     tol = best + tol
 
     cell_point_map = {}
@@ -779,3 +761,30 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
         mult = sum(masks)
         masks = [m / mult for m in masks]
     return masks
+
+
+def trace_tabulation(ref_el, cell_point_map, order, pts, phis):
+    """Lift trace tabulations into the cells and raise TraceError on invalid tabulations."""
+    from FIAT.polynomial_set import mis
+    from FIAT.hdiv_trace import TraceError
+    parent = ref_el.get_parent()
+    tdim = ref_el.get_spatial_dimension()
+    gdim = parent.get_spatial_dimension()
+    facet_key = (0, ) * tdim
+    cell_key = (0, ) * gdim
+
+    for cell in phis:
+        # Lift facet keys to cell keys
+        phi = phis[cell][facet_key]
+        # Raise TraceError on gradient tabulations
+        msg = "Gradients on trace elements are not well-defined."
+        phis[cell] = {alpha: phi if sum(alpha) == 0 else TraceError(msg)
+                      for i in range(order+1)
+                      for alpha in mis(gdim, i)}
+
+    if sum(len(cell_point_map[cell]) for cell in cell_point_map) < len(pts):
+        # Raise TraceError when interior points fail to be binned on facets
+        for cell in parent.topology[gdim]:
+            msg = "The HDivTrace element can only be tabulated on facets."
+            phis[cell] = {cell_key: TraceError(msg)}
+    return phis

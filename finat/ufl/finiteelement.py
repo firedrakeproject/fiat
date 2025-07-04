@@ -39,6 +39,7 @@ class FiniteElement(FiniteElementBase):
             from finat.ufl.enrichedelement import EnrichedElement
             from finat.ufl.hdivcurl import HCurlElement as HCurl
             from finat.ufl.hdivcurl import HDivElement as HDiv
+            from finat.ufl.hdivcurl import HDivTraceElement as HDivTrace
             from finat.ufl.tensorproductelement import TensorProductElement
 
             family, short_name, degree, reference_value_shape, sobolev_space, mapping, embedded_degree = \
@@ -96,18 +97,21 @@ class FiniteElement(FiniteElementBase):
 
             elif family == "HDiv Trace":
                 cell_h, cell_v = cell.sub_cells()
-                cell_h, cell_v = cell.sub_cells()
+                if not isinstance(degree, tuple):
+                    degree = (degree, degree)
+                hdegree, vdegree = degree
 
-                hdegree = 0 if cell_h.cellname() == "interval" else degree
-                vdegree = 0 if cell_v.cellname() == "interval" else degree
-                tr_h = FiniteElement("HDiv Trace", cell_h, hdegree, variant=variant)
-                tr_v = FiniteElement("HDiv Trace", cell_v, vdegree, variant=variant)
+                dg_family = lambda cell: "DG" if cell.is_simplex() else "DQ"
+                is_interval = lambda cell: cell.cellname() == "interval"
 
-                dg_h = FiniteElement("DG", cell_h, degree, variant=variant)
-                dg_v = FiniteElement("DG", cell_v, degree, variant=variant)
+                dg_h = FiniteElement(dg_family(cell_h), cell_h, hdegree, variant=variant)
+                tr_h = FiniteElement("HDiv Trace", cell_h, 0 if is_interval(cell_h) else hdegree, variant=variant)
 
-                return EnrichedElement(TensorProductElement(tr_h, dg_v, cell=cell),
-                                       TensorProductElement(dg_h, tr_v, cell=cell))
+                dg_v = FiniteElement(dg_family(cell_v), cell_v, vdegree, variant=variant)
+                tr_v = FiniteElement("HDiv Trace", cell_v, 0 if is_interval(cell_v) else vdegree, variant=variant)
+
+                return EnrichedElement(HDivTrace(TensorProductElement(tr_h, dg_v, cell=cell)),
+                                       HDivTrace(TensorProductElement(dg_h, tr_v, cell=cell)))
 
             elif family == "Q":
                 return TensorProductElement(*[FiniteElement("CG", c, degree, variant=variant)

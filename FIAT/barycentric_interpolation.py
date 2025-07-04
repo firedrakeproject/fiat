@@ -75,7 +75,7 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
             x = pts[ibfs]
             if ref_el.is_trace():
                 verts = ref_el.get_vertices_of_subcomplex(ref_el.topology[1][cell])
-                A = numpy.diff(verts, axis=0)[0]/2
+                A, = numpy.diff(verts, axis=0)
                 A /= numpy.linalg.norm(A)
                 b = -numpy.dot(numpy.sum(verts, axis=0)/2, A.T)
                 self.affine_mappings[cell] = (A, b)

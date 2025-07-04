@@ -32,7 +32,7 @@ from .tensor_product import TensorProductElement                   # noqa: F401
 from .cube import FlattenedDimensions                              # noqa: F401
 from .discontinuous import DiscontinuousElement                    # noqa: F401
 from .enriched import EnrichedElement                              # noqa: F401
-from .hdivcurl import HCurlElement, HDivElement                    # noqa: F401
+from .hdivcurl import HCurlElement, HDivElement, HDivTraceElement  # noqa: F401
 from .mixed import MixedElement                                    # noqa: F401
 from .nodal_enriched import NodalEnrichedElement                   # noqa: F401
 from .quadrature_element import QuadratureElement, make_quadrature_element  # noqa: F401
