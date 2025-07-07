@@ -620,32 +620,21 @@ class SimplicialComplex(Cell):
         if entity is None:
             entity = (self.get_dimension(), 0)
         entity_dim, entity_id = entity
-        sd = len(self.vertices[0])
+        subcomplex = self.topology[entity_dim][entity_id]
 
-        # get a subcell containing the entity and the restriction indices of the entity
-        outside = None
-        indices = slice(None)
-        top = self.get_topology()
-        subcomplex = top[entity_dim][entity_id]
-        if entity_dim != sd:
+        tdim = sum(entity_dim) if isinstance(entity_dim, tuple) else entity_dim
+        gdim = len(self.vertices[0])
+        if tdim != gdim:
+            # Add extra vertices to construct a subcell containing the entity
             parent = self.get_parent_complex() if self.is_trace() else self
-            cell_id = min(parent.connectivity[(entity_dim, sd)][entity_id])
-            subcell = parent.topology[sd][cell_id]
-            while len(subcell) > sd + 1:
-                # construct a simplex if we have a hypercube
-                k = max(set(subcell) - set(subcomplex))
-                subcell = subcell[:k] + subcell[k+1:]
-
-            indices = [i for i, v in enumerate(subcell) if v in subcomplex]
-            subcomplex = subcell
-
-            outside = [i for i in range(len(subcomplex)) if i not in indices]
-            indices.extend(outside)
+            cell_dim = parent.get_dimension()
+            cell_id = min(parent.connectivity[(entity_dim, cell_dim)][entity_id])
+            subcell = parent.topology[cell_dim][cell_id]
+            subcomplex += tuple(set(subcell) - set(subcomplex))[:gdim-tdim]
 
         cell_verts = self.get_vertices_of_subcomplex(subcomplex)
         ref_verts = numpy.eye(len(cell_verts))
         A, b = make_affine_mapping(cell_verts, ref_verts)
-        A, b = A[indices], b[indices]
         if rescale:
             # rescale barycentric coordinates by the height w.r.t. the facet
             h = 1 / numpy.linalg.norm(A, axis=1)
@@ -653,9 +642,9 @@ class SimplicialComplex(Cell):
             A *= h[:, None]
         bary = numpy.dot(points, A.T)
         numpy.add(bary, b, out=bary)
-
-        if outside is not None:
-            bary[:, -len(outside):] = -abs(bary[:, -len(outside):])
+        if tdim != gdim:
+            # the extra coordinates are always negated to mark points outside the facet
+            bary[:, tdim-gdim:] = -abs(bary[:, tdim-gdim:])
         return bary
 
     def compute_bubble(self, points, entity=None):
