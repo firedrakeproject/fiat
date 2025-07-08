@@ -31,14 +31,14 @@ class BDMDualSet(dual_set.DualSet):
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q}
             # degree is q
             Q_ref = create_quadrature(facet, interpolant_deg + degree)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree, scale=1)
+            Pq = polynomial_set.ONPolynomialSet(facet, degree)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in sorted(top[sd - 1]):
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
                 Jdet = Q.jacobian_determinant()
                 thats = ref_el.compute_tangents(sd-1, f)
-                nhat = numpy.dot(R, *thats) if sd == 2 else numpy.cross(*thats)
+                nhat = numpy.dot(R, *thats) if sd == 2 else -numpy.cross(*thats)
                 n = nhat / Jdet
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
@@ -66,8 +66,8 @@ class BDMDualSet(dual_set.DualSet):
             Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
             for entity in sorted(top[sd]):
                 Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                F = numpy.linalg.inv(Q.jacobian().T)
-                phis = numpy.tensordot(F, Ned_at_qpts, (1, 1)).transpose((1, 0, 2))
+                Jinv = numpy.linalg.inv(Q.jacobian())
+                phis = numpy.tensordot(Jinv.T, Ned_at_qpts, (1, 1)).transpose((1, 0, 2))
                 cur = len(nodes)
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 entity_ids[sd][entity] = list(range(cur, len(nodes)))
@@ -96,14 +96,13 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
+        if degree < 1:
+            raise Exception("BDM_k elements only valid for k >= 1")
         if variant is not None:
             splitting, variant = parse_lagrange_variant(variant, integral=True)
             if splitting is not None:
                 ref_el = splitting(ref_el)
-
         variant, interpolant_deg = check_format_variant(variant, degree)
-        if degree < 1:
-            raise Exception("BDM_k elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
         if ref_el.is_macrocell():

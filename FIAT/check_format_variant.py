@@ -61,7 +61,7 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
     default = "integral" if integral else "spectral"
     if integral:
-        supported_point_variants = {"integral": None}
+        supported_point_variants = {"integral": None, "point": "point"}
     elif discontinuous:
         supported_point_variants = supported_dg_variants
     else:
@@ -81,6 +81,8 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
             k, = match.groups()
             call_split = IsoSplit
             splitting_args = (int(k),)
+        elif opt.startswith("integral"):
+            point_variant = opt
         elif opt in supported_point_variants:
             point_variant = supported_point_variants[opt]
         else:
