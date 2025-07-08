@@ -371,18 +371,20 @@ class ExpansionSet(object):
                     phi[alpha] /= mult[None, ipts]
 
         # Insert subcell tabulations into the corresponding submatrices
-        idx = lambda *args: args if args[1] is Ellipsis else numpy.ix_(*args)
+        idx = lambda *args: args if args[-1] is Ellipsis else numpy.ix_(*args)
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
         result = {}
         base_phi = tuple(phis.values())[0]
         for alpha in base_phi:
             dtype = base_phi[alpha].dtype
-            result[alpha] = numpy.zeros((num_phis, *pts.shape[:-1]), dtype=dtype)
+            phi_shape = (num_phis,) + base_phi[alpha].shape[1:-1]
+            shape_idx = tuple(range(i) for i in phi_shape[1:])
+            result[alpha] = numpy.zeros(phi_shape + pts.shape[:-1], dtype=dtype)
             for cell in cell_point_map:
                 ibfs = cell_node_map[cell]
                 ipts = cell_point_map[cell]
-                result[alpha][idx(ibfs, ipts)] += phis[cell][alpha]
+                result[alpha][idx(ibfs, *shape_idx, ipts)] += phis[cell][alpha]
         return result
 
     def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
@@ -599,7 +601,10 @@ def polynomial_dimension(ref_el, n, continuity=None):
             raise ValueError("Only degree zero polynomials supported on point elements.")
         return 1
     top = ref_el.get_topology()
-    if continuity == "C0":
+
+    if isinstance(continuity, dict):
+        space_dimension = sum(len(continuity[dim][0]) * len(top[dim]) for dim in top)
+    elif continuity == "C0":
         space_dimension = sum(math.comb(n - 1, dim) * len(top[dim]) for dim in top)
     else:
         dim = ref_el.get_spatial_dimension()
@@ -620,7 +625,9 @@ def polynomial_entity_ids(ref_el, n, continuity=None):
     entity_ids = {}
     cur = 0
     for dim in sorted(top):
-        if continuity == "C0":
+        if isinstance(continuity, dict):
+            dofs, = set(len(continuity[dim][entity]) for entity in continuity[dim])
+        elif continuity == "C0":
             dofs = math.comb(n - 1, dim)
         else:
             # DG numbering

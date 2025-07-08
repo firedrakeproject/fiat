@@ -2,7 +2,7 @@ from itertools import chain, combinations
 
 import numpy
 
-from FIAT import expansions, polynomial_set
+from FIAT import expansions, polynomial_set, reference_element
 from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
 from FIAT.reference_element import (TRIANGLE, SimplicialComplex, lattice_iter,
                                     make_lattice)
@@ -554,3 +554,86 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
         U = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree, **kwargs)
         coeffs = hdiv_conforming(U, order=order)
         super().__init__(ref_el, degree, degree, U.expansion_set, coeffs)
+
+
+class MacroExpansionSet(expansions.ExpansionSet):
+
+    def __init__(self, ref_el, element):
+        self.element = element
+        self.ref_el = ref_el
+        self.variant = None
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        base_ref_el = element.ref_el
+        base_verts = base_ref_el.get_vertices()
+
+        self.affine_mappings = [reference_element.make_affine_mapping(
+                                ref_el.get_vertices_of_subcomplex(top[sd][cell]),
+                                base_verts) for cell in top[sd]]
+        self.scale = 1
+        self.continuity = element.entity_dofs()
+        self.recurrence_order = element.degree
+        self._dmats_cache = {}
+        self._cell_node_map_cache = {}
+
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        A, b = self.affine_mappings[cell]
+        ref_pts = numpy.add(numpy.dot(pts, A.T), b)
+        Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
+        phis = self.element.tabulate(order, ref_pts)
+        for alpha in phis:
+            phis[alpha] = self.pullback(Jinv, phis[alpha])
+        return phis
+
+    def pullback(self, Jinv, phi):
+        mapping = self.element.mapping()[0]
+        if mapping == "covariant piola":
+            phi = numpy.tensordot(Jinv.T, phi, (1, 1)).transpose((1, 0, 2))
+        elif mapping == "contravariant piola":
+            J = numpy.linalg.inv(Jinv)
+            Jdet = abs(numpy.linalg.det(J))
+            phi = numpy.tensordot(J/Jdet, phi, (1, 1)).transpose((1, 0, 2))
+        elif mapping != "identity":
+            raise ValueError(f"Unrecognized mapping {mapping}")
+
+        return phi
+
+
+if __name__ == "__main__":
+    from FIAT import Nedelec, RaviartThomas, ufc_simplex
+    from FIAT.reference_element import symmetric_simplex
+
+    dim = 3
+    K = symmetric_simplex(dim)
+    # A = AlfeldSplit(K)
+    A = IsoSplit(K)
+
+    degree = 1
+    fe = RaviartThomas(K, degree)
+    # fe = Nedelec(K, degree)
+
+    U = MacroExpansionSet(A, fe)
+
+    mapping = fe.mapping()[0]
+    fdim = fe.formdegree
+    comps = []
+    pts = []
+    for entity in A.topology[fdim]:
+        pts_cur = A.make_points(fdim, entity, degree+fdim)
+        pts.extend(pts_cur)
+        if mapping == "covariant piola":
+            comp = A.compute_edge_tangent(entity)
+        elif mapping == "contravariant piola":
+            comp = A.compute_scaled_normal(entity)
+        comps.extend([comp] * len(pts_cur))
+
+    phis = U._tabulate(degree, pts)
+    for alpha in phis:
+        shape = phis[alpha].shape
+        result = numpy.zeros((shape[0], shape[-1]))
+        for i, comp in enumerate(comps):
+            result[..., i] = numpy.dot(phis[alpha][..., i], comp)
+        result[abs(result) < 1E-14] = 0
+        phis[alpha] = result
+
+    print(phis)
