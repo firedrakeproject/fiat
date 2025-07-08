@@ -770,12 +770,9 @@ def trace_tabulation(ref_el, cell_point_map, order, pts, phis):
     parent = ref_el.get_parent()
     tdim = ref_el.get_spatial_dimension()
     gdim = parent.get_spatial_dimension()
-    facet_key = (0, ) * tdim
-    cell_key = (0, ) * gdim
-
     for cell in phis:
         # Lift facet keys to cell keys
-        phi = phis[cell][facet_key]
+        phi = phis[cell][(0,) * tdim]
         # Raise TraceError on gradient tabulations
         msg = "Gradients on trace elements are not well-defined."
         phis[cell] = {alpha: phi if sum(alpha) == 0 else TraceError(msg)
@@ -786,5 +783,7 @@ def trace_tabulation(ref_el, cell_point_map, order, pts, phis):
         # Raise TraceError when interior points fail to be binned on facets
         for cell in parent.topology[gdim]:
             msg = "The HDivTrace element can only be tabulated on facets."
-            phis[cell] = {cell_key: TraceError(msg)}
+            phis[cell] = {alpha: TraceError(msg)
+                          for i in range(order+1)
+                          for alpha in mis(gdim, i)}
     return phis
