@@ -51,13 +51,14 @@ class LegendreDual(dual_set.DualSet):
                 continue
 
             ref_facet = ref_el.construct_subelement(dim)
-            poly_set = ONPolynomialSet(ref_facet, degree)
+            poly_set = ONPolynomialSet(ref_facet, degree, scale=1)
             Q_ref = create_quadrature(ref_facet, 2 * degree)
             phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
             for entity in sorted(top[dim]):
                 cur = len(nodes)
+                Jdet = ref_el.volume_of_subcomplex(dim, entity)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
+                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi/Jdet) for phi in phis)
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
                 entity_permutations[dim][entity] = perms
 
@@ -69,7 +70,7 @@ class Legendre(finite_element.CiarletElement):
     def __new__(cls, ref_el, degree, variant=None):
         if degree == 0:
             splitting, _ = parse_lagrange_variant(variant, integral=True)
-            if splitting is None:
+            if splitting is None and not ref_el.is_macrocell():
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0.P0(ref_el)
         return super().__new__(cls)

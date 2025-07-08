@@ -30,7 +30,7 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
         sp_simplify = numpy.vectorize(simplify)
     else:
         sp_simplify = lambda x: x
-    phi = numpy.add.outer(-nodes, pts.flatten())
+    phi = numpy.add.outer(-nodes.flatten(), pts.flatten())
     with numpy.errstate(divide='ignore', invalid='ignore'):
         numpy.reciprocal(phi, out=phi)
         numpy.multiply(phi, wts[:, None], out=phi)
@@ -49,7 +49,7 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
 def make_dmat(x):
     """Returns Lagrange differentiation matrix and barycentric weights
     associated with x[j]."""
-    dmat = numpy.add.outer(-x, x)
+    dmat = numpy.add.outer(-x.flatten(), x.flatten())
     numpy.fill_diagonal(dmat, 1.0)
     wts = numpy.prod(dmat, axis=0)
     numpy.reciprocal(wts, out=wts)
@@ -59,22 +59,38 @@ def make_dmat(x):
 
 
 class LagrangeLineExpansionSet(expansions.LineExpansionSet):
-    """Lagrange polynomial expansion set for given points the line."""
+    """Lagrange polynomial expansion set for given points on the line."""
     def __init__(self, ref_el, pts):
+        if ref_el.get_spatial_dimension() != 1:
+            raise Exception("Must have a line")
+        pts = numpy.asarray(pts)
         self.points = pts
-        self.x = numpy.array(pts, dtype="d").flatten()
+
         self.cell_node_map = expansions.compute_cell_point_map(ref_el, pts, unique=False)
         self.dmats = [None for _ in self.cell_node_map]
         self.weights = [None for _ in self.cell_node_map]
         self.nodes = [None for _ in self.cell_node_map]
+        self.affine_mappings = {}
         for cell, ibfs in self.cell_node_map.items():
-            self.nodes[cell] = self.x[ibfs]
-            self.dmats[cell], self.weights[cell] = make_dmat(self.nodes[cell])
+            x = pts[ibfs]
+            if ref_el.is_trace():
+                verts = ref_el.get_vertices_of_subcomplex(ref_el.topology[1][cell])
+                A, = numpy.diff(verts, axis=0)
+                A /= numpy.linalg.norm(A)
+                b = -numpy.dot(numpy.sum(verts, axis=0)/2, A.T)
+                self.affine_mappings[cell] = (A, b)
+                x = numpy.add(numpy.dot(x, A.T), b)
+            self.nodes[cell] = x
+            self.dmats[cell], self.weights[cell] = make_dmat(x)
 
         self.degree = max(len(wts) for wts in self.weights)-1
         self.recurrence_order = self.degree + 1
-        super().__init__(ref_el)
-        self.continuity = None if len(self.x) == sum(len(xk) for xk in self.nodes) else "C0"
+        self.ref_el = ref_el
+        self.variant = None
+        self.scale = 1
+        self.continuity = None if len(pts) == sum(len(xk) for xk in self.nodes) else "C0"
+        self._dmats_cache = {}
+        self._cell_node_map_cache = {}
 
     def get_num_members(self, n):
         return len(self.points)
@@ -89,6 +105,12 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
         return [self.dmats[cell].T]
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        try:
+            A, b = self.affine_mappings[cell]
+            ref_pts = numpy.add(numpy.dot(pts.reshape(-1, A.shape[-1]), A.T), b)
+            pts = ref_pts.reshape(*pts.shape[:-1], -1)
+        except KeyError:
+            pass
         return barycentric_interpolation(self.nodes[cell], self.weights[cell], self.dmats[cell], pts, order=order)
 
 

@@ -112,7 +112,8 @@ class FiatElement(FiniteElementBase):
         index_shape = (self._element.space_dimension(),)
         for alpha, fiat_table in fiat_result.items():
             if isinstance(fiat_table, Exception):
-                result[alpha] = gem.Failure(self.index_shape + self.value_shape, fiat_table)
+                shape = ps.points.shape[:-1] + self.index_shape + self.value_shape
+                result[alpha] = gem.partial_indexed(gem.Failure(shape, fiat_table), ps.indices)
                 continue
 
             derivative = sum(alpha)

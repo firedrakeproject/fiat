@@ -36,12 +36,13 @@ def test_basis_values(dim, degree, variant):
     (2) The entity pair (dim, id) is provided, and the trace element
         tabulates accordingly using the new tabulate API.
     """
-    from FIAT import ufc_simplex, HDivTrace, make_quadrature
+    from FIAT import ufc_simplex, HDivTrace, make_quadrature, DiscontinuousLagrange
 
     ref_el = ufc_simplex(dim)
-    quadrule = make_quadrature(ufc_simplex(dim - 1), degree + 1)
+    facet = ref_el.get_facet_element()
+    quadrule = make_quadrature(facet, degree + 1)
     fiat_element = HDivTrace(ref_el, degree, variant=variant)
-    facet_element = fiat_element.dg_elements[dim - 1]
+    facet_element = DiscontinuousLagrange(facet, degree, variant=variant)
     nf = facet_element.space_dimension()
 
     for facet_id in range(dim + 1):
@@ -70,20 +71,22 @@ def test_basis_values(dim, degree, variant):
 
 
 @pytest.mark.parametrize("degree", range(4))
-def test_quad_trace(degree):
+@pytest.mark.parametrize("variant", ("spectral", "integral"))
+def test_quad_trace(degree, variant):
     """Test the trace element defined on a quadrilateral cell"""
-    from FIAT import ufc_simplex, HDivTrace, make_quadrature
-    from FIAT.reference_element import TensorProductCell
+    from FIAT import ufc_cell, HDivTrace, make_quadrature, DiscontinuousLagrange
 
-    tpc = TensorProductCell(ufc_simplex(1), ufc_simplex(1))
-    fiat_element = HDivTrace(tpc, (degree, degree))
-    facet_elements = fiat_element.dg_elements
-    quadrule = make_quadrature(ufc_simplex(1), degree + 1)
+    ref_el = ufc_cell("quadrilateral")
+    fiat_element = HDivTrace(ref_el, degree, variant=variant)
 
-    for i, entity in enumerate([((0, 1), 0), ((0, 1), 1),
-                                ((1, 0), 0), ((1, 0), 1)]):
-        entity_dim, _ = entity
-        element = facet_elements[entity_dim]
+    facet = ref_el.get_facet_element()
+    facet_element = DiscontinuousLagrange(facet, degree, variant=variant)
+    quadrule = make_quadrature(facet, degree + 1)
+
+    entity_dim = facet.get_dimension()
+    for i, entity_id in enumerate(ref_el.topology[entity_dim]):
+        entity = (entity_dim, entity_id)
+        element = facet_element
         nf = element.space_dimension()
 
         tab = fiat_element.tabulate(0, quadrule.pts,

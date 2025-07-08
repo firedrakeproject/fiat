@@ -10,6 +10,7 @@ from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.barycentric_interpolation import LagrangePolynomialSet, get_lagrange_points
 from FIAT.reference_element import LINE
 from FIAT.check_format_variant import parse_lagrange_variant
+from FIAT.hierarchical import IntegratedLegendre
 
 
 class LagrangeDualSet(dual_set.DualSet):
@@ -72,6 +73,11 @@ class Lagrange(finite_element.CiarletElement):
                         entity id. The DOFs are always sorted by the entity ordering
                         and then lexicographically by lattice multiindex.
     """
+    def __new__(cls, ref_el, degree, variant="equispaced", sort_entities=False):
+        if variant and variant.startswith("integral"):
+            return IntegratedLegendre(ref_el, degree, variant=variant)
+        return super().__new__(cls)
+
     def __init__(self, ref_el, degree, variant="equispaced", sort_entities=False):
         splitting, point_variant = parse_lagrange_variant(variant)
         if splitting is not None:
