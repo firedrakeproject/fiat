@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "firedrake-fiat"
 version = "2025.7.0.dev0"
 dependencies = [
-  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git@ksagiyam/introduce_mixed_map",
+  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git@ksagiyam/introduce_mixed_map_mixed_cell",
   "numpy>=1.16",
   "recursivenodes",
   "scipy",
