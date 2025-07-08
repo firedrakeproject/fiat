@@ -18,26 +18,28 @@ class BDMDualSet(dual_set.DualSet):
         nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-
         entity_ids = {}
         # set to empty
-        for dim in top:
+        for dim in sorted(top):
             entity_ids[dim] = {}
-            for entity in top[dim]:
+            for entity in sorted(top[dim]):
                 entity_ids[dim][entity] = []
 
         if variant == "integral":
+            R = numpy.array([[0, 1], [-1, 0]])
             facet = ref_el.construct_subelement(sd-1)
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q}
             # degree is q
             Q_ref = create_quadrature(facet, interpolant_deg + degree)
-            Pq = polynomial_set.ONPolynomialSet(facet, degree)
+            Pq = polynomial_set.ONPolynomialSet(facet, degree, scale=1)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
-            for f in top[sd - 1]:
+            for f in sorted(top[sd - 1]):
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
                 Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                thats = ref_el.compute_tangents(sd-1, f)
+                nhat = numpy.dot(R, *thats) if sd == 2 else numpy.cross(*thats)
+                n = nhat / Jdet
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -46,7 +48,7 @@ class BDMDualSet(dual_set.DualSet):
         elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
-            for f in top[sd - 1]:
+            for f in sorted(top[sd - 1]):
                 cur = len(nodes)
                 pts_cur = ref_el.make_points(sd - 1, f, sd + degree)
                 nodes.extend(functional.PointScaledNormalEvaluation(ref_el, f, pt)
@@ -61,13 +63,13 @@ class BDMDualSet(dual_set.DualSet):
             cell = ref_el.construct_subelement(sd)
             Q_ref = create_quadrature(cell, interpolant_deg + degree - 1)
             Nedel = nedelec.Nedelec(cell, degree - 1, variant)
-            Nedfs = Nedel.get_nodal_basis()
-            Ned_at_qpts = Nedfs.tabulate(Q_ref.get_points())[(0,) * sd]
-            for entity in top[sd]:
+            Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
+            for entity in sorted(top[sd]):
                 Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                JinvT = numpy.linalg.inv(Q.jacobian().T)
+                F = numpy.linalg.inv(Q.jacobian().T)
+                phis = numpy.tensordot(F, Ned_at_qpts, (1, 1)).transpose((1, 0, 2))
                 cur = len(nodes)
-                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, JinvT @ phi) for phi in Ned_at_qpts)
+                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
                 entity_ids[sd][entity] = list(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
@@ -98,6 +100,7 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
             splitting, variant = parse_lagrange_variant(variant, integral=True)
             if splitting is not None:
                 ref_el = splitting(ref_el)
+
         variant, interpolant_deg = check_format_variant(variant, degree)
         if degree < 1:
             raise Exception("BDM_k elements only valid for k >= 1")

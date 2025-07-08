@@ -600,12 +600,11 @@ class MacroExpansionSet(expansions.ExpansionSet):
 
 
 if __name__ == "__main__":
-    from FIAT import Nedelec, RaviartThomas, ufc_simplex
+    from FIAT import RaviartThomas
     from FIAT.reference_element import symmetric_simplex
 
     dim = 3
     K = symmetric_simplex(dim)
-    # A = AlfeldSplit(K)
     A = IsoSplit(K)
 
     degree = 1
