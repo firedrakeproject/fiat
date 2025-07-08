@@ -111,7 +111,7 @@ class FiniteElement(FiniteElementBase):
                 tr_v = FiniteElement("HDiv Trace", cell_v, 0 if is_interval(cell_v) else vdegree, variant=variant)
 
                 return EnrichedElement(HDivTrace(TensorProductElement(tr_h, dg_v, cell=cell)),
-                                       HDivTrace(TensorProductElement(dg_h, tr_v, cell=cell)))
+                                       HDivTrace(TensorProductElement(dg_h, tr_v, cell=cell)), family=family)
 
             elif family == "Q":
                 return TensorProductElement(*[FiniteElement("CG", c, degree, variant=variant)
