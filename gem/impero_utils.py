@@ -56,6 +56,7 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
             return not isinstance(expression, gem.Zero)
         assignments = list(filter(nonzero, assignments))
 
+    to_cupy(assignments)
     # Just the expressions
     expressions = [expression for variable, expression in assignments]
 
@@ -65,7 +66,6 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
         for node in traversal(expressions)
         if isinstance(node, (gem.Indexed, gem.FlexiblyIndexed))
     )))
-
     # Build ordered index map
     index_ordering = make_prefix_ordering(indices, prefix_ordering)
     apply_ordering = make_index_orderer(index_ordering)
@@ -320,3 +320,99 @@ def temp_refcount(temporaries, op):
         raise AssertionError("unhandled operation: %s" % type(op))
 
     return counter
+
+
+def to_cupy(assignments):
+    
+    func_decl = lambda *args: f"def cupy_kernel({",".join(args)}):"
+    args = []
+    declare = {"counter" : 0}
+    counter = 0
+    indices = {}
+
+    @singledispatch
+    def recurse(expr, loop_indices):
+        """Visit an Impero AST to collect declarations.
+
+        :arg expr: Impero tree node
+        :arg loop_indices: loop indices (in order) from the outer
+                           loops surrounding ``expr``
+        """
+        raise AssertionError("unsupported expression type %s" % type(expr))
+
+    @recurse.register(gem.IndexSum)
+    def recurse_indexsum(expr, loop_indices):
+        return "IndexSum{" + ",".join([recurse(e, loop_indices)[0] for e in expr.children]) + "}[" + str(expr.multiindex) + "]", ()
+
+    @recurse.register(gem.Product)
+    def recurse_product(expr, loop_indices):
+        return f"cp.multiply({recurse(expr.children[0], loop_indices)}, {recurse(expr.children[1], loop_indices)})\n", tuple()
+        #return "*".join([recurse(e, loop_indices)[0] for e in expr.children]), tuple()
+
+    @recurse.register(gem.Sum)
+    def recurse_sum(expr, loop_indices):
+        
+        summands =  [recurse(e, loop_indices) for e in expr.children] 
+        breakpoint()
+        return "+".join(summands[:][0]), tuple()
+
+    @recurse.register(gem.MathFunction)
+    def recurse_fn(expr, loop_indices):
+        chld, idx =  recurse(expr.children[0], loop_indices) 
+        return expr.name + "(" + chld + ")", idx
+
+    @recurse.register(gem.Indexed)
+    def recurse_indexed(expr, loop_indices):
+        chld, idx =  recurse(expr.children[0], loop_indices) 
+        return chld + "[" + str(expr.multiindex) + "]", expr.multiindex
+
+    @recurse.register(gem.FlexiblyIndexed)
+    def recurse_findexed(expr, loop_indices):
+        chld, idx =  recurse(expr.children[0], loop_indices) 
+        return chld + "f[" + str(expr.dim2idxs) + "]", expr.dim2idxs
+
+    @recurse.register(gem.Variable)
+    def recurse_variable(expr, loop_indices):
+        return expr.name, tuple() 
+
+    @recurse.register(gem.Literal)
+    def recurse_literal(expr, loop_indices):
+        if expr not in declare.keys():
+            declare[expr] = (f"t{declare["counter"]}", expr.array)
+            declare["counter"] += 1 
+        return declare[expr][0], tuple()
+#
+#    @recurse.register(imp.Evaluate)
+#    def recurse_evaluate(expr, loop_indices):
+#        return "eval:" + recurse(expr.expression, loop_indices) 
+#    
+#    
+#    @recurse.register(imp.Return)
+#    def recurse_return(expr, loop_indices):
+#        return recurse(expr.variable, loop_indices) + "=" + recurse(expr.expression, loop_indices)
+#
+#    @recurse.register(imp.Terminal)
+#    def recurse_terminal(expr, loop_indices):
+#        return str(type(expr)) 
+#
+#    @recurse.register(imp.For)
+#    def recurse_for(expr, loop_indices):
+#        return "for {" + recurse(expr.children[0], loop_indices + (expr.index,)) + "\n}"
+#
+#    @recurse.register(imp.Block)
+#    def recurse_block(expr, loop_indices):
+#        # Temporaries declared at the beginning of the block are
+#        # collected here
+#        declare[expr] = []
+#
+#        # Collect reference counts for the block
+#        refcount = "" 
+#        for statement in expr.children:
+#            refcount += "Block[" + (recurse(statement, loop_indices)) + "]\n"
+#
+#        return refcount
+    strs = []
+    for var, expr in assignments:
+        strs += [recurse(expr, ())]
+
+    breakpoint()
