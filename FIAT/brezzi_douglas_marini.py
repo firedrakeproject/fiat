@@ -18,28 +18,26 @@ class BDMDualSet(dual_set.DualSet):
         nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
+
         entity_ids = {}
         # set to empty
-        for dim in sorted(top):
+        for dim in top:
             entity_ids[dim] = {}
-            for entity in sorted(top[dim]):
+            for entity in top[dim]:
                 entity_ids[dim][entity] = []
 
         if variant == "integral":
-            R = numpy.array([[0, 1], [-1, 0]])
             facet = ref_el.construct_subelement(sd-1)
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q}
             # degree is q
             Q_ref = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
-            for f in sorted(top[sd - 1]):
+            for f in top[sd - 1]:
                 cur = len(nodes)
                 Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
                 Jdet = Q.jacobian_determinant()
-                thats = ref_el.compute_tangents(sd-1, f)
-                nhat = numpy.dot(R, *thats) if sd == 2 else -numpy.cross(*thats)
-                n = nhat / Jdet
+                n = ref_el.compute_scaled_normal(f) / Jdet
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -48,7 +46,7 @@ class BDMDualSet(dual_set.DualSet):
         elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
-            for f in sorted(top[sd - 1]):
+            for f in top[sd - 1]:
                 cur = len(nodes)
                 pts_cur = ref_el.make_points(sd - 1, f, sd + degree)
                 nodes.extend(functional.PointScaledNormalEvaluation(ref_el, f, pt)
@@ -64,7 +62,7 @@ class BDMDualSet(dual_set.DualSet):
             Q_ref = create_quadrature(cell, interpolant_deg + degree - 1)
             Nedel = nedelec.Nedelec(cell, degree - 1, variant)
             Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
-            for entity in sorted(top[sd]):
+            for entity in top[sd]:
                 Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
                 Jinv = numpy.linalg.inv(Q.jacobian())
                 phis = numpy.tensordot(Jinv.T, Ned_at_qpts, (1, 1)).transpose((1, 0, 2))
