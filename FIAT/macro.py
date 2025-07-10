@@ -556,82 +556,120 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
         super().__init__(ref_el, degree, degree, U.expansion_set, coeffs)
 
 
-class MacroExpansionSet(expansions.ExpansionSet):
+def pullback(mapping, Jinv, phi):
+    try:
+        formdegree = {
+            "affine": (0,),
+            "covariant piola": (1,),
+            "contravariant piola": (2,),
+            "double covariant piola": (1, 1),
+            "double contravariant piola": (2, 2),
+            "covariant contravariant piola": (1, 2),
+            "contravariant covariant piola": (2, 1), }[mapping]
+    except KeyError:
+        raise ValueError(f"Unrecognized mapping {mapping}")
 
+    F1 = Jinv.T
+    F2 = numpy.linalg.inv(Jinv) * numpy.linalg.det(Jinv)
+
+    perm = [*range(1, phi.ndim-1), 0, -1]
+    phi = phi.transpose(perm)
+
+    for i, k in enumerate(formdegree):
+        if k == 0:
+            continue
+        F = F1 if k == 1 else F2
+        phi = numpy.tensordot(F, phi, (1, i))
+
+    perm = [-2, *range(phi.ndim-2), -1]
+    phi = phi.transpose(perm)
+    return phi
+
+
+class MacroPolynomialSet(polynomial_set.PolynomialSet):
+    """Constructs a PolynomialSet by tiling a CiarletElement on a
+    SimplicialComplex.
+
+    :arg ref_el: The SimplicialComplex.
+    :arg element: The CiarletElement.
+    """
     def __init__(self, ref_el, element):
-        self.element = element
-        self.ref_el = ref_el
-        self.variant = None
-        sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-        base_ref_el = element.ref_el
-        base_verts = base_ref_el.get_vertices()
+        sd = ref_el.get_spatial_dimension()
 
-        self.affine_mappings = [reference_element.make_affine_mapping(
-                                ref_el.get_vertices_of_subcomplex(top[sd][cell]),
-                                base_verts) for cell in top[sd]]
-        self.scale = 1
-        self.continuity = element.entity_dofs()
-        self.recurrence_order = element.degree
-        self._dmats_cache = {}
-        self._cell_node_map_cache = {}
+        mapping, = set(element.mapping())
+        base_ref_el = element.get_reference_element()
+        base_entity_ids = element.entity_dofs()
+        n = element.degree()
 
-    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
-        A, b = self.affine_mappings[cell]
-        ref_pts = numpy.add(numpy.dot(pts, A.T), b)
-        Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
-        phis = self.element.tabulate(order, ref_pts)
-        for alpha in phis:
-            phis[alpha] = self.pullback(Jinv, phis[alpha])
-        return phis
+        base_expansion_set = element.get_nodal_basis().get_expansion_set()
+        expansion_set = base_expansion_set.reconstruct(ref_el=ref_el)
 
-    def pullback(self, Jinv, phi):
-        mapping = self.element.mapping()[0]
-        if mapping == "covariant piola":
-            phi = numpy.tensordot(Jinv.T, phi, (1, 1)).transpose((1, 0, 2))
-        elif mapping == "contravariant piola":
-            J = numpy.linalg.inv(Jinv)
-            Jdet = abs(numpy.linalg.det(J))
-            phi = numpy.tensordot(J/Jdet, phi, (1, 1)).transpose((1, 0, 2))
-        elif mapping != "identity":
-            raise ValueError(f"Unrecognized mapping {mapping}")
+        base_entity_ids = expansions.polynomial_entity_ids(base_ref_el, n, base_entity_ids)
+        entity_ids = expansions.polynomial_entity_ids(ref_el, n, base_entity_ids)
 
-        return phi
+        shp = element.value_shape()
+        num_bfs = expansions.polynomial_dimension(ref_el, n, entity_ids)
+        num_members = expansion_set.get_num_members(n)
+        coeffs = numpy.zeros((num_bfs, *shp, num_members))
+        base_coeffs = element.get_coeffs()
+
+        rmap = expansions.polynomial_cell_node_map(ref_el, n, base_entity_ids)
+        cmap = expansion_set.get_cell_node_map(n)
+        for cell in sorted(top):
+            cell_verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
+            A, b = reference_element.make_affine_mapping(cell_verts, base_ref_el.vertices)
+
+            indices = numpy.ix_(rmap[cell], *map(range, shp), cmap[cell])
+            coeffs[indices] = pullback(mapping, A, base_coeffs)
+
+        super().__init__(ref_el, element.degree(), element.degree(), expansion_set, coeffs)
 
 
 if __name__ == "__main__":
-    from FIAT import RaviartThomas
+    from FIAT import Lagrange, Nedelec, RaviartThomas, Regge
     from FIAT.reference_element import symmetric_simplex
 
+    degree = 1
     dim = 3
     K = symmetric_simplex(dim)
-    A = IsoSplit(K)
+    A = AlfeldSplit(K)
 
-    degree = 1
+    fe = Lagrange(K, degree)
+    fe = Nedelec(K, degree)
     fe = RaviartThomas(K, degree)
-    # fe = Nedelec(K, degree)
-
-    U = MacroExpansionSet(A, fe)
+    fe = Regge(K, 0)
 
     mapping = fe.mapping()[0]
     fdim = fe.formdegree
+    if isinstance(fdim, tuple):
+        fdim, = set(fdim)
     comps = []
     pts = []
     for entity in A.topology[fdim]:
         pts_cur = A.make_points(fdim, entity, degree+fdim)
         pts.extend(pts_cur)
-        if mapping == "covariant piola":
+        if mapping == "affine":
+            comp = numpy.ones(())
+        elif mapping.endswith("covariant piola"):
             comp = A.compute_edge_tangent(entity)
-        elif mapping == "contravariant piola":
+        elif mapping.endswith("contravariant piola"):
             comp = A.compute_scaled_normal(entity)
+        if mapping.startswith("double"):
+            comp = numpy.outer(comp, comp)
         comps.extend([comp] * len(pts_cur))
 
-    phis = U._tabulate(degree, pts)
+    P = MacroPolynomialSet(A, fe)
+    phis = P.tabulate(pts)
+
     for alpha in phis:
         shape = phis[alpha].shape
+        shp = shape[1:-1]
         result = numpy.zeros((shape[0], shape[-1]))
+
+        ax = (tuple(range(-len(shp), 0)), )*2
         for i, comp in enumerate(comps):
-            result[..., i] = numpy.dot(phis[alpha][..., i], comp)
+            result[..., i] = numpy.tensordot(phis[alpha][..., i], comp, ax)
         result[abs(result) < 1E-14] = 0
         phis[alpha] = result
 

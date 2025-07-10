@@ -105,6 +105,8 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
         sd = ref_el.get_spatial_dimension()
         if ref_el.is_macrocell():
             poly_set = macro.HDivPolynomialSet(ref_el, degree)
+            # base_element = BrezziDouglasMarini(ref_el.get_parent(), degree)
+            # poly_set = macro.MacroPolynomialSet(ref_el, base_element)
         else:
             poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
         dual = BDMDualSet(ref_el, degree, variant, interpolant_deg)

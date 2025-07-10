@@ -274,10 +274,17 @@ class ExpansionSet(object):
         if scale is None:
             scale = math.sqrt(1.0 / base_ref_el.volume())
         self.scale = scale
+        self.variant = variant
         self.continuity = "C0" if variant == "bubble" else None
         self.recurrence_order = 2
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
+
+    def reconstruct(self, ref_el=None, scale=None, variant=None):
+        """Reconstructs this ExpansionSet with modified arguments."""
+        return ExpansionSet(ref_el or self.ref_el,
+                            scale=scale or self.scale,
+                            variant=variant or self.variant)
 
     def get_scale(self, n, cell=0):
         scale = self.scale
@@ -378,13 +385,11 @@ class ExpansionSet(object):
         base_phi = tuple(phis.values())[0]
         for alpha in base_phi:
             dtype = base_phi[alpha].dtype
-            phi_shape = (num_phis,) + base_phi[alpha].shape[1:-1]
-            shape_idx = tuple(range(i) for i in phi_shape[1:])
-            result[alpha] = numpy.zeros(phi_shape + pts.shape[:-1], dtype=dtype)
+            result[alpha] = numpy.zeros((num_phis, *pts.shape[:-1]), dtype=dtype)
             for cell in cell_point_map:
                 ibfs = cell_node_map[cell]
                 ipts = cell_point_map[cell]
-                result[alpha][idx(ibfs, *shape_idx, ipts)] += phis[cell][alpha]
+                result[alpha][idx(ibfs, ipts)] += phis[cell][alpha]
         return result
 
     def tabulate_normal_jumps(self, n, ref_pts, facet, order=0):
