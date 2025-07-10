@@ -324,8 +324,8 @@ def temp_refcount(temporaries, op):
 
 def to_cupy(assignments):
     
-    func_decl = lambda *args: f"def cupy_kernel({",".join(args)}):"
-    args = []
+    func_decl = lambda *args: [f"def cupy_kernel({",".join(args)}):"]
+    args = {} 
     declare = {"counter" : 0}
     counter = 0
     indices = {}
@@ -342,19 +342,42 @@ def to_cupy(assignments):
 
     @recurse.register(gem.IndexSum)
     def recurse_indexsum(expr, loop_indices):
-        return "IndexSum{" + ",".join([recurse(e, loop_indices)[0] for e in expr.children]) + "}[" + str(expr.multiindex) + "]", ()
+        summands = [recurse(e, loop_indices) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        idx_dict = {idx : chr(65 + i) for i, idx in enumerate(list(set(index[0])))}
+        idx_str = ""
+        for idx in index:
+            for sub in idx:
+                idx_str += idx_dict[sub]
+            idx_str += ","
+        idx_str = idx_str[:-1] + "->"
+        idx_str += "".join([idx_dict[free] for free in expr.free_indices])
+        return f"cp.einsum(\"{idx_str}\", {",".join(commands)})", expr.free_indices
+        #return "IndexSum{" + ",".join() + "}[" + str(expr.multiindex) + "]", ()
 
     @recurse.register(gem.Product)
     def recurse_product(expr, loop_indices):
-        return f"cp.multiply({recurse(expr.children[0], loop_indices)}, {recurse(expr.children[1], loop_indices)})\n", tuple()
-        #return "*".join([recurse(e, loop_indices)[0] for e in expr.children]), tuple()
+        chld1, idx1 = recurse(expr.children[0], loop_indices)
+        chld2, idx2 = recurse(expr.children[1], loop_indices)
+        try:
+            assert set(idx1).issubset(set(idx2)) or set(idx2).issubset(set(idx1))
+        except:
+            breakpoint()
+        if len(idx2) >= len(idx1):
+            return f"cp.multiply({chld1}, {chld2})\n", idx2
+        return f"cp.multiply({chld1}, {chld2})\n", idx1
+        #return "*".join([recurse(e, loop_indices)[0] for e in expr.children]), idx1
 
     @recurse.register(gem.Sum)
     def recurse_sum(expr, loop_indices):
         
         summands =  [recurse(e, loop_indices) for e in expr.children] 
-        breakpoint()
-        return "+".join(summands[:][0]), tuple()
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        #return "+".join(commands), index[0] 
+        return f"cp.add({commands[0]}, {commands[1]})", index[0]
 
     @recurse.register(gem.MathFunction)
     def recurse_fn(expr, loop_indices):
@@ -364,15 +387,30 @@ def to_cupy(assignments):
     @recurse.register(gem.Indexed)
     def recurse_indexed(expr, loop_indices):
         chld, idx =  recurse(expr.children[0], loop_indices) 
-        return chld + "[" + str(expr.multiindex) + "]", expr.multiindex
+        chld += "["
+        for i in expr.multiindex:
+            if isinstance(i, gem.Index):
+                chld += ":,"
+            else:
+                chld += f"{i},"
+        chld = chld[:-1] + "]"
+        return chld, expr.index_ordering()
 
     @recurse.register(gem.FlexiblyIndexed)
     def recurse_findexed(expr, loop_indices):
         chld, idx =  recurse(expr.children[0], loop_indices) 
-        return chld + "f[" + str(expr.dim2idxs) + "]", expr.dim2idxs
+        chld += "["
+        for (off, var) in expr.dim2idxs:
+            if len(var) == 0:
+                chld += f"{off},"
+            else:
+                chld += ":,"
+        chld = chld[:-1] + "]"
+        return chld , expr.index_ordering()
 
     @recurse.register(gem.Variable)
     def recurse_variable(expr, loop_indices):
+        args[expr.name] = 1
         return expr.name, tuple() 
 
     @recurse.register(gem.Literal)
@@ -381,38 +419,16 @@ def to_cupy(assignments):
             declare[expr] = (f"t{declare["counter"]}", expr.array)
             declare["counter"] += 1 
         return declare[expr][0], tuple()
-#
-#    @recurse.register(imp.Evaluate)
-#    def recurse_evaluate(expr, loop_indices):
-#        return "eval:" + recurse(expr.expression, loop_indices) 
-#    
-#    
-#    @recurse.register(imp.Return)
-#    def recurse_return(expr, loop_indices):
-#        return recurse(expr.variable, loop_indices) + "=" + recurse(expr.expression, loop_indices)
-#
-#    @recurse.register(imp.Terminal)
-#    def recurse_terminal(expr, loop_indices):
-#        return str(type(expr)) 
-#
-#    @recurse.register(imp.For)
-#    def recurse_for(expr, loop_indices):
-#        return "for {" + recurse(expr.children[0], loop_indices + (expr.index,)) + "\n}"
-#
-#    @recurse.register(imp.Block)
-#    def recurse_block(expr, loop_indices):
-#        # Temporaries declared at the beginning of the block are
-#        # collected here
-#        declare[expr] = []
-#
-#        # Collect reference counts for the block
-#        refcount = "" 
-#        for statement in expr.children:
-#            refcount += "Block[" + (recurse(statement, loop_indices)) + "]\n"
-#
-#        return refcount
+    
     strs = []
     for var, expr in assignments:
-        strs += [recurse(expr, ())]
-
+        e, _ = recurse(expr, ())
+        print(var)
+        strs += [e]
+    
+    temp_vars = []
+    for key, val in declare.items():
+       if key != "counter":
+            temp_vars += [f"{val[0]}=cp.{repr(val[1])}"] 
+    res = "\n".join(func_decl(*list(args.keys())) + temp_vars + strs)
     breakpoint()
