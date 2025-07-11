@@ -12,6 +12,8 @@ from itertools import chain, groupby
 from gem.node import traversal, collect_refcount
 from gem import gem, impero as imp, optimise, scheduling
 
+import os
+from firedrake.device import add_kernel_string
 
 # ImperoC is named tuple for C code generation.
 #
@@ -56,7 +58,11 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
             return not isinstance(expression, gem.Zero)
         assignments = list(filter(nonzero, assignments))
 
-    to_cupy(assignments)
+    if "FIREDRAKE_USE_GPU" in os.environ:
+        print("Generating cupy string")
+        res = to_cupy(assignments)
+        add_kernel_string(res)
+
     # Just the expressions
     expressions = [expression for variable, expression in assignments]
 
@@ -360,13 +366,23 @@ def to_cupy(assignments):
     def recurse_product(expr, loop_indices):
         chld1, idx1 = recurse(expr.children[0], loop_indices)
         chld2, idx2 = recurse(expr.children[1], loop_indices)
-        try:
-            assert set(idx1).issubset(set(idx2)) or set(idx2).issubset(set(idx1))
-        except:
-            breakpoint()
+        assert set(idx1).issubset(set(idx2)) or set(idx2).issubset(set(idx1))
+        indexing = ""
+        if len(idx1) != len(idx2) and len(idx1) > 0 and len(idx2) > 0:
+            l_idx, s_idx = (idx1, idx2) if len(idx1) > len(idx2) else (idx2, idx1)
+            l_chld, s_chld = (chld1, chld2) if len(idx1) > len(idx2) else (chld2, chld1)
+            empty_slots = 0
+            indexing = "["
+            for i in range(max(len(idx2), len(idx1))):
+                if i-empty_slots >= len(s_idx) or l_idx[i] != s_idx[i-empty_slots]:
+                    indexing += "cp.newaxis,"
+                    empty_slots += 1
+                else:
+                    indexing += ":,"
+            indexing = indexing[:-1] + "]" 
         if len(idx2) >= len(idx1):
-            return f"cp.multiply({chld1}, {chld2})\n", idx2
-        return f"cp.multiply({chld1}, {chld2})\n", idx1
+            return f"cp.multiply({chld1}{indexing}, {chld2})\n", idx2
+        return f"cp.multiply({chld1}, {chld2}{indexing})\n", idx1
         #return "*".join([recurse(e, loop_indices)[0] for e in expr.children]), idx1
 
     @recurse.register(gem.Sum)
@@ -398,13 +414,18 @@ def to_cupy(assignments):
 
     @recurse.register(gem.FlexiblyIndexed)
     def recurse_findexed(expr, loop_indices):
+        # TODO this doesn't encapsulate the detail dim2idx
         chld, idx =  recurse(expr.children[0], loop_indices) 
         chld += "["
         for (off, var) in expr.dim2idxs:
             if len(var) == 0:
                 chld += f"{off},"
             else:
-                chld += ":,"
+                for (i, stride) in var:
+                    if isinstance(i, gem.Index):
+                        chld += ":,"
+                    else:
+                        breakpoint()
         chld = chld[:-1] + "]"
         return chld , expr.index_ordering()
 
@@ -416,19 +437,25 @@ def to_cupy(assignments):
     @recurse.register(gem.Literal)
     def recurse_literal(expr, loop_indices):
         if expr not in declare.keys():
-            declare[expr] = (f"t{declare["counter"]}", expr.array)
+            declare[expr] = (f"\tt{declare["counter"]}", expr.array)
             declare["counter"] += 1 
         return declare[expr][0], tuple()
     
     strs = []
     for var, expr in assignments:
-        e, _ = recurse(expr, ())
+        e, e_idx = recurse(expr, ())
         print(var)
-        strs += [e]
+        v, v_idx = recurse(var, ())
+        assert v_idx == e_idx
+        print(v)
+        strs += [f"\tprint(\"in kernel\", {e})"]
+        strs += [f"\t{v}={e}"]
+        strs += [f"\tprint(\"in kernel res\", {v})"]
+        
     
     temp_vars = []
     for key, val in declare.items():
        if key != "counter":
             temp_vars += [f"{val[0]}=cp.{repr(val[1])}"] 
     res = "\n".join(func_decl(*list(args.keys())) + temp_vars + strs)
-    breakpoint()
+    return res
