@@ -581,7 +581,7 @@ def pullback(mapping, Jinv, phi):
         F = F1 if k == 1 else F2
         phi = numpy.tensordot(F, phi, (1, i))
 
-    perm = [-2, *range(phi.ndim-2), -1]
+    perm = [-2, *reversed(range(phi.ndim-2)), -1]
     phi = phi.transpose(perm)
     return phi
 
@@ -605,18 +605,15 @@ class MacroPolynomialSet(polynomial_set.PolynomialSet):
         base_expansion_set = element.get_nodal_basis().get_expansion_set()
         expansion_set = base_expansion_set.reconstruct(ref_el=ref_el)
 
-        base_entity_ids = expansions.polynomial_entity_ids(base_ref_el, n, base_entity_ids)
-        entity_ids = expansions.polynomial_entity_ids(ref_el, n, base_entity_ids)
-
         shp = element.value_shape()
-        num_bfs = expansions.polynomial_dimension(ref_el, n, entity_ids)
+        num_bfs = expansions.polynomial_dimension(ref_el, n, base_entity_ids)
         num_members = expansion_set.get_num_members(n)
         coeffs = numpy.zeros((num_bfs, *shp, num_members))
         base_coeffs = element.get_coeffs()
 
         rmap = expansions.polynomial_cell_node_map(ref_el, n, base_entity_ids)
         cmap = expansion_set.get_cell_node_map(n)
-        for cell in sorted(top):
+        for cell in sorted(top[sd]):
             cell_verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
             A, b = reference_element.make_affine_mapping(cell_verts, base_ref_el.vertices)
 
@@ -624,53 +621,3 @@ class MacroPolynomialSet(polynomial_set.PolynomialSet):
             coeffs[indices] = pullback(mapping, A, base_coeffs)
 
         super().__init__(ref_el, element.degree(), element.degree(), expansion_set, coeffs)
-
-
-if __name__ == "__main__":
-    from FIAT import Lagrange, Nedelec, RaviartThomas, Regge
-    from FIAT.reference_element import symmetric_simplex
-
-    degree = 1
-    dim = 3
-    K = symmetric_simplex(dim)
-    A = AlfeldSplit(K)
-
-    fe = Lagrange(K, degree)
-    fe = Nedelec(K, degree)
-    fe = RaviartThomas(K, degree)
-    fe = Regge(K, 0)
-
-    mapping = fe.mapping()[0]
-    fdim = fe.formdegree
-    if isinstance(fdim, tuple):
-        fdim, = set(fdim)
-    comps = []
-    pts = []
-    for entity in A.topology[fdim]:
-        pts_cur = A.make_points(fdim, entity, degree+fdim)
-        pts.extend(pts_cur)
-        if mapping == "affine":
-            comp = numpy.ones(())
-        elif mapping.endswith("covariant piola"):
-            comp = A.compute_edge_tangent(entity)
-        elif mapping.endswith("contravariant piola"):
-            comp = A.compute_scaled_normal(entity)
-        if mapping.startswith("double"):
-            comp = numpy.outer(comp, comp)
-        comps.extend([comp] * len(pts_cur))
-
-    P = MacroPolynomialSet(A, fe)
-    phis = P.tabulate(pts)
-
-    for alpha in phis:
-        shape = phis[alpha].shape
-        shp = shape[1:-1]
-        result = numpy.zeros((shape[0], shape[-1]))
-
-        ax = (tuple(range(-len(shp), 0)), )*2
-        for i, comp in enumerate(comps):
-            result[..., i] = numpy.tensordot(phis[alpha][..., i], comp, ax)
-        result[abs(result) < 1E-14] = 0
-        phis[alpha] = result
-
-    print(phis)

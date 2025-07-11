@@ -166,7 +166,7 @@ def test_affine(ref_to_phys, element, degree, dimension):
     check_zany_mapping(element, ref_to_phys[dimension], degree)
 
 
-@pytest.mark.parametrize("element", [finat.BrezziDouglasMarini])
+@pytest.mark.parametrize("element", [finat.BrezziDouglasMarini, finat.NedelecSecondKind])
 @pytest.mark.parametrize("degree", [1, 2])
 @pytest.mark.parametrize("dimension", [2, 3])
 @pytest.mark.parametrize("variant", [None, "iso"])
