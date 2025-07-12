@@ -8,8 +8,8 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-from FIAT import dual_set, finite_element, polynomial_set
-from FIAT.check_format_variant import check_format_variant
+from FIAT import dual_set, finite_element, polynomial_set, macro
+from FIAT.check_format_variant import check_format_variant, parse_lagrange_variant
 from FIAT.functional import (PointwiseInnerProductEvaluation,
                              ComponentPointEvaluation,
                              TensorBidirectionalIntegralMoment as BidirectionalMoment)
@@ -66,20 +66,27 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
             nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[i+1], n[i+2], pt)
                          for pt in pts for i in range((sd-1)*(sd-2)))
         else:
-            Q = create_quadrature(ref_el, qdegree + degree)
-            P = polynomial_set.ONPolynomialSet(ref_el, degree)
-            phis = P.tabulate(Q.get_points())[(0,)*sd]
-            phis /= ref_el.volume()
+            cell = ref_el.construct_subelement(sd)
+            Q_ref = create_quadrature(cell, qdegree + degree)
+            P = polynomial_set.ONPolynomialSet(cell, degree)
+            Phis = P.tabulate(Q_ref.get_points())[(0,) * sd]
             dimPkm1 = P.expansion_set.get_num_members(degree-1)
-            # n[f]^T u n[f] integrated against a basis for P_{k-1}
-            nodes.extend(BidirectionalMoment(ref_el, n[f], n[f], Q, phi)
-                         for phi in phis[:dimPkm1] for f in sorted(top[sd-1]))
 
-            # n[i+1]^T u n[i+2] integrated against a basis for Pk
-            nodes.extend(BidirectionalMoment(ref_el, n[i+1], n[i+2], Q, phi)
-                         for phi in phis for i in range((sd-1)*(sd-2)))
+            for entity in sorted(top[sd]):
+                cur = len(nodes)
+                faces = ref_el.get_connectivity()[(sd, sd-1)][entity]
+                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
+                phis = Phis / Q.jacobian_determinant()
 
-        entity_ids[sd][0].extend(range(cur, len(nodes)))
+                # n[f]^T u n[f] integrated against a basis for P_{k-1}
+                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f], Q, phi)
+                             for phi in phis[:dimPkm1] for f in faces)
+
+                # n[i+1]^T u n[i+2] integrated against a basis for Pk
+                nodes.extend(BidirectionalMoment(ref_el, n[faces[i+1]], n[faces[i+2]], Q, phi)
+                             for phi in phis for i in range((sd-1)*(sd-2)))
+
+                entity_ids[sd][entity].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -93,8 +100,17 @@ class HellanHerrmannJohnson(finite_element.CiarletElement):
         if degree < 0:
             raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
 
+        if variant is not None:
+            splitting, variant = parse_lagrange_variant(variant, integral=True)
+            if splitting is not None:
+                ref_el = splitting(ref_el)
         variant, qdegree = check_format_variant(variant, degree)
-        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        if ref_el.is_macrocell():
+            base_element = HellanHerrmannJohnson(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+
         dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree)
         sd = ref_el.get_spatial_dimension()
         formdegree = (sd-1, sd-1)

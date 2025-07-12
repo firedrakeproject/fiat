@@ -3,7 +3,7 @@ import numpy
 import pytest
 from FIAT import (Lagrange, Nedelec, RaviartThomas, DiscontinuousLagrange, Legendre, P0,
                   NedelecSecondKind, BrezziDouglasMarini,
-                  Regge, GopalakrishnanLedererSchoberlSecondKind)
+                  Regge, HellanHerrmannJohnson, GopalakrishnanLedererSchoberlSecondKind)
 from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet, MacroPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
@@ -444,7 +444,8 @@ def test_macro_sympy(cell, element):
 
 @pytest.mark.parametrize("element,degree", [
     (Lagrange, 1), (Nedelec, 1), (RaviartThomas, 1), (DiscontinuousLagrange, 0),
-    (Regge, 0)])
+    (Regge, 0), (HellanHerrmannJohnson, 0),
+    (GopalakrishnanLedererSchoberlSecondKind, 0)])
 @pytest.mark.parametrize("dim", (2, 3))
 def test_macro_polynomial_set(dim, element, degree):
     K = ufc_simplex(dim)
@@ -454,41 +455,53 @@ def test_macro_polynomial_set(dim, element, degree):
     mapping = fe.mapping()[0]
     fdim = fe.formdegree
     if isinstance(fdim, tuple):
-        fdim, = set(fdim)
+        fdim = max(fdim)
     comps = []
     pts = []
     for entity in A.topology[fdim]:
         pts_cur = A.make_points(fdim, entity, 1+fdim)
         pts.extend(pts_cur)
+
         if mapping == "affine":
             comp = numpy.ones(())
+        elif mapping == "covariant contravariant piola":
+            ts = A.compute_tangents(fdim, entity)
+            n = A.compute_scaled_normal(entity)
+            comp = ts[..., None] * n[None, None, :]
+
         elif mapping.endswith("covariant piola"):
             comp = A.compute_edge_tangent(entity)
         elif mapping.endswith("contravariant piola"):
             comp = A.compute_scaled_normal(entity)
         if mapping.startswith("double"):
             comp = numpy.outer(comp, comp)
-        comps.extend([comp] * len(pts_cur))
+
+        comps.extend(comp for pt in pts_cur)
 
     P = MacroPolynomialSet(A, fe)
-    phis = P.tabulate(pts)
-
-    alpha = (0,) * dim
-    shape = phis[alpha].shape
+    phis = P.tabulate(pts)[(0,)*dim]
+    shape = phis.shape
     shp = shape[1:-1]
-    result = numpy.zeros((shape[0], shape[-1]))
+    ncomp = comp.shape[:-len(shp)]
 
+    result = numpy.zeros((shape[0], *ncomp, shape[-1]))
     ax = (tuple(range(-len(shp), 0)), )*2
     for i, comp in enumerate(comps):
-        result[..., i] = numpy.tensordot(phis[alpha][..., i], comp, ax)
+        result[..., i] = numpy.tensordot(comp, phis[..., i], ax).T
     result[abs(result) < 1E-14] = 0
+    result = result[:len(pts)*numpy.prod(ncomp, dtype=int)]
 
+    if ncomp:
+        result = result.transpose((*range(1, len(ncomp)+1), 0, -1))
+        result = result.reshape((shape[0], -1))
     assert numpy.allclose(numpy.diag(numpy.diag(result)), result)
 
 
 @pytest.mark.parametrize("element,degree", [
     (Lagrange, 4), (Nedelec, 3), (RaviartThomas, 2), (DiscontinuousLagrange, 1),
-    (NedelecSecondKind, 3), (BrezziDouglasMarini, 2), (Regge, 1), (GopalakrishnanLedererSchoberlSecondKind, 1)])
+    (NedelecSecondKind, 3), (BrezziDouglasMarini, 2),
+    (Regge, 3), (HellanHerrmannJohnson, 1),
+    (GopalakrishnanLedererSchoberlSecondKind, 1)])
 @pytest.mark.parametrize("dim", (2, 3))
 @pytest.mark.parametrize("variant", ("alfeld", "iso"))
 def test_macro_variants(dim, element, degree, variant):

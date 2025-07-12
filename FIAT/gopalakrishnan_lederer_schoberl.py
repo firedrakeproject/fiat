@@ -77,7 +77,7 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
 
 
-def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree):
+def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree, variant=None):
     """The GLS element used for the Mass-Conserving mixed Stress (MCS)
     formulation for Stokes flow.
 
@@ -86,12 +86,16 @@ def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree):
 
     Reference: https://doi.org/10.1093/imanum/drz022
     """
-    fe = GopalakrishnanLedererSchoberlSecondKind(ref_el, degree)
+    fe = GopalakrishnanLedererSchoberlSecondKind(ref_el, degree, variant=variant)
     entity_dofs = fe.entity_dofs()
     sd = ref_el.get_spatial_dimension()
-    dimPkm1 = (sd-1)*expansions.polynomial_dimension(ref_el.construct_subelement(sd-1), degree-1)
+    facet = ref_el.construct_subelement(sd-1)
+    dimPkm1 = (sd-1)*expansions.polynomial_dimension(facet, degree-1)
+
     indices = []
-    for f in entity_dofs[sd-1]:
+    for f in sorted(entity_dofs[sd-1]):
         indices.extend(entity_dofs[sd-1][f][:dimPkm1])
-    indices.extend(entity_dofs[sd][0])
+    for cell in sorted(entity_dofs[sd]):
+        indices.extend(entity_dofs[sd][cell])
+
     return RestrictedElement(fe, indices=indices)
