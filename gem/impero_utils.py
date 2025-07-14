@@ -14,6 +14,7 @@ from gem import gem, impero as imp, optimise, scheduling
 
 import os
 from firedrake.device import add_kernel_string
+import numpy as np
 
 # ImperoC is named tuple for C code generation.
 #
@@ -351,7 +352,7 @@ def to_cupy(assignments):
         summands = [recurse(e, loop_indices) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        idx_dict = {idx : chr(65 + i) for i, idx in enumerate(list(set(index[0])))}
+        idx_dict = {idx : chr(65 + i) for i, idx in enumerate(list(set(expr.multiindex + expr.free_indices)))}
         idx_str = ""
         for idx in index:
             for sub in idx:
@@ -359,14 +360,21 @@ def to_cupy(assignments):
             idx_str += ","
         idx_str = idx_str[:-1] + "->"
         idx_str += "".join([idx_dict[free] for free in expr.free_indices])
+        
+        if idx_str == "A->B" or idx_str == "B->A":
+            breakpoint()
+        if len(idx_str[:-3]) > 2:
+            declare[expr.children[0]] = (f"\tis{declare["counter"]}", commands[0].replace("\n",""))
+            if declare["counter"] == 6:
+                breakpoint()
+            declare["counter"] += 1
+            return f"cp.einsum(\"{idx_str}\", {declare[expr.children[0]][0][1:]})", expr.free_indices
         return f"cp.einsum(\"{idx_str}\", {",".join(commands)})", expr.free_indices
-        #return "IndexSum{" + ",".join() + "}[" + str(expr.multiindex) + "]", ()
 
     @recurse.register(gem.Product)
     def recurse_product(expr, loop_indices):
         chld1, idx1 = recurse(expr.children[0], loop_indices)
         chld2, idx2 = recurse(expr.children[1], loop_indices)
-        assert set(idx1).issubset(set(idx2)) or set(idx2).issubset(set(idx1))
         indexing = ""
         if len(idx1) != len(idx2) and len(idx1) > 0 and len(idx2) > 0:
             l_idx, s_idx = (idx1, idx2) if len(idx1) > len(idx2) else (idx2, idx1)
@@ -380,25 +388,52 @@ def to_cupy(assignments):
                 else:
                     indexing += ":,"
             indexing = indexing[:-1] + "]" 
+
+        #result_idx = list(set(idx1 + idx2))
+        result_idx = tuple(dict.fromkeys(idx1 + idx2))
         if len(idx2) >= len(idx1):
-            return f"cp.multiply({chld1}{indexing}, {chld2})\n", idx2
-        return f"cp.multiply({chld1}, {chld2}{indexing})\n", idx1
-        #return "*".join([recurse(e, loop_indices)[0] for e in expr.children]), idx1
+            if result_idx != idx2:
+                breakpoint()
+            return f"cp.multiply({chld1}{indexing}, {chld2})",result_idx 
+        if result_idx != idx1:
+            breakpoint()
+        return f"cp.multiply({chld1}, {chld2}{indexing})", result_idx
 
     @recurse.register(gem.Sum)
     def recurse_sum(expr, loop_indices):
-        
+        summands =  [recurse(e, loop_indices) for e in expr.children] 
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        try:
+            assert len(set(index)) == 1
+        except:
+            breakpoint()
+        return f"cp.add({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Division)
+    def recurse_div(expr, loop_indices):
         summands =  [recurse(e, loop_indices) for e in expr.children] 
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
-        #return "+".join(commands), index[0] 
-        return f"cp.add({commands[0]}, {commands[1]})", index[0]
+        return f"cp.divide({commands[0]}, {commands[1]})", index[0]
 
     @recurse.register(gem.MathFunction)
     def recurse_fn(expr, loop_indices):
         chld, idx =  recurse(expr.children[0], loop_indices) 
         return expr.name + "(" + chld + ")", idx
+
+    @recurse.register(gem.ListTensor)
+    def recurse_list_tensor(expr, loop_indices):
+        str_array = "cp." + repr(np.empty_like(expr.array)).replace('None', "{}").replace("object", "cp.float64")
+        chld_list = []
+        idx_list = []
+        for chld_expr in expr.array.flatten():
+            chld, idx =  recurse(chld_expr, loop_indices) 
+            chld_list += [chld]
+            idx_list += [idx]
+        assert len(set(idx_list)) == 1
+        return str_array.format(*chld_list), idx_list[0]
 
     @recurse.register(gem.Indexed)
     def recurse_indexed(expr, loop_indices):
@@ -439,23 +474,25 @@ def to_cupy(assignments):
         if expr not in declare.keys():
             declare[expr] = (f"\tt{declare["counter"]}", expr.array)
             declare["counter"] += 1 
-        return declare[expr][0], tuple()
+        return declare[expr][0][1:], tuple()
     
     strs = []
     for var, expr in assignments:
         e, e_idx = recurse(expr, ())
-        print(var)
         v, v_idx = recurse(var, ())
-        assert v_idx == e_idx
-        print(v)
-        strs += [f"\tprint(\"in kernel\", {e})"]
-        strs += [f"\t{v}={e}"]
-        strs += [f"\tprint(\"in kernel res\", {v})"]
+        # TODO check ordering of indices
+        assert set(v_idx) == set(e_idx)
+        strs += [f"\t{v}=cp.array({e})"]
         
     
     temp_vars = []
     for key, val in declare.items():
-       if key != "counter":
+       if key != "counter" and val[0][:2] == "\tt":
             temp_vars += [f"{val[0]}=cp.{repr(val[1])}"] 
+       elif key != "counter":
+            temp_vars += ["\tbreakpoint()"]
+            temp_vars += [f"{val[0]}={repr(val[1])[1:-1]}"] 
+    #kernel_fuse = ["@cp.fuse()\n"]
     res = "\n".join(func_decl(*list(args.keys())) + temp_vars + strs)
+
     return res
