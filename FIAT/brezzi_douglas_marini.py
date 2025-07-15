@@ -6,8 +6,8 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import (finite_element, functional, dual_set,
-                  polynomial_set, nedelec, macro)
-from FIAT.check_format_variant import check_format_variant, parse_lagrange_variant
+                  polynomial_set, nedelec)
+from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 import numpy
@@ -95,21 +95,15 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant=None):
 
-        if variant is not None:
-            splitting, variant = parse_lagrange_variant(variant, integral=True)
-            if splitting is not None:
-                ref_el = splitting(ref_el)
-        variant, interpolant_deg = check_format_variant(variant, degree)
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
 
         if degree < 1:
             raise Exception("BDM_k elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
-        if ref_el.is_macrocell():
-            base_element = BrezziDouglasMarini(ref_el.get_parent(), degree)
-            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
-        else:
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
         dual = BDMDualSet(ref_el, degree, variant, interpolant_deg)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

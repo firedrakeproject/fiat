@@ -9,7 +9,7 @@ from FIAT import (polynomial_set, expansions, dual_set,
                   finite_element, functional, macro)
 import numpy
 from itertools import chain
-from FIAT.check_format_variant import check_format_variant, parse_lagrange_variant
+from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 
@@ -200,11 +200,9 @@ class Nedelec(finite_element.CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
-        if variant is not None:
-            splitting, variant = parse_lagrange_variant(variant, integral=True)
-            if splitting is not None:
-                ref_el = splitting(ref_el)
-        variant, interpolant_deg = check_format_variant(variant, degree)
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
 
         if ref_el.is_macrocell():
             base_element = Nedelec(ref_el.get_parent(), degree)

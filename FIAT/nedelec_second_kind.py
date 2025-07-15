@@ -15,8 +15,7 @@ from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.check_format_variant import check_format_variant, parse_lagrange_variant
-from FIAT import macro
+from FIAT.check_format_variant import check_format_variant
 
 
 class NedelecSecondKindDual(DualSet):
@@ -193,12 +192,9 @@ class NedelecSecondKind(CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
-
-        if variant is not None:
-            splitting, variant = parse_lagrange_variant(variant, integral=True)
-            if splitting is not None:
-                ref_el = splitting(ref_el)
-        variant, interpolant_deg = check_format_variant(variant, degree)
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
 
         # Check degree
         assert degree >= 1, "Second kind Nedelecs start at 1!"
@@ -206,11 +202,7 @@ class NedelecSecondKind(CiarletElement):
         # Get dimension
         d = ref_el.get_spatial_dimension()
         # Construct polynomial basis for d-vector fields
-        if ref_el.is_macrocell():
-            base_element = NedelecSecondKind(ref_el.get_parent(), degree)
-            Ps = macro.MacroPolynomialSet(ref_el, base_element)
-        else:
-            Ps = ONPolynomialSet(ref_el, degree, (d, ))
+        Ps = ONPolynomialSet(ref_el, degree, (d, ))
 
         # Construct dual space
         Ls = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg)

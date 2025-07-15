@@ -623,7 +623,7 @@ class SimplicialComplex(Cell):
         indices = slice(None)
         subcomplex = top[entity_dim][entity_id]
         if entity_dim != sd:
-            cell_id = self.connectivity[(entity_dim, sd)][0][0]
+            cell_id = self.connectivity[(entity_dim, sd)][entity_id][0]
             indices = [i for i, v in enumerate(top[sd][cell_id]) if v in subcomplex]
             subcomplex = top[sd][cell_id]
 

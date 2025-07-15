@@ -27,6 +27,8 @@ supported_splits = {
 
 
 def check_format_variant(variant, degree):
+    splitting, variant = parse_lagrange_variant(variant, integral=True)
+
     if variant is None:
         variant = "integral"
 
@@ -44,7 +46,7 @@ def check_format_variant(variant, degree):
         raise ValueError('Choose either variant="point" or variant="integral"'
                          'or variant="integral(q)"')
 
-    return variant, interpolant_degree
+    return splitting, variant, interpolant_degree
 
 
 def parse_lagrange_variant(variant, discontinuous=False, integral=False):

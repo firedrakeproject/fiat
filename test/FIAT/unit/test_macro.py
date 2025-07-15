@@ -3,7 +3,8 @@ import numpy
 import pytest
 from FIAT import (Lagrange, Nedelec, RaviartThomas, DiscontinuousLagrange, Legendre, P0,
                   NedelecSecondKind, BrezziDouglasMarini,
-                  Regge, HellanHerrmannJohnson, GopalakrishnanLedererSchoberlSecondKind)
+                  Regge, HellanHerrmannJohnson, GopalakrishnanLedererSchoberlSecondKind,
+                  CrouzeixRaviart)
 from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet, MacroPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex
@@ -506,3 +507,10 @@ def test_macro_polynomial_set(dim, element, degree):
 @pytest.mark.parametrize("variant", ("alfeld", "iso"))
 def test_macro_variants(dim, element, degree, variant):
     element(ufc_simplex(dim), degree, variant=variant)
+
+
+@pytest.mark.parametrize("element,degree", [
+    (CrouzeixRaviart, 3)])
+@pytest.mark.parametrize("variant", ("alfeld", "iso"))
+def test_macro_variants_triangle(element, degree, variant):
+    element(ufc_simplex(2), degree, variant=variant)

@@ -8,8 +8,8 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-from FIAT import dual_set, finite_element, polynomial_set, macro
-from FIAT.check_format_variant import check_format_variant, parse_lagrange_variant
+from FIAT import dual_set, finite_element, polynomial_set
+from FIAT.check_format_variant import check_format_variant
 from FIAT.functional import (PointwiseInnerProductEvaluation,
                              ComponentPointEvaluation,
                              TensorBidirectionalIntegralMoment as BidirectionalMoment)
@@ -100,17 +100,11 @@ class HellanHerrmannJohnson(finite_element.CiarletElement):
         if degree < 0:
             raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
 
-        if variant is not None:
-            splitting, variant = parse_lagrange_variant(variant, integral=True)
-            if splitting is not None:
-                ref_el = splitting(ref_el)
-        variant, qdegree = check_format_variant(variant, degree)
-        if ref_el.is_macrocell():
-            base_element = HellanHerrmannJohnson(ref_el.get_parent(), degree)
-            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
-        else:
-            poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        splitting, variant, qdegree = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
 
+        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
         dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree)
         sd = ref_el.get_spatial_dimension()
         formdegree = (sd-1, sd-1)
