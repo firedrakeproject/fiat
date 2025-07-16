@@ -328,6 +328,17 @@ def temp_refcount(temporaries, op):
 
     return counter
 
+def construct_einsum_str(expr, index):
+    idx_dict = {idx : chr(65 + i) for i, idx in enumerate(set(sum(index+[expr.free_indices], tuple())))}
+    idx_str = ""
+    for idx in index:
+        for sub in idx:
+            idx_str += idx_dict[sub]
+        idx_str += ","
+    idx_str = idx_str[:-1]
+    idx_str += "->"
+    idx_str += "".join([idx_dict[free] for free in expr.free_indices])
+    return idx_str
 
 def to_cupy(assignments):
     
@@ -347,67 +358,31 @@ def to_cupy(assignments):
         """
         raise AssertionError("unsupported expression type %s" % type(expr))
 
+    @recurse.register(gem.Product)
     @recurse.register(gem.IndexSum)
     def recurse_indexsum(expr, loop_indices):
         summands = [recurse(e, loop_indices) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        idx_dict = {idx : chr(65 + i) for i, idx in enumerate(list(set(expr.multiindex + expr.free_indices)))}
-        idx_str = ""
-        for idx in index:
-            for sub in idx:
-                idx_str += idx_dict[sub]
-            idx_str += ","
-        idx_str = idx_str[:-1] + "->"
-        idx_str += "".join([idx_dict[free] for free in expr.free_indices])
-        
-        if idx_str == "A->B" or idx_str == "B->A":
-            breakpoint()
-        if len(idx_str[:-3]) > 2:
-            declare[expr.children[0]] = (f"\tis{declare["counter"]}", commands[0].replace("\n",""))
-            if declare["counter"] == 6:
-                breakpoint()
-            declare["counter"] += 1
-            return f"cp.einsum(\"{idx_str}\", {declare[expr.children[0]][0][1:]})", expr.free_indices
+        idx_str = construct_einsum_str(expr, index)
+        # put sub expressions into temporary if they are over an arbitary number of characters (60)
+        if  any([len(command) > 60 for command in commands]):
+            for i in range(len(expr.children)):
+                if expr.children[i] not in declare.keys():
+                    declare[expr.children[i]] = (f"\tis{declare["counter"]}", commands[i].replace("\n",""))
+                    declare["counter"] += 1
+            # the indexing [1:] removes the tab character from the start
+            operands =",".join([declare[expr.children[i]][0][1:] for i in range(len(expr.children))])
+            return f"cp.einsum(\"{idx_str}\", {operands})", expr.free_indices
         return f"cp.einsum(\"{idx_str}\", {",".join(commands)})", expr.free_indices
 
-    @recurse.register(gem.Product)
-    def recurse_product(expr, loop_indices):
-        chld1, idx1 = recurse(expr.children[0], loop_indices)
-        chld2, idx2 = recurse(expr.children[1], loop_indices)
-        indexing = ""
-        if len(idx1) != len(idx2) and len(idx1) > 0 and len(idx2) > 0:
-            l_idx, s_idx = (idx1, idx2) if len(idx1) > len(idx2) else (idx2, idx1)
-            l_chld, s_chld = (chld1, chld2) if len(idx1) > len(idx2) else (chld2, chld1)
-            empty_slots = 0
-            indexing = "["
-            for i in range(max(len(idx2), len(idx1))):
-                if i-empty_slots >= len(s_idx) or l_idx[i] != s_idx[i-empty_slots]:
-                    indexing += "cp.newaxis,"
-                    empty_slots += 1
-                else:
-                    indexing += ":,"
-            indexing = indexing[:-1] + "]" 
-
-        #result_idx = list(set(idx1 + idx2))
-        result_idx = tuple(dict.fromkeys(idx1 + idx2))
-        if len(idx2) >= len(idx1):
-            if result_idx != idx2:
-                breakpoint()
-            return f"cp.multiply({chld1}{indexing}, {chld2})",result_idx 
-        if result_idx != idx1:
-            breakpoint()
-        return f"cp.multiply({chld1}, {chld2}{indexing})", result_idx
 
     @recurse.register(gem.Sum)
     def recurse_sum(expr, loop_indices):
         summands =  [recurse(e, loop_indices) for e in expr.children] 
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        try:
-            assert len(set(index)) == 1
-        except:
-            breakpoint()
+        assert len(set(index)) == 1
         return f"cp.add({commands[0]}, {commands[1]})", index[0]
 
     @recurse.register(gem.Division)
@@ -445,8 +420,8 @@ def to_cupy(assignments):
             else:
                 chld += f"{i},"
         chld = chld[:-1] + "]"
-        return chld, expr.index_ordering()
-
+        return chld, expr.index_ordering() + idx 
+    
     @recurse.register(gem.FlexiblyIndexed)
     def recurse_findexed(expr, loop_indices):
         # TODO this doesn't encapsulate the detail dim2idx
@@ -458,7 +433,8 @@ def to_cupy(assignments):
             else:
                 for (i, stride) in var:
                     if isinstance(i, gem.Index):
-                        chld += ":,"
+                        #chld += f"{off},:,"
+                        chld += f":,"
                     else:
                         breakpoint()
         chld = chld[:-1] + "]"
@@ -490,7 +466,7 @@ def to_cupy(assignments):
        if key != "counter" and val[0][:2] == "\tt":
             temp_vars += [f"{val[0]}=cp.{repr(val[1])}"] 
        elif key != "counter":
-            temp_vars += ["\tbreakpoint()"]
+            #temp_vars += ["\tbreakpoint()"]
             temp_vars += [f"{val[0]}={repr(val[1])[1:-1]}"] 
     #kernel_fuse = ["@cp.fuse()\n"]
     res = "\n".join(func_decl(*list(args.keys())) + temp_vars + strs)
