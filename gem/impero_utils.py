@@ -349,7 +349,7 @@ def to_cupy(assignments):
     indices = {}
 
     @singledispatch
-    def recurse(expr, loop_indices):
+    def recurse(expr):
         """Visit an Impero AST to collect declarations.
 
         :arg expr: Impero tree node
@@ -360,8 +360,8 @@ def to_cupy(assignments):
 
     @recurse.register(gem.Product)
     @recurse.register(gem.IndexSum)
-    def recurse_indexsum(expr, loop_indices):
-        summands = [recurse(e, loop_indices) for e in expr.children]
+    def recurse_indexsum(expr):
+        summands = [recurse(e) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         idx_str = construct_einsum_str(expr, index)
@@ -369,50 +369,51 @@ def to_cupy(assignments):
         if  any([len(command) > 60 for command in commands]):
             for i in range(len(expr.children)):
                 if expr.children[i] not in declare.keys():
-                    declare[expr.children[i]] = (f"\tis{declare["counter"]}", commands[i].replace("\n",""))
+                    declare[expr.children[i]] = (f"is{declare["counter"]}", commands[i].replace("\n",""))
                     declare["counter"] += 1
-            # the indexing [1:] removes the tab character from the start
-            operands =",".join([declare[expr.children[i]][0][1:] for i in range(len(expr.children))])
+            operands =",".join([declare[expr.children[i]][0] for i in range(len(expr.children))])
             return f"cp.einsum(\"{idx_str}\", {operands})", expr.free_indices
         return f"cp.einsum(\"{idx_str}\", {",".join(commands)})", expr.free_indices
 
-
     @recurse.register(gem.Sum)
-    def recurse_sum(expr, loop_indices):
-        summands =  [recurse(e, loop_indices) for e in expr.children] 
+    def recurse_sum(expr):
+        summands =  [recurse(e) for e in expr.children] 
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.add({commands[0]}, {commands[1]})", index[0]
 
     @recurse.register(gem.Division)
-    def recurse_div(expr, loop_indices):
-        summands =  [recurse(e, loop_indices) for e in expr.children] 
+    def recurse_div(expr):
+        summands =  [recurse(e) for e in expr.children] 
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.divide({commands[0]}, {commands[1]})", index[0]
 
     @recurse.register(gem.MathFunction)
-    def recurse_fn(expr, loop_indices):
-        chld, idx =  recurse(expr.children[0], loop_indices) 
-        return expr.name + "(" + chld + ")", idx
+    def recurse_fn(expr):
+        chld, idx =  recurse(expr.children[0]) 
+        name = expr.name
+        if name != "abs":
+            name = "cp." + name
+        return name + "(" + chld + ")", idx
 
     @recurse.register(gem.ListTensor)
-    def recurse_list_tensor(expr, loop_indices):
+    def recurse_list_tensor(expr):
         str_array = "cp." + repr(np.empty_like(expr.array)).replace('None', "{}").replace("object", "cp.float64")
         chld_list = []
         idx_list = []
         for chld_expr in expr.array.flatten():
-            chld, idx =  recurse(chld_expr, loop_indices) 
+            chld, idx =  recurse(chld_expr) 
             chld_list += [chld]
             idx_list += [idx]
         assert len(set(idx_list)) == 1
         return str_array.format(*chld_list), idx_list[0]
 
     @recurse.register(gem.Indexed)
-    def recurse_indexed(expr, loop_indices):
-        chld, idx =  recurse(expr.children[0], loop_indices) 
+    def recurse_indexed(expr):
+        chld, idx =  recurse(expr.children[0]) 
         chld += "["
         for i in expr.multiindex:
             if isinstance(i, gem.Index):
@@ -423,9 +424,9 @@ def to_cupy(assignments):
         return chld, expr.index_ordering() + idx 
     
     @recurse.register(gem.FlexiblyIndexed)
-    def recurse_findexed(expr, loop_indices):
+    def recurse_findexed(expr):
         # TODO this doesn't encapsulate the detail dim2idx
-        chld, idx =  recurse(expr.children[0], loop_indices) 
+        chld, idx =  recurse(expr.children[0]) 
         chld += "["
         for (off, var) in expr.dim2idxs:
             if len(var) == 0:
@@ -441,34 +442,32 @@ def to_cupy(assignments):
         return chld , expr.index_ordering()
 
     @recurse.register(gem.Variable)
-    def recurse_variable(expr, loop_indices):
+    def recurse_variable(expr):
         args[expr.name] = 1
         return expr.name, tuple() 
 
     @recurse.register(gem.Literal)
-    def recurse_literal(expr, loop_indices):
+    def recurse_literal(expr):
         if expr not in declare.keys():
-            declare[expr] = (f"\tt{declare["counter"]}", expr.array)
+            declare[expr] = (f"t{declare["counter"]}", expr.array)
             declare["counter"] += 1 
-        return declare[expr][0][1:], tuple()
+        return declare[expr][0], tuple()
     
     strs = []
     for var, expr in assignments:
-        e, e_idx = recurse(expr, ())
-        v, v_idx = recurse(var, ())
-        # TODO check ordering of indices
-        assert set(v_idx) == set(e_idx)
+        e, e_idx = recurse(expr)
+        v, v_idx = recurse(var)
+        assert v_idx == e_idx
         strs += [f"\t{v}=cp.array({e})"]
         
     
     temp_vars = []
     for key, val in declare.items():
-       if key != "counter" and val[0][:2] == "\tt":
-            temp_vars += [f"{val[0]}=cp.{repr(val[1])}"] 
+       if key != "counter" and val[0][0] == "t":
+            temp_vars += [f"\t{val[0]}=cp.{repr(val[1])}"] 
        elif key != "counter":
             #temp_vars += ["\tbreakpoint()"]
-            temp_vars += [f"{val[0]}={repr(val[1])[1:-1]}"] 
-    #kernel_fuse = ["@cp.fuse()\n"]
+            temp_vars += [f"\t{val[0]}={repr(val[1])[1:-1]}"] 
     res = "\n".join(func_decl(*list(args.keys())) + temp_vars + strs)
 
     return res
