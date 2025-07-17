@@ -9,7 +9,7 @@ from FIAT.finite_element import CiarletElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.functional import PointEdgeTangentEvaluation as Tangent
-from FIAT.functional import FacetIntegralMomentBlock
+from FIAT.functional import FacetIntegralMomentBlock, FunctionalBlock
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
@@ -43,38 +43,27 @@ class NedelecSecondKindDual(DualSet):
     Higher spatial dimensions are not yet implemented. (For d = 1,
     these elements coincide with the CG_k elements.)
     """
-
     def __init__(self, cell, degree, variant, interpolant_deg):
-
-        # Define degrees of freedom
-        nodes = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg)
-        # Call init of super-class
-        super().__init__(nodes, cell)
-
-    def generate_degrees_of_freedom(self, cell, degree, variant, interpolant_deg):
-        """Generate degrees of freedom for each entity."""
-
-        nodes = {}
-
         # Extract spatial dimension and topology
         d = cell.get_spatial_dimension()
         assert (d in (2, 3)), "Second kind Nedelecs only implemented in 2/3D."
 
         # Zero vertex-based degrees of freedom
-        nodes[0] = {i: [] for i in sorted(cell.topology[0])}
+        nodes = []
 
         # (degree+1) degrees of freedom per entity of codimension 1 (edges)
-        nodes[1] = self._generate_edge_dofs(cell, degree, variant, interpolant_deg)
+        nodes.extend(self._generate_edge_dofs(cell, degree, variant, interpolant_deg))
 
         # Include face degrees of freedom if 3D
         if d == 3:
-            nodes[d-1] = self._generate_facet_dofs(d-1, cell, degree,
-                                                   variant, interpolant_deg)
+            nodes.extend(self._generate_facet_dofs(d-1, cell, degree,
+                                                   variant, interpolant_deg))
 
         # Varying degrees of freedom (possibly zero) per cell
-        nodes[d] = self._generate_facet_dofs(d, cell, degree, variant, interpolant_deg)
+        nodes.extend(self._generate_facet_dofs(d, cell, degree, variant, interpolant_deg))
 
-        return nodes
+        # Call init of super-class
+        super().__init__(nodes, cell)
 
     def _generate_edge_dofs(self, cell, degree, variant, interpolant_deg):
         """Generate degrees of freedom (dofs) for entities of
@@ -86,7 +75,7 @@ class NedelecSecondKindDual(DualSet):
         # (degree+1) tangential component point evaluation degrees of
         # freedom per entity of codimension 1 (edges)
         top = cell.get_topology()
-        nodes = {entity: [] for entity in top[1]}
+        nodes = []
         if variant == "point":
             for edge in top[1]:
 
@@ -94,7 +83,7 @@ class NedelecSecondKindDual(DualSet):
                 points = cell.make_points(1, edge, degree + 2)
 
                 # A tangential component evaluation for each point
-                nodes[edge].extend(Tangent(cell, edge, point) for point in points)
+                nodes.append(FunctionalBlock(cell, 1, edge, [Tangent(cell, edge, point) for point in points]))
 
         return nodes
 
@@ -103,7 +92,7 @@ class NedelecSecondKindDual(DualSet):
 
         # Initialize empty dofs
         top = cell.get_topology()
-        nodes = {entity: [] for entity in top[dim]}
+        nodes = []
 
         # Return empty info if not applicable
         rt_degree = degree - dim + 1
@@ -127,14 +116,13 @@ class NedelecSecondKindDual(DualSet):
             mapping, = set(RT.mapping())
 
         # Evaluate basis functions at reference quadrature points
-        ells = FacetIntegralMomentBlock(cell, Q_ref, Phi, mapping=mapping)
 
         # Iterate over the facets
         for entity in top[dim]:
             # Construct degrees of freedom as integral moments on this cell,
             # using the face quadrature weighted against the values
             # of the (physical) Raviart--Thomas'es on the face
-            nodes[entity].append(ells)
+            nodes.append(FacetIntegralMomentBlock(cell, dim, entity, Q_ref, Phi, mapping=mapping))
 
         return nodes
 

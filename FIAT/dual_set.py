@@ -13,20 +13,18 @@ from FIAT import polynomial_set, functional
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids=None, entity_permutations=None):
-        if isinstance(nodes, dict):
-            assert entity_ids is None
+        if entity_ids is None:
             # flatten nodes
             top = ref_el.get_topology()
             entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-            entity_nodes = nodes
+            blocks = nodes
             nodes = []
-            for dim in entity_nodes:
-                for entity in entity_nodes[dim]:
-                    cur = len(nodes)
-                    ells = entity_nodes[dim][entity]
-                    for ell in ells:
-                        nodes.extend(ell.nodes(dim, entity))
-                    entity_ids[dim][entity].extend(range(cur, len(nodes)))
+            for ell in blocks:
+                cur = len(nodes)
+                nodes.extend(ell.nodes)
+                dim = ell.entity_dim
+                entity = ell.entity_id
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
         self.nodes = nodes

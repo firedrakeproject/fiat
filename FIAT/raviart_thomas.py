@@ -59,12 +59,11 @@ class RTDualSet(dual_set.DualSet):
     moments against polynomials"""
 
     def __init__(self, ref_el, degree, variant, interpolant_deg):
-        nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
 
         # set to empty
-        nodes = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
 
         if variant == "integral":
             facet = ref_el.construct_subelement(sd-1)
@@ -72,9 +71,8 @@ class RTDualSet(dual_set.DualSet):
             q = degree - 1
             Q_ref = create_quadrature(facet, interpolant_deg + q)
             Pq = polynomial_set.ONPolynomialSet(facet, q if sd > 1 else 0)
-            ells = functional.FacetNormalIntegralMomentBlock(ref_el, Q_ref, Pq)
             for f in top[sd - 1]:
-                nodes[sd - 1][f].append(ells)
+                nodes.append(functional.FacetNormalIntegralMomentBlock(ref_el, sd-1, f, Q_ref, Pq))
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-1}^d
             if q > 0:
@@ -85,21 +83,24 @@ class RTDualSet(dual_set.DualSet):
 
                 for entity in top[sd]:
                     Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                    nodes[sd][entity].extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                                             for d in range(sd) for phi in Pqm1_at_qpts)
+                    nodes.append(functional.FunctionalBlock(ref_el, sd, entity, [
+                        functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
+                        for d in range(sd) for phi in Pqm1_at_qpts]))
 
         elif variant == "point":
             # codimension 1 facets
             for i in top[sd - 1]:
                 pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1)
-                nodes[sd - 1][i].extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
-                                        for pt in pts_cur)
+                nodes.append(functional.FunctionalBlock(ref_el, sd-1, i, [
+                    functional.PointScaledNormalEvaluation(ref_el, i, pt)
+                    for pt in pts_cur]))
 
             # internal nodes.  Let's just use points at a lattice
             if degree > 1:
                 pts = ref_el.make_points(sd, 0, sd + degree - 1)
-                nodes[sd][0].extend(functional.ComponentPointEvaluation(ref_el, d, (sd,), pt)
-                                    for d in range(sd) for pt in pts)
+                nodes.append(functional.FunctionalBlock(ref_el, sd, 0, [
+                    functional.ComponentPointEvaluation(ref_el, d, (sd,), pt)
+                    for d in range(sd) for pt in pts]))
 
         super().__init__(nodes, ref_el)
 

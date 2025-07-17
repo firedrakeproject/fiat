@@ -17,7 +17,7 @@ class BDMDualSet(dual_set.DualSet):
         top = ref_el.get_topology()
 
         # set to empty
-        nodes = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
 
         if variant == "integral":
             facet = ref_el.construct_subelement(sd-1)
@@ -25,17 +25,17 @@ class BDMDualSet(dual_set.DualSet):
             # degree is q
             Q_ref = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
-            ells = functional.FacetNormalIntegralMomentBlock(ref_el, Q_ref, Pq)
             for f in top[sd - 1]:
-                nodes[sd-1][f] = [ells]
+                nodes.append(functional.FacetNormalIntegralMomentBlock(ref_el, sd-1, f, Q_ref, Pq))
 
         elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
             for f in top[sd - 1]:
                 pts_cur = ref_el.make_points(sd - 1, f, sd + degree)
-                nodes[sd-1][f].extend(functional.PointScaledNormalEvaluation(ref_el, f, pt)
-                                      for pt in pts_cur)
+                nodes.append(functional.FunctionalBlock(ref_el, sd-1, f, [
+                    functional.PointScaledNormalEvaluation(ref_el, f, pt)
+                    for pt in pts_cur]))
 
         # internal nodes
         if degree > 1:
@@ -47,9 +47,8 @@ class BDMDualSet(dual_set.DualSet):
             Nedel = nedelec.Nedelec(cell, degree - 1, variant)
             mapping, = set(Nedel.mapping())
             Phi = Nedel.get_nodal_basis()
-            ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Phi, mapping=mapping)
             for entity in top[sd]:
-                nodes[sd][entity] = [ells]
+                nodes.append(functional.FacetIntegralMomentBlock(ref_el, sd, entity, Q_ref, Phi, mapping=mapping))
 
         super().__init__(nodes, ref_el)
 

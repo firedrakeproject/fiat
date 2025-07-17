@@ -104,9 +104,6 @@ class NedelecDual(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
 
-        # set to empty
-        nodes = {dim: {entity: [] for entity in top[dim]} for dim in top}
-
         if variant == "integral":
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
@@ -121,22 +118,23 @@ class NedelecDual(dual_set.DualSet):
                     Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
                     Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
                     mapping = "contravariant piola"
-                    ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Pqmd, mapping=mapping)
                     for entity in top[dim]:
-                        nodes[dim][entity].append(ells)
+                        nodes.append(functional.FacetIntegralMomentBlock(ref_el, dim, entity, Q_ref, Pqmd, mapping=mapping))
 
         elif variant == "point":
             for i in top[1]:
                 # points to specify P_k on each edge
                 pts_cur = ref_el.make_points(1, i, degree + 1)
-                nodes[1][i].extend(functional.PointEdgeTangentEvaluation(ref_el, i, pt)
-                                   for pt in pts_cur)
+                nodes.append(functional.FunctionalBlock(ref_el, 1, i, [
+                    functional.PointEdgeTangentEvaluation(ref_el, i, pt)
+                    for pt in pts_cur]))
 
             if sd > 2 and degree > 1:  # face tangents
                 for i in top[2]:  # loop over faces
                     pts_cur = ref_el.make_points(2, i, degree + 1)
-                    nodes[2][1].extend(functional.PointFaceTangentEvaluation(ref_el, i, k, pt)
-                                       for k in range(2) for pt in pts_cur)
+                    nodes.append(functional.FunctionalBlock(ref_el, 2, i, [
+                        functional.PointFaceTangentEvaluation(ref_el, i, k, pt)
+                        for k in range(2) for pt in pts_cur]))
 
         # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-d}^3(T)
         phi_deg = degree - sd
@@ -151,8 +149,9 @@ class NedelecDual(dual_set.DualSet):
 
             for entity in top[sd]:
                 Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                nodes[sd][entity].extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                                         for d in range(sd) for phi in Phis)
+                nodes.append(functional.FunctionalBlock(ref_el, sd, entity, [
+                    functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
+                    for d in range(sd) for phi in Phis]))
 
         super().__init__(nodes, ref_el)
 

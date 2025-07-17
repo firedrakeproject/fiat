@@ -60,125 +60,107 @@ def pullback(mapping, J, detJ, phi):
 
 
 class FunctionalBlock:
-    def __init__(self, ref_el):
+    def __init__(self, ref_el, entity_dim, entity_id, nodes):
         self.ref_el = ref_el
+        self.entity_dim = entity_dim
+        self.entity_id = entity_id
+        self.nodes = nodes
 
     def completion(self):
         return self
 
-    def nodes(self, entity_dim, entity_id):
-        raise NotImplementedError
-
 
 class FunctionalBlockView(FunctionalBlock):
     def __init__(self, block, subset):
-        self.subset = subset
         self.block = block
-        super().__init__(block.ref_el)
+        nodes = [block.nodes[i] for i in subset]
+        super().__init__(block.ref_el, block.entity_dim, block.entity_id, nodes)
 
-    def completion(self):
+    def completion(self, entity_dim, entity_id):
         return self.block
 
-    def nodes(self, entity_dim, entity_id):
-        nodes = list(self.block.nodes(entity_dim, entity_id))
-        for i in self.subset:
-            yield nodes[i]
+
+class RelabeledFunctionalBlock(FunctionalBlock):
+    def __init__(self, block, entity_dim, entity_id):
+        super().__init__(block.ref_el, entity_dim, entity_id, block.nodes)
 
 
-class PointFunctionalBlock(FunctionalBlock):
-    def __init__(self, ref_el, order):
-        self.order = order
-        super().__init__(ref_el)
-
-    def nodes(self, entity_dim, entity_id):
+class PointEvaluationBlock(FunctionalBlock):
+    def __init__(self, ref_el, entity_dim, entity_id, order=0, degree=0, variant=None):
         from FIAT.polynomial_set import mis
-        sd = self.ref_el.get_spatial_dimension()
-        for pt in self.ref_el.make_points(entity_dim, entity_id, 0):
-            for alpha in mis(sd, self.order):
-                yield PointDerivative(self.ref_el, pt, alpha)
+        sd = ref_el.get_spatial_dimension()
+        pts = ref_el.make_points(entity_dim, entity_id, degree, variant=variant)
+        if order == 0:
+            nodes = [PointEvaluation(ref_el, pt) for pt in pts]
+        else:
+            nodes = [PointDerivative(ref_el, pt, alpha) for pt in pts for alpha in mis(sd, order)]
+        super().__init__(ref_el, entity_dim, entity_id, nodes)
 
 
-class PointGradient(PointFunctionalBlock):
-    def __init__(self, ref_el, x):
-        super().__init__(ref_el, 1)
+class PointGradientBlock(PointEvaluationBlock):
+    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
+        super().__init__(ref_el, entity_dim, entity_id, order=1, degree=degree, variant=variant)
 
 
-class PointHessian(PointFunctionalBlock):
-    def __init__(self, ref_el, x):
-        super().__init__(ref_el, 2)
+class PointHessianBlock(PointEvaluationBlock):
+    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
+        super().__init__(ref_el, entity_dim, entity_id, order=2, degree=degree, variant=None)
 
 
-class PointDirectionalDerivativeBlock(PointFunctionalBlock):
-    def __init__(self, ref_el, basis):
-        self.basis = basis
-        super().__init__(ref_el)
-
-    def get_basis(self, entity_dim, entity_id):
-        return self.basis
-
-    def nodes(self, entity_dim, entity_id):
-        for pt in self.ref_el.make_points(entity_dim, entity_id, 0):
-            for e in self.get_basis(entity_dim, entity_id):
-                yield PointDirectionalDerivative(self.ref_el, pt, e)
+class PointDirectionalDerivativeBlock(PointEvaluationBlock):
+    def __init__(self, ref_el, entity_dim, entity_id, basis):
+        nodes = [PointDirectionalDerivative(self.ref_el, pt, e)
+                 for pt in self.ref_el.make_points(entity_dim, entity_id, 0)
+                 for e in basis]
+        super().__init__(ref_el, entity_dim, entity_id, nodes)
 
 
 class PointNormalTangentialDerivativeBlock(PointDirectionalDerivativeBlock):
-    def __init__(self, ref_el, facet_id):
-        super().__init__(ref_el, None)
-
-    def get_basis(self, entity_dim, entity_id):
+    def __init__(self, ref_el, entity_dim, entity_id):
         sd = self.ref_el.get_spatial_dimension()
         basis = numpy.zeros((sd, sd))
         basis[0] = self.ref_el.compute_scaled_normal(entity_id)
         basis[1:] = self.ref_el.compute_tangents(sd-1, entity_id)
-        return basis
+        super().__init__(ref_el, entity_dim, entity_id, basis)
 
 
 class PointNormalDerivativeView(FunctionalBlockView):
-    def __init__(self, ref_el):
-        block = PointNormalTangentialDerivativeBlock(ref_el)
+    def __init__(self, ref_el, entity_dim, entity_id):
+        block = PointNormalTangentialDerivativeBlock(ref_el, entity_dim, entity_id)
         super().__init__(block, [0])
 
 
 class FacetIntegralMomentBlock(FunctionalBlock):
-    def __init__(self, ref_el, Q_ref, P, mapping="L2 piola"):
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref, P, mapping="L2 piola"):
         dim = P.ref_el.get_spatial_dimension()
-        self.Q_ref = Q_ref
         self.Phis = P.tabulate(Q_ref.get_points())[(0,) * dim]
-        self.mapping = mapping
-        super().__init__(ref_el)
 
-    def get_functions(self, entity_dim, entity_id):
+        Q = quadrature.FacetQuadratureRule(ref_el, entity_dim, entity_id, Q_ref)
+        Phis = self.get_functions()
+        phis = pullback(mapping, Q.jacobian(), Q.jacobian_determinant(), Phis)
+        nodes = [FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis]
+
+        super().__init__(ref_el, entity_dim, entity_id, nodes)
+
+    def get_functions(self):
         return self.Phis
-
-    def nodes(self, entity_dim, entity_id):
-        Q = quadrature.FacetQuadratureRule(self.ref_el, entity_dim, entity_id, self.Q_ref)
-        Phis = self.get_functions(entity_dim, entity_id)
-        phis = pullback(self.mapping, Q.jacobian(), Q.jacobian_determinant(), Phis)
-        for phi in phis:
-            yield FrobeniusIntegralMoment(self.ref_el, Q, phi)
 
 
 class FacetDirectionalIntegralMomentBlock(FacetIntegralMomentBlock):
-    def __init__(self, ref_el, Q_ref, Phis, direction):
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref, Phis, direction):
         self.direction = direction
-        super().__init__(ref_el, Q_ref, Phis)
+        super().__init__(ref_el, entity_dim, entity_id, Q_ref, Phis)
 
-    def get_direction(self, entity_dim, entity_id):
-        return self.direction
-
-    def get_functions(self, entity_dim, entity_id):
-        udir = self.get_direction(entity_dim, entity_id)
+    def get_functions(self):
+        udir = self.direction
         Phis = self.Phis
         return Phis[(slice(None), *(None for _ in range(udir.ndim)), slice(None))] * udir[(*(None for _ in range(Phis.ndim-1)), Ellipsis, None)]
 
 
 class FacetNormalIntegralMomentBlock(FacetDirectionalIntegralMomentBlock):
-    def __init__(self, ref_el, Q_ref, Phis):
-        super().__init__(ref_el, Q_ref, Phis, "normal")
-
-    def get_direction(self, entity_dim, entity_id):
-        return self.ref_el.compute_scaled_normal(entity_id)
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref, Phis):
+        normal = ref_el.compute_scaled_normal(entity_id)
+        super().__init__(ref_el, entity_dim, entity_id, Q_ref, Phis, normal)
 
 
 class Functional(FunctionalBlock):
