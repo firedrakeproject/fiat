@@ -23,11 +23,9 @@ def to_cupy(assignments):
 
     @singledispatch
     def recurse(expr):
-        """Visit an Impero AST to collect declarations.
+        """Visit an gem expression to convert it to a cupy function..
 
-        :arg expr: Impero tree node
-        :arg loop_indices: loop indices (in order) from the outer
-                           loops surrounding ``expr``
+        :arg expr: GEM expression
         """
         raise AssertionError("unsupported expression type %s" % type(expr))
 
@@ -64,6 +62,30 @@ def to_cupy(assignments):
         assert len(set(index)) == 1
         return f"cp.divide({commands[0]}, {commands[1]})", index[0]
 
+    @recurse.register(gem.FloorDiv)
+    def recurse_floor_div(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.floor_divide({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Remainder)
+    def recurse_remainder(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.remainder({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Power)
+    def recurse_power(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.power{commands[0]}, {commands[1]})", index[0]
+
     @recurse.register(gem.MathFunction)
     def recurse_fn(expr):
         chld, idx = recurse(expr.children[0])
@@ -76,6 +98,49 @@ def to_cupy(assignments):
     def recurse_max(expr):
         chld, idx = recurse(expr.children[0])
         return f"cp.max({chld})", idx
+
+    @recurse.register(gem.MinValue)
+    def recurse_min(expr):
+        chld, idx = recurse(expr.children[0])
+        return f"cp.min({chld})", idx
+
+    @recurse.register(gem.Comparison)
+    def recurse_compare(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"({commands[0]} {expr.operator} {commands[1]})", idx
+
+    @recurse.register(gem.LogicalNot)
+    def recurse_not(expr):
+        chld, idx = recurse(expr.children[0])
+        return f"cp.logical_not({chld})", idx
+
+    @recurse.register(gem.LogicalAnd)
+    def recurse_and(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.logical_and{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.LogicalOr)
+    def recurse_or(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.logical_or{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Conditional)
+    def recurse_cond(expr):
+        # children are ordered as (condition, then, else)
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index[1:])) == 1
+        return f"(commands[1] if commands[0] else commands[2])", index[1]
 
     @recurse.register(gem.ListTensor)
     def recurse_list_tensor(expr):
@@ -124,6 +189,14 @@ def to_cupy(assignments):
     def recurse_variable(expr):
         args[expr.name] = 1
         return expr.name, tuple()
+
+    @recurse.register(gem.Zero)
+    def recurse_identity(expr):
+        return f"cp.zeros({expr.shape},dtype=cp.float64)", tuple()
+
+    @recurse.register(gem.Identity)
+    def recurse_identity(expr):
+        return f"cp.eye({expr.shape},dtype={expr.dtype})", tuple()
 
     @recurse.register(gem.Literal)
     def recurse_literal(expr):
