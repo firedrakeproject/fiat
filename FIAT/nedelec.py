@@ -125,17 +125,11 @@ class NedelecDual(dual_set.DualSet):
                     Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
                     Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
                     Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * dim]
-                    Phis = numpy.transpose(Phis, (0, 2, 1))
-
+                    mapping = "contravariant piola"
+                    ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Phis, mapping=mapping)
                     for entity in top[dim]:
                         cur = len(nodes)
-                        Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                        Jdet = Q.jacobian_determinant()
-                        R = numpy.array(ref_el.compute_tangents(dim, entity))
-                        phis = numpy.dot(Phis, R / Jdet)
-                        phis = numpy.transpose(phis, (0, 2, 1))
-                        nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                                     for phi in phis)
+                        nodes.extend(ells.nodes(dim, entity))
                         entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
         elif variant == "point":

@@ -9,8 +9,6 @@ from FIAT import (finite_element, functional, dual_set,
                   polynomial_set, nedelec)
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
-import numpy
 
 
 class BDMDualSet(dual_set.DualSet):
@@ -33,14 +31,10 @@ class BDMDualSet(dual_set.DualSet):
             Q_ref = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
+            ells = functional.FacetNormalIntegralMomentBlock(ref_el, Q_ref, Pq_at_qpts)
             for f in top[sd - 1]:
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
-                phis = n[None, :, None] * Pq_at_qpts[:, None, :]
-                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                             for phi in phis)
+                nodes.extend(ells.nodes(sd-1, f))
                 entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
 
         elif variant == "point":
@@ -61,13 +55,12 @@ class BDMDualSet(dual_set.DualSet):
             cell = ref_el.construct_subelement(sd)
             Q_ref = create_quadrature(cell, interpolant_deg + degree - 1)
             Nedel = nedelec.Nedelec(cell, degree - 1, variant)
+            mapping, = set(Nedel.mapping())
             Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
+            ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Ned_at_qpts, mapping=mapping)
             for entity in top[sd]:
-                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                Jinv = numpy.linalg.inv(Q.jacobian())
-                phis = numpy.tensordot(Jinv.T, Ned_at_qpts, (1, 1)).transpose((1, 0, 2))
                 cur = len(nodes)
-                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
+                nodes.extend(ells.nodes(sd, entity))
                 entity_ids[sd][entity] = list(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)

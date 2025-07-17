@@ -77,14 +77,10 @@ class RTDualSet(dual_set.DualSet):
             Q_ref = create_quadrature(facet, interpolant_deg + q)
             Pq = polynomial_set.ONPolynomialSet(facet, q if sd > 1 else 0)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
+            ells = functional.FacetNormalIntegralMomentBlock(ref_el, Q_ref, Pq_at_qpts)
             for f in top[sd - 1]:
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
-                phis = n[None, :, None] * Pq_at_qpts[:, None, :]
-                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                             for phi in phis)
+                nodes.extend(ells.nodes(sd-1, f))
                 entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-1}^d

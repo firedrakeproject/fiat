@@ -15,7 +15,7 @@
 from itertools import chain
 import numpy
 
-from FIAT import polynomial_set, jacobi, quadrature_schemes
+from FIAT import polynomial_set, jacobi, quadrature, quadrature_schemes
 
 
 def index_iterator(shp):
@@ -25,7 +25,162 @@ def index_iterator(shp):
     return numpy.ndindex(shp)
 
 
-class Functional(object):
+def pullback(mapping, J, detJ, phi):
+    try:
+        formdegree = {
+            "identity": (0,),
+            "L2 piola": (3,),
+            "covariant piola": (1,),
+            "contravariant piola": (2,),
+            "double covariant piola": (1, 1),
+            "double contravariant piola": (2, 2),
+            "covariant contravariant piola": (1, 2),
+            "contravariant covariant piola": (2, 1), }[mapping]
+    except KeyError:
+        raise ValueError(f"Unrecognized mapping {mapping}")
+
+    F1 = numpy.linalg.pinv(J).T
+    F2 = J / detJ
+
+    perm = [*range(1, phi.ndim-1), 0, -1]
+    phi = phi.transpose(perm)
+
+    for i, k in enumerate(formdegree):
+        if k == 0:
+            continue
+        elif k == 3:
+            phi = phi / detJ
+        else:
+            F = F1 if k == 1 else F2
+            phi = numpy.tensordot(F, phi, (1, i))
+
+    perm = [-2, *reversed(range(phi.ndim-2)), -1]
+    phi = phi.transpose(perm)
+    return phi
+
+
+class FunctionalBlock:
+    def __init__(self, ref_el):
+        self.ref_el = ref_el
+
+    def completion(self):
+        return self
+
+    def nodes(self, entity_dim, entity_id):
+        raise NotImplementedError
+
+
+class FunctionalBlockView(FunctionalBlock):
+    def __init__(self, block, subset):
+        self.subset = subset
+        self.block = block
+        super().__init__(block.ref_el)
+
+    def completion(self):
+        return self.block
+
+    def nodes(self, entity_dim, entity_id):
+        nodes = list(self.block.nodes(entity_dim, entity_id))
+        for i in self.subset:
+            yield nodes[i]
+
+
+class PointFunctionalBlock(FunctionalBlock):
+    def __init__(self, ref_el, order):
+        self.order = order
+        super().__init__(ref_el)
+
+    def nodes(self, entity_dim, entity_id):
+        from FIAT.polynomial_set import mis
+        sd = self.ref_el.get_spatial_dimension()
+        for pt in self.ref_el.make_points(entity_dim, entity_id, 0):
+            for alpha in mis(sd, self.order):
+                yield PointDerivative(self.ref_el, pt, alpha)
+
+
+class PointGradient(PointFunctionalBlock):
+    def __init__(self, ref_el, x):
+        super().__init__(ref_el, 1)
+
+
+class PointHessian(PointFunctionalBlock):
+    def __init__(self, ref_el, x):
+        super().__init__(ref_el, 2)
+
+
+class PointDirectionalDerivativeBlock(PointFunctionalBlock):
+    def __init__(self, ref_el, basis):
+        self.basis = basis
+        super().__init__(ref_el)
+
+    def get_basis(self, entity_dim, entity_id):
+        return self.basis
+
+    def nodes(self, entity_dim, entity_id):
+        for pt in self.ref_el.make_points(entity_dim, entity_id, 0):
+            for e in self.get_basis(entity_dim, entity_id):
+                yield PointDirectionalDerivative(self.ref_el, pt, e)
+
+
+class PointNormalTangentialDerivativeBlock(PointDirectionalDerivativeBlock):
+    def __init__(self, ref_el, facet_id):
+        super().__init__(ref_el, None)
+
+    def get_basis(self, entity_dim, entity_id):
+        sd = self.ref_el.get_spatial_dimension()
+        basis = numpy.zeros((sd, sd))
+        basis[0] = self.ref_el.compute_scaled_normal(entity_id)
+        basis[1:] = self.ref_el.compute_tangents(sd-1, entity_id)
+        return basis
+
+
+class PointNormalDerivativeView(FunctionalBlockView):
+    def __init__(self, ref_el):
+        block = PointNormalTangentialDerivativeBlock(ref_el)
+        super().__init__(block, [0])
+
+
+class FacetIntegralMomentBlock(FunctionalBlock):
+    def __init__(self, ref_el, Q_ref, Phis, mapping="L2 piola"):
+        self.Q_ref = Q_ref
+        self.Phis = Phis
+        self.mapping = mapping
+        super().__init__(ref_el)
+
+    def get_functions(self, entity_dim, entity_id):
+        return self.Phis
+
+    def nodes(self, entity_dim, entity_id):
+        Q = quadrature.FacetQuadratureRule(self.ref_el, entity_dim, entity_id, self.Q_ref)
+        Phis = self.get_functions(entity_dim, entity_id)
+        phis = pullback(self.mapping, Q.jacobian(), Q.jacobian_determinant(), Phis)
+        for phi in phis:
+            yield FrobeniusIntegralMoment(self.ref_el, Q, phi)
+
+
+class FacetDirectionalIntegralMomentBlock(FacetIntegralMomentBlock):
+    def __init__(self, ref_el, Q_ref, Phis, direction):
+        self.direction = direction
+        super().__init__(ref_el, Q_ref, Phis)
+
+    def get_direction(self, entity_dim, entity_id):
+        return self.direction
+
+    def get_functions(self, entity_dim, entity_id):
+        udir = self.get_direction(entity_dim, entity_id)
+        Phis = self.Phis
+        return Phis[(slice(None), *(None for _ in range(udir.ndim)), slice(None))] * udir[(*(None for _ in range(Phis.ndim-1)), Ellipsis, None)]
+
+
+class FacetNormalIntegralMomentBlock(FacetDirectionalIntegralMomentBlock):
+    def __init__(self, ref_el, Q_ref, Phis):
+        super().__init__(ref_el, Q_ref, Phis, "normal")
+
+    def get_direction(self, entity_dim, entity_id):
+        return self.ref_el.compute_scaled_normal(entity_id)
+
+
+class Functional(FunctionalBlock):
     r"""Abstract class representing a linear functional.
     All FIAT functionals are discrete in the sense that
     they are written as a weighted sum of (derivatives of components of) their
