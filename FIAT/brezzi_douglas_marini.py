@@ -13,16 +13,11 @@ from FIAT.quadrature_schemes import create_quadrature
 
 class BDMDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, interpolant_deg):
-        nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
 
-        entity_ids = {}
         # set to empty
-        for dim in top:
-            entity_ids[dim] = {}
-            for entity in top[dim]:
-                entity_ids[dim][entity] = []
+        nodes = {dim: {entity: [] for entity in top[dim]} for dim in top}
 
         if variant == "integral":
             facet = ref_el.construct_subelement(sd-1)
@@ -30,22 +25,17 @@ class BDMDualSet(dual_set.DualSet):
             # degree is q
             Q_ref = create_quadrature(facet, interpolant_deg + degree)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
-            Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
-            ells = functional.FacetNormalIntegralMomentBlock(ref_el, Q_ref, Pq_at_qpts)
+            ells = functional.FacetNormalIntegralMomentBlock(ref_el, Q_ref, Pq)
             for f in top[sd - 1]:
-                cur = len(nodes)
-                nodes.extend(ells.nodes(sd-1, f))
-                entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
+                nodes[sd-1][f] = [ells]
 
         elif variant == "point":
             # Define each functional for the dual set
             # codimension 1 facets
             for f in top[sd - 1]:
-                cur = len(nodes)
                 pts_cur = ref_el.make_points(sd - 1, f, sd + degree)
-                nodes.extend(functional.PointScaledNormalEvaluation(ref_el, f, pt)
-                             for pt in pts_cur)
-                entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
+                nodes[sd-1][f].extend(functional.PointScaledNormalEvaluation(ref_el, f, pt)
+                                      for pt in pts_cur)
 
         # internal nodes
         if degree > 1:
@@ -56,14 +46,12 @@ class BDMDualSet(dual_set.DualSet):
             Q_ref = create_quadrature(cell, interpolant_deg + degree - 1)
             Nedel = nedelec.Nedelec(cell, degree - 1, variant)
             mapping, = set(Nedel.mapping())
-            Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
-            ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Ned_at_qpts, mapping=mapping)
+            Phi = Nedel.get_nodal_basis()
+            ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Phi, mapping=mapping)
             for entity in top[sd]:
-                cur = len(nodes)
-                nodes.extend(ells.nodes(sd, entity))
-                entity_ids[sd][entity] = list(range(cur, len(nodes)))
+                nodes[sd][entity] = [ells]
 
-        super().__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el)
 
 
 class BrezziDouglasMarini(finite_element.CiarletElement):

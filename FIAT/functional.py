@@ -141,9 +141,10 @@ class PointNormalDerivativeView(FunctionalBlockView):
 
 
 class FacetIntegralMomentBlock(FunctionalBlock):
-    def __init__(self, ref_el, Q_ref, Phis, mapping="L2 piola"):
+    def __init__(self, ref_el, Q_ref, P, mapping="L2 piola"):
+        dim = P.ref_el.get_spatial_dimension()
         self.Q_ref = Q_ref
-        self.Phis = Phis
+        self.Phis = P.tabulate(Q_ref.get_points())[(0,) * dim]
         self.mapping = mapping
         super().__init__(ref_el)
 
@@ -215,6 +216,9 @@ class Functional(FunctionalBlock):
             self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
             self.max_deriv_order = 0
+
+    def nodes(self, entity_dim, entity_id):
+        yield self
 
     def evaluate(self, f):
         """Obsolete and broken functional evaluation.

@@ -47,77 +47,68 @@ class NedelecSecondKindDual(DualSet):
     def __init__(self, cell, degree, variant, interpolant_deg):
 
         # Define degrees of freedom
-        (dofs, ids) = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg)
+        nodes = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg)
         # Call init of super-class
-        super().__init__(dofs, cell, ids)
+        super().__init__(nodes, cell)
 
     def generate_degrees_of_freedom(self, cell, degree, variant, interpolant_deg):
-        "Generate dofs and geometry-to-dof maps (ids)."
+        """Generate degrees of freedom for each entity."""
 
-        dofs = []
-        ids = {}
+        nodes = {}
 
         # Extract spatial dimension and topology
         d = cell.get_spatial_dimension()
         assert (d in (2, 3)), "Second kind Nedelecs only implemented in 2/3D."
 
         # Zero vertex-based degrees of freedom
-        ids[0] = {i: [] for i in sorted(cell.topology[0])}
+        nodes[0] = {i: [] for i in sorted(cell.topology[0])}
 
         # (degree+1) degrees of freedom per entity of codimension 1 (edges)
-        (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
-        dofs.extend(edge_dofs)
+        nodes[1] = self._generate_edge_dofs(cell, degree, variant, interpolant_deg)
 
         # Include face degrees of freedom if 3D
         if d == 3:
-            face_dofs, ids[d-1] = self._generate_facet_dofs(d-1, cell, degree,
-                                                            len(dofs), variant, interpolant_deg)
-            dofs.extend(face_dofs)
+            nodes[d-1] = self._generate_facet_dofs(d-1, cell, degree,
+                                                   variant, interpolant_deg)
 
         # Varying degrees of freedom (possibly zero) per cell
-        cell_dofs, ids[d] = self._generate_facet_dofs(d, cell, degree, len(dofs), variant, interpolant_deg)
-        dofs.extend(cell_dofs)
+        nodes[d] = self._generate_facet_dofs(d, cell, degree, variant, interpolant_deg)
 
-        return (dofs, ids)
+        return nodes
 
-    def _generate_edge_dofs(self, cell, degree, offset, variant, interpolant_deg):
+    def _generate_edge_dofs(self, cell, degree, variant, interpolant_deg):
         """Generate degrees of freedom (dofs) for entities of
         codimension 1 (edges)."""
 
         if variant == "integral":
-            return self._generate_facet_dofs(1, cell, degree, offset, variant, interpolant_deg)
+            return self._generate_facet_dofs(1, cell, degree, variant, interpolant_deg)
 
         # (degree+1) tangential component point evaluation degrees of
         # freedom per entity of codimension 1 (edges)
-        dofs = []
-        ids = {}
+        top = cell.get_topology()
+        nodes = {entity: [] for entity in top[1]}
         if variant == "point":
-            for edge in range(len(cell.get_topology()[1])):
+            for edge in top[1]:
 
                 # Create points for evaluation of tangential components
                 points = cell.make_points(1, edge, degree + 2)
 
                 # A tangential component evaluation for each point
-                dofs.extend(Tangent(cell, edge, point) for point in points)
+                nodes[edge].extend(Tangent(cell, edge, point) for point in points)
 
-                # Associate these dofs with this edge
-                i = len(points) * edge
-                ids[edge] = list(range(offset + i, offset + i + len(points)))
+        return nodes
 
-        return (dofs, ids)
-
-    def _generate_facet_dofs(self, dim, cell, degree, offset, variant, interpolant_deg):
+    def _generate_facet_dofs(self, dim, cell, degree, variant, interpolant_deg):
         """Generate degrees of freedom (dofs) for facets."""
 
-        # Initialize empty dofs and identifiers (ids)
-        num_facets = len(cell.get_topology()[dim])
-        dofs = []
-        ids = {i: [] for i in range(num_facets)}
+        # Initialize empty dofs
+        top = cell.get_topology()
+        nodes = {entity: [] for entity in top[dim]}
 
         # Return empty info if not applicable
         rt_degree = degree - dim + 1
         if rt_degree < 1:
-            return (dofs, ids)
+            return nodes
 
         if interpolant_deg is None:
             interpolant_deg = degree
@@ -136,21 +127,16 @@ class NedelecSecondKindDual(DualSet):
             mapping, = set(RT.mapping())
 
         # Evaluate basis functions at reference quadrature points
-        Phis = Phi.tabulate(Q_ref.get_points())[(0,) * dim]
-        ells = FacetIntegralMomentBlock(cell, Q_ref, Phis, mapping=mapping)
+        ells = FacetIntegralMomentBlock(cell, Q_ref, Phi, mapping=mapping)
 
         # Iterate over the facets
-        for entity in range(num_facets):
-            cur = offset + len(dofs)
+        for entity in top[dim]:
             # Construct degrees of freedom as integral moments on this cell,
             # using the face quadrature weighted against the values
             # of the (physical) Raviart--Thomas'es on the face
-            dofs.extend(ells.nodes(dim, entity))
+            nodes[entity].append(ells)
 
-            # Assign identifiers (num RTs per face + previous edge dofs)
-            ids[entity].extend(range(cur, offset + len(dofs)))
-
-        return (dofs, ids)
+        return nodes
 
 
 class NedelecSecondKind(CiarletElement):

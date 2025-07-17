@@ -12,7 +12,22 @@ from FIAT import polynomial_set, functional
 
 
 class DualSet(object):
-    def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
+    def __init__(self, nodes, ref_el, entity_ids=None, entity_permutations=None):
+        if isinstance(nodes, dict):
+            assert entity_ids is None
+            # flatten nodes
+            top = ref_el.get_topology()
+            entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+            entity_nodes = nodes
+            nodes = []
+            for dim in entity_nodes:
+                for entity in entity_nodes[dim]:
+                    cur = len(nodes)
+                    ells = entity_nodes[dim][entity]
+                    for ell in ells:
+                        nodes.extend(ell.nodes(dim, entity))
+                    entity_ids[dim][entity].extend(range(cur, len(nodes)))
+
         nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
         self.nodes = nodes
         self.ref_el = ref_el

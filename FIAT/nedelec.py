@@ -104,12 +104,8 @@ class NedelecDual(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
 
-        entity_ids = {}
         # set to empty
-        for dim in top:
-            entity_ids[dim] = {}
-            for entity in top[dim]:
-                entity_ids[dim][entity] = []
+        nodes = {dim: {entity: [] for entity in top[dim]} for dim in top}
 
         if variant == "integral":
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
@@ -124,32 +120,23 @@ class NedelecDual(dual_set.DualSet):
                     facet = ref_el.construct_subelement(dim)
                     Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
                     Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
-                    Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * dim]
                     mapping = "contravariant piola"
-                    ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Phis, mapping=mapping)
+                    ells = functional.FacetIntegralMomentBlock(ref_el, Q_ref, Pqmd, mapping=mapping)
                     for entity in top[dim]:
-                        cur = len(nodes)
-                        nodes.extend(ells.nodes(dim, entity))
-                        entity_ids[dim][entity] = list(range(cur, len(nodes)))
+                        nodes[dim][entity].append(ells)
 
         elif variant == "point":
             for i in top[1]:
-                cur = len(nodes)
                 # points to specify P_k on each edge
                 pts_cur = ref_el.make_points(1, i, degree + 1)
-                nodes.extend(functional.PointEdgeTangentEvaluation(ref_el, i, pt)
-                             for pt in pts_cur)
-                entity_ids[1][i] = list(range(cur, len(nodes)))
+                nodes[1][i].extend(functional.PointEdgeTangentEvaluation(ref_el, i, pt)
+                                   for pt in pts_cur)
 
             if sd > 2 and degree > 1:  # face tangents
                 for i in top[2]:  # loop over faces
-                    cur = len(nodes)
                     pts_cur = ref_el.make_points(2, i, degree + 1)
-                    nodes.extend(functional.PointFaceTangentEvaluation(ref_el, i, k, pt)
-                                 for k in range(2)  # loop over tangents
-                                 for pt in pts_cur  # loop over points
-                                 )
-                    entity_ids[2][i] = list(range(cur, len(nodes)))
+                    nodes[2][1].extend(functional.PointFaceTangentEvaluation(ref_el, i, k, pt)
+                                       for k in range(2) for pt in pts_cur)
 
         # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-d}^3(T)
         phi_deg = degree - sd
@@ -164,13 +151,10 @@ class NedelecDual(dual_set.DualSet):
 
             for entity in top[sd]:
                 Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                cur = len(nodes)
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                             for d in range(sd)
-                             for phi in Phis)
-                entity_ids[sd][entity] = list(range(cur, len(nodes)))
+                nodes[sd][entity].extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
+                                         for d in range(sd) for phi in Phis)
 
-        super().__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el)
 
 
 class Nedelec(finite_element.CiarletElement):
