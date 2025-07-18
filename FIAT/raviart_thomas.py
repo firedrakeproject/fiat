@@ -58,11 +58,9 @@ class RTDualSet(dual_set.DualSet):
     moments against polynomials"""
 
     def __init__(self, ref_el, degree, variant, interpolant_deg):
+        nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-
-        # set to empty
-        nodes = []
 
         if variant == "integral":
             facet = ref_el.construct_subelement(sd-1)
@@ -83,13 +81,13 @@ class RTDualSet(dual_set.DualSet):
                                  for i in range(sd))
 
         elif variant == "point":
-            # codimension 1 facets
+            # Normal component evaluation at lattice points on facets
             for i in top[sd - 1]:
-                nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, sd-1, i, degree=degree+sd-1, direction="normal"))
+                nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, sd-1, i, direction="normal", degree=degree+sd-1))
 
             # internal nodes.  Let's just use points at a lattice
-            if degree > 1:
-                nodes.extend(functional.PointEvaluationBlock(ref_el, sd, 0, degree=degree+sd-1, comp=(d,), shape=(sd,))
+            for i in top[sd]:
+                nodes.extend(functional.PointEvaluationBlock(ref_el, sd, i, degree=degree+sd-1, comp=(d,), shape=(sd,))
                              for d in range(sd))
 
         super().__init__(nodes, ref_el)

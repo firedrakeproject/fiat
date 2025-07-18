@@ -13,11 +13,9 @@ from FIAT.quadrature_schemes import create_quadrature
 
 class BDMDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, interpolant_deg):
+        nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-
-        # set to empty
-        nodes = []
 
         if variant == "integral":
             facet = ref_el.construct_subelement(sd-1)
@@ -29,13 +27,9 @@ class BDMDualSet(dual_set.DualSet):
                 nodes.append(functional.FacetNormalIntegralMomentBlock(ref_el, sd-1, f, Q_ref, Pq))
 
         elif variant == "point":
-            # Define each functional for the dual set
-            # codimension 1 facets
+            # Normal component evaluation at lattice points on facets
             for f in top[sd - 1]:
-                pts_cur = ref_el.make_points(sd - 1, f, sd + degree)
-                nodes.append(functional.FunctionalBlock(ref_el, sd-1, f, [
-                    functional.PointScaledNormalEvaluation(ref_el, f, pt)
-                    for pt in pts_cur]))
+                nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, sd-1, f, direction="normal", degree=degree+sd))
 
         # internal nodes
         if degree > 1:

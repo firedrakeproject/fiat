@@ -122,7 +122,7 @@ class NedelecDual(dual_set.DualSet):
 
         elif variant == "point":
             for dim in range(1, sd):
-                for i in top[2]:
+                for i in top[dim]:
                     nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, dim, i, direction="tangential", degree=degree+1))
 
         # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-d}^3(T)

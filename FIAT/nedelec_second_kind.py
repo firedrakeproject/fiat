@@ -44,42 +44,14 @@ class NedelecSecondKindDual(DualSet):
     """
     def __init__(self, cell, degree, variant, interpolant_deg):
         # Extract spatial dimension and topology
-        d = cell.get_spatial_dimension()
-        assert (d in (2, 3)), "Second kind Nedelecs only implemented in 2/3D."
+        sd = cell.get_spatial_dimension()
+        assert (sd in (2, 3)), "Second kind Nedelecs only implemented in 2/3D."
 
-        # Zero vertex-based degrees of freedom
         nodes = []
+        for dim in range(1, sd+1):
+            nodes.extend(self._generate_facet_dofs(dim, cell, degree, variant, interpolant_deg))
 
-        # (degree+1) degrees of freedom per entity of codimension 1 (edges)
-        nodes.extend(self._generate_edge_dofs(cell, degree, variant, interpolant_deg))
-
-        # Include face degrees of freedom if 3D
-        if d == 3:
-            nodes.extend(self._generate_facet_dofs(d-1, cell, degree,
-                                                   variant, interpolant_deg))
-
-        # Varying degrees of freedom (possibly zero) per cell
-        nodes.extend(self._generate_facet_dofs(d, cell, degree, variant, interpolant_deg))
-
-        # Call init of super-class
         super().__init__(nodes, cell)
-
-    def _generate_edge_dofs(self, cell, degree, variant, interpolant_deg):
-        """Generate degrees of freedom (dofs) for entities of
-        codimension 1 (edges)."""
-
-        if variant == "integral":
-            return self._generate_facet_dofs(1, cell, degree, variant, interpolant_deg)
-
-        # (degree+1) tangential component point evaluation degrees of
-        # freedom per entity of codimension 1 (edges)
-        top = cell.get_topology()
-        nodes = []
-        for edge in top[1]:
-            # A tangential component evaluation for each point
-            nodes.append(PointDirectionalEvaluationBlock(cell, 1, edge, direction="tangential", degree=degree+2))
-
-        return nodes
 
     def _generate_facet_dofs(self, dim, cell, degree, variant, interpolant_deg):
         """Generate degrees of freedom (dofs) for facets."""
@@ -87,6 +59,11 @@ class NedelecSecondKindDual(DualSet):
         # Initialize empty dofs
         top = cell.get_topology()
         nodes = []
+        if dim == 1 and variant == "point":
+            for entity in top[dim]:
+                # A tangential component evaluation for each point
+                nodes.append(PointDirectionalEvaluationBlock(cell, dim, entity, direction="tangential", degree=degree+2))
+            return nodes
 
         # Return empty info if not applicable
         rt_degree = degree - dim + 1
@@ -108,8 +85,6 @@ class NedelecSecondKindDual(DualSet):
             RT = RaviartThomas(ref_facet, rt_degree, variant)
             Phi = RT.get_nodal_basis()
             mapping, = set(RT.mapping())
-
-        # Evaluate basis functions at reference quadrature points
 
         # Iterate over the facets
         for entity in top[dim]:

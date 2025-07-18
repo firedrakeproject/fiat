@@ -104,13 +104,19 @@ class PointDirectionalEvaluationBlock(FunctionalBlock):
     def __init__(self, ref_el, entity_dim, entity_id, direction=None, degree=0, variant=None):
         pts = ref_el.make_points(entity_dim, entity_id, degree, variant=variant)
         if direction == "normal":
-            nodes = [PointScaledNormalEvaluation(ref_el, entity_id, pt) for pt in pts]
+            sd = ref_el.get_spatial_dimension()
+            if entity_dim == sd-1:
+                nodes = [PointScaledNormalEvaluation(ref_el, entity_id, pt) for pt in pts]
+            else:
+                raise ValueError("Normals are only defined on codim=1 facets.")
         elif direction == "tangential":
             if entity_dim == 1:
                 nodes = [PointEdgeTangentEvaluation(ref_el, entity_id, pt) for pt in pts]
             else:
                 nodes = [PointFaceTangentEvaluation(ref_el, entity_id, i, pt)
                          for i in range(entity_dim) for pt in pts]
+        else:
+            raise ValueError(f"Unrecognized direction {direction}.")
 
         super().__init__(ref_el, entity_dim, entity_id, nodes)
 
@@ -151,10 +157,10 @@ class PointNormalDerivativeView(FunctionalBlockView):
 class FacetIntegralMomentBlock(FunctionalBlock):
     def __init__(self, ref_el, entity_dim, entity_id, Q_ref, P, mapping="L2 piola", comp=(), shape=None):
         dim = P.ref_el.get_spatial_dimension()
-        self.Phis = P.tabulate(Q_ref.get_points())[(0,) * dim]
+        Phis = P.tabulate(Q_ref.get_points())[(0,) * dim]
+        Phis = self.mapping(Phis)
 
         Q = quadrature.FacetQuadratureRule(ref_el, entity_dim, entity_id, Q_ref)
-        Phis = self.get_functions()
         phis = pullback(mapping, Q.jacobian(), Q.jacobian_determinant(), Phis)
 
         if shape is not None:
@@ -164,8 +170,8 @@ class FacetIntegralMomentBlock(FunctionalBlock):
 
         super().__init__(ref_el, entity_dim, entity_id, nodes)
 
-    def get_functions(self):
-        return self.Phis
+    def mapping(self, Phis):
+        return Phis
 
 
 class FacetDirectionalIntegralMomentBlock(FacetIntegralMomentBlock):
@@ -173,9 +179,8 @@ class FacetDirectionalIntegralMomentBlock(FacetIntegralMomentBlock):
         self.direction = direction
         super().__init__(ref_el, entity_dim, entity_id, Q_ref, Phis)
 
-    def get_functions(self):
+    def mapping(self, Phis):
         udir = self.direction
-        Phis = self.Phis
         return Phis[(slice(None), *(None for _ in range(udir.ndim)), slice(None))] * udir[(*(None for _ in range(Phis.ndim-1)), Ellipsis, None)]
 
 
@@ -220,9 +225,6 @@ class Functional(FunctionalBlock):
             self.max_deriv_order = max(sum(wac[1]) for wac in chain(*deriv_dict.values()))
         else:
             self.max_deriv_order = 0
-
-    def nodes(self, entity_dim, entity_id):
-        yield self
 
     def evaluate(self, f):
         """Obsolete and broken functional evaluation.
