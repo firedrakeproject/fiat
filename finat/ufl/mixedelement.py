@@ -248,9 +248,25 @@ class MixedElement(FiniteElementBase):
     def reconstruct(self, **kwargs):
         """Doc."""
         cell = kwargs.pop('cell', None)
-        if not isinstance(cell, CellSequence):
-            raise TypeError(f"Expecting a CellSequence: got {cells}")
-        return MixedElement(*[e.reconstruct(cell=c, **kwargs) for c, e in zip(cell.cells, self.sub_elements)])
+        if isinstance(self.cell, CellSequence):
+            if cell is None:
+                cell = self.cell
+            else:
+                if not isinstance(cell, CellSequence):
+                    # Allow for passing a single base cell.
+                    cell = CellSequence([cell] * len(self.sub_elements))
+            cells = cell.cells
+        else:
+            if cell is None:
+                cell = self.cell
+            else:
+                if isinstance(cell, CellSequence):
+                    raise TypeError(f"Input cell(={cell}) must not be CellSequence")
+            cells = [cell] * len(self.sub_elements)
+        return MixedElement(
+            *[e.reconstruct(cell=c, **kwargs) for c, e in zip(cells, self.sub_elements)],
+            make_cell_sequence=isinstance(self.cell, CellSequence),
+        )
 
     def variant(self):
         """Doc."""
