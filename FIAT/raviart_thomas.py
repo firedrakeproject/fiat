@@ -11,7 +11,6 @@ import numpy
 from itertools import chain
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
 
 
 def RTSpace(ref_el, degree):
@@ -79,28 +78,19 @@ class RTDualSet(dual_set.DualSet):
                 cell = ref_el.construct_subelement(sd)
                 Q_ref = create_quadrature(cell, interpolant_deg + q - 1)
                 Pqm1 = polynomial_set.ONPolynomialSet(cell, q - 1)
-                Pqm1_at_qpts = Pqm1.tabulate(Q_ref.get_points())[(0,) * sd]
-
                 for entity in top[sd]:
-                    Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                    nodes.append(functional.FunctionalBlock(ref_el, sd, entity, [
-                        functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                        for d in range(sd) for phi in Pqm1_at_qpts]))
+                    nodes.extend(functional.FacetIntegralMomentBlock(ref_el, sd, entity, Q_ref, Pqm1, comp=(i,), shape=(sd,))
+                                 for i in range(sd))
 
         elif variant == "point":
             # codimension 1 facets
             for i in top[sd - 1]:
-                pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1)
-                nodes.append(functional.FunctionalBlock(ref_el, sd-1, i, [
-                    functional.PointScaledNormalEvaluation(ref_el, i, pt)
-                    for pt in pts_cur]))
+                nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, sd-1, i, degree=degree+sd-1, direction="normal"))
 
             # internal nodes.  Let's just use points at a lattice
             if degree > 1:
-                pts = ref_el.make_points(sd, 0, sd + degree - 1)
-                nodes.append(functional.FunctionalBlock(ref_el, sd, 0, [
-                    functional.ComponentPointEvaluation(ref_el, d, (sd,), pt)
-                    for d in range(sd) for pt in pts]))
+                nodes.extend(functional.PointEvaluationBlock(ref_el, sd, 0, degree=degree+sd-1, comp=(d,), shape=(sd,))
+                             for d in range(sd))
 
         super().__init__(nodes, ref_el)
 

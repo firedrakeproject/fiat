@@ -8,8 +8,7 @@
 from FIAT.finite_element import CiarletElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import ONPolynomialSet
-from FIAT.functional import PointEdgeTangentEvaluation as Tangent
-from FIAT.functional import FacetIntegralMomentBlock, FunctionalBlock
+from FIAT.functional import FacetIntegralMomentBlock, PointDirectionalEvaluationBlock
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
@@ -76,14 +75,9 @@ class NedelecSecondKindDual(DualSet):
         # freedom per entity of codimension 1 (edges)
         top = cell.get_topology()
         nodes = []
-        if variant == "point":
-            for edge in top[1]:
-
-                # Create points for evaluation of tangential components
-                points = cell.make_points(1, edge, degree + 2)
-
-                # A tangential component evaluation for each point
-                nodes.append(FunctionalBlock(cell, 1, edge, [Tangent(cell, edge, point) for point in points]))
+        for edge in top[1]:
+            # A tangential component evaluation for each point
+            nodes.append(PointDirectionalEvaluationBlock(cell, 1, edge, direction="tangential", degree=degree+2))
 
         return nodes
 

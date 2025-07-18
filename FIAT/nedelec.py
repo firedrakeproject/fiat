@@ -11,7 +11,6 @@ import numpy
 from itertools import chain
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
 
 
 def NedelecSpace2D(ref_el, degree):
@@ -122,19 +121,9 @@ class NedelecDual(dual_set.DualSet):
                         nodes.append(functional.FacetIntegralMomentBlock(ref_el, dim, entity, Q_ref, Pqmd, mapping=mapping))
 
         elif variant == "point":
-            for i in top[1]:
-                # points to specify P_k on each edge
-                pts_cur = ref_el.make_points(1, i, degree + 1)
-                nodes.append(functional.FunctionalBlock(ref_el, 1, i, [
-                    functional.PointEdgeTangentEvaluation(ref_el, i, pt)
-                    for pt in pts_cur]))
-
-            if sd > 2 and degree > 1:  # face tangents
-                for i in top[2]:  # loop over faces
-                    pts_cur = ref_el.make_points(2, i, degree + 1)
-                    nodes.append(functional.FunctionalBlock(ref_el, 2, i, [
-                        functional.PointFaceTangentEvaluation(ref_el, i, k, pt)
-                        for k in range(2) for pt in pts_cur]))
+            for dim in range(1, sd):
+                for i in top[2]:
+                    nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, dim, i, direction="tangential", degree=degree+1))
 
         # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-d}^3(T)
         phi_deg = degree - sd
@@ -145,13 +134,9 @@ class NedelecDual(dual_set.DualSet):
             cell = ref_el.construct_subelement(sd)
             Q_ref = create_quadrature(cell, interpolant_deg + phi_deg)
             Pqmd = polynomial_set.ONPolynomialSet(cell, phi_deg)
-            Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * sd]
-
             for entity in top[sd]:
-                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                nodes.append(functional.FunctionalBlock(ref_el, sd, entity, [
-                    functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                    for d in range(sd) for phi in Phis]))
+                nodes.extend(functional.FacetIntegralMomentBlock(ref_el, sd, entity, Q_ref, Pqmd, comp=(i,), shape=(sd,))
+                             for i in range(sd))
 
         super().__init__(nodes, ref_el)
 

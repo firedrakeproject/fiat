@@ -86,14 +86,32 @@ class RelabeledFunctionalBlock(FunctionalBlock):
 
 
 class PointEvaluationBlock(FunctionalBlock):
-    def __init__(self, ref_el, entity_dim, entity_id, order=0, degree=0, variant=None):
+    def __init__(self, ref_el, entity_dim, entity_id, order=0, degree=0, variant=None, comp=(), shape=None):
         from FIAT.polynomial_set import mis
-        sd = ref_el.get_spatial_dimension()
         pts = ref_el.make_points(entity_dim, entity_id, degree, variant=variant)
         if order == 0:
-            nodes = [PointEvaluation(ref_el, pt) for pt in pts]
+            if shape is None:
+                nodes = [PointEvaluation(ref_el, pt) for pt in pts]
+            else:
+                nodes = [ComponentPointEvaluation(ref_el, comp, shape, pt) for pt in pts]
         else:
+            sd = ref_el.get_spatial_dimension()
             nodes = [PointDerivative(ref_el, pt, alpha) for pt in pts for alpha in mis(sd, order)]
+        super().__init__(ref_el, entity_dim, entity_id, nodes)
+
+
+class PointDirectionalEvaluationBlock(FunctionalBlock):
+    def __init__(self, ref_el, entity_dim, entity_id, direction=None, degree=0, variant=None):
+        pts = ref_el.make_points(entity_dim, entity_id, degree, variant=variant)
+        if direction == "normal":
+            nodes = [PointScaledNormalEvaluation(ref_el, entity_id, pt) for pt in pts]
+        elif direction == "tangential":
+            if entity_dim == 1:
+                nodes = [PointEdgeTangentEvaluation(ref_el, entity_id, pt) for pt in pts]
+            else:
+                nodes = [PointFaceTangentEvaluation(ref_el, entity_id, i, pt)
+                         for i in range(entity_dim) for pt in pts]
+
         super().__init__(ref_el, entity_dim, entity_id, nodes)
 
 
@@ -131,14 +149,18 @@ class PointNormalDerivativeView(FunctionalBlockView):
 
 
 class FacetIntegralMomentBlock(FunctionalBlock):
-    def __init__(self, ref_el, entity_dim, entity_id, Q_ref, P, mapping="L2 piola"):
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref, P, mapping="L2 piola", comp=(), shape=None):
         dim = P.ref_el.get_spatial_dimension()
         self.Phis = P.tabulate(Q_ref.get_points())[(0,) * dim]
 
         Q = quadrature.FacetQuadratureRule(ref_el, entity_dim, entity_id, Q_ref)
         Phis = self.get_functions()
         phis = pullback(mapping, Q.jacobian(), Q.jacobian_determinant(), Phis)
-        nodes = [FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis]
+
+        if shape is not None:
+            nodes = [IntegralMoment(ref_el, Q, phi, comp=comp, shp=shape) for phi in phis]
+        else:
+            nodes = [FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis]
 
         super().__init__(ref_el, entity_dim, entity_id, nodes)
 
