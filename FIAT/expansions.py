@@ -436,26 +436,38 @@ class ExpansionSet(object):
         """
 
         from FIAT.polynomial_set import mis
+        sd = self.ref_el.get_spatial_dimension()
         num_members = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
+        cell_point_map = compute_cell_point_map(self.ref_el, points, unique=False)
 
-        top = self.ref_el.get_topology()
-        sd = self.ref_el.get_spatial_dimension()
-        interior_facets = self.ref_el.get_interior_facets(sd-1)
+        num_jumps = 0
+        facet_point_map = {}
+        for facet in self.ref_el.get_interior_facets(sd-1):
+            try:
+                cells = self.ref_el.connectivity[(sd-1, sd)][facet]
+                ipts = list(set.intersection(*(set(cell_point_map[c]) for c in cells)))
+                if ipts != ():
+                    facet_point_map[facet] = ipts
+                    num_jumps += len(ipts)
+            except KeyError:
+                pass
+
         derivs = {cell: self._tabulate_on_cell(n, points, order=order, cell=cell)
-                  for cell in top[sd]}
+                  for cell in cell_point_map}
+
         jumps = {}
         for r in range(order+1):
             cur = 0
             alphas = mis(sd, r)
-            jumps[r] = numpy.zeros((num_members, len(alphas)*len(interior_facets), len(points)))
-            for facet in interior_facets:
-                facet_verts = set(top[sd-1][facet])
-                c0, c1 = tuple(k for k in top[sd] if facet_verts < set(top[sd][k]))
+            jumps[r] = numpy.zeros((num_members, len(alphas) * num_jumps))
+            for facet, ipts in facet_point_map.items():
+                c0, c1 = self.ref_el.connectivity[(sd-1, sd)][facet]
                 for alpha in alphas:
-                    jumps[r][cell_node_map[c1], cur] += derivs[c1][alpha]
-                    jumps[r][cell_node_map[c0], cur] -= derivs[c0][alpha]
-                    cur = cur + 1
+                    ijump = range(cur, cur + len(ipts))
+                    jumps[r][numpy.ix_(cell_node_map[c1], ijump)] += derivs[c1][alpha][:, ipts]
+                    jumps[r][numpy.ix_(cell_node_map[c0], ijump)] -= derivs[c0][alpha][:, ipts]
+                    cur += len(ipts)
         return jumps
 
     def get_dmats(self, degree, cell=0):
@@ -552,7 +564,7 @@ class LineExpansionSet(ExpansionSet):
         results = {}
         scale = self.get_scale(n, cell=cell) * numpy.sqrt(2 * numpy.arange(n+1) + 1)
         for k in range(order+1):
-            v = numpy.zeros((n + 1, len(xs)), xs.dtype)
+            v = numpy.zeros((n + 1, *xs.shape[:-1]), xs.dtype)
             if n >= k:
                 v[k:] = jacobi.eval_jacobi_batch(k, k, n-k, xs)
             for p in range(n + 1):

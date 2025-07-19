@@ -3,15 +3,15 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "fenics-fiat"
-version = "2024.0.0"
+name = "firedrake-fiat"
+version = "2025.4.0"
 dependencies = [
+  "fenics-ufl>=2025.1.0",
   "numpy>=1.16",
   "recursivenodes",
   "scipy",
   "symengine",
   "sympy",
-  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git",
 ]
 requires-python = ">=3.10"
 authors = [
@@ -22,7 +22,6 @@ description = "FInite element Automatic Tabulator"
 readme = "README.rst"
 classifiers = [
   "Programming Language :: Python",
-  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
 ]
 
 [project.urls]

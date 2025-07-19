@@ -1,13 +1,15 @@
-from abc import ABCMeta, abstractproperty
+import abc
+import hashlib
+from functools import cached_property
 from itertools import chain, product
 
 import numpy
 
 import gem
-from gem.utils import cached_property
+from gem.utils import safe_repr
 
 
-class AbstractPointSet(metaclass=ABCMeta):
+class AbstractPointSet(abc.ABC):
     """A way of specifying a known set of points, perhaps with some
     (tensor) structure.
 
@@ -15,8 +17,15 @@ class AbstractPointSet(metaclass=ABCMeta):
     where point_set_shape is () for scalar, (N,) for N element vector,
     (N, M) for N x M matrix etc.
     """
+    def __hash__(self):
+        return int.from_bytes(hashlib.md5(repr(self).encode()).digest(), byteorder="big")
 
-    @abstractproperty
+    @abc.abstractmethod
+    def __repr__(self):
+        pass
+
+    @property
+    @abc.abstractmethod
     def points(self):
         """A flattened numpy array of points or ``UnknownPointsArray``
         object with shape (# of points, point dimension)."""
@@ -24,15 +33,16 @@ class AbstractPointSet(metaclass=ABCMeta):
     @property
     def dimension(self):
         """Point dimension."""
-        _, dim = self.points.shape
-        return dim
+        return self.points.shape[-1]
 
-    @abstractproperty
+    @property
+    @abc.abstractmethod
     def indices(self):
         """GEM indices with matching shape and extent to the structure of the
         point set."""
 
-    @abstractproperty
+    @property
+    @abc.abstractmethod
     def expression(self):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
@@ -52,6 +62,9 @@ class PointSingleton(AbstractPointSet):
         # 1 point ought to be a 1D array - see docstring above and points method
         assert len(point.shape) == 1
         self.point = point
+
+    def __repr__(self):
+        return f"{type(self).__name__}({safe_repr(self.point)})"
 
     @cached_property
     def points(self):
@@ -106,14 +119,16 @@ class UnknownPointSet(AbstractPointSet):
         assert len(points_expr.shape) == 2
         self._points_expr = points_expr
 
+    def __repr__(self):
+        return f"{type(self).__name__}({self._points_expr!r})"
+
     @cached_property
     def points(self):
         return UnknownPointsArray(self._points_expr.shape)
 
     @cached_property
     def indices(self):
-        N, _ = self._points_expr.shape
-        return (gem.Index(extent=N),)
+        return tuple(gem.Index(extent=N) for N in self._points_expr.shape[:-1])
 
     @cached_property
     def expression(self):
@@ -133,13 +148,16 @@ class PointSet(AbstractPointSet):
         assert len(points.shape) == 2
         self.points = points
 
+    def __repr__(self):
+        return f"{type(self).__name__}({self.points!r})"
+
     @cached_property
     def points(self):
         pass  # set at initialisation
 
     @cached_property
     def indices(self):
-        return (gem.Index(extent=len(self.points)),)
+        return tuple(gem.Index(extent=N) for N in self.points.shape[:-1])
 
     @cached_property
     def expression(self):
@@ -177,6 +195,9 @@ class TensorPointSet(AbstractPointSet):
     def __init__(self, factors):
         self.factors = tuple(factors)
 
+    def __repr__(self):
+        return f"{type(self).__name__}({self.factors!r})"
+
     @cached_property
     def points(self):
         return numpy.array([list(chain(*pt_tuple))
@@ -201,3 +222,58 @@ class TensorPointSet(AbstractPointSet):
             len(self.factors) == len(other.factors) and \
             all(s.almost_equal(o, tolerance=tolerance)
                 for s, o in zip(self.factors, other.factors))
+
+
+class FacetPointSet(AbstractPointSet):
+    """A point set on facets.
+
+    A FacetPointSet is constructed by mapping a lower-dimensional PointSet
+    onto all facets of a higher-dimensional cell.
+
+    Parameters
+    ----------
+    cell : FIAT.Cell
+        The cell.
+    ps : PointSet
+        A lower-dimensional point set.
+
+    """
+    def __init__(self, cell, ps):
+        self.cell = cell
+        self.ps = ps
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.ps!r})"
+
+    @cached_property
+    def entities(self):
+        """The list of all cell entites matching the reference point set dimension."""
+        to_int = lambda x: sum(x) if isinstance(x, tuple) else x
+        top = self.cell.topology
+        return [(dim, entity)
+                for dim in sorted(top)
+                for entity in sorted(top[dim])
+                if to_int(dim) == self.ps.dimension]
+
+    @cached_property
+    def points(self):
+        """The array with the reference points mapped onto each facet."""
+        ref_pts = self.ps.points
+        pts = [self.cell.get_entity_transform(dim, entity)(ref_pts)
+               for dim, entity in self.entities]
+        return numpy.concatenate(pts)
+
+    @cached_property
+    def indices(self):
+        """An Index tuple of the facet index and the reference point indices."""
+        return (gem.Index(extent=len(self.entities)), *self.ps.indices)
+
+    @cached_property
+    def expression(self):
+        raise NotImplementedError("Symbolic point expression is not yet implemented for FacetPointSet.")
+
+    def almost_equal(self, other, tolerance=1e-12):
+        """Approximate numerical equality of point sets"""
+        return type(self) is type(other) and \
+            self.cell == other.cell and \
+            self.ps.almost_equal(other.ps, tolerance=tolerance)

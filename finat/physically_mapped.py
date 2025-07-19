@@ -264,7 +264,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         :arg coordinate_mapping: Object providing physical geometry."""
         pass
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def map_tabulation(self, tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
 
         M = self.basis_transformation(coordinate_mapping)
@@ -281,13 +281,15 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             val = gem.ListTensor(expressions)
             return gem.optimise.aggressive_unroll(val)
 
+        return {alpha: matvec(tabulation[alpha]) for alpha in tabulation}
+
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
+        return self.map_tabulation(result, coordinate_mapping)
 
-        return {alpha: matvec(table)
-                for alpha, table in result.items()}
-
-    def point_evaluation(self, order, refcoords, entity=None):
-        raise NotImplementedError("TODO: not yet thought about it")
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
+        result = super().point_evaluation(order, refcoords, entity=entity)
+        return self.map_tabulation(result, coordinate_mapping)
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):

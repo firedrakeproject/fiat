@@ -149,13 +149,14 @@ dg_interval_variants = {
 @convert.register(finat.ufl.FiniteElement)
 def convert_finiteelement(element, **kwargs):
     cell = as_fiat_cell(element.cell)
-    if element.family() == "Quadrature":
+    if element.family() in {"Quadrature", "Boundary Quadrature"}:
         degree = element.degree()
-        scheme = element.quadrature_scheme()
+        scheme = element.quadrature_scheme() or "default"
         if degree is None or scheme is None:
             raise ValueError("Quadrature scheme and degree must be specified!")
 
-        return finat.make_quadrature_element(cell, degree, scheme), set()
+        codim = 1 if element.family() == "Boundary Quadrature" else 0
+        return finat.make_quadrature_element(cell, degree, scheme, codim), set()
     lmbda = supported_elements[element.family()]
     if element.family() == "Real" and element.cell.cellname() in {"quadrilateral", "hexahedron"}:
         lmbda = None
@@ -179,7 +180,7 @@ def convert_finiteelement(element, **kwargs):
         kind = 'spectral'  # default variant
 
     if element.family() == "Lagrange":
-        if kind == 'spectral':
+        if kind in ['spectral', 'mimetic']:
             lmbda = finat.GaussLobattoLegendre
         elif element.cell.cellname() == "interval" and kind in cg_interval_variants:
             lmbda = cg_interval_variants[kind]
@@ -200,6 +201,8 @@ def convert_finiteelement(element, **kwargs):
     elif element.family() in ["Discontinuous Lagrange", "Discontinuous Lagrange L2"]:
         if kind == 'spectral':
             lmbda = finat.GaussLegendre
+        elif kind == 'mimetic':
+            lmbda = finat.Histopolation
         elif element.cell.cellname() == "interval" and kind in dg_interval_variants:
             lmbda = dg_interval_variants[kind]
         elif any(map(kind.startswith, ['integral', 'demkowicz', 'fdm'])):
@@ -216,7 +219,7 @@ def convert_finiteelement(element, **kwargs):
             lmbda = finat.DiscontinuousLagrange
             finat_kwargs["variant"] = kind
 
-    elif element.family() == "HDiv Trace":
+    elif element.family() in {"HDiv Trace", "Bubble", "FacetBubble"}:
         finat_kwargs["variant"] = kind
 
     elif element.variant() is not None:

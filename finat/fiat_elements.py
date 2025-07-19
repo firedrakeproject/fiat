@@ -116,9 +116,8 @@ class FiatElement(FiniteElementBase):
                 continue
 
             derivative = sum(alpha)
-            table_roll = fiat_table.reshape(
-                space_dimension, value_size, len(ps.points)
-            ).transpose(1, 2, 0)
+            shp = (space_dimension, value_size, *ps.points.shape[:-1])
+            table_roll = np.moveaxis(fiat_table.reshape(shp), 0, -1)
 
             exprs = []
             for table in table_roll:
@@ -157,7 +156,7 @@ class FiatElement(FiniteElementBase):
                 result[alpha] = expr
         return result
 
-    def point_evaluation(self, order, refcoords, entity=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -167,6 +166,9 @@ class FiatElement(FiniteElementBase):
                           a vector with the correct dimension, its
                           free indices are arbitrary.
         :param entity: the cell entity on which to tabulate.
+        :param coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
         '''
         if entity is None:
             entity = (self.cell.get_dimension(), 0)
@@ -346,13 +348,13 @@ class Bernstein(ScalarFiatElement):
 
 
 class Bubble(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.Bubble(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.Bubble(cell, degree, variant=variant))
 
 
 class FacetBubble(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.FacetBubble(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.FacetBubble(cell, degree, variant=variant))
 
 
 class CrouzeixRaviart(ScalarFiatElement):
@@ -376,6 +378,11 @@ class KongMulderVeldhuizen(ScalarFiatElement):
 class DiscontinuousLagrange(ScalarFiatElement):
     def __init__(self, cell, degree, variant=None):
         super().__init__(FIAT.DiscontinuousLagrange(cell, degree, variant=variant))
+
+
+class Histopolation(ScalarFiatElement):
+    def __init__(self, cell, degree):
+        super().__init__(FIAT.Histopolation(cell, degree))
 
 
 class Real(DiscontinuousLagrange):

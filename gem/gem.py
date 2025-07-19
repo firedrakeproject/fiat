@@ -16,6 +16,7 @@ indices.
 
 from abc import ABCMeta
 from itertools import chain
+from functools import reduce
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -324,7 +325,12 @@ class Variable(Terminal):
 class Sum(Scalar):
     __slots__ = ('children',)
 
-    def __new__(cls, a, b):
+    def __new__(cls, *args):
+        try:
+            a, b = args
+        except ValueError:
+            # Handle more than two arguments
+            return reduce(Sum, args)
         assert not a.shape
         assert not b.shape
 
@@ -345,7 +351,12 @@ class Sum(Scalar):
 class Product(Scalar):
     __slots__ = ('children',)
 
-    def __new__(cls, a, b):
+    def __new__(cls, *args):
+        try:
+            a, b = args
+        except ValueError:
+            # Handle more than two arguments
+            return reduce(Product, args)
         assert not a.shape
         assert not b.shape
 
@@ -960,6 +971,9 @@ class Delta(Scalar, Terminal):
     __back__ = ('dtype',)
 
     def __new__(cls, i, j, dtype=None):
+        if isinstance(i, tuple) and isinstance(j, tuple):
+            # Handle multiindices
+            return Product(*map(Delta, i, j))
         assert isinstance(i, IndexBase)
         assert isinstance(j, IndexBase)
 
@@ -968,8 +982,14 @@ class Delta(Scalar, Terminal):
             return one
 
         # Fixed indices
-        if isinstance(i, int) and isinstance(j, int):
+        if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
+
+        if isinstance(i, Integral):
+            return Indexed(Literal(numpy.eye(j.extent)[i]), (j,))
+
+        if isinstance(j, Integral):
+            return Indexed(Literal(numpy.eye(i.extent)[j]), (i,))
 
         self = super(Delta, cls).__new__(cls)
         self.i = i
