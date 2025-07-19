@@ -318,6 +318,7 @@ class VectorElement(MixedElement):
             if cell is None:
                 raise ValueError("Cannot infer vector dimension without a cell.")
             # TODO: is this the right default
+            cell, = cell.cells# Vectorelement of mixed elements.
             dim = cell.topological_dimension()
 
         self._mapping = sub_element.mapping()
