@@ -1,6 +1,6 @@
 import FIAT
 
-from gem import ListTensor
+from gem import ListTensor, partial_indexed
 
 from finat.fiat_elements import ScalarFiatElement
 from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
@@ -10,37 +10,41 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=2):
         if Citations is not None:
             Citations().register("Morley1971")
-        super().__init__(FIAT.Morley(cell))
+        super().__init__(FIAT.Morley(cell, degree=degree))
 
     def basis_transformation(self, coordinate_mapping):
+        sd = self.cell.get_spatial_dimension()
+        top = self.cell.get_topology()
         # Jacobians at edge midpoints
-        J = coordinate_mapping.jacobian_at([1/3, 1/3])
+        bary, = self.cell.make_points(sd, 0, sd+1)
+        J = coordinate_mapping.jacobian_at(bary)
 
         rns = coordinate_mapping.reference_normals()
         pns = coordinate_mapping.physical_normals()
-
         pts = coordinate_mapping.physical_tangents()
-
         pel = coordinate_mapping.physical_edge_lengths()
 
         V = identity(self.space_dimension())
 
-        for i in range(3):
-            V[i+3, i+3] = (rns[i, 0]*(pns[i, 0]*J[0, 0] + pns[i, 1]*J[1, 0])
-                           + rns[i, 1]*(pns[i, 0]*J[0, 1] + pns[i, 1]*J[1, 1]))
+        offset = len(top[sd-2])
+        for i in top[sd-1]:
+            nhat = partial_indexed(rns, (i,))
+            n = partial_indexed(pns, (i,))
+            t = partial_indexed(pts, (i,))
+            Bn = J @ nhat
+            Bnn = n @ Bn
+            Btn = t @ Bn
 
-        for i, c in enumerate([(1, 2), (0, 2), (0, 1)]):
-            B12 = (rns[i, 0]*(pts[i, 0]*J[0, 0] + pts[i, 1]*J[1, 0])
-                   + rns[i, 1]*(pts[i, 0]*J[0, 1] + pts[i, 1]*J[1, 1]))
-            V[3+i, c[0]] = -1*B12 / pel[i]
-            V[3+i, c[1]] = B12 / pel[i]
+            c = list(top[sd-1][i])
+            s = i + offset
+            V[s, s] = Bnn
+            V[s, c] = Btn / pel[i]
+            V[s, c[0]] *= -1
 
         # diagonal post-scaling to patch up conditioning
         h = coordinate_mapping.cell_size()
-
-        for e in range(3):
-            v0id, v1id = [i for i in range(3) if i != e]
-            for i in range(6):
-                V[i, 3+e] = 2*V[i, 3+e] / (h[v0id] + h[v1id])
+        for i in top[sd-1]:
+            s = i + offset
+            V[:, s] *= 2 / sum(h[v] for v in top[sd-1][i])
 
         return ListTensor(V.T)
