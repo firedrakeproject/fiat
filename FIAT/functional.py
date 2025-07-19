@@ -100,6 +100,16 @@ class PointEvaluationBlock(FunctionalBlock):
         super().__init__(ref_el, entity_dim, entity_id, nodes)
 
 
+class PointGradientBlock(PointEvaluationBlock):
+    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
+        super().__init__(ref_el, entity_dim, entity_id, order=1, degree=degree, variant=variant)
+
+
+class PointHessianBlock(PointEvaluationBlock):
+    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
+        super().__init__(ref_el, entity_dim, entity_id, order=2, degree=degree, variant=variant)
+
+
 class PointDirectionalEvaluationBlock(FunctionalBlock):
     def __init__(self, ref_el, entity_dim, entity_id, direction=None, degree=0, variant=None):
         pts = ref_el.make_points(entity_dim, entity_id, degree, variant=variant)
@@ -121,36 +131,26 @@ class PointDirectionalEvaluationBlock(FunctionalBlock):
         super().__init__(ref_el, entity_dim, entity_id, nodes)
 
 
-class PointGradientBlock(PointEvaluationBlock):
-    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
-        super().__init__(ref_el, entity_dim, entity_id, order=1, degree=degree, variant=variant)
-
-
-class PointHessianBlock(PointEvaluationBlock):
-    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
-        super().__init__(ref_el, entity_dim, entity_id, order=2, degree=degree, variant=None)
-
-
 class PointDirectionalDerivativeBlock(PointEvaluationBlock):
-    def __init__(self, ref_el, entity_dim, entity_id, basis):
+    def __init__(self, ref_el, entity_dim, entity_id, basis, degree=0, variant=None):
         nodes = [PointDirectionalDerivative(self.ref_el, pt, e)
-                 for pt in self.ref_el.make_points(entity_dim, entity_id, 0)
+                 for pt in self.ref_el.make_points(entity_dim, entity_id, degree, variant=variant)
                  for e in basis]
         super().__init__(ref_el, entity_dim, entity_id, nodes)
 
 
 class PointNormalTangentialDerivativeBlock(PointDirectionalDerivativeBlock):
-    def __init__(self, ref_el, entity_dim, entity_id):
+    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
         sd = self.ref_el.get_spatial_dimension()
         basis = numpy.zeros((sd, sd))
         basis[0] = self.ref_el.compute_scaled_normal(entity_id)
         basis[1:] = self.ref_el.compute_tangents(sd-1, entity_id)
-        super().__init__(ref_el, entity_dim, entity_id, basis)
+        super().__init__(ref_el, entity_dim, entity_id, basis, degree=degree, variant=variant)
 
 
 class PointNormalDerivativeView(FunctionalBlockView):
-    def __init__(self, ref_el, entity_dim, entity_id):
-        block = PointNormalTangentialDerivativeBlock(ref_el, entity_dim, entity_id)
+    def __init__(self, ref_el, entity_dim, entity_id, degree=0, variant=None):
+        block = PointNormalTangentialDerivativeBlock(ref_el, entity_dim, entity_id, degree=0, variant=None)
         super().__init__(block, [0])
 
 
