@@ -15,6 +15,7 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
     def basis_transformation(self, coordinate_mapping):
         sd = self.cell.get_spatial_dimension()
         top = self.cell.get_topology()
+        conn = self.cell.get_connectivity()
         # Jacobians at edge midpoints
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)
@@ -35,8 +36,8 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
             Bnn = n @ Bn
             Btn = t @ Bn
 
-            c = list(top[sd-1][i])
             s = i + offset
+            c = list(conn[(sd-1, sd-2)][i])
             V[s, s] = Bnn
             V[s, c] = Btn / pel[i]
             V[s, c[0]] *= -1

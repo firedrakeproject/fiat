@@ -13,8 +13,8 @@ import numpy
 
 class MorleyDualSet(dual_set.DualSet):
     """The dual basis for Morley elements.  This class works for
-    simplices of any dimension.  Nodes are constant moments on codim=2 entities
-    and constant moments of normal derivatives on codim=1 entities."""
+    simplices of any dimension.  Nodes are average on codim=2 entities
+    and average of normal derivative on codim=1 entities."""
 
     def __init__(self, ref_el, degree):
         top = ref_el.get_topology()
@@ -38,7 +38,7 @@ class MorleyDualSet(dual_set.DualSet):
                 else:
                     # codim=2 edge dof -- integral average
                     Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                    ell = functional.IntegralMoment(ref_el, Q, scale)
+                    ell = functional.IntegralMoment(ref_el, Q, scale / Q.jacobian_determinant())
 
                 nodes.append(ell)
                 entity_ids[dim][entity].extend(list(range(cur, len(nodes))))
