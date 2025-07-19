@@ -21,9 +21,10 @@ class MorleyDualSet(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
-        for dim in (sd-2, sd-1):
+        for codim in (2, 1):
+            dim = sd - codim
             facet = ref_el.construct_subelement(dim)
-            Q_ref = create_quadrature(facet, degree-1)
+            Q_ref = create_quadrature(facet, degree+codim-2)
             scale = numpy.ones(Q_ref.get_weights().shape)
 
             for entity in sorted(top[dim]):
