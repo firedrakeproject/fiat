@@ -349,8 +349,9 @@ class IntegralMomentOfDerivative(Functional):
 class IntegralMomentOfNormalDerivative(Functional):
     """Functional giving normal derivative integrated against some function on a facet."""
 
-    def __init__(self, ref_el, facet_no, Q, f_at_qpts):
-        n = ref_el.compute_normal(facet_no)
+    def __init__(self, ref_el, facet_no, Q, f_at_qpts, n=None):
+        if n is None:
+            n = ref_el.compute_normal(facet_no)
         self.n = n
         self.f_at_qpts = f_at_qpts
         self.Q = Q

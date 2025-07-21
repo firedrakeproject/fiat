@@ -9,7 +9,7 @@
 # bfs, but the extra three are used in the transformation theory.
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import TRIANGLE, ufc_simplex
+from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi
 
@@ -33,10 +33,10 @@ class BellDualSet(dual_set.DualSet):
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
         # we need an edge quadrature rule for the moment
-        facet = ufc_simplex(1)
-        Q_ref = create_quadrature(facet, 8)
-        qpts = Q_ref.get_points()[:, 0]
-        leg4_at_qpts = eval_jacobi(0, 0, 4, 2.0*qpts - 1)
+        facet = ref_el.construct_subelement(1)
+        Q_ref = create_quadrature(facet, 2*(degree-1))
+        x = facet.compute_barycentric_coordinates(Q_ref.get_points())
+        leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
 
         for e in sorted(top[1]):
             cur = len(nodes)
@@ -53,7 +53,7 @@ class Bell(finite_element.CiarletElement):
         if ref_el.get_shape() != TRIANGLE:
             raise ValueError(f"{type(self).__name__} only defined on triangles")
         if degree != 5:
-            raise ValueError(f"{type(self).__name__} only defined for degree=5.")
+            raise ValueError(f"{type(self).__name__} only defined for degree = 5.")
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = BellDualSet(ref_el, degree)
         super().__init__(poly_set, dual, degree)
