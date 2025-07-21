@@ -26,12 +26,10 @@ class LagrangeDualSet(dual_set.DualSet):
                         and then lexicographically by lattice multiindex.
     """
     def __init__(self, ref_el, degree, point_variant="equispaced", sort_entities=False):
-        nodes = []
-        entity_ids = {}
-        entity_permutations = {}
         top = ref_el.get_topology()
+
+        entity_permutations = {}
         for dim in sorted(top):
-            entity_ids[dim] = {}
             entity_permutations[dim] = {}
             perms = {0: [0]} if dim == 0 else make_entity_permutations_simplex(dim, degree - dim)
             for entity in sorted(top[dim]):
@@ -45,12 +43,9 @@ class LagrangeDualSet(dual_set.DualSet):
 
         # make nodes by getting points
         # need to do this entity-by-entity
-        for dim, entity in entities:
-            cur = len(nodes)
-            pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
-            nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts_cur)
-            entity_ids[dim][entity] = list(range(cur, len(nodes)))
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+        nodes = [functional.PointEvaluationBlock(ref_el, dim, entity, degree=degree, variant=point_variant)
+                 for dim, entity in entities]
+        super().__init__(nodes, ref_el, entity_permutations=entity_permutations)
 
 
 class Lagrange(finite_element.CiarletElement):

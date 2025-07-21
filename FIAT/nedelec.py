@@ -11,7 +11,6 @@ import numpy
 from itertools import chain
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
 
 
 def NedelecSpace2D(ref_el, degree):
@@ -104,13 +103,6 @@ class NedelecDual(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
 
-        entity_ids = {}
-        # set to empty
-        for dim in top:
-            entity_ids[dim] = {}
-            for entity in top[dim]:
-                entity_ids[dim][entity] = []
-
         if variant == "integral":
             # edge nodes are \int_F v\cdot t p ds where p \in P_{q-1}(edge)
             # degree is q - 1
@@ -124,38 +116,14 @@ class NedelecDual(dual_set.DualSet):
                     facet = ref_el.construct_subelement(dim)
                     Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
                     Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
-                    Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * dim]
-                    Phis = numpy.transpose(Phis, (0, 2, 1))
-
+                    mapping = "contravariant piola"
                     for entity in top[dim]:
-                        cur = len(nodes)
-                        Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                        Jdet = Q.jacobian_determinant()
-                        R = numpy.array(ref_el.compute_tangents(dim, entity))
-                        phis = numpy.dot(Phis, R / Jdet)
-                        phis = numpy.transpose(phis, (0, 2, 1))
-                        nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                                     for phi in phis)
-                        entity_ids[dim][entity] = list(range(cur, len(nodes)))
+                        nodes.append(functional.FacetIntegralMomentBlock(ref_el, dim, entity, Q_ref, Pqmd, mapping=mapping))
 
         elif variant == "point":
-            for i in top[1]:
-                cur = len(nodes)
-                # points to specify P_k on each edge
-                pts_cur = ref_el.make_points(1, i, degree + 1)
-                nodes.extend(functional.PointEdgeTangentEvaluation(ref_el, i, pt)
-                             for pt in pts_cur)
-                entity_ids[1][i] = list(range(cur, len(nodes)))
-
-            if sd > 2 and degree > 1:  # face tangents
-                for i in top[2]:  # loop over faces
-                    cur = len(nodes)
-                    pts_cur = ref_el.make_points(2, i, degree + 1)
-                    nodes.extend(functional.PointFaceTangentEvaluation(ref_el, i, k, pt)
-                                 for k in range(2)  # loop over tangents
-                                 for pt in pts_cur  # loop over points
-                                 )
-                    entity_ids[2][i] = list(range(cur, len(nodes)))
+            for dim in range(1, sd):
+                for i in top[dim]:
+                    nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, dim, i, direction="tangential", degree=degree+1))
 
         # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-d}^3(T)
         phi_deg = degree - sd
@@ -166,17 +134,11 @@ class NedelecDual(dual_set.DualSet):
             cell = ref_el.construct_subelement(sd)
             Q_ref = create_quadrature(cell, interpolant_deg + phi_deg)
             Pqmd = polynomial_set.ONPolynomialSet(cell, phi_deg)
-            Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * sd]
-
             for entity in top[sd]:
-                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                cur = len(nodes)
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                             for d in range(sd)
-                             for phi in Phis)
-                entity_ids[sd][entity] = list(range(cur, len(nodes)))
+                nodes.extend(functional.FacetIntegralMomentBlock(ref_el, sd, entity, Q_ref, Pqmd, comp=(i,), shape=(sd,))
+                             for i in range(sd))
 
-        super().__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el)
 
 
 class Nedelec(finite_element.CiarletElement):

@@ -11,7 +11,6 @@ import numpy
 from itertools import chain
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.quadrature import FacetQuadratureRule
 
 
 def RTSpace(ref_el, degree):
@@ -63,64 +62,35 @@ class RTDualSet(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
 
-        entity_ids = {}
-        # set to empty
-        for dim in top:
-            entity_ids[dim] = {}
-            for entity in top[dim]:
-                entity_ids[dim][entity] = []
-
         if variant == "integral":
             facet = ref_el.construct_subelement(sd-1)
             # Facet nodes are \int_F v\cdot n p ds where p \in P_q
             q = degree - 1
             Q_ref = create_quadrature(facet, interpolant_deg + q)
             Pq = polynomial_set.ONPolynomialSet(facet, q if sd > 1 else 0)
-            Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
-                cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
-                phis = n[None, :, None] * Pq_at_qpts[:, None, :]
-                nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
-                             for phi in phis)
-                entity_ids[sd - 1][f] = list(range(cur, len(nodes)))
+                nodes.append(functional.FacetNormalIntegralMomentBlock(ref_el, sd-1, f, Q_ref, Pq))
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-1}^d
             if q > 0:
                 cell = ref_el.construct_subelement(sd)
                 Q_ref = create_quadrature(cell, interpolant_deg + q - 1)
                 Pqm1 = polynomial_set.ONPolynomialSet(cell, q - 1)
-                Pqm1_at_qpts = Pqm1.tabulate(Q_ref.get_points())[(0,) * sd]
-
                 for entity in top[sd]:
-                    Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                    cur = len(nodes)
-                    nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                                 for d in range(sd)
-                                 for phi in Pqm1_at_qpts)
-                    entity_ids[sd][entity] = list(range(cur, len(nodes)))
+                    nodes.extend(functional.FacetIntegralMomentBlock(ref_el, sd, entity, Q_ref, Pqm1, comp=(i,), shape=(sd,))
+                                 for i in range(sd))
 
         elif variant == "point":
-            # codimension 1 facets
+            # Normal component evaluation at lattice points on facets
             for i in top[sd - 1]:
-                cur = len(nodes)
-                pts_cur = ref_el.make_points(sd - 1, i, sd + degree - 1)
-                nodes.extend(functional.PointScaledNormalEvaluation(ref_el, i, pt)
-                             for pt in pts_cur)
-                entity_ids[sd - 1][i] = list(range(cur, len(nodes)))
+                nodes.append(functional.PointDirectionalEvaluationBlock(ref_el, sd-1, i, direction="normal", degree=degree+sd-1))
 
             # internal nodes.  Let's just use points at a lattice
-            if degree > 1:
-                cur = len(nodes)
-                pts = ref_el.make_points(sd, 0, sd + degree - 1)
-                nodes.extend(functional.ComponentPointEvaluation(ref_el, d, (sd,), pt)
-                             for d in range(sd)
-                             for pt in pts)
-                entity_ids[sd][0] = list(range(cur, len(nodes)))
+            for i in top[sd]:
+                nodes.extend(functional.PointEvaluationBlock(ref_el, sd, i, degree=degree+sd-1, comp=(d,), shape=(sd,))
+                             for d in range(sd))
 
-        super().__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el)
 
 
 class RaviartThomas(finite_element.CiarletElement):
