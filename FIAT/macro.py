@@ -485,7 +485,15 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
-def hdiv_conforming(U, order=0):
+def hdiv_conforming_coefficients(U, order=0):
+    """Constrains a PolynomialSet to have vanishing normal jumps on the
+       interior facets of a simplicial complex.
+
+    :arg U: A PolynomialSet, it may be vector- or tensor-valued.
+    :arg order: The maximum order of differentiation on the normal jump constraints.
+
+    :returns: The coefficients of the constrained PolynomialSet.
+    """
     from FIAT.quadrature_schemes import create_quadrature
     degree = U.degree
     ref_el = U.get_reference_element()
@@ -503,18 +511,16 @@ def hdiv_conforming(U, order=0):
     qpts, qwts = Q.get_points(), Q.get_weights()
     phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
     weights = numpy.multiply(phi_at_qpts, qwts)
+    ax = tuple(range(1, weights.ndim))
 
     rows = []
     for facet in ref_el.get_interior_facets(sd-1):
-        normal = ref_el.compute_normal(facet)
-        normal = normal[(None,) * len(shape) + (slice(None), None)]
+        normal = ref_el.compute_scaled_normal(facet)
+        ncoeffs = numpy.tensordot(coeffs, normal, axes=(len(shape), 0))
         jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
         for r in range(k, order+1):
-            jump = numpy.dot(coeffs, jumps[r])
-            # num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
-            wn = weights[..., None, :] * normal
-            ax = tuple(range(1, len(wn.shape)))
-            rows.append(numpy.tensordot(wn, jump, axes=(ax, ax)))
+            njump = numpy.dot(ncoeffs, jumps[r])
+            rows.append(numpy.tensordot(weights, njump, axes=(ax, ax)))
 
     if len(rows) > 0:
         dual_mat = numpy.vstack(rows)
@@ -536,7 +542,7 @@ class HDivPolynomialSet(polynomial_set.PolynomialSet):
     def __init__(self, ref_el, degree, order=0, **kwargs):
         sd = ref_el.get_spatial_dimension()
         U = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), **kwargs)
-        coeffs = hdiv_conforming(U, order=order)
+        coeffs = hdiv_conforming_coefficients(U, order=order)
         super().__init__(ref_el, degree, degree, U.expansion_set, coeffs)
 
 
@@ -552,11 +558,21 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
     """
     def __init__(self, ref_el, degree, order=0, **kwargs):
         U = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree, **kwargs)
-        coeffs = hdiv_conforming(U, order=order)
+        coeffs = hdiv_conforming_coefficients(U, order=order)
         super().__init__(ref_el, degree, degree, U.expansion_set, coeffs)
 
 
-def pullback(mapping, Jinv, phi):
+def pullback(phi, mapping, J=None, Jinv=None, Jdet=None):
+    """Transforms a reference tabulation into physical space.
+
+    :arg phi: The tabulation on reference space.
+    :arg mapping: A string indicating the pullback type.
+    :arg J: The Jacobian of the transformation from reference to physical space.
+    :arg Jinv: The inverse of the Jacobian.
+    :arg Jdet: The determinant of the Jacobian.
+
+    :returns: The tabulation on physical space.
+    """
     try:
         formdegree = {
             "affine": (0,),
@@ -569,26 +585,33 @@ def pullback(mapping, Jinv, phi):
     except KeyError:
         raise ValueError(f"Unrecognized mapping {mapping}")
 
+    if J is None:
+        J = numpy.linalg.pinv(Jinv)
+    if Jinv is None:
+        Jinv = numpy.linalg.pinv(J)
+    if Jdet is None:
+        Jdet = numpy.linalg.det(J)
     F1 = Jinv.T
-    F2 = numpy.linalg.inv(Jinv) * numpy.linalg.det(Jinv)
-
-    perm = [*range(1, phi.ndim-1), 0, -1]
-    phi = phi.transpose(perm)
+    F2 = J / Jdet
 
     for i, k in enumerate(formdegree):
         if k == 0:
             continue
         F = F1 if k == 1 else F2
-        phi = numpy.tensordot(F, phi, (1, i))
 
-    perm = [-2, *reversed(range(phi.ndim-2)), -1]
-    phi = phi.transpose(perm)
+        perm = list(range(phi.ndim))
+        perm[i+1], perm[-1] = perm[-1], perm[i+1]
+
+        phi = phi.transpose(perm)
+        phi = phi.dot(F.T)
+        phi = phi.transpose(perm)
+
     return phi
 
 
 class MacroPolynomialSet(polynomial_set.PolynomialSet):
     """Constructs a PolynomialSet by tiling a CiarletElement on a
-    SimplicialComplex.
+       SimplicialComplex.
 
     :arg ref_el: The SimplicialComplex.
     :arg element: The CiarletElement.
@@ -615,9 +638,9 @@ class MacroPolynomialSet(polynomial_set.PolynomialSet):
         cmap = expansion_set.get_cell_node_map(n)
         for cell in sorted(top[sd]):
             cell_verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
-            A, b = reference_element.make_affine_mapping(cell_verts, base_ref_el.vertices)
+            A, b = reference_element.make_affine_mapping(base_ref_el.vertices, cell_verts)
 
             indices = numpy.ix_(rmap[cell], *map(range, shp), cmap[cell])
-            coeffs[indices] = pullback(mapping, A, base_coeffs)
+            coeffs[indices] = pullback(base_coeffs, mapping, J=A)
 
         super().__init__(ref_el, element.degree(), element.degree(), expansion_set, coeffs)
