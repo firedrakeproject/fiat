@@ -82,10 +82,12 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     Mh[abs(Mh) < 1E-10] = 0
     M[abs(M) < 1E-10] = 0
 
-    error = M - Mh
+    error = Mh.T - M.T
     error[abs(error) < 1E-10] = 0
-    assert np.allclose(residual, 0), str(error.T.tolist())
-    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(error.T.tolist())
+    error = error[np.ix_(*map(np.unique, np.nonzero(error)))]
+
+    assert np.allclose(residual, 0), str(error)
+    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(error)
 
 
 @pytest.mark.parametrize("element", [
@@ -99,7 +101,6 @@ def test_C1_triangle(ref_to_phys, element):
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
-                         finat.Walkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[3])

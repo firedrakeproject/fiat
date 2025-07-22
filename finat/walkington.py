@@ -40,7 +40,7 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
 
         offset = ndof
         voffset = comb(sd + vorder, vorder)
-        foffset = len(self._element.entity_dofs()[sd-1][0]) - len(self._entity_dofs[sd-1][0])
+        foffset = len(self._element.entity_dofs()[2][0]) - len(self.entity_dofs()[2][0])
 
         edges = self.cell.get_connectivity()[(2, 1)]
         for f in sorted(top[2]):
