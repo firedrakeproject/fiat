@@ -79,10 +79,15 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     Vh, residual, *_ = np.linalg.lstsq(Phi.T, phi.T)
     Mh = Vh.T
     Mh = Mh[:num_dofs]
-    Mh[abs(Mh) < 1E-10] = 0.0
-    M[abs(M) < 1E-10] = 0.0
-    assert np.allclose(residual, 0), str(M.T - Mh.T)
-    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(M.T - Mh.T)
+    Mh[abs(Mh) < 1E-10] = 0
+    M[abs(M) < 1E-10] = 0
+
+    error = Mh.T - M.T
+    error[abs(error) < 1E-10] = 0
+    error = error[np.ix_(*map(np.unique, np.nonzero(error)))]
+
+    assert np.allclose(residual, 0), str(error)
+    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(error)
 
 
 @pytest.mark.parametrize("element", [
