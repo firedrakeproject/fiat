@@ -51,13 +51,14 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
                 nhat = self.cell.compute_scaled_normal(face)
                 ahat = numpy.linalg.norm(nhat)
                 nhat /= ahat
+
                 Jn = J @ Literal(nhat)
                 Bnn = n @ Jn
-                # Why 3/4?
-                V[s, s] = (3/4) * Bnn
+                # Why 1/2?
+                V[s, s] = 0.5*Bnn
 
                 # Not sure where this comes from
-                factor = Bnn / (2 * ahat * detJ)
+                factor = 0.5*Bnn / (ahat * detJ)
 
                 xf, = self.cell.make_points(2, face, 3)
                 for edge in edges[face]:
@@ -76,6 +77,8 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
         h = coordinate_mapping.cell_size()
         for i in top[sd-1]:
             s = i + offset
-            V[:, s] *= 2 / sum(h[v] for v in top[sd-1][i])
+            verts = top[sd-1][i]
+            havg = sum(h[v] for v in verts) / len(verts)
+            V[:, s] *= havg ** -(sd-1)
 
         return ListTensor(V.T)
