@@ -79,6 +79,7 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
             s = i + offset
             verts = top[sd-1][i]
             havg = sum(h[v] for v in verts) / len(verts)
-            V[:, s] *= havg ** -(sd-1)
+            for i in range(sd-1):
+                V[:, s] *= 1/havg
 
         return ListTensor(V.T)
