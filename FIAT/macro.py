@@ -185,6 +185,10 @@ class SplitSimplicialComplex(SimplicialComplex):
         """
         return self.get_parent().construct_subelement(dimension)
 
+    def get_facet_element(self):
+        dimension = self.get_spatial_dimension()
+        return self.construct_subelement(dimension - 1)
+
     def is_macrocell(self):
         return True
 
