@@ -32,12 +32,8 @@ class MorleyDualSet(dual_set.DualSet):
                 if dim == sd-1:
                     # codim=1 dof -- average of normal derivative at each facet
                     ell = functional.IntegralMomentOfNormalDerivative(ref_el, entity, Q_ref, scale)
-                elif dim == 0:
-                    # codim=2 vertex dof -- point evaluation
-                    pt, = ref_el.make_points(dim, entity, degree)
-                    ell = functional.PointEvaluation(ref_el, pt)
                 else:
-                    # codim=2 edge dof -- integral average
+                    # codim=2 dof -- integral average
                     Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                     ell = functional.IntegralMoment(ref_el, Q, scale / Q.jacobian_determinant())
 

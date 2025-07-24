@@ -1,7 +1,7 @@
 import FIAT
 import numpy
 
-from gem import ListTensor, partial_indexed, Literal
+from gem import ListTensor, partial_indexed, Literal, Power, Zero
 
 from finat.fiat_elements import ScalarFiatElement
 from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
@@ -16,7 +16,6 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
     def basis_transformation(self, coordinate_mapping):
         sd = self.cell.get_spatial_dimension()
         top = self.cell.get_topology()
-        edges = self.cell.get_connectivity()[(sd-1, sd-2)]
         # Jacobians at barycenter
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)
@@ -30,48 +29,54 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
         offset = len(top[sd-2])
 
         if sd == 2:
-            for i in top[sd-1]:
-                e = list(edges[i])
-                s = offset + i
-                n = partial_indexed(pns, (i,))
-                t = partial_indexed(pts, (i,))
-                nhat = self.cell.compute_normal(i)
+            for e in top[sd-1]:
+                s = offset + e
+                n = partial_indexed(pns, (e,))
+                t = partial_indexed(pts, (e,))
+                nhat = self.cell.compute_normal(e)
                 Jn = J @ Literal(nhat)
-                Bnn = n @ Jn
-                Bnt = t @ Jn
+                Bnn = Jn @ n
+                Bnt = Jn @ t
                 V[s, s] = Bnn
-                V[s, e] = Bnt / pel[i]
-                V[s, e[0]] *= -1
+                v = list(top[sd-1][e])
+                V[s, v] = Bnt / pel[e]
+                V[s, v[0]] *= -1
 
         else:
+            R = ListTensor([[Zero(), Literal(1)], [Literal(-1), Zero()]])
+            edges = self.cell.get_connectivity()[(sd-1, sd-2)]
             for face in top[sd-1]:
                 s = offset + face
-                n = partial_indexed(pns, (face,))
 
-                nhat = self.cell.compute_scaled_normal(face)
+                te = numpy.array(list(map(self.cell.compute_edge_tangent, edges[face])))
+                nhat = -numpy.cross(*te[:2])
                 ahat = numpy.linalg.norm(nhat)
-                nhat /= ahat
 
+                # Reciprocal basis
+                nhat /= numpy.dot(nhat, nhat)
+                thats = numpy.array([numpy.cross(te[0], nhat), numpy.cross(te[1], nhat)])
+
+                Jt = J @ Literal(thats.T)
                 Jn = J @ Literal(nhat)
-                Bnn = n @ Jn
-                # Why 1/2?
-                V[s, s] = 0.5*Bnn
+                Jte = J @ Literal(te.T)
+
+                A = Jte.T @ Jte
+                area = Power(A[0, 0]*A[1, 1] - A[0, 1]*A[1, 0], Literal(0.5))
+
+                detF = area / ahat
+                Bnn = detJ / detF
+                V[s, s] = Bnn
+
+                Gte = Jt.T @ Jte
+                Gnt = Jn @ Jt
+                Bne = (Gnt @ R) @ Gte
 
                 # Not sure where this comes from
-                factor = 0.5*Bnn / (ahat * detJ)
-
-                xf, = self.cell.make_points(2, face, 3)
-                for edge in edges[face]:
-                    t = partial_indexed(pts, (edge,))
-
-                    xe, = self.cell.make_points(1, edge, 2)
-                    out = numpy.array(xe) - numpy.array(xf)
-                    that = self.cell.compute_edge_tangent(edge)
-                    sign = numpy.sign(numpy.dot(numpy.cross(nhat, that), out))
-
-                    # Bnt = dot(cross(n, t), J * nhat)
-                    Bnt = sum((n[i]*t[j] - n[j]*t[i]) * Jn[k] for i, j, k in [(1, 2, 0), (2, 0, 1), (0, 1, 2)])
-                    V[s, edge] = Bnt * pel[edge] * sign * factor
+                factor = 2*ahat / (detF * detF)
+                for i, edge in enumerate(edges[face]):
+                    # UFC convention alternates signs
+                    sign = (-1) ** i
+                    V[s, edge] = Bne[i] * sign * factor
 
         # diagonal post-scaling to patch up conditioning
         h = coordinate_mapping.cell_size()
