@@ -9,6 +9,7 @@ from FIAT.reference_element import TETRAHEDRON, TRIANGLE
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 import numpy
+import math
 
 
 class MorleyDualSet(dual_set.DualSet):
@@ -26,6 +27,9 @@ class MorleyDualSet(dual_set.DualSet):
             facet = ref_el.construct_subelement(dim)
             Q_ref = create_quadrature(facet, degree+codim-2)
             scale = numpy.ones(Q_ref.get_weights().shape)
+            if codim == 1 and sd > 2:
+                # normalized normals do not have unit norm!
+                scale /= math.factorial(sd-1)
 
             for entity in sorted(top[dim]):
                 cur = len(nodes)
