@@ -52,9 +52,9 @@ class Morley(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree=2):
         if ref_el.get_shape() not in {TRIANGLE, TETRAHEDRON}:
-            raise ValueError("Morley only defined on simplices")
+            raise ValueError("Morley only defined on simplices of dimension >= 2")
         if degree != 2:
-            raise ValueError("{type(self).__name__} only defined for degree=2")
+            raise ValueError("{type(self).__name__} only defined for degree == 2")
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = MorleyDualSet(ref_el, degree)
         super().__init__(poly_set, dual, degree)
