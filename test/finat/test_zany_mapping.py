@@ -104,6 +104,7 @@ def test_C1_triangle(ref_to_phys, element):
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
+                         finat.Walkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[3])
