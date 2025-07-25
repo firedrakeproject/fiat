@@ -10,7 +10,6 @@ import numpy
 
 from FIAT import finite_element, dual_set, functional, P0
 from FIAT.reference_element import symmetric_simplex
-from FIAT.orientation_utils import make_entity_permutations_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
@@ -35,19 +34,15 @@ class LegendreDual(dual_set.DualSet):
     def __init__(self, ref_el, degree, codim=0):
         nodes = []
         entity_ids = {}
-        entity_permutations = {}
 
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         for dim in sorted(top):
             npoints = degree + 1 if dim == sd - codim else 0
-            perms = make_entity_permutations_simplex(dim, npoints)
-            entity_permutations[dim] = {}
             entity_ids[dim] = {}
             if npoints == 0:
                 for entity in sorted(top[dim]):
                     entity_ids[dim][entity] = []
-                    entity_permutations[dim][entity] = perms
                 continue
 
             ref_facet = ref_el.construct_subelement(dim)
@@ -59,9 +54,8 @@ class LegendreDual(dual_set.DualSet):
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                 nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
-                entity_permutations[dim][entity] = perms
 
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Legendre(finite_element.CiarletElement):
@@ -89,20 +83,16 @@ class IntegratedLegendreDual(dual_set.DualSet):
     def __init__(self, ref_el, degree):
         nodes = []
         entity_ids = {}
-        entity_permutations = {}
 
         top = ref_el.get_topology()
         for dim in sorted(top):
-            perms = make_entity_permutations_simplex(dim, degree - dim)
             entity_ids[dim] = {}
-            entity_permutations[dim] = {}
             if dim == 0 or degree <= dim:
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
                     pts = ref_el.make_points(dim, entity, degree)
                     nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
                     entity_ids[dim][entity] = list(range(cur, len(nodes)))
-                    entity_permutations[dim][entity] = perms
                 continue
 
             ref_facet = symmetric_simplex(dim)
@@ -117,9 +107,8 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
                 nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in Jphis)
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
-                entity_permutations[dim][entity] = perms
 
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class IntegratedLegendre(finite_element.CiarletElement):

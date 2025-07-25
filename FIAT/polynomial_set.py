@@ -294,15 +294,7 @@ def make_bubbles(ref_el, degree, codim=0, shape=(), scale="L2 piola"):
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
     sd = ref_el.get_spatial_dimension()
     dim = sd - codim
-    if dim == 1:
-        # Apply even / odd reordering on edge bubbles
-        indices = []
-        for entity in entity_ids[dim]:
-            ids = entity_ids[dim][entity]
-            indices.extend(ids[::2])
-            indices.extend(ids[1::2])
-    else:
-        indices = list(chain(*entity_ids[dim].values()))
+    indices = list(chain(*entity_ids[dim].values()))
 
     if shape != ():
         ncomp = numpy.prod(shape)

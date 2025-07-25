@@ -11,8 +11,7 @@ import numpy
 
 from FIAT import dual_set, finite_element, functional, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
-from FIAT.hierarchical import IntegratedLegendre
-from FIAT.orientation_utils import make_entity_permutations_simplex
+from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.P0 import P0Dual
 from FIAT.reference_element import LINE
 
@@ -48,15 +47,17 @@ class FDMDual(dual_set.DualSet):
     def __init__(self, ref_el, degree, bc_order=1, formdegree=0, orthogonalize=False):
         # Define the generalized eigenproblem on a reference element
         embedded_degree = degree + formdegree
-        embedded = IntegratedLegendre(ref_el, embedded_degree)
-        edim = embedded.space_dimension()
-        self.embedded = embedded
+        P = ONPolynomialSet(ref_el, embedded_degree, variant="bubble")
+        Pdim = len(P)
+        # Apply even / odd reordering on edge bubbles
+        P = P.take([0, 1, *range(2, Pdim, 2), *range(3, Pdim, 2)])
+        self.poly_set = P
 
         vertices = ref_el.get_vertices()
         if bc_order == 1 and formdegree == 0:
-            rule = quadrature.GaussLobattoLegendreQuadratureLineRule(ref_el, edim+1)
+            rule = quadrature.GaussLobattoLegendreQuadratureLineRule(ref_el, Pdim+1)
         else:
-            rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
+            rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, Pdim)
         self.rule = rule
 
         solve_eig = sym_eig
@@ -65,21 +66,21 @@ class FDMDual(dual_set.DualSet):
 
         # Tabulate the BC nodes
         if bc_order == 0:
-            C = numpy.empty((0, edim), "d")
+            C = numpy.empty((0, Pdim), "d")
         else:
-            constraints = embedded.tabulate(bc_order-1, vertices)
+            constraints = P.tabulate(vertices, bc_order-1)
             C = numpy.transpose(numpy.column_stack(list(constraints.values())))
         bdof = slice(None, C.shape[0])
         idof = slice(C.shape[0], None)
 
         # Tabulate the basis that splits the DOFs into interior and bcs
-        E = numpy.eye(edim)
+        E = numpy.eye(Pdim)
         E[bdof, idof] = -C[:, idof]
         E[bdof, :] = numpy.linalg.solve(C[:, bdof], E[bdof, :])
 
         # Assemble the constrained Galerkin matrices on the reference cell
         k = max(1, bc_order)
-        phi = embedded.tabulate(k, rule.get_points())
+        phi = P.tabulate(rule.get_points(), k)
         wts = rule.get_weights()
         E0 = numpy.dot(E.T, phi[(0, )])
         Ek = numpy.dot(E.T, phi[(k, )])
@@ -131,16 +132,10 @@ class FDMDual(dual_set.DualSet):
         if len(bc_nodes) > 0:
             entity_ids = {0: {0: [0], 1: [1]},
                           1: {0: list(range(2, degree+1))}}
-            entity_permutations = {}
-            entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
-            entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree - 1)}
         else:
             entity_ids = {0: {0: [], 1: []},
                           1: {0: list(range(0, degree+1))}}
-            entity_permutations = {}
-            entity_permutations[0] = {0: {0: []}, 1: {0: []}}
-            entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree + 1)}
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
@@ -167,7 +162,7 @@ class FDMFiniteElement(finite_element.CiarletElement):
             dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
                            formdegree=self._formdegree, orthogonalize=self._orthogonalize)
         if self._formdegree == 0:
-            poly_set = dual.embedded.poly_set
+            poly_set = dual.poly_set
         else:
             lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
             poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
