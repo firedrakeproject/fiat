@@ -22,27 +22,31 @@ class MorleyDualSet(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
-        for codim in (2, 1):
-            dim = sd - codim
+
+        def duals(ref_el, dim, degree):
             facet = ref_el.construct_subelement(dim)
-            Q_ref = create_quadrature(facet, degree+codim-2)
+            Q_ref = create_quadrature(facet, degree)
             scale = numpy.ones(Q_ref.get_weights().shape)
-            if codim == 1 and sd > 2:
-                # normalized normals do not have unit norm!
-                scale /= math.factorial(sd-1)
+            return Q_ref, scale
 
-            for entity in sorted(top[dim]):
-                cur = len(nodes)
-                if dim == sd-1:
-                    # codim=1 dof -- average of normal derivative at each facet
-                    ell = functional.IntegralMomentOfNormalDerivative(ref_el, entity, Q_ref, scale)
-                else:
-                    # codim=2 dof -- integral average
-                    Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                    ell = functional.IntegralMoment(ref_el, Q, scale / Q.jacobian_determinant())
+        # codim=2 dof -- integral average
+        dim = sd - 2
+        Q_ref, scale = duals(ref_el, dim, degree)
+        for entity in sorted(top[dim]):
+            cur = len(nodes)
+            Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+            nodes.append(functional.IntegralMoment(ref_el, Q, scale / Q.jacobian_determinant()))
+            entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-                nodes.append(ell)
-                entity_ids[dim][entity].extend(list(range(cur, len(nodes))))
+        # codim=1 dof -- average of normal derivative at each facet
+        dim = sd - 1
+        Q_ref, scale = duals(ref_el, dim, degree-1)
+        # normalized normals do not have unit norm!
+        scale /= math.factorial(sd-1)
+        for entity in sorted(top[dim]):
+            cur = len(nodes)
+            nodes.append(functional.IntegralMomentOfNormalDerivative(ref_el, entity, Q_ref, scale))
+            entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
