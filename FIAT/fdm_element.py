@@ -53,7 +53,6 @@ class FDMDual(dual_set.DualSet):
         P = P.take([0, 1, *range(2, Pdim, 2), *range(3, Pdim, 2)])
         self.poly_set = P
 
-        vertices = ref_el.get_vertices()
         if bc_order == 1 and formdegree == 0:
             rule = quadrature.GaussLobattoLegendreQuadratureLineRule(ref_el, Pdim+1)
         else:
@@ -68,7 +67,7 @@ class FDMDual(dual_set.DualSet):
         if bc_order == 0:
             C = numpy.empty((0, Pdim), "d")
         else:
-            constraints = P.tabulate(vertices, bc_order-1)
+            constraints = P.tabulate(ref_el.get_vertices(), bc_order-1)
             C = numpy.transpose(numpy.column_stack(list(constraints.values())))
         bdof = slice(None, C.shape[0])
         idof = slice(C.shape[0], None)
@@ -114,27 +113,30 @@ class FDMDual(dual_set.DualSet):
             numpy.multiply(S, lam, out=S)
             basis = numpy.dot(S.T, Ek)
 
-        bc_nodes = []
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
         if formdegree == 0:
             if orthogonalize:
                 idof = slice(None)
             elif bc_order > 0:
-                bc_nodes += [functional.PointEvaluation(ref_el, x) for x in vertices]
-                for alpha in range(1, bc_order):
-                    bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in vertices]
+                for v in sorted(top[0]):
+                    cur = len(nodes)
+                    x, = ref_el.make_points(0, v, 0)
+                    nodes.append(functional.PointEvaluation(ref_el, x))
+                    nodes.extend(functional.PointDerivative(ref_el, x, (alpha, ))
+                                 for alpha in range(1, bc_order))
+                    entity_ids[0][v].extend(range(cur, len(nodes)))
 
         elif bc_order > 0:
-            basis[bdof, :] = numpy.sqrt(1.0E0 / ref_el.volume())
+            basis[bdof] = numpy.sqrt(1.0E0 / ref_el.volume())
             idof = slice(formdegree, None)
 
-        nodes = bc_nodes + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]]
+        cur = len(nodes)
+        nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[idof])
+        entity_ids[sd][0].extend(range(cur, len(nodes)))
 
-        if len(bc_nodes) > 0:
-            entity_ids = {0: {0: [0], 1: [1]},
-                          1: {0: list(range(2, degree+1))}}
-        else:
-            entity_ids = {0: {0: [], 1: []},
-                          1: {0: list(range(0, degree+1))}}
         super().__init__(nodes, ref_el, entity_ids)
 
 
