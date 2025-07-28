@@ -12,8 +12,9 @@ import numpy
 from FIAT import dual_set, finite_element, functional, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
 from FIAT.polynomial_set import ONPolynomialSet
-from FIAT.P0 import P0Dual
 from FIAT.reference_element import LINE
+from FIAT import DiscontinuousLagrange
+from FIAT.orientation_utils import make_entity_permutations_simplex
 
 
 def sym_eig(A, B):
@@ -137,7 +138,12 @@ class FDMDual(dual_set.DualSet):
         nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[idof])
         entity_ids[sd][0].extend(range(cur, len(nodes)))
 
-        super().__init__(nodes, ref_el, entity_ids)
+        entity_permutations = {}
+        for dim in sorted(top):
+            perms = make_entity_permutations_simplex(dim, len(entity_ids[dim][0]))
+            perms = {0: perms[0]}
+            entity_permutations[dim] = dict.fromkeys(top[dim], perms)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
@@ -155,14 +161,16 @@ class FDMFiniteElement(finite_element.CiarletElement):
     def _formdegree(self):
         pass
 
+    def __new__(cls, ref_el, degree):
+        if cls._formdegree == 1 and degree == 0:
+            return DiscontinuousLagrange(ref_el, degree)
+        return super().__new__(cls)
+
     def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("%s is only defined in one dimension." % type(self))
-        if degree == 0:
-            dual = P0Dual(ref_el)
-        else:
-            dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
-                           formdegree=self._formdegree, orthogonalize=self._orthogonalize)
+        dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
+                       formdegree=self._formdegree, orthogonalize=self._orthogonalize)
         if self._formdegree == 0:
             poly_set = dual.poly_set
         else:

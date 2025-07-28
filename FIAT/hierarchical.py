@@ -14,6 +14,7 @@ from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import parse_lagrange_variant
+from FIAT.orientation_utils import make_entity_permutations_simplex
 
 
 def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None):
@@ -32,17 +33,18 @@ def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None):
 class LegendreDual(dual_set.DualSet):
     """The dual basis for Legendre elements."""
     def __init__(self, ref_el, degree, codim=0):
-        nodes = []
-        entity_ids = {}
-
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        entity_permutations = {}
+        nodes = []
+
         for dim in sorted(top):
             npoints = degree + 1 if dim == sd - codim else 0
-            entity_ids[dim] = {}
+            perms = make_entity_permutations_simplex(dim, npoints)
+            perms = {0: perms[0]}
+            entity_permutations[dim] = dict.fromkeys(top[dim], perms)
             if npoints == 0:
-                for entity in sorted(top[dim]):
-                    entity_ids[dim][entity] = []
                 continue
 
             ref_facet = ref_el.construct_subelement(dim)
@@ -55,7 +57,7 @@ class LegendreDual(dual_set.DualSet):
                 nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
-        super().__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
 
 class Legendre(finite_element.CiarletElement):
@@ -81,34 +83,37 @@ class Legendre(finite_element.CiarletElement):
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for integrated Legendre elements."""
     def __init__(self, ref_el, degree):
-        nodes = []
-        entity_ids = {}
-
         top = ref_el.get_topology()
-        for dim in sorted(top):
-            entity_ids[dim] = {}
-            if dim == 0 or degree <= dim:
-                for entity in sorted(top[dim]):
-                    cur = len(nodes)
-                    pts = ref_el.make_points(dim, entity, degree)
-                    nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
-                    entity_ids[dim][entity] = list(range(cur, len(nodes)))
-                continue
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
 
+        dim = 0
+        for entity in top[dim]:
+            cur = len(nodes)
+            pts = ref_el.make_points(dim, entity, degree)
+            nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
+            entity_ids[dim][entity] = list(range(cur, len(nodes)))
+
+        for dim in sorted(top):
+            if dim == 0 or degree - dim <= 0:
+                continue
             ref_facet = symmetric_simplex(dim)
             Q_ref, phis = make_dual_bubbles(ref_facet, degree)
-            for entity in sorted(top[dim]):
+            for entity in top[dim]:
                 cur = len(nodes)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-
                 # phis must transform like a d-form to undo the measure transformation
                 scale = 1 / Q_facet.jacobian_determinant()
                 Jphis = scale * phis
-
                 nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in Jphis)
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
 
-        super().__init__(nodes, ref_el, entity_ids)
+        entity_permutations = {}
+        for dim in sorted(top):
+            perms = make_entity_permutations_simplex(dim, degree-dim)
+            perms = {0: perms[0]}
+            entity_permutations[dim] = dict.fromkeys(top[dim], perms)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
 
 class IntegratedLegendre(finite_element.CiarletElement):
