@@ -82,15 +82,17 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     Mh[abs(Mh) < 1E-10] = 0
     M[abs(M) < 1E-10] = 0
 
-    with np.errstate(divide='ignore', invalid='ignore'):
-        error = M.T / Mh.T - 1
-    error[error != error] = 0
+    error = M.T - Mh.T
     error[abs(error) < 1E-10] = 0
-    error = error[np.ix_(*map(np.unique, np.nonzero(error)))]
-    error[error != 0] += 1
+    with np.errstate(divide='ignore', invalid='ignore'):
+        # error /= Mh.T
+        error[error != error] = 0
+    # error[error!=0] += 1
+    # error = error[:num_dofs]
 
+    error = error[np.ix_(*map(np.unique, np.nonzero(error)))]
     assert np.allclose(residual, 0), str(error)
-    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(error)
+    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(error.tolist())
 
 
 @pytest.mark.parametrize("element", [
