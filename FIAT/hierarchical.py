@@ -42,7 +42,6 @@ class LegendreDual(dual_set.DualSet):
         for dim in sorted(top):
             npoints = degree + 1 if dim == sd - codim else 0
             perms = make_entity_permutations_simplex(dim, npoints)
-            perms = {0: perms[0]}
             entity_permutations[dim] = dict.fromkeys(top[dim], perms)
             if npoints == 0:
                 continue
@@ -56,6 +55,7 @@ class LegendreDual(dual_set.DualSet):
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                 nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
                 entity_ids[dim][entity] = list(range(cur, len(nodes)))
+        entity_permutations = None
 
         super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
@@ -111,8 +111,9 @@ class IntegratedLegendreDual(dual_set.DualSet):
         entity_permutations = {}
         for dim in sorted(top):
             perms = make_entity_permutations_simplex(dim, degree-dim)
-            perms = {0: perms[0]}
             entity_permutations[dim] = dict.fromkeys(top[dim], perms)
+        entity_permutations = None
+
         super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
 

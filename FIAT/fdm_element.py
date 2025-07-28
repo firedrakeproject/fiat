@@ -141,8 +141,9 @@ class FDMDual(dual_set.DualSet):
         entity_permutations = {}
         for dim in sorted(top):
             perms = make_entity_permutations_simplex(dim, len(entity_ids[dim][0]))
-            perms = {0: perms[0]}
             entity_permutations[dim] = dict.fromkeys(top[dim], perms)
+        entity_permutations = None
+
         super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
 
