@@ -206,7 +206,7 @@ def to_cupy(assignments):
         return declare[expr][0], tuple()
 
     def func_decl(*args):
-        return [f"def cupy_kernel({",".join(args)}):"]
+        return [f"def cupy_kernel({", ".join(args)}):"]
 
     strs = []
     for var, expr in assignments:
@@ -218,10 +218,17 @@ def to_cupy(assignments):
     temp_vars = []
     for key, val in declare.items():
         if key != "counter" and val[0][0] == "t":
-            temp_vars += [f"\t{val[0]}=cp.{repr(val[1])}"]
+            temp_vars += [f"\t{val[0]} = cp.{repr(val[1])}"]
         elif key != "counter":
-            # temp_vars += ["\tbreakpoint()"]
-            temp_vars += [f"\t{val[0]}={repr(val[1])[1:-1]}"]
-    res = "\n".join(func_decl(*list(args.keys())) + temp_vars + strs)
+            temp_vars += [f"\t{val[0]} = {repr(val[1])[1:-1]}"]
+    
+    arg_list = list(args.keys())
+    # this ordering probably needs work
+    if "A" in arg_list:
+        a_idx = arg_list.index("A")
+        a = arg_list.pop(a_idx)
+        arg_list = [a] + arg_list
+        strs += ["\treturn A"]
+    res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
 
-    return res
+    return res, arg_list

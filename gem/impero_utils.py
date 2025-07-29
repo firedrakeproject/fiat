@@ -62,8 +62,9 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
     if "FIREDRAKE_USE_GPU" in os.environ:
         print("Generating cupy string")
-        res = to_cupy(assignments)
-        add_kernel_string(res)
+        res, args = to_cupy(assignments)
+        add_kernel_string(res, args)
+        return (res, tuple(args))
 
     # Just the expressions
     expressions = [expression for variable, expression in assignments]
