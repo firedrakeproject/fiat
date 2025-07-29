@@ -19,6 +19,8 @@ from FIAT.P0 import P0
 
 def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None):
     """Tabulate the L2-duals of the hierarchical C0 basis."""
+    if ref_el.get_spatial_dimension() == 0:
+        degree = 0
     if interpolant_deg is None:
         interpolant_deg = degree
     Q = create_quadrature(ref_el, degree + interpolant_deg)
@@ -82,19 +84,12 @@ class IntegratedLegendreDual(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
 
-        dim = 0
-        for entity in top[dim]:
-            cur = len(nodes)
-            pts = ref_el.make_points(dim, entity, degree)
-            nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
-            entity_ids[dim][entity].extend(range(cur, len(nodes)))
-
         for dim in sorted(top):
-            if dim == 0 or degree - dim <= 0:
+            if degree <= dim:
                 continue
             ref_facet = symmetric_simplex(dim)
             Q_ref, Phis = make_dual_bubbles(ref_facet, degree)
-            for entity in top[dim]:
+            for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                 # phis must transform like a d-form to undo the measure transformation
