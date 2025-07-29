@@ -498,6 +498,48 @@ def test_macro_polynomial_set(dim, element, degree):
     assert numpy.allclose(numpy.diag(numpy.diag(result)), result)
 
 
+def span_greater_equal(A, B):
+    # span(A) >= span(B)
+    _, residual, *_ = numpy.linalg.lstsq(A.reshape(A.shape[0], -1).T,
+                                         B.reshape(B.shape[0], -1).T)
+    return numpy.allclose(residual, 0)
+
+
+def span_equal(A, B):
+    # span(A) == span(B)
+    return span_greater_equal(A, B) and span_greater_equal(B, A)
+
+
+def run_macro_test(element, K, degree, variant):
+    fe_macro = element(K, degree, variant=variant)
+
+    ref_complex = fe_macro.get_reference_complex()
+    assert ref_complex.is_macrocell()
+    top = ref_complex.topology
+    dim = ref_complex.get_spatial_dimension()
+    assert len(top[dim]) > 1
+    cell = max(top[dim])
+
+    K0 = ref_complex.construct_subelement(dim)
+    K0.vertices = ref_complex.get_vertices_of_subcomplex(top[dim][cell])
+    fe_ref = element(K0, degree)
+
+    pts = K0.make_points(dim, 0, degree+2, interior=0)
+    tab_macro = fe_macro.tabulate(1, pts)
+    tab_ref = fe_ref.tabulate(1, pts)
+
+    ids = fe_ref.entity_dofs()
+    cell_node_map = polynomial_cell_node_map(ref_complex, degree, continuity=ids)
+    indices_macro = cell_node_map[cell]
+    assert len(indices_macro) == fe_ref.space_dimension()
+
+    for alpha in tab_ref:
+        expected = tab_ref[alpha]
+        result = tab_macro[alpha][indices_macro]
+        assert span_equal(expected.T, result.T)
+        # assert numpy.allclose(result, expected)
+
+
 @pytest.mark.parametrize("element,degree", [
     (Lagrange, 4), (Nedelec, 3), (RaviartThomas, 2), (DiscontinuousLagrange, 1),
     (NedelecSecondKind, 3), (BrezziDouglasMarini, 2),
@@ -506,11 +548,13 @@ def test_macro_polynomial_set(dim, element, degree):
 @pytest.mark.parametrize("dim", (2, 3))
 @pytest.mark.parametrize("variant", ("alfeld", "iso"))
 def test_macro_variants(dim, element, degree, variant):
-    element(ufc_simplex(dim), degree, variant=variant)
+    K = ufc_simplex(dim)
+    run_macro_test(element, K, degree, variant)
 
 
 @pytest.mark.parametrize("element,degree", [
     (CrouzeixRaviart, 3)])
 @pytest.mark.parametrize("variant", ("alfeld", "iso"))
 def test_macro_variants_triangle(element, degree, variant):
-    element(ufc_simplex(2), degree, variant=variant)
+    K = ufc_simplex(2)
+    run_macro_test(element, K, degree, variant)
