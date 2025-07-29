@@ -8,13 +8,13 @@
 
 import numpy
 
-from FIAT import finite_element, dual_set, functional, P0
+from FIAT import finite_element, dual_set, functional
 from FIAT.reference_element import symmetric_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import parse_lagrange_variant
-from FIAT.orientation_utils import make_entity_permutations_simplex
+from FIAT.P0 import P0
 
 
 def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None):
@@ -36,28 +36,23 @@ class LegendreDual(dual_set.DualSet):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-        entity_permutations = {}
         nodes = []
 
-        for dim in sorted(top):
-            npoints = degree + 1 if dim == sd - codim else 0
-            perms = make_entity_permutations_simplex(dim, npoints)
-            entity_permutations[dim] = dict.fromkeys(top[dim], perms)
-            if npoints == 0:
-                continue
+        dim = sd - codim
+        ref_facet = ref_el.construct_subelement(dim)
+        poly_set = ONPolynomialSet(ref_facet, degree)
+        Q_ref = create_quadrature(ref_facet, 2 * degree)
+        Phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
+        for entity in sorted(top[dim]):
+            cur = len(nodes)
+            Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
+            # phis must transform like a d-form to undo the measure transformation
+            scale = 1 / Q_facet.jacobian_determinant()
+            phis = scale * Phis
+            nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
+            entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-            ref_facet = ref_el.construct_subelement(dim)
-            poly_set = ONPolynomialSet(ref_facet, degree)
-            Q_ref = create_quadrature(ref_facet, 2 * degree)
-            phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
-            for entity in sorted(top[dim]):
-                cur = len(nodes)
-                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
-                entity_ids[dim][entity] = list(range(cur, len(nodes)))
-        entity_permutations = None
-
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class Legendre(finite_element.CiarletElement):
@@ -67,7 +62,7 @@ class Legendre(finite_element.CiarletElement):
             splitting, _ = parse_lagrange_variant(variant, integral=True)
             if splitting is None:
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
-                return P0.P0(ref_el)
+                return P0(ref_el)
         return super().__new__(cls)
 
     def __init__(self, ref_el, degree, variant=None):
@@ -92,29 +87,23 @@ class IntegratedLegendreDual(dual_set.DualSet):
             cur = len(nodes)
             pts = ref_el.make_points(dim, entity, degree)
             nodes.extend(functional.PointEvaluation(ref_el, pt) for pt in pts)
-            entity_ids[dim][entity] = list(range(cur, len(nodes)))
+            entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         for dim in sorted(top):
             if dim == 0 or degree - dim <= 0:
                 continue
             ref_facet = symmetric_simplex(dim)
-            Q_ref, phis = make_dual_bubbles(ref_facet, degree)
+            Q_ref, Phis = make_dual_bubbles(ref_facet, degree)
             for entity in top[dim]:
                 cur = len(nodes)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
                 # phis must transform like a d-form to undo the measure transformation
                 scale = 1 / Q_facet.jacobian_determinant()
-                Jphis = scale * phis
-                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in Jphis)
-                entity_ids[dim][entity] = list(range(cur, len(nodes)))
+                phis = scale * Phis
+                nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
+                entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
-        entity_permutations = {}
-        for dim in sorted(top):
-            perms = make_entity_permutations_simplex(dim, degree-dim)
-            entity_permutations[dim] = dict.fromkeys(top[dim], perms)
-        entity_permutations = None
-
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class IntegratedLegendre(finite_element.CiarletElement):

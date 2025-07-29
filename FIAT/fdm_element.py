@@ -9,12 +9,10 @@
 import abc
 import numpy
 
-from FIAT import dual_set, finite_element, functional, quadrature
+from FIAT import dual_set, finite_element, functional, quadrature, P0
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
 from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.reference_element import LINE
-from FIAT import DiscontinuousLagrange
-from FIAT.orientation_utils import make_entity_permutations_simplex
 
 
 def sym_eig(A, B):
@@ -138,13 +136,7 @@ class FDMDual(dual_set.DualSet):
         nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[idof])
         entity_ids[sd][0].extend(range(cur, len(nodes)))
 
-        entity_permutations = {}
-        for dim in sorted(top):
-            perms = make_entity_permutations_simplex(dim, len(entity_ids[dim][0]))
-            entity_permutations[dim] = dict.fromkeys(top[dim], perms)
-        entity_permutations = None
-
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
@@ -164,7 +156,7 @@ class FDMFiniteElement(finite_element.CiarletElement):
 
     def __new__(cls, ref_el, degree):
         if cls._formdegree == 1 and degree == 0:
-            return DiscontinuousLagrange(ref_el, degree)
+            return P0(ref_el)
         return super().__new__(cls)
 
     def __init__(self, ref_el, degree):
