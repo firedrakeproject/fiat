@@ -147,11 +147,13 @@ def stokes_eigenbasis(V0):
     return Q, eps_test, div_test, S, nullspace_dim
 
 
-def macro_stokes_space(ref_el, degree, bubble=False):
+def macro_stokes_space(ref_el, degree, bubble=False, full_macro=False):
     sd = ref_el.get_spatial_dimension()
     shape = (sd,)
-    K = ref_el.get_parent() or ref_el
-    # K = ref_el
+    if full_macro:
+        K = ref_el
+    else:
+        K = ref_el.get_parent() or ref_el
 
     # non-macro space
     if bubble:
