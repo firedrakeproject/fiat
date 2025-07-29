@@ -355,7 +355,7 @@ class Product(Scalar):
             a, b = args
         except ValueError:
             # Handle more than two arguments
-            return reduce(Product, args)
+            return one if len(args) == 0 else reduce(Product, args)
         assert not a.shape
         assert not b.shape
 

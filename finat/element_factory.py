@@ -222,7 +222,7 @@ def convert_finiteelement(element, **kwargs):
             lmbda = finat.DiscontinuousLagrange
             finat_kwargs["variant"] = kind
 
-    elif element.family() == "HDiv Trace":
+    elif element.family() in {"HDiv Trace", "Bubble", "FacetBubble"}:
         finat_kwargs["variant"] = kind
 
     elif element.variant() is not None:

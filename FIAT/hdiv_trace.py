@@ -5,12 +5,15 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import numpy as np
+from collections import defaultdict
 from FIAT.barycentric_interpolation import get_lagrange_points
 from FIAT.discontinuous_lagrange import DiscontinuousLagrange
+from FIAT.hierarchical import Legendre
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import FiniteElement
-from FIAT.functional import PointEvaluation
+from FIAT.functional import IntegralMoment, PointEvaluation
 from FIAT.polynomial_set import mis
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.reference_element import (ufc_simplex, POINT,
                                     LINE, QUADRILATERAL,
                                     TRIANGLE, TETRAHEDRON,
@@ -73,47 +76,35 @@ class HDivTrace(FiniteElement):
             if isinstance(degree, tuple):
                 raise ValueError("Must have a tensor product cell if providing multiple degrees")
 
-        # Initialize entity dofs and construct the DG elements
-        # for the facets
+        # Initialize entity dofs
         facet_sd = sd - 1
-        dg_elements = {}
-        entity_dofs = {}
         topology = ref_el.get_topology()
-        for top_dim, entities in topology.items():
-            cell = ref_el.construct_subelement(top_dim)
-            entity_dofs[top_dim] = {}
+        entity_dofs = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
 
-            # We have a facet entity!
-            if cell.get_spatial_dimension() == facet_sd:
-                dg_elements[top_dim] = construct_dg_element(cell, degree, variant)
-            # Initialize
-            for entity in entities:
-                entity_dofs[top_dim][entity] = []
+        # Construct the DG element for the facets
+        dg_elements = {}
+        for dim in topology:
+            fdim = sum(dim) if isinstance(dim, tuple) else dim
+            if fdim == facet_sd:
+                cell = ref_el.construct_subelement(dim)
+                dg_elements[dim] = construct_dg_element(cell, degree, variant)
 
         # Compute the dof numbering for all facet entities
         # and extract nodes
-        offset = 0
-        pts = []
+        nodes = []
         for facet_dim in sorted(dg_elements):
             element = dg_elements[facet_dim]
-            nf = element.space_dimension()
-            num_facets = len(topology[facet_dim])
+            facet_nodes = element.dual_basis()
+            for i in sorted(topology[facet_dim]):
+                cur = len(nodes)
+                nodes.extend(transform_nodes(facet_nodes, ref_el, facet_dim, i))
+                entity_dofs[facet_dim][i] = list(range(cur, len(nodes)))
 
-            facet_pts = get_lagrange_points(element.dual_basis())
-            for i in range(num_facets):
-                entity_dofs[facet_dim][i] = list(range(offset, offset + nf))
-                offset += nf
-
-                # Run over nodes and collect the points for point evaluations
-                transform = ref_el.get_entity_transform(facet_dim, i)
-                pts.extend(transform(facet_pts))
-
-        # Setting up dual basis - only point evaluations
-        nodes = [PointEvaluation(ref_el, pt) for pt in pts]
+        # Setting up dual basis
         dual = DualSet(nodes, ref_el, entity_dofs)
 
         # Degree of the element
-        deg = max([e.degree() for e in dg_elements.values()])
+        deg = max(e.degree() for e in dg_elements.values())
 
         super().__init__(ref_el, dual, order=deg,
                          formdegree=facet_sd,
@@ -161,6 +152,7 @@ class HDivTrace(FiniteElement):
         """
         sd = self.ref_el.get_spatial_dimension()
         facet_sd = sd - 1
+        evalkey = (0,) * sd
 
         # Initializing dictionary with zeros
         phivals = {}
@@ -168,12 +160,13 @@ class HDivTrace(FiniteElement):
             alphas = mis(sd, i)
             for alpha in alphas:
                 phivals[alpha] = np.zeros(shape=(self.space_dimension(), len(points)))
-
-        evalkey = (0,) * sd
+                if alpha != evalkey:
+                    # If asking for gradient evaluations, insert TraceError in gradient slots
+                    phivals[alpha] = TraceError("Gradients on trace elements are not well-defined.")
 
         # If entity is None, identify facet using numerical tolerance and
         # return the tabulated values
-        if entity is None:
+        if entity is None or entity == (sd, 0):
             # NOTE: Numerical approximation of the facet id is currently only
             # implemented for simplex reference cells.
             if self.ref_el.get_shape() not in [TRIANGLE, TETRAHEDRON]:
@@ -185,25 +178,30 @@ class HDivTrace(FiniteElement):
             # Attempt to identify which facet (if any) the given points are on
             vertices = self.ref_el.vertices
             coordinates = barycentric_coordinates(points, vertices)
-            unique_facet, success = extract_unique_facet(coordinates)
+            facet_to_pts, success = extract_facets(coordinates)
 
             # If not successful, return NaNs
             if not success:
                 for key in phivals:
-                    phivals[key] = np.full(shape=(self.space_dimension(), len(points)), fill_value=np.nan)
-
-                return phivals
+                    if entity is None:
+                        phivals[key].fill(np.nan)
+                    else:
+                        msg = "The HDivTrace element can only be tabulated on facets."
+                        phivals[key] = TraceError(msg)
 
             # Otherwise, extract non-zero values and insertion indices
-            else:
+            element = self.dg_elements[facet_sd]
+            nf = element.space_dimension()
+            for facet, ipts in facet_to_pts.items():
                 # Map points to the reference facet
-                new_points = map_to_reference_facet(points, vertices, unique_facet)
+                new_points = map_to_reference_facet(points[ipts], vertices, facet)
 
                 # Retrieve values by tabulating the DG element
-                element = self.dg_elements[facet_sd]
-                nf = element.space_dimension()
-                nonzerovals, = element.tabulate(order, new_points).values()
-                indices = slice(nf * unique_facet, nf * (unique_facet + 1))
+                nonzerovals = element.tabulate(order, new_points)[(0,)*facet_sd]
+                indices = slice(nf * facet, nf * (facet + 1))
+
+                # Insert non-zero values in appropriate place
+                phivals[evalkey][indices, ipts] = nonzerovals
 
         else:
             entity_dim, _ = entity
@@ -215,36 +213,23 @@ class HDivTrace(FiniteElement):
                     msg = "The HDivTrace element can only be tabulated on facets."
                     phivals[key] = TraceError(msg)
 
-                return phivals
-
             else:
                 # Retrieve function evaluations (order = 0 case)
                 offset = 0
                 for facet_dim in sorted(self.dg_elements):
-                    element = self.dg_elements[facet_dim]
-                    nf = element.space_dimension()
-                    num_facets = len(self.ref_el.get_topology()[facet_dim])
-
                     # Loop over the number of facets until we find a facet
                     # with matching dimension and id
-                    for i in range(num_facets):
+                    element = self.dg_elements[facet_dim]
+                    nf = element.space_dimension()
+                    for i in sorted(self.ref_el.get_topology()[facet_dim]):
                         # Found it! Grab insertion indices
                         if (facet_dim, i) == entity:
-                            nonzerovals, = element.tabulate(0, points).values()
+                            nonzerovals = element.tabulate(0, points)[(0,)*facet_sd]
                             indices = slice(offset, offset + nf)
-
                         offset += nf
 
-        # If asking for gradient evaluations, insert TraceError in
-        # gradient slots
-        if order > 0:
-            msg = "Gradients on trace elements are not well-defined."
-            for key in phivals:
-                if key != evalkey:
-                    phivals[key] = TraceError(msg)
-
-        # Insert non-zero values in appropriate place
-        phivals[evalkey][indices, :] = nonzerovals
+                # Insert non-zero values in appropriate place
+                phivals[evalkey][indices] = nonzerovals
 
         return phivals
 
@@ -270,13 +255,17 @@ def construct_dg_element(ref_el, degree, variant):
     """Constructs a discontinuous galerkin element of a given degree
     on a particular reference cell.
     """
+    if variant and variant.startswith("integral"):
+        DG = Legendre
+    else:
+        DG = DiscontinuousLagrange
     if ref_el.get_shape() in [LINE, TRIANGLE]:
-        dg_element = DiscontinuousLagrange(ref_el, degree, variant)
+        dg_element = DG(ref_el, degree, variant)
 
     # Quadrilateral facets could be on a FiredrakeQuadrilateral.
     # In this case, we treat this as an interval x interval cell:
     elif ref_el.get_shape() == QUADRILATERAL:
-        dg_line = DiscontinuousLagrange(ufc_simplex(1), degree, variant)
+        dg_line = DG(ufc_simplex(1), degree, variant)
         dg_element = TensorProductElement(dg_line, dg_line)
 
     # This handles the more general case for facets:
@@ -302,30 +291,42 @@ def construct_dg_element(ref_el, degree, variant):
     return dg_element
 
 
+def transform_nodes(ells, ref_el, facet_dim, facet_id):
+    """Map functionals into a given facet."""
+    try:
+        facet_pts = get_lagrange_points(ells)
+        transform = ref_el.get_entity_transform(facet_dim, facet_id)
+        pts = transform(facet_pts)
+        for pt in pts:
+            yield PointEvaluation(ref_el, pt)
+    except ValueError:
+        Q_ref, = set(ell.Q for ell in ells)
+        Q = FacetQuadratureRule(ref_el, facet_dim, facet_id, Q_ref)
+        for ell in ells:
+            yield IntegralMoment(ref_el, Q, ell.f_at_qpts)
+
+
 # The following functions are credited to Marie E. Rognes:
-def extract_unique_facet(coordinates, tolerance=epsilon):
-    """Determines whether a set of points (described in its barycentric coordinates)
-    are all on one of the facet sub-entities, and return the particular facet and
-    whether the search has been successful.
+def extract_facets(coordinates, tolerance=epsilon):
+    """Determines whether a set of points (described in barycentric coordinates)
+    are all on facet sub-entities, and return a dict mapping facets to
+    point indices and whether the search has been successful.
 
     :arg coordinates: A set of points described in barycentric coordinates.
     :arg tolerance: A fixed tolerance for geometric identifications.
     """
-    facets = []
-    for c in coordinates:
-        on_facet = set([i for (i, l) in enumerate(c) if abs(l) < tolerance])
-        facets += [on_facet]
+    facet_to_pts = defaultdict(list)
+    for ipt, c in enumerate(coordinates):
+        on_facet = set(i for (i, l) in enumerate(c) if abs(l) < tolerance)
+        try:
+            f, = on_facet
+        except ValueError:
+            # Handle coordinates not on facets
+            return ({}, False)
+        facet_to_pts[f].append(ipt)
 
-    unique_facet = facets[0]
-    for f in facets:
-        unique_facet = unique_facet & f
-
-    # Handle coordinates not on facets
-    if len(unique_facet) != 1:
-        return (None, False)
-
-    # If we have a unique facet, return it and success
-    return (unique_facet.pop(), True)
+    # If all points are on facets, return indices and success
+    return (facet_to_pts, True)
 
 
 def barycentric_coordinates(points, vertices):

@@ -25,7 +25,8 @@ import numpy as np
 
 @pytest.mark.parametrize("dim", (2, 3))
 @pytest.mark.parametrize("degree", range(7))
-def test_basis_values(dim, degree):
+@pytest.mark.parametrize("variant", ("spectral", "integral"))
+def test_basis_values(dim, degree, variant):
     """Ensure that integrating simple monomials produces the expected results
     for each facet entity of the reference triangle and tetrahedron.
 
@@ -39,7 +40,7 @@ def test_basis_values(dim, degree):
 
     ref_el = ufc_simplex(dim)
     quadrule = make_quadrature(ufc_simplex(dim - 1), degree + 1)
-    fiat_element = HDivTrace(ref_el, degree)
+    fiat_element = HDivTrace(ref_el, degree, variant=variant)
     facet_element = fiat_element.dg_elements[dim - 1]
     nf = facet_element.space_dimension()
 

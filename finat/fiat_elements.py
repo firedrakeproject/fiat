@@ -348,13 +348,13 @@ class Bernstein(ScalarFiatElement):
 
 
 class Bubble(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.Bubble(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.Bubble(cell, degree, variant=variant))
 
 
 class FacetBubble(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.FacetBubble(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.FacetBubble(cell, degree, variant=variant))
 
 
 class CrouzeixRaviart(ScalarFiatElement):
