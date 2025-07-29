@@ -9,10 +9,11 @@
 import abc
 import numpy
 
-from FIAT import dual_set, finite_element, functional, quadrature, P0
+from FIAT import dual_set, finite_element, functional, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
 from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.reference_element import LINE
+from FIAT.P0 import P0
 
 
 def sym_eig(A, B):
@@ -45,11 +46,10 @@ class FDMDual(dual_set.DualSet):
     """The dual basis for 1D elements with FDM shape functions."""
     def __init__(self, ref_el, degree, bc_order=1, formdegree=0, orthogonalize=False):
         # Define the generalized eigenproblem on a reference element
-        embedded_degree = degree + formdegree
-        P = ONPolynomialSet(ref_el, embedded_degree, variant="bubble")
+        P = ONPolynomialSet(ref_el, degree + formdegree, variant="bubble")
         Pdim = len(P)
         # Apply even / odd reordering on edge bubbles
-        P = P.take([0, 1, *range(2, Pdim, 2), *range(3, Pdim, 2)])
+        P = P.take([*range(2), *range(2, Pdim, 2), *range(3, Pdim, 2)])
         self.poly_set = P
 
         if bc_order == 1 and formdegree == 0:
@@ -71,7 +71,7 @@ class FDMDual(dual_set.DualSet):
         bdof = slice(None, C.shape[0])
         idof = slice(C.shape[0], None)
 
-        # Tabulate the basis that splits the DOFs into interior and bcs
+        # Coefficients of the vertex and interior modes
         E = numpy.eye(Pdim)
         E[bdof, idof] = -C[:, idof]
         E[bdof, :] = numpy.linalg.solve(C[:, bdof], E[bdof, :])
@@ -120,6 +120,7 @@ class FDMDual(dual_set.DualSet):
             if orthogonalize:
                 idof = slice(None)
             elif bc_order > 0:
+                # Vertex dofs -- jet evaluation
                 for v in sorted(top[0]):
                     cur = len(nodes)
                     x, = ref_el.make_points(0, v, 0)
@@ -132,6 +133,7 @@ class FDMDual(dual_set.DualSet):
             basis[bdof] = numpy.sqrt(1.0E0 / ref_el.volume())
             idof = slice(formdegree, None)
 
+        # Interior dofs -- moments against eigenfunctions
         cur = len(nodes)
         nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[idof])
         entity_ids[sd][0].extend(range(cur, len(nodes)))
