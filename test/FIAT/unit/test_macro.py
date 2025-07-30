@@ -501,6 +501,7 @@ def test_macro_polynomial_set(dim, element, degree):
 def compare_macro_variant(element, K, degree, variant):
     """Test CiarletElement by comparing macro variant to their non-macro
        counterparts."""
+    # Test unisolvence
     fe_macro = element(K, degree, variant=variant)
 
     # Ensure that we have a macroelement
@@ -550,7 +551,7 @@ def compare_macro_variant(element, K, degree, variant):
     (Regge, 3), (HellanHerrmannJohnson, 1),
     (GopalakrishnanLedererSchoberlSecondKind, 1),
 ])
-@pytest.mark.parametrize("dim", (2,))
+@pytest.mark.parametrize("dim", (2, 3))
 @pytest.mark.parametrize("variant", ("alfeld", "iso"))
 def test_macro_variants(dim, element, degree, variant):
     K = ufc_simplex(dim)

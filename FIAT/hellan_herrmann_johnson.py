@@ -25,8 +25,7 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
         nodes = []
 
         cell_to_faces = ref_el.get_connectivity()[(sd, sd-1)]
-        n = {f: ref_el.compute_scaled_normal(f) for f in top[sd-1]}
-
+        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
         if variant == "point":
             for f in sorted(top[sd-1]):
                 cur = len(nodes)
@@ -91,7 +90,7 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
                 nodes.extend(BidirectionalMoment(ref_el, n[f], n[f]/detJ, Q, phi)
                              for phi in Phis[:dimPkm1] for f in faces)
                 # n[i+1]^T u n[i+2] integrated against a basis for Pk
-                nodes.extend(BidirectionalMoment(ref_el, n[faces[i]], n[faces[i+1]]/detJ, Q, phi)
+                nodes.extend(BidirectionalMoment(ref_el, n[faces[i+1]], n[faces[i+2]]/detJ, Q, phi)
                              for phi in Phis for i in range((sd-1)*(sd-2)))
                 entity_ids[sd][entity].extend(range(cur, len(nodes)))
 
