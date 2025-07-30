@@ -548,6 +548,12 @@ class SimplicialComplex(Cell):
         """Returns the unit normal to facet_i of scaled by the
         volume of that facet."""
         dim = self.get_spatial_dimension()
+        if dim == 2:
+            n, = self.compute_tangents(dim-1, facet_i)
+            n[0], n[1] = n[1], -n[0]
+            return n
+        elif dim == 3:
+            return -numpy.cross(*self.compute_tangents(dim-1, facet_i))
         v = self.volume_of_subcomplex(dim - 1, facet_i)
         return self.compute_normal(facet_i) * v
 
@@ -617,7 +623,7 @@ class SimplicialComplex(Cell):
         indices = slice(None)
         subcomplex = top[entity_dim][entity_id]
         if entity_dim != sd:
-            cell_id = self.connectivity[(entity_dim, sd)][0][0]
+            cell_id = self.connectivity[(entity_dim, sd)][entity_id][0]
             indices = [i for i, v in enumerate(top[sd][cell_id]) if v in subcomplex]
             subcomplex = top[sd][cell_id]
 

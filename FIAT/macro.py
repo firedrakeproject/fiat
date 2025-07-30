@@ -2,7 +2,7 @@ from itertools import chain, combinations
 
 import numpy
 
-from FIAT import expansions, polynomial_set
+from FIAT import expansions, polynomial_set, reference_element
 from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
 from FIAT.reference_element import (TRIANGLE, SimplicialComplex, lattice_iter,
                                     make_lattice)
@@ -184,6 +184,10 @@ class SplitSimplicialComplex(SimplicialComplex):
         :arg dimension: subentity dimension (integer)
         """
         return self.get_parent().construct_subelement(dimension)
+
+    def get_facet_element(self):
+        dimension = self.get_spatial_dimension()
+        return self.construct_subelement(dimension - 1)
 
     def is_macrocell(self):
         return True
@@ -485,6 +489,67 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         super().__init__(ref_el, degree, degree, expansion_set, coeffs)
 
 
+def hdiv_conforming_coefficients(U, order=0):
+    """Constrains a PolynomialSet to have vanishing normal jumps on the
+       interior facets of a simplicial complex.
+
+    :arg U: A PolynomialSet, it may be vector- or tensor-valued.
+    :arg order: The maximum order of differentiation on the normal jump constraints.
+
+    :returns: The coefficients of the constrained PolynomialSet.
+    """
+    from FIAT.quadrature_schemes import create_quadrature
+    degree = U.degree
+    ref_el = U.get_reference_element()
+    coeffs = U.get_coeffs()
+    shape = U.get_shape()
+    expansion_set = U.get_expansion_set()
+    k = 1 if expansion_set.continuity == "C0" else 0
+
+    sd = ref_el.get_spatial_dimension()
+    facet_el = ref_el.construct_subelement(sd-1)
+
+    phi_deg = 0 if sd == 1 else degree - k
+    phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg, shape=shape[1:])
+    Q = create_quadrature(facet_el, 2 * phi_deg)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
+    weights = numpy.multiply(phi_at_qpts, qwts)
+    ax = tuple(range(1, weights.ndim))
+
+    rows = []
+    for facet in ref_el.get_interior_facets(sd-1):
+        normal = ref_el.compute_scaled_normal(facet)
+        ncoeffs = numpy.tensordot(coeffs, normal, axes=(len(shape), 0))
+        jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
+        for r in range(k, order+1):
+            njump = numpy.dot(ncoeffs, jumps[r])
+            rows.append(numpy.tensordot(weights, njump, axes=(ax, ax)))
+
+    if len(rows) > 0:
+        dual_mat = numpy.vstack(rows)
+        nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+        coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
+    return coeffs
+
+
+class HDivPolynomialSet(polynomial_set.PolynomialSet):
+    """Constructs a vector-valued PolynomialSet with continuous
+       normal components on a simplicial complex.
+
+    :arg ref_el: The simplicial complex.
+    :arg degree: The polynomial degree.
+    :kwarg order: The order of continuity across subcells.
+    :kwarg variant: The variant for the underlying ExpansionSet.
+    :kwarg scale: The scale for the underlying ExpansionSet.
+    """
+    def __init__(self, ref_el, degree, order=0, **kwargs):
+        sd = ref_el.get_spatial_dimension()
+        U = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), **kwargs)
+        coeffs = hdiv_conforming_coefficients(U, order=order)
+        super().__init__(ref_el, degree, degree, U.expansion_set, coeffs)
+
+
 class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
     """Constructs a symmetric tensor-valued PolynomialSet with continuous
        normal components on a simplicial complex.
@@ -496,36 +561,90 @@ class HDivSymPolynomialSet(polynomial_set.PolynomialSet):
     :kwarg scale: The scale for the underlying ExpansionSet.
     """
     def __init__(self, ref_el, degree, order=0, **kwargs):
-        from FIAT.quadrature_schemes import create_quadrature
         U = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree, **kwargs)
-        coeffs = U.get_coeffs()
-        expansion_set = U.get_expansion_set()
-        k = 1 if expansion_set.continuity == "C0" else 0
+        coeffs = hdiv_conforming_coefficients(U, order=order)
+        super().__init__(ref_el, degree, degree, U.expansion_set, coeffs)
 
+
+def pullback(phi, mapping, J=None, Jinv=None, Jdet=None):
+    """Transforms a reference tabulation into physical space.
+
+    :arg phi: The tabulation on reference space.
+    :arg mapping: A string indicating the pullback type.
+    :arg J: The Jacobian of the transformation from reference to physical space.
+    :arg Jinv: The inverse of the Jacobian.
+    :arg Jdet: The determinant of the Jacobian.
+
+    :returns: The tabulation on physical space.
+    """
+    try:
+        formdegree = {
+            "affine": (0,),
+            "covariant piola": (1,),
+            "contravariant piola": (2,),
+            "double covariant piola": (1, 1),
+            "double contravariant piola": (2, 2),
+            "covariant contravariant piola": (1, 2),
+            "contravariant covariant piola": (2, 1), }[mapping]
+    except KeyError:
+        raise ValueError(f"Unrecognized mapping {mapping}")
+
+    if J is None:
+        J = numpy.linalg.pinv(Jinv)
+    if Jinv is None:
+        Jinv = numpy.linalg.pinv(J)
+    if Jdet is None:
+        Jdet = numpy.linalg.det(J)
+    F1 = Jinv.T
+    F2 = J / Jdet
+
+    for i, k in enumerate(formdegree):
+        if k == 0:
+            continue
+        F = F1 if k == 1 else F2
+
+        perm = list(range(phi.ndim))
+        perm[i+1], perm[-1] = perm[-1], perm[i+1]
+
+        phi = phi.transpose(perm)
+        phi = phi.dot(F.T)
+        phi = phi.transpose(perm)
+
+    return phi
+
+
+class MacroPolynomialSet(polynomial_set.PolynomialSet):
+    """Constructs a PolynomialSet by tiling a CiarletElement on a
+       SimplicialComplex.
+
+    :arg ref_el: The SimplicialComplex.
+    :arg element: The CiarletElement.
+    """
+    def __init__(self, ref_el, element):
+        top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
-        facet_el = ref_el.construct_subelement(sd-1)
 
-        phi_deg = 0 if sd == 1 else degree - k
-        phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg, shape=(sd,))
-        Q = create_quadrature(facet_el, 2 * phi_deg)
-        qpts, qwts = Q.get_points(), Q.get_weights()
-        phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
-        weights = numpy.multiply(phi_at_qpts, qwts)
+        mapping, = set(element.mapping())
+        base_ref_el = element.get_reference_element()
+        base_entity_ids = element.entity_dofs()
+        n = element.degree()
 
-        rows = []
-        for facet in ref_el.get_interior_facets(sd-1):
-            normal = ref_el.compute_normal(facet)
-            jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
-            for r in range(k, order+1):
-                jump = numpy.dot(coeffs, jumps[r])
-                # num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)
-                wn = weights[:, :, None, :] * normal[None, None, :, None]
-                ax = tuple(range(1, len(wn.shape)))
-                rows.append(numpy.tensordot(wn, jump, axes=(ax, ax)))
+        base_expansion_set = element.get_nodal_basis().get_expansion_set()
+        expansion_set = base_expansion_set.reconstruct(ref_el=ref_el)
 
-        if len(rows) > 0:
-            dual_mat = numpy.vstack(rows)
-            nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
-            coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
+        shp = element.value_shape()
+        num_bfs = expansions.polynomial_dimension(ref_el, n, base_entity_ids)
+        num_members = expansion_set.get_num_members(n)
+        coeffs = numpy.zeros((num_bfs, *shp, num_members))
+        base_coeffs = element.get_coeffs()
 
-        super().__init__(ref_el, degree, degree, expansion_set, coeffs)
+        rmap = expansions.polynomial_cell_node_map(ref_el, n, base_entity_ids)
+        cmap = expansion_set.get_cell_node_map(n)
+        for cell in sorted(top[sd]):
+            cell_verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
+            A, b = reference_element.make_affine_mapping(base_ref_el.vertices, cell_verts)
+
+            indices = numpy.ix_(rmap[cell], *map(range, shp), cmap[cell])
+            coeffs[indices] = pullback(base_coeffs, mapping, J=A)
+
+        super().__init__(ref_el, element.degree(), element.degree(), expansion_set, coeffs)

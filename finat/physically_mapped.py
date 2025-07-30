@@ -95,6 +95,19 @@ try:
   doi =          {10.1243/03093247V061020}
 }
 """)
+    Citations().add("MingXu2006", """
+@article{MingXu2006,
+  doi = {10.1007/s00211-005-0662-x},
+  title={{The Morley element for fourth order elliptic equations in any dimensions}},
+  author={Ming, Wang and Xu, Jinchao},
+  journal={Numerische Mathematik},
+  volume={103},
+  number={1},
+  pages={155--169},
+  year={2006},
+  publisher={Springer}
+}
+""")
     Citations().add("Mardal2002", """
 @article{Mardal2002,
         doi = {10.1137/s0036142901383910},
