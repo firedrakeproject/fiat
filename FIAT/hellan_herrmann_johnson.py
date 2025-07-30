@@ -21,71 +21,78 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
     def __init__(self, ref_el, degree, variant, qdegree):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
         entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
-        # Face dofs
+        cell_to_faces = ref_el.get_connectivity()[(sd, sd-1)]
+        n = {f: ref_el.compute_scaled_normal(f) for f in top[sd-1]}
+
         if variant == "point":
-            # n^T u n evaluated on a Pk lattice
             for f in sorted(top[sd-1]):
                 cur = len(nodes)
+                # n^T u n evaluated on a Pk lattice
                 pts = ref_el.make_points(sd-1, f, degree + sd)
                 nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[f], n[f], pt)
                              for pt in pts)
                 entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
+            if sd == 2:
+                # FIXME Keeping Cartesian dofs in 2D just to make regression test pass
+                for entity in sorted(top[sd]):
+                    faces = cell_to_faces[entity]
+                    cur = len(nodes)
+                    pts = ref_el.make_points(sd, entity, degree + sd)
+                    nodes.extend(ComponentPointEvaluation(ref_el, (i, j), (sd, sd), pt)
+                                 for i in range(sd) for j in range(i, sd) for pt in pts)
+                    entity_ids[sd][entity].extend(range(cur, len(nodes)))
+            else:
+                for entity in sorted(top[sd]):
+                    faces = cell_to_faces[entity]
+                    cur = len(nodes)
+                    # n[f]^T u n[f] evaluated on a P_{k-1} lattice
+                    pts = ref_el.make_points(sd, entity, degree + sd)
+                    nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[f], n[f], pt)
+                                 for pt in pts for f in faces)
+
+                    # n[i+1]^T u n[i+2] evaluated on a Pk lattice
+                    pts = ref_el.make_points(sd, entity, degree + sd + 1)
+                    nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[faces[i+1]], n[faces[i+2]], pt)
+                                 for pt in pts for i in range((sd-1)*(sd-2)))
+                    entity_ids[sd][entity].extend(range(cur, len(nodes)))
+
         elif variant == "integral":
-            # n^T u n integrated against a basis for Pk
-            facet = ref_el.construct_subelement(sd-1)
-            Q = create_quadrature(facet, qdegree + degree)
-            P = polynomial_set.ONPolynomialSet(facet, degree)
-            phis = P.tabulate(Q.get_points())[(0,)*(sd-1)]
+            # Face dofs
+            ref_facet = ref_el.construct_subelement(sd-1)
+            Q_ref = create_quadrature(ref_facet, qdegree + degree)
+            P = polynomial_set.ONPolynomialSet(ref_facet, degree)
+            Phis = P.tabulate(Q_ref.get_points())[(0,)*(sd-1)]
+
             for f in sorted(top[sd-1]):
                 cur = len(nodes)
-                Q_mapped = FacetQuadratureRule(ref_el, sd-1, f, Q)
-                detJ = Q_mapped.jacobian_determinant()
-                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f]/detJ, Q_mapped, phi) for phi in phis)
+                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
+                detJ = Q.jacobian_determinant()
+                # n[f]^T u n[f] integrated against a basis for Pk
+                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f]/detJ, Q, phi) for phi in Phis)
                 entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
-        # Interior dofs
-        cur = len(nodes)
-        if sd == 2 and variant == "point":
-            # FIXME Keeping Cartesian dofs in 2D just to make regression test pass
-            pts = ref_el.make_points(sd, 0, degree + sd)
-            nodes.extend(ComponentPointEvaluation(ref_el, (i, j), (sd, sd), pt)
-                         for i in range(sd) for j in range(i, sd) for pt in pts)
-        elif variant == "point":
-            # n[f]^T u n[f] evaluated on a P_{k-1} lattice
-            pts = ref_el.make_points(sd, 0, degree + sd)
-            nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[f], n[f], pt)
-                         for pt in pts for f in sorted(top[sd-1]))
-
-            # n[i+1]^T u n[i+2] evaluated on a Pk lattice
-            pts = ref_el.make_points(sd, 0, degree + sd + 1)
-            nodes.extend(PointwiseInnerProductEvaluation(ref_el, n[i+1], n[i+2], pt)
-                         for pt in pts for i in range((sd-1)*(sd-2)))
-        else:
-            cell = ref_el.construct_subelement(sd)
-            Q_ref = create_quadrature(cell, qdegree + degree)
-            P = polynomial_set.ONPolynomialSet(cell, degree)
+            ref_facet = ref_el.construct_subelement(sd)
+            Q_ref = create_quadrature(ref_facet, qdegree + degree)
+            P = polynomial_set.ONPolynomialSet(ref_facet, degree)
             Phis = P.tabulate(Q_ref.get_points())[(0,) * sd]
             dimPkm1 = P.expansion_set.get_num_members(degree-1)
 
+            # Interior dofs
             for entity in sorted(top[sd]):
                 cur = len(nodes)
-                faces = ref_el.get_connectivity()[(sd, sd-1)][entity]
+                faces = cell_to_faces[entity]
                 Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                phis = Phis / Q.jacobian_determinant()
-
+                detJ = Q.jacobian_determinant()
                 # n[f]^T u n[f] integrated against a basis for P_{k-1}
-                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f], Q, phi)
-                             for phi in phis[:dimPkm1] for f in faces)
-
+                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f]/detJ, Q, phi)
+                             for phi in Phis[:dimPkm1] for f in faces)
                 # n[i+1]^T u n[i+2] integrated against a basis for Pk
-                nodes.extend(BidirectionalMoment(ref_el, n[faces[i+1]], n[faces[i+2]], Q, phi)
-                             for phi in phis for i in range((sd-1)*(sd-2)))
-
+                nodes.extend(BidirectionalMoment(ref_el, n[faces[i]], n[faces[i+1]]/detJ, Q, phi)
+                             for phi in Phis for i in range((sd-1)*(sd-2)))
                 entity_ids[sd][entity].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)

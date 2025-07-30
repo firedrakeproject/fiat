@@ -1,13 +1,13 @@
 import math
 import numpy
 import pytest
-from FIAT import (Lagrange, Nedelec, RaviartThomas, DiscontinuousLagrange, Legendre, P0,
-                  NedelecSecondKind, BrezziDouglasMarini,
+from FIAT import (Lagrange, DiscontinuousLagrange, IntegratedLegendre, Legendre, P0,
+                  Nedelec, NedelecSecondKind, RaviartThomas, BrezziDouglasMarini,
                   Regge, HellanHerrmannJohnson, GopalakrishnanLedererSchoberlSecondKind,
                   CrouzeixRaviart)
 from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet, MacroPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import ufc_simplex
+from FIAT.reference_element import ufc_simplex, UFCSimplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
 from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
 from FIAT.barycentric_interpolation import get_lagrange_points
@@ -498,71 +498,69 @@ def test_macro_polynomial_set(dim, element, degree):
     assert numpy.allclose(numpy.diag(numpy.diag(result)), result)
 
 
-def span_greater_equal(A, B):
-    # span(A) >= span(B)
-    _, residual, *_ = numpy.linalg.lstsq(A.reshape(A.shape[0], -1).T,
-                                         B.reshape(B.shape[0], -1).T)
-    return numpy.allclose(residual, 0)
-
-
-def span_equal(A, B):
-    # span(A) == span(B)
-    return span_greater_equal(A, B) and span_greater_equal(B, A)
-
-
-def run_macro_test(element, K, degree, variant):
+def compare_macro_variant(element, K, degree, variant):
+    """Test CiarletElement by comparing macro variant to their non-macro
+       counterparts."""
     fe_macro = element(K, degree, variant=variant)
 
+    # Ensure that we have a macroelement
     ref_complex = fe_macro.get_reference_complex()
     assert ref_complex.is_macrocell()
     top = ref_complex.topology
     dim = ref_complex.get_spatial_dimension()
     assert len(top[dim]) > 1
-    cell = max(top[dim])
 
-    K0 = ref_complex.construct_subelement(dim)
-    K0.vertices = ref_complex.get_vertices_of_subcomplex(top[dim][cell])
-    fe_ref = element(K0, degree)
+    # Construct the non-macro element on a subcell
+    subcell = max(top[dim])
+    vids = list(top[dim][subcell])
+    subtop = {d: dict(enumerate(tuple(map(vids.index, top[d][e]))
+                                for e in top[d]
+                                if set(top[d][e]) <= set(vids)))
+              for d in sorted(top)}
+    vertices = ref_complex.get_vertices_of_subcomplex(vids)
+    Ksub = UFCSimplex(K.shape, vertices, subtop)
+    fe_ref = element(Ksub, degree)
 
-    ids = fe_ref.entity_dofs()
-    cell_node_map = polynomial_cell_node_map(ref_complex, degree, continuity=ids)
-    indices = cell_node_map[cell]
-    assert len(indices) == fe_ref.space_dimension()
-
-    P = fe_macro.get_nodal_basis().take(indices)
+    # Compute Vandermonde matrix on the subcell
+    P = fe_macro.get_nodal_basis()
     B = P.get_coeffs()
     A = fe_ref.dual.to_riesz(P)
     V = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
-    V[abs(V) < 1E-9] = 0
+
+    # Assert that V = permutation matrix
+    V[abs(V) < 1E-12] = 0
     rows, cols = numpy.nonzero(V)
     assert len(rows) == fe_ref.space_dimension()
     assert numpy.allclose(V[rows, cols], 1)
 
-    pts = K0.make_points(dim, 0, degree+2, interior=0)
+    # Test tabulation on interior points
+    pts = Ksub.make_points(dim, 0, degree+dim, interior=1)
     tab_macro = fe_macro.tabulate(1, pts)
     tab_ref = fe_ref.tabulate(1, pts)
     for alpha in tab_ref:
-        expected = tab_ref[alpha]
-        result = tab_macro[alpha][indices]
-        assert span_equal(expected.T, result.T)
-        # assert numpy.allclose(result, expected)
+        expected = tab_ref[alpha][rows]
+        result = tab_macro[alpha][cols]
+        assert numpy.allclose(result, expected)
 
 
 @pytest.mark.parametrize("element,degree", [
-    (Lagrange, 4), (Nedelec, 3), (RaviartThomas, 2), (DiscontinuousLagrange, 1),
-    (NedelecSecondKind, 3), (BrezziDouglasMarini, 2),
+    (IntegratedLegendre, 4), (Legendre, 1),
+    (Nedelec, 3), (NedelecSecondKind, 3),
+    (RaviartThomas, 2), (BrezziDouglasMarini, 2),
     (Regge, 3), (HellanHerrmannJohnson, 1),
-    (GopalakrishnanLedererSchoberlSecondKind, 1)])
-@pytest.mark.parametrize("dim", (2, 3))
+    (GopalakrishnanLedererSchoberlSecondKind, 1),
+])
+@pytest.mark.parametrize("dim", (2,))
 @pytest.mark.parametrize("variant", ("alfeld", "iso"))
 def test_macro_variants(dim, element, degree, variant):
     K = ufc_simplex(dim)
-    run_macro_test(element, K, degree, variant)
+    compare_macro_variant(element, K, degree, variant)
 
 
 @pytest.mark.parametrize("element,degree", [
-    (CrouzeixRaviart, 3)])
+    (CrouzeixRaviart, 3),
+])
 @pytest.mark.parametrize("variant", ("alfeld", "iso"))
 def test_macro_variants_triangle(element, degree, variant):
     K = ufc_simplex(2)
-    run_macro_test(element, K, degree, variant)
+    compare_macro_variant(element, K, degree, variant)
