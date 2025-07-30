@@ -524,18 +524,26 @@ def run_macro_test(element, K, degree, variant):
     K0.vertices = ref_complex.get_vertices_of_subcomplex(top[dim][cell])
     fe_ref = element(K0, degree)
 
+    ids = fe_ref.entity_dofs()
+    cell_node_map = polynomial_cell_node_map(ref_complex, degree, continuity=ids)
+    indices = cell_node_map[cell]
+    assert len(indices) == fe_ref.space_dimension()
+
+    P = fe_macro.get_nodal_basis().take(indices)
+    B = P.get_coeffs()
+    A = fe_ref.dual.to_riesz(P)
+    V = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
+    V[abs(V) < 1E-9] = 0
+    rows, cols = numpy.nonzero(V)
+    assert len(rows) == fe_ref.space_dimension()
+    assert numpy.allclose(V[rows, cols], 1)
+
     pts = K0.make_points(dim, 0, degree+2, interior=0)
     tab_macro = fe_macro.tabulate(1, pts)
     tab_ref = fe_ref.tabulate(1, pts)
-
-    ids = fe_ref.entity_dofs()
-    cell_node_map = polynomial_cell_node_map(ref_complex, degree, continuity=ids)
-    indices_macro = cell_node_map[cell]
-    assert len(indices_macro) == fe_ref.space_dimension()
-
     for alpha in tab_ref:
         expected = tab_ref[alpha]
-        result = tab_macro[alpha][indices_macro]
+        result = tab_macro[alpha][indices]
         assert span_equal(expected.T, result.T)
         # assert numpy.allclose(result, expected)
 
