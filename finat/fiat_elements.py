@@ -326,13 +326,13 @@ class HellanHerrmannJohnson(FiatElement):  # symmetric matrix valued
 
 
 class GopalakrishnanLedererSchoberlFirstKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree, variant=variant))
 
 
 class GopalakrishnanLedererSchoberlSecondKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree, variant=variant))
 
 
 class ScalarFiatElement(FiatElement):

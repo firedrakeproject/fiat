@@ -177,5 +177,14 @@ def test_piola_triangle_high_order(ref_to_phys, element, degree, variant):
                          *((finat.GopalakrishnanLedererSchoberlSecondKind, k) for k in range(0, 3)),
                          ])
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_affine(ref_to_phys, element, degree, dimension):
-    check_zany_mapping(element, ref_to_phys[dimension], degree)
+@pytest.mark.parametrize("variant", [None, "alfeld"])
+def test_affine(ref_to_phys, element, degree, variant, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)
+
+
+@pytest.mark.parametrize("element", [finat.BrezziDouglasMarini, finat.NedelecSecondKind])
+@pytest.mark.parametrize("degree", [1, 2])
+@pytest.mark.parametrize("dimension", [2, 3])
+@pytest.mark.parametrize("variant", [None, "iso"])
+def test_macro_piola(ref_to_phys, element, degree, variant, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)
