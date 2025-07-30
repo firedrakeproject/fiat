@@ -213,7 +213,7 @@ def to_cupy(assignments):
         e, e_idx = recurse(expr)
         v, v_idx = recurse(var)
         assert v_idx == e_idx
-        strs += [f"\t{v}=cp.array({e})"]
+        strs += [f"\t{v}+=cp.array({e})"]
 
     temp_vars = []
     for key, val in declare.items():
@@ -228,7 +228,6 @@ def to_cupy(assignments):
         a_idx = arg_list.index("A")
         a = arg_list.pop(a_idx)
         arg_list = [a] + arg_list
-        strs += ["\treturn A"]
     res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
 
     return res, arg_list
