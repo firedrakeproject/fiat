@@ -9,60 +9,39 @@
 # bfs, but the extra three are used in the transformation theory.
 
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.reference_element import TRIANGLE, ufc_simplex
+from FIAT.reference_element import TRIANGLE
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.jacobi import eval_jacobi
 
 
 class BellDualSet(dual_set.DualSet):
-    def __init__(self, ref_el):
-        entity_ids = {}
-        nodes = []
-        cur = 0
-
-        # make nodes by getting points
-        # need to do this dimension-by-dimension, facet-by-facet
+    def __init__(self, ref_el, degree):
         top = ref_el.get_topology()
-        verts = ref_el.get_vertices()
         sd = ref_el.get_spatial_dimension()
-        if ref_el.get_shape() != TRIANGLE:
-            raise ValueError("Bell only defined on triangles")
-
-        pd = functional.PointDerivative
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
 
         # get jet at each vertex
-
-        entity_ids[0] = {}
         for v in sorted(top[0]):
-            nodes.append(functional.PointEvaluation(ref_el, verts[v]))
+            cur = len(nodes)
+            x, = ref_el.make_points(0, v, degree)
+            nodes.append(functional.PointEvaluation(ref_el, x))
 
-            # first derivatives
-            for i in range(sd):
-                alpha = [0] * sd
-                alpha[i] = 1
-                nodes.append(pd(ref_el, verts[v], alpha))
-
-            # second derivatives
-            alphas = [[2, 0], [1, 1], [0, 2]]
-            for alpha in alphas:
-                nodes.append(pd(ref_el, verts[v], alpha))
-
-            entity_ids[0][v] = list(range(cur, cur + 6))
-            cur += 6
+            # first and second derivatives
+            nodes.extend(functional.PointDerivative(ref_el, x, alpha)
+                         for i in (1, 2) for alpha in polynomial_set.mis(sd, i))
+            entity_ids[0][v].extend(range(cur, len(nodes)))
 
         # we need an edge quadrature rule for the moment
-        from FIAT.quadrature_schemes import create_quadrature
-        from FIAT.jacobi import eval_jacobi
-        rline = ufc_simplex(1)
-        q1d = create_quadrature(rline, 8)
-        q1dpts = q1d.get_points()[:, 0]
-        leg4_at_qpts = eval_jacobi(0, 0, 4, 2.0*q1dpts - 1)
+        facet = ref_el.construct_subelement(1)
+        Q_ref = create_quadrature(facet, 2*(degree-1))
+        x = facet.compute_barycentric_coordinates(Q_ref.get_points())
+        leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
 
-        imond = functional.IntegralMomentOfNormalDerivative
-        entity_ids[1] = {}
         for e in sorted(top[1]):
-            entity_ids[1][e] = [18+e]
-            nodes.append(imond(ref_el, e, q1d, leg4_at_qpts))
-
-        entity_ids[2] = {0: []}
+            cur = len(nodes)
+            nodes.append(functional.IntegralMomentOfNormalDerivative(ref_el, e, Q_ref, leg4_at_qpts))
+            entity_ids[1][e].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -70,7 +49,11 @@ class BellDualSet(dual_set.DualSet):
 class Bell(finite_element.CiarletElement):
     """The Bell finite element."""
 
-    def __init__(self, ref_el):
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, 5)
-        dual = BellDualSet(ref_el)
-        super().__init__(poly_set, dual, 5)
+    def __init__(self, ref_el, degree=5):
+        if ref_el.get_shape() != TRIANGLE:
+            raise ValueError(f"{type(self).__name__} only defined on triangles")
+        if degree != 5:
+            raise ValueError(f"{type(self).__name__} only defined for degree = 5.")
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        dual = BellDualSet(ref_el, degree)
+        super().__init__(poly_set, dual, degree)
