@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "firedrake-fiat"
-version = "2025.4.0"
+version = "2025.7.0.dev0"
 dependencies = [
   "fenics-ufl @ git+https://github.com/FEniCS/ufl.git",
   "numpy>=1.16",
