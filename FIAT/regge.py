@@ -65,7 +65,10 @@ class Regge(finite_element.CiarletElement):
         if degree < 0:
             raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
 
-        variant, qdegree = check_format_variant(variant, degree)
+        splitting, variant, qdegree = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
+
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
         dual = ReggeDual(ref_el, degree, variant, qdegree)
         formdegree = (1, 1)
