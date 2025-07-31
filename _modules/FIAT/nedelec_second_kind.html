@@ -106,8 +106,8 @@
         <span class="n">d</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">assert</span> <span class="p">(</span><span class="n">d</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)),</span> <span class="s2">&quot;Second kind Nedelecs only implemented in 2/3D.&quot;</span>
 
-        <span class="c1"># Zero vertex-based degrees of freedom (d+1 of these)</span>
-        <span class="n">ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">d</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)}</span>
+        <span class="c1"># Zero vertex-based degrees of freedom</span>
+        <span class="n">ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="mi">0</span><span class="p">])}</span>
 
         <span class="c1"># (degree+1) degrees of freedom per entity of codimension 1 (edges)</span>
         <span class="p">(</span><span class="n">edge_dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_edge_dofs</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
@@ -152,16 +152,16 @@
 
         <span class="k">return</span> <span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_facet_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">codim</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_facet_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Generate degrees of freedom (dofs) for facets.&quot;&quot;&quot;</span>
 
         <span class="c1"># Initialize empty dofs and identifiers (ids)</span>
-        <span class="n">num_facets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">codim</span><span class="p">])</span>
+        <span class="n">num_facets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">dim</span><span class="p">])</span>
         <span class="n">dofs</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">)}</span>
 
         <span class="c1"># Return empty info if not applicable</span>
-        <span class="n">rt_degree</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">-</span> <span class="n">codim</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">rt_degree</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">-</span> <span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span>
         <span class="k">if</span> <span class="n">rt_degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">(</span><span class="n">dofs</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span>
 
@@ -169,17 +169,17 @@
             <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">degree</span>
 
         <span class="c1"># Construct quadrature scheme for the reference facet</span>
-        <span class="n">ref_facet</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">codim</span><span class="p">)</span>
+        <span class="n">ref_facet</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
         <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">+</span> <span class="n">rt_degree</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">codim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="n">Phi</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">rt_degree</span><span class="p">,</span> <span class="p">(</span><span class="n">codim</span><span class="p">,))</span>
+        <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">Phi</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">rt_degree</span><span class="p">,</span> <span class="p">(</span><span class="n">dim</span><span class="p">,))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Construct Raviart-Thomas on the reference facet</span>
             <span class="n">RT</span> <span class="o">=</span> <span class="n">RaviartThomas</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">rt_degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
             <span class="n">Phi</span> <span class="o">=</span> <span class="n">RT</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span>
 
         <span class="c1"># Evaluate basis functions at reference quadrature points</span>
-        <span class="n">Phis</span> <span class="o">=</span> <span class="n">Phi</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">codim</span><span class="p">]</span>
+        <span class="n">Phis</span> <span class="o">=</span> <span class="n">Phi</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">dim</span><span class="p">]</span>
         <span class="c1"># Note: Phis has dimensions:</span>
         <span class="c1"># num_basis_functions x num_components x num_quad_points</span>
         <span class="n">Phis</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">Phis</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
@@ -190,7 +190,7 @@
         <span class="n">cur</span> <span class="o">=</span> <span class="n">offset</span>
         <span class="k">for</span> <span class="n">facet</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_facets</span><span class="p">):</span>
             <span class="c1"># Get the quadrature and Jacobian on this facet</span>
-            <span class="n">Q_facet</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">codim</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
+            <span class="n">Q_facet</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
             <span class="n">J</span> <span class="o">=</span> <span class="n">Q_facet</span><span class="o">.</span><span class="n">jacobian</span><span class="p">()</span>
             <span class="n">detJ</span> <span class="o">=</span> <span class="n">Q_facet</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">()</span>
 
@@ -237,21 +237,21 @@
 <span class="sd">    interpolation.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-
-        <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">splitting</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">ref_el</span> <span class="o">=</span> <span class="n">splitting</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
 
         <span class="c1"># Check degree</span>
         <span class="k">assert</span> <span class="n">degree</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;Second kind Nedelecs start at 1!&quot;</span>
 
         <span class="c1"># Get dimension</span>
-        <span class="n">d</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-
+        <span class="n">d</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="c1"># Construct polynomial basis for d-vector fields</span>
-        <span class="n">Ps</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="p">))</span>
+        <span class="n">Ps</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="p">))</span>
 
         <span class="c1"># Construct dual space</span>
-        <span class="n">Ls</span> <span class="o">=</span> <span class="n">NedelecSecondKindDual</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
+        <span class="n">Ls</span> <span class="o">=</span> <span class="n">NedelecSecondKindDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">)</span>
 
         <span class="c1"># Set form degree</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="mi">1</span>  <span class="c1"># 1-form</span>

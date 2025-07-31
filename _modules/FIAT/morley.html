@@ -43,54 +43,50 @@
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">ufc_simplex</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TETRAHEDRON</span><span class="p">,</span> <span class="n">TRIANGLE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 
 
 <div class="viewcode-block" id="MorleyDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.morley.MorleyDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MorleyDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Lagrange elements.  This class works for</span>
-<span class="sd">    simplices of any dimension.  Nodes are point evaluation at</span>
-<span class="sd">    equispaced points.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Morley elements.  This class works for</span>
+<span class="sd">    simplices of any dimension.  Nodes are average on codim=2 entities</span>
+<span class="sd">    and average of normal derivative on codim=1 entities.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
-        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
-
-        <span class="c1"># make nodes by getting points</span>
-        <span class="c1"># need to do this dimension-by-dimension, facet-by-facet</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
-        <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Morley only defined on triangles&quot;</span><span class="p">)</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
 
-        <span class="c1"># vertex point evaluations</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">duals</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+            <span class="n">facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
+            <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">facet</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+            <span class="n">scale</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">Q_ref</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">Q_ref</span><span class="p">,</span> <span class="n">scale</span>
 
-        <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">]))</span>
+        <span class="c1"># codim=2 dof -- integral average</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">2</span>
+        <span class="n">Q_ref</span><span class="p">,</span> <span class="n">scale</span> <span class="o">=</span> <span class="n">duals</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">IntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">scale</span> <span class="o">/</span> <span class="n">Q</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">()))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
-            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">cur</span><span class="p">]</span>
-            <span class="n">cur</span> <span class="o">+=</span> <span class="mi">1</span>
-
-        <span class="c1"># edge dof -- average of normal derivative at each edge</span>
-        <span class="n">rline</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">degree</span> <span class="o">=</span> <span class="mi">2</span>
-        <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">rline</span><span class="p">,</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">qwts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
-        <span class="n">scale</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">qwts</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
-
-        <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
-            <span class="n">n</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">scale</span><span class="p">)</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">e</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">cur</span><span class="p">]</span>
-            <span class="n">cur</span> <span class="o">+=</span> <span class="mi">1</span>
-
-        <span class="n">entity_ids</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[]}</span>
+        <span class="c1"># codim=1 dof -- average of normal derivative at each facet</span>
+        <span class="n">dim</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="n">Q_ref</span><span class="p">,</span> <span class="n">scale</span> <span class="o">=</span> <span class="n">duals</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># normalized normals do not have unit norm!</span>
+        <span class="n">scale</span> <span class="o">/=</span> <span class="n">math</span><span class="o">.</span><span class="n">factorial</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">,</span> <span class="n">scale</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
 
@@ -101,10 +97,14 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">Morley</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The Morley finite element.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
-        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
-        <span class="n">dual</span> <span class="o">=</span> <span class="n">MorleyDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span></div>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">TETRAHEDRON</span><span class="p">}:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Morley only defined on simplices of dimension &gt;= 2&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;{type(self).__name__} only defined for degree == 2&quot;</span><span class="p">)</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">MorleyDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
 
 </pre></div>
 

@@ -1128,6 +1128,8 @@
         <li><a href="FIAT.html#FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation">(FIAT.reference_element.TensorProductCell method)</a>
 </li>
       </ul></li>
+      <li><a href="FIAT.html#FIAT.hdiv_trace.extract_facets">extract_facets() (in module FIAT.hdiv_trace)</a>
+</li>
       <li><a href="FIAT.html#FIAT.reference_element.Cell.extract_intrinsic_orientation">extract_intrinsic_orientation() (FIAT.reference_element.Cell method)</a>
 
       <ul>
@@ -1157,8 +1159,6 @@
 </li>
       </ul></li>
       <li><a href="gem.html#gem.gem.extract_type">extract_type() (in module gem.gem)</a>
-</li>
-      <li><a href="FIAT.html#FIAT.hdiv_trace.extract_unique_facet">extract_unique_facet() (in module FIAT.hdiv_trace)</a>
 </li>
       <li><a href="FIAT.html#FIAT.quadrature.QuadratureRule.extrinsic_orientation_permutation_map">extrinsic_orientation_permutation_map (FIAT.quadrature.QuadratureRule property)</a>
 
@@ -2458,9 +2458,11 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="FIAT.html#FIAT.polynomial_set.PolynomialSet.get_expansion_set">get_expansion_set() (FIAT.polynomial_set.PolynomialSet method)</a>
 </li>
-      <li><a href="FIAT.html#FIAT.reference_element.IntrepidTetrahedron.get_facet_element">get_facet_element() (FIAT.reference_element.IntrepidTetrahedron method)</a>
+      <li><a href="FIAT.html#FIAT.macro.SplitSimplicialComplex.get_facet_element">get_facet_element() (FIAT.macro.SplitSimplicialComplex method)</a>
 
       <ul>
+        <li><a href="FIAT.html#FIAT.reference_element.IntrepidTetrahedron.get_facet_element">(FIAT.reference_element.IntrepidTetrahedron method)</a>
+</li>
         <li><a href="FIAT.html#FIAT.reference_element.IntrepidTriangle.get_facet_element">(FIAT.reference_element.IntrepidTriangle method)</a>
 </li>
         <li><a href="FIAT.html#FIAT.reference_element.Simplex.get_facet_element">(FIAT.reference_element.Simplex method)</a>
@@ -2666,12 +2668,16 @@
       </ul></li>
       <li><a href="FIAT.html#FIAT.hdivcurl.Hdiv">Hdiv() (in module FIAT.hdivcurl)</a>
 </li>
+      <li><a href="FIAT.html#FIAT.macro.hdiv_conforming_coefficients">hdiv_conforming_coefficients() (in module FIAT.macro)</a>
+</li>
       <li><a href="finat.html#finat.hdivcurl.HDivElement">HDivElement (class in finat.hdivcurl)</a>
 
       <ul>
         <li><a href="finat.ufl.html#finat.ufl.hdivcurl.HDivElement">(class in finat.ufl.hdivcurl)</a>
 </li>
       </ul></li>
+      <li><a href="FIAT.html#FIAT.macro.HDivPolynomialSet">HDivPolynomialSet (class in FIAT.macro)</a>
+</li>
       <li><a href="FIAT.html#FIAT.macro.HDivSymPolynomialSet">HDivSymPolynomialSet (class in FIAT.macro)</a>
 </li>
       <li><a href="FIAT.html#FIAT.hdiv_trace.HDivTrace">HDivTrace (class in FIAT.hdiv_trace)</a>
@@ -2680,14 +2686,14 @@
         <li><a href="finat.html#finat.fiat_elements.HDivTrace">(class in finat.fiat_elements)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="FIAT.html#FIAT.hellan_herrmann_johnson.HellanHerrmannJohnson">HellanHerrmannJohnson (class in FIAT.hellan_herrmann_johnson)</a>
 
       <ul>
         <li><a href="finat.html#finat.fiat_elements.HellanHerrmannJohnson">(class in finat.fiat_elements)</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="FIAT.html#FIAT.hellan_herrmann_johnson.HellanHerrmannJohnsonDual">HellanHerrmannJohnsonDual (class in FIAT.hellan_herrmann_johnson)</a>
 </li>
       <li><a href="finat.html#finat.hermite.Hermite">Hermite (class in finat.hermite)</a>
@@ -3094,6 +3100,8 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="FIAT.html#FIAT.macro.MacroPolynomialSet">MacroPolynomialSet (class in FIAT.macro)</a>
+</li>
       <li><a href="FIAT.html#FIAT.macro.MacroQuadratureRule">MacroQuadratureRule (class in FIAT.macro)</a>
 </li>
       <li><a href="FIAT.html#FIAT.reference_element.make_affine_mapping">make_affine_mapping() (in module FIAT.reference_element)</a>
@@ -3845,6 +3853,8 @@
         <li><a href="finat.ufl.html#finat.ufl.mixedelement.VectorElement.pullback">(finat.ufl.mixedelement.VectorElement property)</a>
 </li>
       </ul></li>
+      <li><a href="FIAT.html#FIAT.macro.pullback">pullback() (in module FIAT.macro)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -3909,9 +3919,11 @@
 </li>
       <li><a href="FIAT.html#FIAT.orthopoly.rec_jacobi01">rec_jacobi01() (in module FIAT.orthopoly)</a>
 </li>
-      <li><a href="finat.ufl.html#finat.ufl.brokenelement.BrokenElement.reconstruct">reconstruct() (finat.ufl.brokenelement.BrokenElement method)</a>
+      <li><a href="FIAT.html#FIAT.expansions.ExpansionSet.reconstruct">reconstruct() (FIAT.expansions.ExpansionSet method)</a>
 
       <ul>
+        <li><a href="finat.ufl.html#finat.ufl.brokenelement.BrokenElement.reconstruct">(finat.ufl.brokenelement.BrokenElement method)</a>
+</li>
         <li><a href="finat.ufl.html#finat.ufl.enrichedelement.EnrichedElementBase.reconstruct">(finat.ufl.enrichedelement.EnrichedElementBase method)</a>
 </li>
         <li><a href="finat.ufl.html#finat.ufl.finiteelement.FiniteElement.reconstruct">(finat.ufl.finiteelement.FiniteElement method)</a>
@@ -4397,14 +4409,14 @@
 </li>
       <li><a href="FIAT.html#FIAT.expansions.TetrahedronExpansionSet">TetrahedronExpansionSet (class in FIAT.expansions)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="FIAT.html#FIAT.dual_set.DualSet.to_riesz">to_riesz() (FIAT.dual_set.DualSet method)</a>
 
       <ul>
         <li><a href="FIAT.html#FIAT.functional.Functional.to_riesz">(FIAT.functional.Functional method)</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="gem.html#gem.pprint.to_str">to_str() (in module gem.pprint)</a>
 </li>
       <li><a href="FIAT.html#FIAT.functional.ComponentPointEvaluation.tostr">tostr() (FIAT.functional.ComponentPointEvaluation method)</a>
@@ -4428,6 +4440,8 @@
       <li><a href="FIAT.html#FIAT.polynomial_set.TracelessTensorPolynomialSet">TracelessTensorPolynomialSet (class in FIAT.polynomial_set)</a>
 </li>
       <li><a href="finat.html#finat.hdivcurl.WrapperElementBase.transform">transform (finat.hdivcurl.WrapperElementBase attribute)</a>
+</li>
+      <li><a href="FIAT.html#FIAT.hdiv_trace.transform_nodes">transform_nodes() (in module FIAT.hdiv_trace)</a>
 </li>
       <li><a href="gem.html#gem.node.traversal">traversal() (in module gem.node)</a>
 </li>

@@ -40,7 +40,7 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">polynomial_set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">reference_element</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span><span class="p">,</span> <span class="n">QuadratureRule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">SimplicialComplex</span><span class="p">,</span> <span class="n">lattice_iter</span><span class="p">,</span>
                                     <span class="n">make_lattice</span><span class="p">)</span>
@@ -253,6 +253,13 @@
 <span class="sd">        :arg dimension: subentity dimension (integer)</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SplitSimplicialComplex.get_facet_element">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.macro.SplitSimplicialComplex.get_facet_element">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_facet_element</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">dimension</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="SplitSimplicialComplex.is_macrocell">
@@ -595,6 +602,73 @@
 
 
 
+<div class="viewcode-block" id="hdiv_conforming_coefficients">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.macro.hdiv_conforming_coefficients">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">hdiv_conforming_coefficients</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constrains a PolynomialSet to have vanishing normal jumps on the</span>
+<span class="sd">       interior facets of a simplicial complex.</span>
+
+<span class="sd">    :arg U: A PolynomialSet, it may be vector- or tensor-valued.</span>
+<span class="sd">    :arg order: The maximum order of differentiation on the normal jump constraints.</span>
+
+<span class="sd">    :returns: The coefficients of the constrained PolynomialSet.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
+    <span class="n">degree</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">degree</span>
+    <span class="n">ref_el</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span>
+    <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">facet_el</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">phi_deg</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">degree</span> <span class="o">-</span> <span class="n">k</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">facet_el</span><span class="p">,</span> <span class="n">phi_deg</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">facet_el</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">phi_deg</span><span class="p">)</span>
+    <span class="n">qpts</span><span class="p">,</span> <span class="n">qwts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+    <span class="n">phi_at_qpts</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">phi_at_qpts</span><span class="p">,</span> <span class="n">qwts</span><span class="p">)</span>
+    <span class="n">ax</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">weights</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
+
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">facet</span> <span class="ow">in</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">normal</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
+        <span class="n">ncoeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">normal</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">),</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">jumps</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">tabulate_normal_jumps</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">njump</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">ncoeffs</span><span class="p">,</span> <span class="n">jumps</span><span class="p">[</span><span class="n">r</span><span class="p">])</span>
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">weights</span><span class="p">,</span> <span class="n">njump</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">ax</span><span class="p">)))</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">dual_mat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+        <span class="n">nsp</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">spanning_basis</span><span class="p">(</span><span class="n">dual_mat</span><span class="p">,</span> <span class="n">nullspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">nsp</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">coeffs</span></div>
+
+
+
+<div class="viewcode-block" id="HDivPolynomialSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.macro.HDivPolynomialSet">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">HDivPolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a vector-valued PolynomialSet with continuous</span>
+<span class="sd">       normal components on a simplicial complex.</span>
+
+<span class="sd">    :arg ref_el: The simplicial complex.</span>
+<span class="sd">    :arg degree: The polynomial degree.</span>
+<span class="sd">    :kwarg order: The order of continuity across subcells.</span>
+<span class="sd">    :kwarg variant: The variant for the underlying ExpansionSet.</span>
+<span class="sd">    :kwarg scale: The scale for the underlying ExpansionSet.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">U</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">hdiv_conforming_coefficients</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">U</span><span class="o">.</span><span class="n">expansion_set</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="HDivSymPolynomialSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.HDivSymPolynomialSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HDivSymPolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
@@ -608,39 +682,99 @@
 <span class="sd">    :kwarg scale: The scale for the underlying ExpansionSet.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
         <span class="n">U</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONSymTensorPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
-        <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
-        <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">hdiv_conforming_coefficients</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">U</span><span class="o">.</span><span class="n">expansion_set</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span></div>
 
+
+
+<div class="viewcode-block" id="pullback">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.macro.pullback">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pullback</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">J</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Jinv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Jdet</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Transforms a reference tabulation into physical space.</span>
+
+<span class="sd">    :arg phi: The tabulation on reference space.</span>
+<span class="sd">    :arg mapping: A string indicating the pullback type.</span>
+<span class="sd">    :arg J: The Jacobian of the transformation from reference to physical space.</span>
+<span class="sd">    :arg Jinv: The inverse of the Jacobian.</span>
+<span class="sd">    :arg Jdet: The determinant of the Jacobian.</span>
+
+<span class="sd">    :returns: The tabulation on physical space.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;affine&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,),</span>
+            <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,),</span>
+            <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span>
+            <span class="s2">&quot;double covariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="s2">&quot;double contravariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">&quot;covariant contravariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">&quot;contravariant covariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">}[</span><span class="n">mapping</span><span class="p">]</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized mapping </span><span class="si">{</span><span class="n">mapping</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">J</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">J</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">Jinv</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">Jinv</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">Jinv</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">J</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">Jdet</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">Jdet</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">det</span><span class="p">(</span><span class="n">J</span><span class="p">)</span>
+    <span class="n">F1</span> <span class="o">=</span> <span class="n">Jinv</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">F2</span> <span class="o">=</span> <span class="n">J</span> <span class="o">/</span> <span class="n">Jdet</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">formdegree</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">F</span> <span class="o">=</span> <span class="n">F1</span> <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">F2</span>
+
+        <span class="n">perm</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">phi</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
+        <span class="n">perm</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">],</span> <span class="n">perm</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">perm</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">perm</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">perm</span><span class="p">)</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">perm</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">phi</span></div>
+
+
+
+<div class="viewcode-block" id="MacroPolynomialSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.macro.MacroPolynomialSet">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MacroPolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a PolynomialSet by tiling a CiarletElement on a</span>
+<span class="sd">       SimplicialComplex.</span>
+
+<span class="sd">    :arg ref_el: The SimplicialComplex.</span>
+<span class="sd">    :arg element: The CiarletElement.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">facet_el</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 
-        <span class="n">phi_deg</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">degree</span> <span class="o">-</span> <span class="n">k</span>
-        <span class="n">phi</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">facet_el</span><span class="p">,</span> <span class="n">phi_deg</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,))</span>
-        <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">facet_el</span><span class="p">,</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">phi_deg</span><span class="p">)</span>
-        <span class="n">qpts</span><span class="p">,</span> <span class="n">qwts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">(),</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
-        <span class="n">phi_at_qpts</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">phi_at_qpts</span><span class="p">,</span> <span class="n">qwts</span><span class="p">)</span>
+        <span class="n">mapping</span><span class="p">,</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">mapping</span><span class="p">())</span>
+        <span class="n">base_ref_el</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+        <span class="n">base_entity_ids</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span>
 
-        <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">facet</span> <span class="ow">in</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
-            <span class="n">normal</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet</span><span class="p">)</span>
-            <span class="n">jumps</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">tabulate_normal_jumps</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="n">qpts</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
-                <span class="n">jump</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">jumps</span><span class="p">[</span><span class="n">r</span><span class="p">])</span>
-                <span class="c1"># num_wt = 1 if sd == 1 else expansions.polynomial_dimension(facet_el, degree-r)</span>
-                <span class="n">wn</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[:,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span> <span class="o">*</span> <span class="n">normal</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">]</span>
-                <span class="n">ax</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">wn</span><span class="o">.</span><span class="n">shape</span><span class="p">)))</span>
-                <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">wn</span><span class="p">,</span> <span class="n">jump</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">ax</span><span class="p">)))</span>
+        <span class="n">base_expansion_set</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
+        <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">base_expansion_set</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="n">dual_mat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
-            <span class="n">nsp</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">spanning_basis</span><span class="p">(</span><span class="n">dual_mat</span><span class="p">,</span> <span class="n">nullspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">nsp</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">,</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+        <span class="n">shp</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span>
+        <span class="n">num_bfs</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">base_entity_ids</span><span class="p">)</span>
+        <span class="n">num_members</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_bfs</span><span class="p">,</span> <span class="o">*</span><span class="n">shp</span><span class="p">,</span> <span class="n">num_members</span><span class="p">))</span>
+        <span class="n">base_coeffs</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
 
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">expansion_set</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span></div>
+        <span class="n">rmap</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_cell_node_map</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">base_entity_ids</span><span class="p">)</span>
+        <span class="n">cmap</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">get_cell_node_map</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]):</span>
+            <span class="n">cell_verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices_of_subcomplex</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">cell</span><span class="p">])</span>
+            <span class="n">A</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">make_affine_mapping</span><span class="p">(</span><span class="n">base_ref_el</span><span class="o">.</span><span class="n">vertices</span><span class="p">,</span> <span class="n">cell_verts</span><span class="p">)</span>
+
+            <span class="n">indices</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">rmap</span><span class="p">[</span><span class="n">cell</span><span class="p">],</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="nb">range</span><span class="p">,</span> <span class="n">shp</span><span class="p">),</span> <span class="n">cmap</span><span class="p">[</span><span class="n">cell</span><span class="p">])</span>
+            <span class="n">coeffs</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span> <span class="o">=</span> <span class="n">pullback</span><span class="p">(</span><span class="n">base_coeffs</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">J</span><span class="o">=</span><span class="n">A</span><span class="p">)</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">(),</span> <span class="n">expansion_set</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span></div>
 
 </pre></div>
 
