@@ -6,9 +6,9 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import (polynomial_set, expansions, dual_set,
-                  finite_element, functional)
-from itertools import chain
+                  finite_element, functional, macro)
 import numpy
+from itertools import chain
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
@@ -158,18 +158,23 @@ class NedelecDual(dual_set.DualSet):
                     entity_ids[2][i] = list(range(cur, len(nodes)))
 
         # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-d}^3(T)
-        dim = sd
-        phi_deg = degree - dim
+        phi_deg = degree - sd
         if phi_deg >= 0:
             if interpolant_deg is None:
                 interpolant_deg = degree
-            cur = len(nodes)
-            Q = create_quadrature(ref_el, interpolant_deg + phi_deg)
-            Pqmd = polynomial_set.ONPolynomialSet(ref_el, phi_deg)
-            Phis = Pqmd.tabulate(Q.get_points())[(0,) * dim]
-            nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (dim,))
-                         for d in range(dim) for phi in Phis)
-            entity_ids[dim][0] = list(range(cur, len(nodes)))
+
+            cell = ref_el.construct_subelement(sd)
+            Q_ref = create_quadrature(cell, interpolant_deg + phi_deg)
+            Pqmd = polynomial_set.ONPolynomialSet(cell, phi_deg)
+            Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * sd]
+
+            for entity in top[sd]:
+                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
+                cur = len(nodes)
+                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
+                             for d in range(sd)
+                             for phi in Phis)
+                entity_ids[sd][entity] = list(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -195,9 +200,14 @@ class Nedelec(finite_element.CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
 
-        variant, interpolant_deg = check_format_variant(variant, degree)
-        if ref_el.get_spatial_dimension() == 3:
+        if ref_el.is_macrocell():
+            base_element = Nedelec(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        elif ref_el.get_spatial_dimension() == 3:
             poly_set = NedelecSpace3D(ref_el, degree)
         elif ref_el.get_spatial_dimension() == 2:
             poly_set = NedelecSpace2D(ref_el, degree)

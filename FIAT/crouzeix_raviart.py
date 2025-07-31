@@ -81,12 +81,13 @@ class CrouzeixRaviart(finite_element.CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
-
-        variant, interpolant_deg = check_format_variant(variant, degree)
-
         if degree % 2 != 1:
             raise ValueError("Crouzeix-Raviart only defined for odd degree")
 
-        space = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
+
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg)
-        super().__init__(space, dual, degree)
+        super().__init__(poly_set, dual, degree)
