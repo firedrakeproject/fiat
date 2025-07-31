@@ -39,9 +39,9 @@ if [ ! -d "$DATA_DIR" ]; then
 else
     pushd $DATA_DIR
     echo "Found existing reference data repository, pulling new data"
-    git checkout master
+    git checkout main
     if [ $? -ne 0 ]; then
-        echo "Failed to checkout master, check state of reference data directory."
+        echo "Failed to checkout main, check state of reference data directory."
         exit 1
     fi
     git fetch
