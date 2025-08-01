@@ -13,7 +13,7 @@ from FIAT.reference_element import symmetric_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
-from FIAT.check_format_variant import parse_lagrange_variant
+from FIAT.check_format_variant import check_format_variant
 from FIAT.P0 import P0
 
 
@@ -34,7 +34,9 @@ def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None):
 
 class LegendreDual(dual_set.DualSet):
     """The dual basis for Legendre elements."""
-    def __init__(self, ref_el, degree, codim=0):
+    def __init__(self, ref_el, degree, codim=0, interpolant_deg=None):
+        if interpolant_deg is None:
+            interpolant_deg = degree
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
@@ -43,7 +45,7 @@ class LegendreDual(dual_set.DualSet):
         dim = sd - codim
         ref_facet = ref_el.construct_subelement(dim)
         poly_set = ONPolynomialSet(ref_facet, degree)
-        Q_ref = create_quadrature(ref_facet, 2 * degree)
+        Q_ref = create_quadrature(ref_facet, degree + interpolant_deg)
         Phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
         for entity in sorted(top[dim]):
             cur = len(nodes)
@@ -61,25 +63,27 @@ class Legendre(finite_element.CiarletElement):
     """Simplicial discontinuous element with Legendre polynomials."""
     def __new__(cls, ref_el, degree, variant=None):
         if degree == 0:
-            splitting, _ = parse_lagrange_variant(variant, integral=True)
-            if splitting is None:
+            splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+            if splitting is None and interpolant_deg == 0:
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0(ref_el)
         return super().__new__(cls)
 
     def __init__(self, ref_el, degree, variant=None):
-        splitting, _ = parse_lagrange_variant(variant, integral=True)
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
         poly_set = ONPolynomialSet(ref_el, degree)
-        dual = LegendreDual(ref_el, degree)
+        dual = LegendreDual(ref_el, degree, interpolant_deg=interpolant_deg)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super().__init__(poly_set, dual, degree, formdegree)
 
 
 class IntegratedLegendreDual(dual_set.DualSet):
     """The dual basis for integrated Legendre elements."""
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, interpolant_deg=None):
+        if interpolant_deg is None:
+            interpolant_deg = degree
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
@@ -88,7 +92,7 @@ class IntegratedLegendreDual(dual_set.DualSet):
             if degree <= dim:
                 continue
             ref_facet = symmetric_simplex(dim)
-            Q_ref, Phis = make_dual_bubbles(ref_facet, degree)
+            Q_ref, Phis = make_dual_bubbles(ref_facet, degree, interpolant_deg=interpolant_deg)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
                 Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
@@ -104,12 +108,12 @@ class IntegratedLegendreDual(dual_set.DualSet):
 class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
     def __init__(self, ref_el, degree, variant=None):
-        splitting, _ = parse_lagrange_variant(variant, integral=True)
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
-        dual = IntegratedLegendreDual(ref_el, degree)
+        dual = IntegratedLegendreDual(ref_el, degree, interpolant_deg=interpolant_deg)
         formdegree = 0  # 0-form
         super().__init__(poly_set, dual, degree, formdegree)
