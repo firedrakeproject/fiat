@@ -231,3 +231,230 @@ def to_cupy(assignments):
     res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
 
     return res, arg_list
+
+def to_triton(assignments, temporaries):
+
+    args = {}
+    declare = {"counter": 0}
+    
+
+    @singledispatch
+    def recurse(expr):
+        """Visit an gem expression to convert it to a cupy function..
+
+        :arg expr: GEM expression
+        """
+        raise AssertionError("unsupported expression type %s" % type(expr))
+
+    @recurse.register(gem.Product)
+    def recurse_product(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        breakpoint()
+        return "*".join(commands) 
+    
+    @recurse.register(gem.IndexSum)
+    def recurse_indexsum(expr):
+        raise NotImplementedError("IndexSum")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        prod = "*".join(commands)
+        return f"tl.sum({prod}, {sum_idx})"
+        idx_str = construct_einsum_str(expr, index)
+        # put sub expressions into temporary if they are over an arbitary number of characters (61)
+        if any([len(command) > 60 for command in commands]):
+            for i in range(len(expr.children)):
+                if expr.children[i] not in declare.keys():
+                    declare[expr.children[i]] = (f"is{declare["counter"]}", commands[i].replace("\n", ""))
+                    declare["counter"] += 1
+            operands = ",".join([declare[expr.children[i]][0] for i in range(len(expr.children))])
+            return f"cp.einsum(\"{idx_str}\", {operands})", expr.free_indices
+        return f"cp.einsum(\"{idx_str}\", {",".join(commands)})", expr.free_indices
+
+    @recurse.register(gem.Sum)
+    def recurse_sum(expr):
+        raise NotImplementedError("Sum")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.add({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Division)
+    def recurse_div(expr):
+        raise NotImplementedError("Div")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.divide({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.FloorDiv)
+    def recurse_floor_div(expr):
+        raise NotImplementedError("FloorDiv")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.floor_divide({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Remainder)
+    def recurse_remainder(expr):
+        raise NotImplementedError("Remainder")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.remainder({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Power)
+    def recurse_power(expr):
+        raise NotImplementedError("Power")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.power{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.MathFunction)
+    def recurse_fn(expr):
+        raise NotImplementedError("Math")
+        chld, idx = recurse(expr.children[0])
+        name = expr.name
+        if name != "abs":
+            name = "cp." + name
+        return name + "(" + chld + ")", idx
+
+    @recurse.register(gem.MaxValue)
+    def recurse_max(expr):
+        raise NotImplementedError("Max")
+        chld, idx = recurse(expr.children[0])
+        return f"cp.max({chld})", idx
+
+    @recurse.register(gem.MinValue)
+    def recurse_min(expr):
+        raise NotImplementedError("Min")
+        chld, idx = recurse(expr.children[0])
+        return f"cp.min({chld})", idx
+
+    @recurse.register(gem.Comparison)
+    def recurse_compare(expr):
+        raise NotImplementedError("Compare")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"({commands[0]} {expr.operator} {commands[1]})", idx
+
+    @recurse.register(gem.LogicalNot)
+    def recurse_not(expr):
+        raise NotImplementedError("Logical Not")
+        chld, idx = recurse(expr.children[0])
+        return f"cp.logical_not({chld})", idx
+
+    @recurse.register(gem.LogicalAnd)
+    def recurse_and(expr):
+        raise NotImplementedError("Logical And")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.logical_and{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.LogicalOr)
+    def recurse_or(expr):
+        raise NotImplementedError("Logical Or")
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.logical_or{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Conditional)
+    def recurse_cond(expr):
+        raise NotImplementedError("Cond")
+        # children are ordered as (condition, then, else)
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index[1:])) == 1
+        return f"(commands[1] if commands[0] else commands[2])", index[1]
+
+    @recurse.register(gem.ListTensor)
+    def recurse_list_tensor(expr):
+        raise NotImplementedError("ListTensor")
+        str_array = repr(np.empty_like(expr.array)).replace('None', "{}")
+        str_array = "cp." + str_array.replace("object", "cp.float64")
+        chld_list = []
+        idx_list = []
+        for chld_expr in expr.array.flatten():
+            chld, idx = recurse(chld_expr)
+            chld_list += [chld]
+            idx_list += [idx]
+        assert len(set(idx_list)) == 1
+        return str_array.format(*chld_list), idx_list[0]
+
+    @recurse.register(gem.Indexed)
+    def recurse_indexed(expr):
+        raise NotImplementedError("Indexed")
+        chld, idx = recurse(expr.children[0])
+        chld += "["
+        for i in expr.multiindex:
+            if isinstance(i, gem.Index):
+                chld += ":,"
+            else:
+                chld += f"{i},"
+        chld = chld[:-1] + "]"
+        return chld, expr.index_ordering() + idx
+
+    @recurse.register(gem.FlexiblyIndexed)
+    def recurse_findexed(expr):
+        # TODO this doesn't encapsulate the detail dim2idx
+        chld, idx = recurse(expr.children[0])
+        index = None
+        for (off, var) in expr.dim2idxs:
+            if len(var) == 0:
+                index = f"{off}"
+            else:
+                for (i, stride) in var:
+                    if isinstance(i, gem.Index):
+                        pass
+                    else:
+                        raise NotImplementedError("Flexibly indexed Strides")
+        if index is not None:
+            declare[expr] = (f"{chld}{index}",f"_take_slice_({chld}, len({chld}.shape), 0, {index}, {chld}.shape[1]).reshape({chld}.shape[0])")
+            res_str = f"{chld}{index}" 
+        else:
+            res_str = chld
+        return res_str, expr.index_ordering()
+
+    @recurse.register(gem.Variable)
+    def recurse_variable(expr):
+        args[expr.name] = expr.shape 
+        return expr.name, tuple()
+
+    @recurse.register(gem.Zero)
+    def recurse_identity(expr):
+        raise NotImplementedError("Zero")
+        return f"cp.zeros({expr.shape},dtype=cp.float64)", tuple()
+
+    @recurse.register(gem.Identity)
+    def recurse_identity(expr):
+        raise NotImplementedError("Id")
+        return f"cp.eye({expr.shape},dtype={expr.dtype})", tuple()
+
+    @recurse.register(gem.Literal)
+    def recurse_literal(expr):
+        if len(expr.array.shape) == 0:
+            return str(expr.array.item()), tuple()
+        raise NotImplementedError("Literal")
+        if expr not in declare.keys():
+            declare[expr] = (f"t{declare["counter"]}", expr.array)
+            declare["counter"] += 1
+        return declare[expr][0], tuple()
+
+    for t in temporaries:
+        recurse(t)
+    breakpoint()
