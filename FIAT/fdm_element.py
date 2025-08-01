@@ -11,10 +11,9 @@ import numpy
 
 from FIAT import dual_set, finite_element, functional, quadrature
 from FIAT.barycentric_interpolation import LagrangePolynomialSet
-from FIAT.hierarchical import IntegratedLegendre
-from FIAT.orientation_utils import make_entity_permutations_simplex
-from FIAT.P0 import P0Dual
+from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.reference_element import LINE
+from FIAT.P0 import P0
 
 
 def sym_eig(A, B):
@@ -47,16 +46,16 @@ class FDMDual(dual_set.DualSet):
     """The dual basis for 1D elements with FDM shape functions."""
     def __init__(self, ref_el, degree, bc_order=1, formdegree=0, orthogonalize=False):
         # Define the generalized eigenproblem on a reference element
-        embedded_degree = degree + formdegree
-        embedded = IntegratedLegendre(ref_el, embedded_degree)
-        edim = embedded.space_dimension()
-        self.embedded = embedded
+        P = ONPolynomialSet(ref_el, degree + formdegree, variant="bubble")
+        Pdim = len(P)
+        # Apply even / odd reordering on edge bubbles
+        P = P.take([*range(2), *range(2, Pdim, 2), *range(3, Pdim, 2)])
+        self.poly_set = P
 
-        vertices = ref_el.get_vertices()
         if bc_order == 1 and formdegree == 0:
-            rule = quadrature.GaussLobattoLegendreQuadratureLineRule(ref_el, edim+1)
+            rule = quadrature.GaussLobattoLegendreQuadratureLineRule(ref_el, Pdim+1)
         else:
-            rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, edim)
+            rule = quadrature.GaussLegendreQuadratureLineRule(ref_el, Pdim)
         self.rule = rule
 
         solve_eig = sym_eig
@@ -65,21 +64,21 @@ class FDMDual(dual_set.DualSet):
 
         # Tabulate the BC nodes
         if bc_order == 0:
-            C = numpy.empty((0, edim), "d")
+            C = numpy.empty((0, Pdim), "d")
         else:
-            constraints = embedded.tabulate(bc_order-1, vertices)
+            constraints = P.tabulate(ref_el.get_vertices(), bc_order-1)
             C = numpy.transpose(numpy.column_stack(list(constraints.values())))
         bdof = slice(None, C.shape[0])
         idof = slice(C.shape[0], None)
 
-        # Tabulate the basis that splits the DOFs into interior and bcs
-        E = numpy.eye(edim)
+        # Coefficients of the vertex and interior modes
+        E = numpy.eye(Pdim)
         E[bdof, idof] = -C[:, idof]
         E[bdof, :] = numpy.linalg.solve(C[:, bdof], E[bdof, :])
 
         # Assemble the constrained Galerkin matrices on the reference cell
         k = max(1, bc_order)
-        phi = embedded.tabulate(k, rule.get_points())
+        phi = P.tabulate(rule.get_points(), k)
         wts = rule.get_weights()
         E0 = numpy.dot(E.T, phi[(0, )])
         Ek = numpy.dot(E.T, phi[(k, )])
@@ -113,34 +112,33 @@ class FDMDual(dual_set.DualSet):
             numpy.multiply(S, lam, out=S)
             basis = numpy.dot(S.T, Ek)
 
-        bc_nodes = []
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
         if formdegree == 0:
             if orthogonalize:
                 idof = slice(None)
             elif bc_order > 0:
-                bc_nodes += [functional.PointEvaluation(ref_el, x) for x in vertices]
-                for alpha in range(1, bc_order):
-                    bc_nodes += [functional.PointDerivative(ref_el, x, [alpha]) for x in vertices]
+                # Vertex dofs -- jet evaluation
+                for v in sorted(top[0]):
+                    cur = len(nodes)
+                    x, = ref_el.make_points(0, v, 0)
+                    nodes.append(functional.PointEvaluation(ref_el, x))
+                    nodes.extend(functional.PointDerivative(ref_el, x, (alpha, ))
+                                 for alpha in range(1, bc_order))
+                    entity_ids[0][v].extend(range(cur, len(nodes)))
 
         elif bc_order > 0:
-            basis[bdof, :] = numpy.sqrt(1.0E0 / ref_el.volume())
+            basis[bdof] = numpy.sqrt(1.0E0 / ref_el.volume())
             idof = slice(formdegree, None)
 
-        nodes = bc_nodes + [functional.IntegralMoment(ref_el, rule, f) for f in basis[idof]]
+        # Interior dofs -- moments against eigenfunctions
+        cur = len(nodes)
+        nodes.extend(functional.IntegralMoment(ref_el, rule, f) for f in basis[idof])
+        entity_ids[sd][0].extend(range(cur, len(nodes)))
 
-        if len(bc_nodes) > 0:
-            entity_ids = {0: {0: [0], 1: [1]},
-                          1: {0: list(range(2, degree+1))}}
-            entity_permutations = {}
-            entity_permutations[0] = {0: {0: [0]}, 1: {0: [0]}}
-            entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree - 1)}
-        else:
-            entity_ids = {0: {0: [], 1: []},
-                          1: {0: list(range(0, degree+1))}}
-            entity_permutations = {}
-            entity_permutations[0] = {0: {0: []}, 1: {0: []}}
-            entity_permutations[1] = {0: make_entity_permutations_simplex(1, degree + 1)}
-        super().__init__(nodes, ref_el, entity_ids, entity_permutations)
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class FDMFiniteElement(finite_element.CiarletElement):
@@ -158,16 +156,18 @@ class FDMFiniteElement(finite_element.CiarletElement):
     def _formdegree(self):
         pass
 
+    def __new__(cls, ref_el, degree):
+        if cls._formdegree == 1 and degree == 0:
+            return P0(ref_el)
+        return super().__new__(cls)
+
     def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("%s is only defined in one dimension." % type(self))
-        if degree == 0:
-            dual = P0Dual(ref_el)
-        else:
-            dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
-                           formdegree=self._formdegree, orthogonalize=self._orthogonalize)
+        dual = FDMDual(ref_el, degree, bc_order=self._bc_order,
+                       formdegree=self._formdegree, orthogonalize=self._orthogonalize)
         if self._formdegree == 0:
-            poly_set = dual.embedded.poly_set
+            poly_set = dual.poly_set
         else:
             lr = quadrature.GaussLegendreQuadratureLineRule(ref_el, degree+1)
             poly_set = LagrangePolynomialSet(ref_el, lr.get_points())
