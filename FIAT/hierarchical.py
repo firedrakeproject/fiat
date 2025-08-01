@@ -44,7 +44,7 @@ class LegendreDual(dual_set.DualSet):
 
         dim = sd - codim
         ref_facet = ref_el.construct_subelement(dim)
-        poly_set = ONPolynomialSet(ref_facet, degree)
+        poly_set = ONPolynomialSet(ref_facet, degree, scale="L2 piola")
         Q_ref = create_quadrature(ref_facet, degree + interpolant_deg)
         Phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
         for entity in sorted(top[dim]):
