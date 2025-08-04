@@ -63,7 +63,7 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
     if "FIREDRAKE_USE_GPU" in os.environ:
         print("Generating cupy string")
         res, args = to_cupy(assignments)
-        add_kernel_string(res, args)
+        #add_kernel_string(res, args, "cupy")
         #return (res, tuple(args))
 
     # Just the expressions
@@ -102,7 +102,8 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
     if "FIREDRAKE_USE_GPU" in os.environ:
         print("Generating triton string")
-        res, args = to_triton(ops, temporaries)
+        res, args = to_triton(assignments, temporaries)
+        add_kernel_string(res, args, "triton")
         return (res, tuple(args))
     # Prepare ImperoC (Impero AST + other data for code generation)
     return ImperoC(tree, temporaries, declare, indices)
