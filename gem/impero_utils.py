@@ -64,6 +64,7 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
         print("Generating cupy string")
         res, args = to_cupy(assignments)
         #add_kernel_string(res, args, "cupy")
+        breakpoint()
         #return (res, tuple(args))
 
     # Just the expressions

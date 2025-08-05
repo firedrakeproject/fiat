@@ -403,10 +403,10 @@ def to_triton(assignments, temporaries):
             prev_index = ""
             counter = 0
             for i in index:
-                temps[expr] = (f"{chld}{i[0]}",(f"_take_slice_({chld}{prev_index}, {len(expr.multiindex)-counter}, {i[0]}, {i[1]}, {chld}_dim{i[0]}).reshape({chld}_dim{i[1]})", expr.index_ordering() + idx))
+                temps[expr] = (f"{chld}_{i[0]}",(f"_take_slice_({chld}, len({chld}.shape), {i[0]}, {i[1]}, {chld}.shape[{dim - i[0] - 1}]).reshape({chld}.shape[{i[0]}])", expr.index_ordering() + idx))
                 prev_index = str(index[0])
                 counter += 1
-            res_str = f"{chld}{i[0]}" 
+            res_str = f"{chld}_{i[0]}" 
         else:
             res_str = chld
         return res_str, expr.index_ordering() + idx
@@ -477,16 +477,16 @@ def to_triton(assignments, temporaries):
         strs += [f"\t{v}_res={e}"]
     kernel_args = {"arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "blocks":[]}
     
-    temp_vars = []
+    temp_vars = ["\tpid = tl.program_id(axis=0)"]
     for name, size in args.items():
         kernel_args["arrays"] += [(name, None)]
-        size = size + ("BLOCK_SIZE_C",)
+        size = ("BLOCK_SIZE_C",) + size
         stride_acc = 1
         for i, dim in enumerate(reversed(size)):
             kernel_args["strides"] += [(name + f"_stride{i}", stride_acc)]
             if not isinstance(dim, str):
                 kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
-                kernel_args["sizes_actual"] += [(name + f"_size{1}", dim)]
+                kernel_args["sizes_actual"] += [(name + f"_size{i}", dim)]
                 stride_acc *= dim
                 temp_vars += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
             else:
@@ -496,13 +496,15 @@ def to_triton(assignments, temporaries):
         mask = f"\t{name}_mask = {name}_offsets < "
         block = f"\t{name}"
         for i in range(0, len(size)):
-            slicing = ",".join(["None" if j != i else ":" for j in range(len(size))])
+            slicing = ",".join(["None" if j == i else ":" for j in range(len(size))])
             offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
-            if i < len(size) - 1:
-                mask += f" ({name}_offsets{i}*{name}_stride{i} + {name}_size{i})[{slicing}] + "
-        load = f"\ttl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
+            if 0 < i < len(size):
+                mask += f" ({name}_offsets{i}*{name}_stride{i} + {name}_size{i-1})[{slicing}] + "
+        ptr = f"\t{name}_ptr = {name}"
+        load = f"\t{name} = tl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
 
-        temp_vars += [offsets[:-2], mask[:-2], load]
+
+        temp_vars += [offsets[:-2], mask[:-2], ptr, load]
 
     for val in arrays.values():
         if isinstance(val, int):
@@ -510,22 +512,24 @@ def to_triton(assignments, temporaries):
         name, array = val
         kernel_args["arrays"] += [(name, array)]
         strides = []
+        stride_acc = 1
         for i, dim in enumerate(reversed(array.shape)):
             kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
-            kernel_args["sizes_actual"] += [(name + f"_size{1}", dim)]
+            kernel_args["sizes_actual"] += [(name + f"_size{i}", dim)]
             kernel_args["strides"] += [(name + f"_stride{i}", stride_acc)]
             stride_acc *= dim
             temp_vars += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
         offsets = f"\t{name}_offsets ="
         mask = f"\t{name}_mask = {name}_offsets < "
         for i in range(len(array.shape)):
-            slicing = ",".join(["None" if j != i else ":" for j in range(len(array.shape))])
+            slicing = ",".join(["None" if j == i else ":" for j in range(len(array.shape))])
             offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
             if i < len(size):
                 mask += f" ({name}_offsets{i}*{name}_stride{i} + {name}_size{i})[{slicing}] + "
-        load = f"\ttl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
+        ptr = f"\t{name}_ptr = {name}"
+        load = f"\t{name} = tl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
 
-        temp_vars += [offsets[:-2], mask[:-2], load]
+        temp_vars += [offsets[:-2], mask[:-2], ptr, load]
             
 
     for key, val in temps.items():
@@ -533,6 +537,7 @@ def to_triton(assignments, temporaries):
             temp_vars += [f"\t{val[0]} = {val[1][0]}"]
     #strs += [f"tl.store({output} + offsets, {v}, mask=mask"]
 
+    temp_vars += [f"\tbreakpoint()"]
 
     for key, val in declare.items():
         if key != "counter" and val[0][0] == "t":
@@ -540,13 +545,18 @@ def to_triton(assignments, temporaries):
         elif key != "counter":
             temp_vars += [f"\t{val[0]} = {repr(val[1])[1:-1]}"]
 
-    #this hurts me
-    arg_list = list(list(zip(*(kernel_args["arrays"] + kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"])))[0])
+    const_exprs =kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"] + [("BLOCK_SIZE_C", None)] 
+    const_exprs = [exp[0] + ": tl.constexpr" for exp in const_exprs]
+    array_exprs = [exp[0] for exp in kernel_args["arrays"]]
+    arg_list = array_exprs + const_exprs 
     # this ordering probably needs work
     if "A" in arg_list:
         a_idx = arg_list.index("A")
+        a_idx2 = kernel_args["arrays"].index(("A", None))
         a = arg_list.pop(a_idx)
+        a2 = kernel_args["arrays"].pop(a_idx2)
         arg_list = [a] + arg_list
-        strs += [f"\ttl.store(A + A_offsets, A_res, mask = A_mask)"] 
+        kernel_args["arrays"] = [a2] + kernel_args["arrays"]
+        strs += [f"\ttl.store(A_ptr + A_offsets, A_res, mask = A_mask)"] 
     res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
     return res, kernel_args
