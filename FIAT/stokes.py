@@ -122,10 +122,12 @@ def C0_bubbles(ref_el, degree, shape):
 
 def stokes_eigenbasis(V0):
     ref_el = V0.get_reference_element()
+    sd = ref_el.get_spatial_dimension()
     Q = create_quadrature(ref_el, 2*V0.degree)
     Qpts, Qwts = Q.get_points(), Q.get_weights()
 
     V0_at_qpts = V0.tabulate(Qpts, 1)
+    test = V0_at_qpts[(0,)*sd]
     eps_test = eps(V0_at_qpts)
     div_test = numpy.trace(eps_test, axis1=1, axis2=2)
 
@@ -138,6 +140,13 @@ def stokes_eigenbasis(V0):
     nullspace_dim = len([s for s in sig if abs(s) <= tol])
 
     S1 = S[:, :nullspace_dim]
+
+    # Reorthogonalize div-free subset in L2
+    test_div0 = numpy.tensordot(S1, test, axes=(0, 0))
+    M = inner(test_div0, test_div0, Qwts)
+    _, W = scipy.linalg.eigh(M)
+    S1 = numpy.dot(S1, W)
+
     S2 = S[:, nullspace_dim:]
     S2 *= numpy.sqrt(1 / sig[None, nullspace_dim:])
 
@@ -379,16 +388,12 @@ class MacroStokes(finite_element.CiarletElement):
 class DivStokesDual(dual_set.DualSet):
     def __init__(self, ref_el, degree):
         self.degree = degree
-        nodes = []
-        entity_ids = {}
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         Q = create_quadrature(ref_el, 2*degree)
 
-        for dim in sorted(top):
-            entity_ids[dim] = {}
-            for entity in sorted(top[dim]):
-                entity_ids[dim][entity] = []
+        nodes = []
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
 
         # Vertex dofs
         for entity in top[0]:
@@ -490,21 +495,23 @@ if __name__ == "__main__":
 
     family = type(fe).__name__
     domains = (None, "reduced", "facet")
-    fig, axes = plt.subplots(nrows=2, ncols=len(domains), figsize=(6*len(domains), 6*2))
+    fig, axes = plt.subplots(nrows=3, ncols=len(domains), figsize=(6*len(domains), 6*2))
     axes = axes.T.flat
     for domain in domains:
         if domain:
             fe = FIAT.RestrictedElement(fe, restriction_domain=domain)
 
         phi_at_qpts = fe.tabulate(1, Qpts)
+        V = phi_at_qpts[(0,)*dim]
         Veps = eps(phi_at_qpts)
         Vdiv = numpy.trace(Veps, axis1=1, axis2=2)
         Aeps = inner(Veps, Veps, Qwts)
         Adiv = inner(Vdiv, Vdiv, Qwts)
+        Amass = inner(V, V, Qwts)
 
         title = f"{family}({degree}, {domain})"
-        names = ("eps", "div")
-        mats = (Aeps, Adiv)
+        names = ("eps", "div", "mass")
+        mats = (Aeps, Adiv, Amass)
         for name, A in zip(names, mats):
             A[abs(A) < 1E-10] = 0.0
             scipy_mat = scipy.sparse.csr_matrix(A)
