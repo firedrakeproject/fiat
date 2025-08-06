@@ -238,13 +238,13 @@ def to_triton(assignments, temporaries):
     declare = {"counter": 0}
     arrays = {"counter": 0} 
 
-    def recurse(expr):
+    def recurse(expr, outer_idx=tuple()):
         if expr not in temps:
-            return _recurse(expr)
+            return _recurse(expr, outer_idx)
         return temps[expr][0], temps[expr][1][1]
 
     @singledispatch
-    def _recurse(expr):
+    def _recurse(expr, outer_idx):
         """Visit an gem expression to convert it to a cupy function..
 
         :arg expr: GEM expression
@@ -252,158 +252,188 @@ def to_triton(assignments, temporaries):
         raise AssertionError("unsupported expression type %s" % type(expr))
 
     @_recurse.register(gem.Product)
-    def _recurse_product(expr):
-        summands = [recurse(e) for e in expr.children]
+    def _recurse_product(expr, outer_idx):
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        if not all([i == index[0] or len(i) == 0 for i in index]):
-            breakpoint()
-        return "(" + " * ".join(commands) + ")", index[0]
+        index_without_empty = list(set(index) - set([tuple()]))
+        if len(index_without_empty) != 1:
+            for i in index:
+                # need to ensure that block index remains the first index
+                if 'BLOCK_IDX' in i:
+                    i_loc = index.index(i)
+                    val = summands.pop(i_loc)
+                    summands = [val] + summands
+                    
+            commands = [s[0] for s in summands]
+            
+            index = [i for s in summands for i in s[1]]
+            mid = (len(index) // 2) - 1
+            if index[mid] != index[mid + 1]:
+                 for i, (command, index) in enumerate(summands):
+                     
+                     slicing = [":" if i == j else "None" for j in range(len(index_without_empty))]
+                     commands[i] += '[' + ','.join(slicing) + ']' 
+            else:
+                index.pop(mid)
+        else:
+            index = [i for s in summands for i in s[1]]
+        return "(" + " * ".join(commands) + ")", tuple(index)
     
     @_recurse.register(gem.IndexSum)
-    def _recurse_indexsum(expr):
-        raise NotImplementedError("IndexSum")
-        summands = [recurse(e) for e in expr.children]
+    def _recurse_indexsum(expr, outer_idx):
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         prod = "*".join(commands)
-        return f"tl.sum({prod}, {sum_idx})"
+        if len(index) > 1:
+            raise NotImplementedError("IndexSum with multiple children")
+        sum_index = list(set(index[0]) - set(expr.free_indices + outer_idx))
+        if len(sum_index) > 1:
+            raise NotImplementedError("Index Summing over multiple indices at once")
+        sum_axis = list(index[0]).index(sum_index[0])
+        return f"tl.sum({prod}, {sum_axis})",outer_idx + expr.free_indices 
 
     @_recurse.register(gem.Sum)
-    def _recurse_sum(expr):
-        summands = [recurse(e) for e in expr.children]
+    def _recurse_sum(expr, outer_idx):
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        assert len(set(index)) == 1
         if not all([i == index[0] for i in index]):
             breakpoint()
+        assert len(set(index)) == 1
         return "(" + " + ".join(commands) + ")" , index[0] 
     @_recurse.register(gem.Division)
-    def _recurse_div(expr):
+    def _recurse_div(expr, outer_idx):
         raise NotImplementedError("Div")
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.divide({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.FloorDiv)
-    def _recurse_floor_div(expr):
+    def _recurse_floor_div(expr, outer_idx):
         raise NotImplementedError("FloorDiv")
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.floor_divide({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Remainder)
-    def _recurse_remainder(expr):
+    def _recurse_remainder(expr, outer_idx):
         raise NotImplementedError("Remainder")
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.remainder({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Power)
-    def _recurse_power(expr):
+    def _recurse_power(expr, outer_idx):
         raise NotImplementedError("Power")
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.power{commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.MathFunction)
-    def _recurse_fn(expr):
-        chld, idx = recurse(expr.children[0])
+    def _recurse_fn(expr, outer_idx):
+        chld, idx = recurse(expr.children[0], outer_idx)
         name = expr.name
         name = "tl." + name
         return name + "(" + chld + ")", idx
 
     @_recurse.register(gem.MaxValue)
-    def _recurse_max(expr):
+    def _recurse_max(expr, outer_idx):
         raise NotImplementedError("Max")
-        chld, idx = recurse(expr.children[0])
+        chld, idx = recurse(expr.children[0], outer_idx)
         return f"cp.max({chld})", idx
 
     @_recurse.register(gem.MinValue)
-    def _recurse_min(expr):
+    def _recurse_min(expr, outer_idx):
         raise NotImplementedError("Min")
-        chld, idx = recurse(expr.children[0])
+        chld, idx = recurse(expr.children[0], outer_idx)
         return f"cp.min({chld})", idx
 
     @_recurse.register(gem.Comparison)
-    def _recurse_compare(expr):
+    def _recurse_compare(expr, outer_idx):
         raise NotImplementedError("Compare")
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"({commands[0]} {expr.operator} {commands[1]})", idx
 
     @_recurse.register(gem.LogicalNot)
-    def _recurse_not(expr):
+    def _recurse_not(expr, outer_idx):
         raise NotImplementedError("Logical Not")
         chld, idx = recurse(expr.children[0])
         return f"cp.logical_not({chld})", idx
 
     @_recurse.register(gem.LogicalAnd)
-    def _recurse_and(expr):
+    def _recurse_and(expr, outer_idx):
         raise NotImplementedError("Logical And")
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.logical_and{commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.LogicalOr)
-    def _recurse_or(expr):
+    def _recurse_or(expr, outer_idx):
         raise NotImplementedError("Logical Or")
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.logical_or{commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Conditional)
-    def _recurse_cond(expr):
+    def _recurse_cond(expr, outer_idx):
         raise NotImplementedError("Cond")
         # children are ordered as (condition, then, else)
-        summands = [recurse(e) for e in expr.children]
+        summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index[1:])) == 1
         return f"(commands[1] if commands[0] else commands[2])", index[1]
 
     @_recurse.register(gem.ListTensor)
-    def _recurse_list_tensor(expr):
+    def _recurse_list_tensor(expr, outer_idx):
         raise NotImplementedError("ListTensor")
         str_array = repr(np.empty_like(expr.array)).replace('None', "{}")
         str_array = "cp." + str_array.replace("object", "cp.float64")
         chld_list = []
         idx_list = []
         for chld_expr in expr.array.flatten():
-            chld, idx = recurse(chld_expr)
+            chld, idx = recurse(chld_expr, outer_idx)
             chld_list += [chld]
             idx_list += [idx]
         assert len(set(idx_list)) == 1
         return str_array.format(*chld_list), idx_list[0]
 
     @_recurse.register(gem.Indexed)
-    def _recurse_indexed(expr):
-        chld, idx = recurse(expr.children[0])
+    def _recurse_indexed(expr, outer_idx):
+        chld, idx = recurse(expr.children[0], outer_idx)
         dim = 0
         index = []
+        slice_dims = []
         for i in expr.multiindex:
             if not isinstance(i, gem.Index):
-                index += [(dim,i)]
+                index += [(dim, i)]
+            else:
+                slice_dims += [dim]
             dim += 1
         if len(index) > 0:
             prev_index = ""
             counter = 0
+            if len(slice_dims) > 1:
+                raise NotImplementedError("Slicing accross multiple dims not implmented")
             for i in index:
-                temps[expr] = (f"{chld}_{i[0]}",(f"_take_slice_({chld}, len({chld}.shape), {i[0]}, {i[1]}, {chld}.shape[{dim - i[0] - 1}]).reshape({chld}.shape[{i[0]}])", expr.index_ordering() + idx))
+                temps[expr] = (f"{chld}_{i[0]}",(f"_take_slice_({chld}, len({chld}.shape), {slice_dims[0]}, {i[1]}, {chld}.shape[{dim - i[0] - 1}]).reshape({chld}.shape[{dim - i[0] - 1}])", expr.index_ordering() + idx))
                 prev_index = str(index[0])
                 counter += 1
             res_str = f"{chld}_{i[0]}" 
@@ -412,9 +442,11 @@ def to_triton(assignments, temporaries):
         return res_str, expr.index_ordering() + idx
 
     @_recurse.register(gem.FlexiblyIndexed)
-    def _recurse_findexed(expr):
+    def _recurse_findexed(expr, outer_idx):
         # TODO this doesn't encapsulate the detail dim2idx
-        chld, idx = recurse(expr.children[0])
+        if len(outer_idx) < 1:
+            breakpoint()
+        chld, idx = recurse(expr.children[0], outer_idx)
         index = None
         for (off, var) in expr.dim2idxs:
             if len(var) == 0:
@@ -426,29 +458,30 @@ def to_triton(assignments, temporaries):
                     else:
                         raise NotImplementedError("Flexibly indexed Strides")
         if index is not None:
-            temps[expr] = (f"{chld}{index}",(f"_take_slice_({chld}, len({chld}.shape), 0, {index}, {chld}.shape[1]).reshape({chld}.shape[0])", expr.index_ordering()))
+            temps[expr] = (f"{chld}{index}",(f"_take_slice_({chld}, len({chld}.shape), 0, {index}, {chld}.shape[1]).reshape({chld}.shape[0])", expr.index_ordering() + idx ))
             res_str = f"{chld}{index}" 
         else:
             res_str = chld
-        return res_str, expr.index_ordering()
+
+        return res_str, expr.index_ordering() + idx
 
     @_recurse.register(gem.Variable)
-    def _recurse_variable(expr):
+    def _recurse_variable(expr, outer_idx):
         args[expr.name] = expr.shape 
-        return expr.name, tuple()
+        return expr.name, outer_idx 
 
     @_recurse.register(gem.Zero)
-    def _recurse_identity(expr):
+    def _recurse_identity(expr, outer_idx):
         raise NotImplementedError("Zero")
         return f"cp.zeros({expr.shape},dtype=cp.float64)", tuple()
 
     @_recurse.register(gem.Identity)
-    def _recurse_identity(expr):
+    def _recurse_identity(expr, outer_idx):
         raise NotImplementedError("Id")
         return f"cp.eye({expr.shape},dtype={expr.dtype})", tuple()
 
     @_recurse.register(gem.Literal)
-    def _recurse_literal(expr):
+    def _recurse_literal(expr, outer_idx):
         if len(expr.array.shape) == 0:
             return str(expr.array.item()), tuple()
         if expr not in arrays.keys():
@@ -467,16 +500,16 @@ def to_triton(assignments, temporaries):
     temp_assigns = []
     strs = []
     for t in temporaries:
-        temps[t] = (f"inter{counter}", recurse(t))
+        temps[t] = (f"inter{counter}", recurse(t, ('BLOCK_SIZE_C',)))
         counter += 1
 
     for var, expr in assignments:
-        e, e_idx = recurse(expr)
-        v, v_idx = recurse(var)
-        assert v_idx == e_idx
+        e, e_idx = recurse(expr, ('BLOCK_SIZE_C',))
+        v, v_idx = recurse(var, ('BLOCK_SIZE_C',))
+        #assert v_idx == e_idx
         strs += [f"\t{v}_res={e}"]
     kernel_args = {"arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "blocks":[]}
-    
+     
     temp_vars = ["\tpid = tl.program_id(axis=0)"]
     for name, size in args.items():
         kernel_args["arrays"] += [(name, None)]
@@ -537,7 +570,7 @@ def to_triton(assignments, temporaries):
             temp_vars += [f"\t{val[0]} = {val[1][0]}"]
     #strs += [f"tl.store({output} + offsets, {v}, mask=mask"]
 
-    temp_vars += [f"\tbreakpoint()"]
+    #temp_vars += [f"\tbreakpoint()"]
 
     for key, val in declare.items():
         if key != "counter" and val[0][0] == "t":
@@ -545,10 +578,11 @@ def to_triton(assignments, temporaries):
         elif key != "counter":
             temp_vars += [f"\t{val[0]} = {repr(val[1])[1:-1]}"]
 
-    const_exprs =kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"] + [("BLOCK_SIZE_C", None)] 
-    const_exprs = [exp[0] + ": tl.constexpr" for exp in const_exprs]
+    const_exprs =kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"] 
+    const_exprs = [f"\t{exp[0]}:tl.constexpr = {int(exp[1])}" for exp in const_exprs]
+    const_exprs += ["\tpdb.set_trace()"]
     array_exprs = [exp[0] for exp in kernel_args["arrays"]]
-    arg_list = array_exprs + const_exprs 
+    arg_list = array_exprs + ["BLOCK_SIZE_C:tl.constexpr"] 
     # this ordering probably needs work
     if "A" in arg_list:
         a_idx = arg_list.index("A")
@@ -558,5 +592,5 @@ def to_triton(assignments, temporaries):
         arg_list = [a] + arg_list
         kernel_args["arrays"] = [a2] + kernel_args["arrays"]
         strs += [f"\ttl.store(A_ptr + A_offsets, A_res, mask = A_mask)"] 
-    res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
+    res = "\n".join(func_decl(*arg_list) + const_exprs + temp_vars + strs)
     return res, kernel_args
