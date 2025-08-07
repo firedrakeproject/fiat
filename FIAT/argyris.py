@@ -53,13 +53,17 @@ class ArgyrisDualSet(dual_set.DualSet):
             # interior dofs
             q = degree - 6
             if q >= 0:
-                Q = create_quadrature(ref_el, interpolant_deg + q)
-                Pq = polynomial_set.ONPolynomialSet(ref_el, q, scale=1)
-                phis = Pq.tabulate(Q.get_points())[(0,) * sd]
-                scale = ref_el.volume()
-                cur = len(nodes)
-                nodes.extend(IntegralMoment(ref_el, Q, phi/scale) for phi in phis)
-                entity_ids[sd][0] = list(range(cur, len(nodes)))
+                cell = ref_el.construct_subelement(sd)
+                Q_ref = create_quadrature(cell, interpolant_deg + q)
+                Pq = polynomial_set.ONPolynomialSet(cell, q, scale=1)
+                Phis = Pq.tabulate(Q_ref.get_points())[(0,) * sd]
+                for entity in sorted(top[sd]):
+                    Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
+                    scale = 1 / Q.jacobian_determinant()
+                    phis = scale * Phis
+                    cur = len(nodes)
+                    nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis)
+                    entity_ids[sd][entity] = list(range(cur, len(nodes)))
 
         elif variant == "point":
             # edge dofs
@@ -77,9 +81,10 @@ class ArgyrisDualSet(dual_set.DualSet):
             # interior dofs
             if degree > 5:
                 cur = len(nodes)
-                internalpts = ref_el.make_points(2, 0, degree - 3)
-                nodes.extend(PointEvaluation(ref_el, pt) for pt in internalpts)
-                entity_ids[2][0] = list(range(cur, len(nodes)))
+                for entity in sorted(top[sd]):
+                    internalpts = ref_el.make_points(sd, entity, degree - 3)
+                    nodes.extend(PointEvaluation(ref_el, pt) for pt in internalpts)
+                    entity_ids[sd][entity] = list(range(cur, len(nodes)))
         else:
             raise ValueError("Invalid variant for Argyris")
         super().__init__(nodes, ref_el, entity_ids)
@@ -103,7 +108,9 @@ class Argyris(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree=5, variant=None):
 
-        variant, interpolant_deg = check_format_variant(variant, degree)
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            raise NotImplementedError(f"{type(self).__name__} is not implemented as a macroelement.")
 
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = ArgyrisDualSet(ref_el, degree, variant, interpolant_deg)

@@ -11,6 +11,7 @@
 from FIAT import finite_element, polynomial_set, dual_set
 from FIAT.check_format_variant import check_format_variant
 from FIAT.reference_element import TRIANGLE
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.functional import (ComponentPointEvaluation,
                              PointwiseInnerProductEvaluation,
@@ -54,23 +55,30 @@ class HuZhangDual(dual_set.DualSet):
             entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # interior dofs
-        cur = len(nodes)
-        if variant == "point":
-            # unique components evaluated at interior points
-            pts = ref_el.make_points(sd, 0, degree+1)
-            nodes.extend(ComponentPointEvaluation(ref_el, (i, j), shp, pt)
-                         for pt in pts for i in range(sd) for j in range(i, sd))
+        if variant == "integral":
+            cell = ref_el.construct_subelement(sd)
+            Q_ref = create_quadrature(cell, 2*degree-2)
+            P = polynomial_set.ONPolynomialSet(cell, degree-2, scale=1)
+            Phis = P.tabulate(Q_ref.get_points())[(0,)*sd]
 
-        elif variant == "integral":
-            # Moments of unique components against a basis for P_{k-2}
-            n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
-            Q = create_quadrature(ref_el, 2*degree-2)
-            P = polynomial_set.ONPolynomialSet(ref_el, degree-2, scale="L2 piola")
-            phis = P.tabulate(Q.get_points())[(0,)*sd]
-            nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n[i+1], n[j+1], Q, phi)
-                         for phi in phis for i in range(sd) for j in range(i, sd))
+        for entity in sorted(top[sd]):
+            cur = len(nodes)
+            if variant == "point":
+                # unique components evaluated at interior points
+                pts = ref_el.make_points(sd, entity, degree+1)
+                nodes.extend(ComponentPointEvaluation(ref_el, (i, j), shp, pt)
+                             for pt in pts for i in range(sd) for j in range(i, sd))
 
-        entity_ids[2][0].extend(range(cur, len(nodes)))
+            elif variant == "integral":
+                # Moments of unique components against a basis for P_{k-2}
+                faces = ref_el.get_connectivity()[(sd, sd-1)][entity]
+                n = list(map(ref_el.compute_scaled_normal, faces))
+                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
+                phis = Phis / Q.jacobian_determinant()
+                nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n[i+1], n[j+1], Q, phi)
+                             for phi in phis for i in range(sd) for j in range(i, sd))
+
+            entity_ids[sd][entity].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
 
@@ -81,7 +89,10 @@ class HuZhang(finite_element.CiarletElement):
             raise ValueError(f"{type(self).__name__} only defined for degree >= 3")
         if ref_el.shape != TRIANGLE:
             raise ValueError(f"{type(self).__name__} only defined on triangles")
-        variant, qdegree = check_format_variant(variant, degree)
+        splitting, variant, qdegree = check_format_variant(variant, degree)
+        if splitting is not None:
+            raise NotImplementedError(f"{type(self).__name__} is not implemented as a macroelement.")
+
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
         dual = HuZhangDual(ref_el, degree, variant, qdegree)
         formdegree = ref_el.get_spatial_dimension() - 1

@@ -80,10 +80,18 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     Vh, residual, *_ = np.linalg.lstsq(Phi.T, phi.T)
     Mh = Vh.T
     Mh = Mh[:num_dofs]
-    Mh[abs(Mh) < 1E-10] = 0.0
-    M[abs(M) < 1E-10] = 0.0
-    assert np.allclose(residual, 0), str(M.T - Mh.T)
-    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs])
+    Mh[abs(Mh) < 1E-10] = 0
+    M[abs(M) < 1E-10] = 0
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        error = M.T / Mh.T - 1
+    error[error != error] = 0
+    error[abs(error) < 1E-10] = 0
+    error = error[np.ix_(*map(np.unique, np.nonzero(error)))]
+    error[error != 0] += 1
+
+    assert np.allclose(residual, 0), str(error)
+    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(error)
 
 
 @pytest.mark.parametrize("element", [
@@ -91,8 +99,15 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
                          finat.Hermite,
                          finat.Bell,
                          ])
-def test_C1_elements(ref_to_phys, element):
+def test_C1_triangle(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[2])
+
+
+@pytest.mark.parametrize("element", [
+                         finat.Morley,
+                         ])
+def test_C1_tetrahedron(ref_to_phys, element):
+    check_zany_mapping(element, ref_to_phys[3])
 
 
 @pytest.mark.parametrize("element", [
@@ -163,5 +178,14 @@ def test_piola_triangle_high_order(ref_to_phys, element, degree, variant):
                          *((finat.GopalakrishnanLedererSchoberlSecondKind, k) for k in range(0, 3)),
                          ])
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_affine(ref_to_phys, element, degree, dimension):
-    check_zany_mapping(element, ref_to_phys[dimension], degree)
+@pytest.mark.parametrize("variant", [None, "alfeld"])
+def test_affine(ref_to_phys, element, degree, variant, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)
+
+
+@pytest.mark.parametrize("element", [finat.BrezziDouglasMarini, finat.NedelecSecondKind])
+@pytest.mark.parametrize("degree", [1, 2])
+@pytest.mark.parametrize("dimension", [2, 3])
+@pytest.mark.parametrize("variant", [None, "iso"])
+def test_macro_piola(ref_to_phys, element, degree, variant, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)

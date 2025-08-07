@@ -65,8 +65,8 @@ class NedelecSecondKindDual(DualSet):
         d = cell.get_spatial_dimension()
         assert (d in (2, 3)), "Second kind Nedelecs only implemented in 2/3D."
 
-        # Zero vertex-based degrees of freedom (d+1 of these)
-        ids[0] = {i: [] for i in range(d + 1)}
+        # Zero vertex-based degrees of freedom
+        ids[0] = {i: [] for i in sorted(cell.topology[0])}
 
         # (degree+1) degrees of freedom per entity of codimension 1 (edges)
         (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
@@ -110,16 +110,16 @@ class NedelecSecondKindDual(DualSet):
 
         return (dofs, ids)
 
-    def _generate_facet_dofs(self, codim, cell, degree, offset, variant, interpolant_deg):
+    def _generate_facet_dofs(self, dim, cell, degree, offset, variant, interpolant_deg):
         """Generate degrees of freedom (dofs) for facets."""
 
         # Initialize empty dofs and identifiers (ids)
-        num_facets = len(cell.get_topology()[codim])
+        num_facets = len(cell.get_topology()[dim])
         dofs = []
         ids = {i: [] for i in range(num_facets)}
 
         # Return empty info if not applicable
-        rt_degree = degree - codim + 1
+        rt_degree = degree - dim + 1
         if rt_degree < 1:
             return (dofs, ids)
 
@@ -127,17 +127,17 @@ class NedelecSecondKindDual(DualSet):
             interpolant_deg = degree
 
         # Construct quadrature scheme for the reference facet
-        ref_facet = cell.construct_subelement(codim)
+        ref_facet = cell.construct_subelement(dim)
         Q_ref = create_quadrature(ref_facet, interpolant_deg + rt_degree)
-        if codim == 1:
-            Phi = ONPolynomialSet(ref_facet, rt_degree, (codim,))
+        if dim == 1:
+            Phi = ONPolynomialSet(ref_facet, rt_degree, (dim,))
         else:
             # Construct Raviart-Thomas on the reference facet
             RT = RaviartThomas(ref_facet, rt_degree, variant)
             Phi = RT.get_nodal_basis()
 
         # Evaluate basis functions at reference quadrature points
-        Phis = Phi.tabulate(Q_ref.get_points())[(0,) * codim]
+        Phis = Phi.tabulate(Q_ref.get_points())[(0,) * dim]
         # Note: Phis has dimensions:
         # num_basis_functions x num_components x num_quad_points
         Phis = numpy.transpose(Phis, (0, 2, 1))
@@ -148,7 +148,7 @@ class NedelecSecondKindDual(DualSet):
         cur = offset
         for facet in range(num_facets):
             # Get the quadrature and Jacobian on this facet
-            Q_facet = FacetQuadratureRule(cell, codim, facet, Q_ref)
+            Q_facet = FacetQuadratureRule(cell, dim, facet, Q_ref)
             J = Q_facet.jacobian()
             Jdet = Q_facet.jacobian_determinant()
 
@@ -196,14 +196,18 @@ class NedelecSecondKind(CiarletElement):
         if degree < 1:
             raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
 
-        sd = ref_el.get_spatial_dimension()
-        poly_set = ONPolynomialSet(ref_el, degree, (sd, ), variant="bubble")
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
+
         if variant and variant.startswith("demkowicz"):
             dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", variant=variant)
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "HCurl", type(self))
         else:
-            variant, interpolant_deg = check_format_variant(variant, degree)
             dual = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg)
+
+        sd = ref_el.get_spatial_dimension()
+        poly_set = ONPolynomialSet(ref_el, degree, (sd, ))
         formdegree = 1  # 1-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")
