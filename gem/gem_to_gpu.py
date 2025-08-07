@@ -83,7 +83,8 @@ def to_cupy(assignments):
         summands = [recurse(e) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        assert len(set(index)) == 1
+        if len(index[1]) != 0:
+            raise NotImplementedError("Power: exponent must be scalar")
         return f"cp.power{commands[0]}, {commands[1]})", index[0]
 
     @recurse.register(gem.MathFunction)
@@ -277,6 +278,35 @@ def to_triton(assignments, temporaries):
                         summands[i] = (command, idx)
             commands = [s[0] for s in summands]
             index = [s[1] for s in summands]
+            if not all([i0 == i1 or i0 == tuple() or i1 == tuple() for i0, i1 in zip(index[0][::-1], index[1][::-1])]):
+                # Empty axis need to be added to allow broadcasting
+                idx0 = len(index[0]) - 1
+                idx1 = len(index[1]) - 1
+                slices0 = "]"
+                slices1 = "]"
+                while 0 <= idx0 or 0 <= idx1:
+                    if index[0][idx0] == index[1][idx1]:
+                        idx0 -= 1
+                        idx1 -= 1
+                        slices0 = ",:" + slices0
+                        slices1 = ",:" + slices1
+                    elif len(index[0]) > len(index[1]):
+                        idx0 -= 1
+                        slices1 = ",None" + slices1
+                    elif len(index[1]) > len(index[0]):
+                        idx1 -= 1
+                        slices0 = ",None" + slices0
+                    else:
+                        raise NotImplementedError("Equal length broadcasting")
+                for i, slices in enumerate([slices0, slices1]):
+                    if "None" in slices:
+                        if commands[i][-1] == "]":
+                            commands[i] = commands[i][:-7] + slices
+                        else:
+                            commands[i] = commands[i] + "[" + slices[2:]
+                        
+            
+
             result_shape = np.broadcast_shapes(tuple(i.count for i in index[0]), tuple(i.count for i in index[1]))
             all_indices = set([i for s in summands for i in s[1]])
             result = tuple([i for i_count in result_shape for i in all_indices if i.count == i_count])
@@ -337,12 +367,12 @@ def to_triton(assignments, temporaries):
 
     @_recurse.register(gem.Power)
     def _recurse_power(expr, outer_idx):
-        raise NotImplementedError("Power")
         summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        assert len(set(index)) == 1
-        return f"cp.power{commands[0]}, {commands[1]})", index[0]
+        if len(index[1]) != 0:
+            raise NotImplementedError("Power: exponent must be scalar")
+        return f"libdevice.pow({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.MathFunction)
     def _recurse_fn(expr, outer_idx):
@@ -573,6 +603,7 @@ def to_triton(assignments, temporaries):
     for key, val in temps.items():
         if key != "counter":
             temp_vars += [f"\t{val[0]} = {val[1][0]}"]
+            #temp_vars += ["\tbreakpoint()"]
     #strs += [f"tl.store({output} + offsets, {v}, mask=mask"]
 
     #temp_vars += [f"\tbreakpoint()"]
