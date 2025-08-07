@@ -39,7 +39,8 @@ def tridiag_eig(A, B):
     numpy.reciprocal(Z, out=Z)
     numpy.multiply(numpy.sqrt(Z), V, out=V)
     numpy.multiply(V, a[:, None], out=V)
-    return Z, V
+    # Reorder by increasing eigenvalue
+    return Z[::-1], V[:, ::-1]
 
 
 class FDMDual(dual_set.DualSet):
