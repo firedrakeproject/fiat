@@ -32,10 +32,9 @@ def check_format_variant(variant, degree):
     if variant is None:
         variant = "integral"
 
-    match = re.match(r"^integral(?:\((\d+)\))?$", variant)
+    match = re.match(r"^(\w+)(?:\((\d+)\))?$", variant)
     if match:
-        variant = "integral"
-        extra_degree, = match.groups()
+        variant, extra_degree = match.groups()
         extra_degree = int(extra_degree) if extra_degree is not None else 0
         interpolant_degree = degree + extra_degree
         if interpolant_degree < degree:
@@ -63,7 +62,7 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
     default = "integral" if integral else "spectral"
     if integral:
-        supported_point_variants = {"integral": None, "point": "point"}
+        supported_point_variants = {"integral": None, "point": "point", "fdm": "fdm", "demkowicz": "demkowicz", "demkowiczmass": "demkowiczmass"}
     elif discontinuous:
         supported_point_variants = supported_dg_variants
     else:
@@ -73,7 +72,6 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
     splitting = None
     splitting_args = tuple()
     point_variant = supported_point_variants[default]
-
     for pre_opt in options:
         opt = pre_opt.lower()
         if opt in supported_splits:

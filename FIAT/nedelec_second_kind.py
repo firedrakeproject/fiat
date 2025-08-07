@@ -16,6 +16,7 @@ from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.check_format_variant import check_format_variant
+from FIAT import demkowicz
 
 
 class NedelecSecondKindDual(DualSet):
@@ -149,10 +150,10 @@ class NedelecSecondKindDual(DualSet):
             # Get the quadrature and Jacobian on this facet
             Q_facet = FacetQuadratureRule(cell, dim, facet, Q_ref)
             J = Q_facet.jacobian()
-            detJ = Q_facet.jacobian_determinant()
+            Jdet = Q_facet.jacobian_determinant()
 
             # Map Phis -> phis (reference values to physical values)
-            piola_map = J / detJ
+            piola_map = J / Jdet
             phis = numpy.dot(Phis, piola_map.T)
             phis = numpy.transpose(phis, (0, 2, 1))
 
@@ -192,26 +193,21 @@ class NedelecSecondKind(CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
+        if degree < 1:
+            raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
+
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        # Check degree
-        assert degree >= 1, "Second kind Nedelecs start at 1!"
+        if variant and variant.startswith("demkowicz"):
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", kind=2, variant=variant)
+        elif variant == "fdm":
+            dual = demkowicz.FDMDual(ref_el, degree, "HCurl", type(self))
+        else:
+            dual = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg)
 
-        # Get dimension
-        d = ref_el.get_spatial_dimension()
-        # Construct polynomial basis for d-vector fields
-        Ps = ONPolynomialSet(ref_el, degree, (d, ))
-
-        # Construct dual space
-        Ls = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg)
-
-        # Set form degree
+        sd = ref_el.get_spatial_dimension()
+        poly_set = ONPolynomialSet(ref_el, degree, (sd, ))
         formdegree = 1  # 1-form
-
-        # Set mapping
-        mapping = "covariant piola"
-
-        # Call init of super-class
-        super().__init__(Ps, Ls, degree, formdegree, mapping=mapping)
+        super().__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")
