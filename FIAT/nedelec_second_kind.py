@@ -201,7 +201,7 @@ class NedelecSecondKind(CiarletElement):
             ref_el = splitting(ref_el)
 
         if variant and variant.startswith("demkowicz"):
-            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", variant=variant)
+            dual = demkowicz.DemkowiczDual(ref_el, degree, "HCurl", kind=2, variant=variant)
         elif variant == "fdm":
             dual = demkowicz.FDMDual(ref_el, degree, "HCurl", type(self))
         else:
