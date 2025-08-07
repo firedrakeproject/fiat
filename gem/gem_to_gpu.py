@@ -258,26 +258,32 @@ def to_triton(assignments, temporaries):
         index = [s[1] for s in summands]
         index_without_empty = list(set(index) - set([tuple()]))
         if len(index_without_empty) != 1:
-            for i in index:
+            # case where the shapes are not exactly the same
+            outer = []
+            for i, (command, idx) in enumerate(summands):
                 # need to ensure that block index remains the first index
-                if 'BLOCK_IDX' in i:
-                    i_loc = index.index(i)
-                    val = summands.pop(i_loc)
-                    summands = [val] + summands
-                    
+                if any(outer in idx for outer in outer_idx):
+                    slicing = "["
+                    for axis in idx:
+                        if axis in outer_idx:
+                            slicing += ":, None, "
+                            idx = list(idx)
+                            idx.remove(axis)
+                            idx = tuple(idx)
+                            if axis not in outer:
+                                outer += [axis]
+                    if len(slicing) > 1:
+                        command += slicing[:-2] + "]"
+                        summands[i] = (command, idx)
             commands = [s[0] for s in summands]
-            
-            index = [i for s in summands for i in s[1]]
-            mid = (len(index) // 2) - 1
-            if index[mid] != index[mid + 1]:
-                 for i, (command, index) in enumerate(summands):
-                     
-                     slicing = [":" if i == j else "None" for j in range(len(index_without_empty))]
-                     commands[i] += '[' + ','.join(slicing) + ']' 
-            else:
-                index.pop(mid)
+            index = [s[1] for s in summands]
+            result_shape = np.broadcast_shapes(tuple(i.count for i in index[0]), tuple(i.count for i in index[1]))
+            all_indices = set([i for s in summands for i in s[1]])
+            result = tuple([i for i_count in result_shape for i in all_indices if i.count == i_count])
+            index = tuple(outer) + result 
         else:
-            index = [i for s in summands for i in s[1]]
+            index = index_without_empty[0]
+        
         return "(" + " * ".join(commands) + ")", tuple(index)
     
     @_recurse.register(gem.IndexSum)
@@ -292,17 +298,16 @@ def to_triton(assignments, temporaries):
         if len(sum_index) > 1:
             raise NotImplementedError("Index Summing over multiple indices at once")
         sum_axis = list(index[0]).index(sum_index[0])
-        return f"tl.sum({prod}, {sum_axis})",outer_idx + expr.free_indices 
+        return f"tl.sum({prod}, {sum_axis})", outer_idx + expr.free_indices 
 
     @_recurse.register(gem.Sum)
     def _recurse_sum(expr, outer_idx):
         summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
-        if not all([i == index[0] for i in index]):
-            breakpoint()
         assert len(set(index)) == 1
         return "(" + " + ".join(commands) + ")" , index[0] 
+
     @_recurse.register(gem.Division)
     def _recurse_div(expr, outer_idx):
         raise NotImplementedError("Div")
@@ -439,7 +444,7 @@ def to_triton(assignments, temporaries):
             res_str = f"{chld}_{i[0]}" 
         else:
             res_str = chld
-        return res_str, expr.index_ordering() + idx
+        return res_str, idx + expr.index_ordering()
 
     @_recurse.register(gem.FlexiblyIndexed)
     def _recurse_findexed(expr, outer_idx):
@@ -458,12 +463,12 @@ def to_triton(assignments, temporaries):
                     else:
                         raise NotImplementedError("Flexibly indexed Strides")
         if index is not None:
-            temps[expr] = (f"{chld}{index}",(f"_take_slice_({chld}, len({chld}.shape), 0, {index}, {chld}.shape[1]).reshape({chld}.shape[0])", expr.index_ordering() + idx ))
+            temps[expr] = (f"{chld}{index}",(f"_take_slice_({chld}, len({chld}.shape), 0, {index}, {chld}.shape[1]).reshape({chld}.shape[0])", idx + expr.index_ordering() ))
             res_str = f"{chld}{index}" 
         else:
             res_str = chld
 
-        return res_str, expr.index_ordering() + idx
+        return res_str, idx + expr.index_ordering()
 
     @_recurse.register(gem.Variable)
     def _recurse_variable(expr, outer_idx):
@@ -580,7 +585,6 @@ def to_triton(assignments, temporaries):
 
     const_exprs =kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"] 
     const_exprs = [f"\t{exp[0]}:tl.constexpr = {int(exp[1])}" for exp in const_exprs]
-    const_exprs += ["\tpdb.set_trace()"]
     array_exprs = [exp[0] for exp in kernel_args["arrays"]]
     arg_list = array_exprs + ["BLOCK_SIZE_C:tl.constexpr"] 
     # this ordering probably needs work
