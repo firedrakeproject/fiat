@@ -599,7 +599,7 @@ def to_triton(assignments, temporaries):
 
         temp_vars += [offsets[:-2], mask[:-2], ptr, load]
             
-
+    kernel_args["blocks"] = [("BLOCK_SIZE_C", 2)]
     for key, val in temps.items():
         if key != "counter":
             temp_vars += [f"\t{val[0]} = {val[1][0]}"]
@@ -617,7 +617,7 @@ def to_triton(assignments, temporaries):
     const_exprs =kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"] 
     const_exprs = [f"\t{exp[0]}:tl.constexpr = {int(exp[1])}" for exp in const_exprs]
     array_exprs = [exp[0] for exp in kernel_args["arrays"]]
-    arg_list = array_exprs + ["BLOCK_SIZE_C:tl.constexpr"] 
+    arg_list = array_exprs + [f"{block[0]}:tl.constexpr" for block in kernel_args["blocks"]] 
     # this ordering probably needs work
     if "A" in arg_list:
         a_idx = arg_list.index("A")
