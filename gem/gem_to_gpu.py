@@ -278,12 +278,15 @@ def to_triton(assignments, temporaries):
                         summands[i] = (command, idx)
             commands = [s[0] for s in summands]
             index = [s[1] for s in summands]
+            new_shape0 = list([i.count for i in index[0]])
+            new_shape1 = list([i.count for i in index[1]])
             if not all([i0 == i1 or i0 == tuple() or i1 == tuple() for i0, i1 in zip(index[0][::-1], index[1][::-1])]):
                 # Empty axis need to be added to allow broadcasting
                 idx0 = len(index[0]) - 1
                 idx1 = len(index[1]) - 1
                 slices0 = "]"
                 slices1 = "]"
+
                 while 0 <= idx0 or 0 <= idx1:
                     if index[0][idx0] == index[1][idx1]:
                         idx0 -= 1
@@ -291,11 +294,13 @@ def to_triton(assignments, temporaries):
                         slices0 = ",:" + slices0
                         slices1 = ",:" + slices1
                     elif len(index[0]) > len(index[1]):
-                        idx0 -= 1
+                        new_shape1 = new_shape1[:idx1+1] + [1] + new_shape1[idx1+1:]
                         slices1 = ",None" + slices1
+                        idx0 -= 1
                     elif len(index[1]) > len(index[0]):
-                        idx1 -= 1
+                        new_shape0 = new_shape1[:idx0+1] + [1] + new_shape1[idx0+1:]
                         slices0 = ",None" + slices0
+                        idx1 -= 1
                     else:
                         raise NotImplementedError("Equal length broadcasting")
                 for i, slices in enumerate([slices0, slices1]):
@@ -305,9 +310,7 @@ def to_triton(assignments, temporaries):
                         else:
                             commands[i] = commands[i] + "[" + slices[2:]
                         
-            
-
-            result_shape = np.broadcast_shapes(tuple(i.count for i in index[0]), tuple(i.count for i in index[1]))
+            result_shape = np.broadcast_shapes(tuple(new_shape0), tuple(new_shape1))
             all_indices = set([i for s in summands for i in s[1]])
             result = tuple([i for i_count in result_shape for i in all_indices if i.count == i_count])
             index = tuple(outer) + result 
@@ -531,19 +534,21 @@ def to_triton(assignments, temporaries):
     def func_decl(*args):
         return ["@triton.jit", f"def triton_kernel({", ".join(args)}):"]
 
+    from firedrake.device import compute_device
+    block_dims = tuple([block[0] for block in compute_device.blocks])
     counter = 0
     temp_assigns = []
     strs = []
     for t in temporaries:
-        temps[t] = (f"inter{counter}", recurse(t, ('BLOCK_SIZE_C',)))
+        temps[t] = (f"inter{counter}", recurse(t, block_dims))
         counter += 1
 
     for var, expr in assignments:
-        e, e_idx = recurse(expr, ('BLOCK_SIZE_C',))
-        v, v_idx = recurse(var, ('BLOCK_SIZE_C',))
+        e, e_idx = recurse(expr, block_dims)
+        v, v_idx = recurse(var, block_dims)
         #assert v_idx == e_idx
         strs += [f"\t{v}_res={e}"]
-    kernel_args = {"arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "blocks":[]}
+    kernel_args = {"arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "BLocks":[]}
      
     temp_vars = ["\tpid = tl.program_id(axis=0)"]
     for name, size in args.items():
@@ -599,7 +604,7 @@ def to_triton(assignments, temporaries):
 
         temp_vars += [offsets[:-2], mask[:-2], ptr, load]
             
-    kernel_args["blocks"] = [("BLOCK_SIZE_C", 2)]
+    kernel_args["blocks"] = compute_device.blocks 
     for key, val in temps.items():
         if key != "counter":
             temp_vars += [f"\t{val[0]} = {val[1][0]}"]
