@@ -685,12 +685,31 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
-        # All indices fixed
-        if all(isinstance(i, int) for i in multiindex):
-            if isinstance(aggregate, Constant):
-                return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
-            elif isinstance(aggregate, ListTensor):
-                return aggregate.array[multiindex]
+        # Simplify Literal and ListTensor
+        if isinstance(aggregate, (Constant, ListTensor)):
+            if all(isinstance(i, int) for i in multiindex):
+                # All indices fixed
+                sub = aggregate.array[multiindex]
+                return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
+            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
+                # Some indices fixed
+                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
+                sub = aggregate.array[slices]
+                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
+                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
+
+        # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
+        if isinstance(aggregate, ComponentTensor):
+            B, = aggregate.children
+            jj = aggregate.multiindex
+            if isinstance(B, Indexed):
+                C, = B.children
+                kk = B.multiindex
+                if all(j in kk for j in jj):
+                    ii = tuple(multiindex)
+                    rep = dict(zip(jj, ii))
+                    ll = tuple(rep.get(k, k) for k in kk)
+                    return Indexed(C, ll)
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
@@ -836,6 +855,11 @@ class ComponentTensor(Node):
         if isinstance(expression, Zero):
             return Zero(shape, dtype=expression.dtype)
 
+        # Index folding
+        if isinstance(expression, Indexed):
+            if multiindex == expression.multiindex:
+                return expression.children[0]
+
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
         self.multiindex = multiindex
@@ -892,8 +916,16 @@ class ListTensor(Node):
         dtype = Node.inherit_dtype_from_children(tuple(array.flat))
 
         # Handle children with shape
-        child_shape = array.flat[0].shape
+        e0 = array.flat[0]
+        child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
+
+        # Index folding
+        if child_shape == array.shape:
+            if all(isinstance(elem, Indexed) for elem in array.flat):
+                if all(elem.children == e0.children for elem in array.flat[1:]):
+                    if all(elem.multiindex == idx for elem, idx in zip(array.flat, numpy.ndindex(array.shape))):
+                        return e0.children[0]
 
         if child_shape:
             # Destroy structure
