@@ -94,10 +94,8 @@ class FiniteElement(FiniteElementBase):
                 return EnrichedElement(HCurl(TensorProductElement(Qc_elt, Id_elt, cell=cell)),
                                        HCurl(TensorProductElement(Qd_elt, Ic_elt, cell=cell)))
 
-            elif family in {"Q", "Bernstein"}:
-                if family == "Q":
-                    family = "CG"
-                return TensorProductElement(*[FiniteElement(family, c, degree, variant=variant)
+            elif family == "Q":
+                return TensorProductElement(*[FiniteElement("CG", c, degree, variant=variant)
                                               for c in cell.sub_cells()],
                                             cell=cell)
 
