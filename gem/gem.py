@@ -985,10 +985,10 @@ class Delta(Scalar, Terminal):
         if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
 
-        if isinstance(i, Integral):
+        if isinstance(i, Integral) and not isinstance(j, Index):
             return Indexed(Literal(numpy.eye(j.extent)[i]), (j,))
 
-        if isinstance(j, Integral):
+        if isinstance(j, Integral) and not isinstance(i, Index):
             return Indexed(Literal(numpy.eye(i.extent)[j]), (i,))
 
         self = super(Delta, cls).__new__(cls)
