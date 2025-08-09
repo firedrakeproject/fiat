@@ -249,6 +249,12 @@ def _select_expression(expressions, index):
         children = remove_componenttensors([Indexed(e, multiindex) for e in expressions])
         return ComponentTensor(_select_expression(children, index), multiindex)
 
+    if types == {Delta}:
+        if all(k == e.i for k, e in enumerate(expressions)):
+            return expr.reconstruct(index, expr.j)
+        elif all(k == e.j for k, e in enumerate(expressions)):
+            return expr.reconstruct(expr.i, index)
+
     if len(types) == 1:
         cls, = types
         if cls.__front__ or cls.__back__:
