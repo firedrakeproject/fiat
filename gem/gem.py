@@ -985,27 +985,11 @@ class Delta(Scalar, Terminal):
         if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
 
-        # VariableIndex
-        if isinstance(i, Integral) and not isinstance(j, Index):
-            return Indexed(ListTensor([Delta(i, k, dtype=dtype) for k in range(j.extent)]), (j,))
-
-        if isinstance(j, Integral) and not isinstance(i, Index):
-            return Indexed(ListTensor([Delta(k, j, dtype=dtype) for k in range(i.extent)]), (i,))
-
-        if isinstance(i, VariableIndex) or isinstance(j, VariableIndex):
-            extent = i.extent if isinstance(i, Index) else j.extent
-            return Indexed(Identity(extent, dtype=dtype), (i, j))
-
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
         # Set up free indices
-        free_indices = []
-        for index in (i, j):
-            if isinstance(index, Index):
-                free_indices.append(index)
-            elif isinstance(index, VariableIndex):
-                raise NotImplementedError("Can not make Delta with VariableIndex")
+        free_indices = [index for index in (i, j) if isinstance(index, Index)]
         self.free_indices = tuple(unique(free_indices))
         self._dtype = dtype
         return self
