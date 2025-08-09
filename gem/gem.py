@@ -15,7 +15,7 @@ indices.
 """
 
 from abc import ABCMeta
-from itertools import chain
+from itertools import chain, repeat
 from functools import reduce
 from operator import attrgetter
 from numbers import Integral, Number
@@ -972,7 +972,7 @@ class Delta(Scalar, Terminal):
     def __new__(cls, i, j, dtype=None):
         if isinstance(i, tuple) and isinstance(j, tuple):
             # Handle multiindices
-            return Product(*map(Delta, i, j))
+            return Product(*map(Delta, i, j, repeat(dtype)))
         assert isinstance(i, IndexBase)
         assert isinstance(j, IndexBase)
 
@@ -984,11 +984,16 @@ class Delta(Scalar, Terminal):
         if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
 
+        # VariableIndex
         if isinstance(i, Integral) and not isinstance(j, Index):
-            return Indexed(Literal(numpy.eye(j.extent)[i]), (j,))
+            return Indexed(ListTensor([Delta(i, k, dtype=dtype) for k in range(j.extent)]), (j,))
 
         if isinstance(j, Integral) and not isinstance(i, Index):
-            return Indexed(Literal(numpy.eye(i.extent)[j]), (i,))
+            return Indexed(ListTensor([Delta(k, j, dtype=dtype) for k in range(i.extent)]), (i,))
+
+        if isinstance(i, VariableIndex) or isinstance(j, VariableIndex):
+            extent = i.extent if isinstance(i, Index) else j.extent
+            return Indexed(Identity(extent, dtype=dtype), (i, j))
 
         self = super(Delta, cls).__new__(cls)
         self.i = i
@@ -1003,6 +1008,9 @@ class Delta(Scalar, Terminal):
         self.free_indices = tuple(unique(free_indices))
         self._dtype = dtype
         return self
+
+    def reconstruct(self, *args):
+        return Delta(*args, dtype=self.dtype)
 
 
 class Inverse(Node):
