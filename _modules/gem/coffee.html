@@ -42,8 +42,7 @@
 <span class="sd">This file is NOT for code generation as a COFFEE AST.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">repeat</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
@@ -96,10 +95,10 @@
 
 <span class="sd">    :returns: list of atomic GEM expressions</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">atomics</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">OrderedDict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">monomial</span><span class="o">.</span><span class="n">atomics</span> <span class="k">for</span> <span class="n">monomial</span> <span class="ow">in</span> <span class="n">monomials</span><span class="p">))))</span>
+    <span class="n">atomics</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">monomial</span><span class="o">.</span><span class="n">atomics</span> <span class="k">for</span> <span class="n">monomial</span> <span class="ow">in</span> <span class="n">monomials</span><span class="p">)))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">cost</span><span class="p">(</span><span class="n">solution</span><span class="p">):</span>
-        <span class="n">extent</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">atomic</span><span class="p">:</span> <span class="n">index_extent</span><span class="p">(</span><span class="n">atomic</span><span class="p">,</span> <span class="n">linear_indices</span><span class="p">),</span> <span class="n">solution</span><span class="p">))</span>
+        <span class="n">extent</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">index_extent</span><span class="p">,</span> <span class="n">solution</span><span class="p">,</span> <span class="n">repeat</span><span class="p">(</span><span class="n">linear_indices</span><span class="p">)))</span>
         <span class="c1"># Prefer shorter solutions, but larger extents</span>
         <span class="k">return</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">solution</span><span class="p">),</span> <span class="o">-</span><span class="n">extent</span><span class="p">)</span>
 
