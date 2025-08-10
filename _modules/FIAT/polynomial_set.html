@@ -56,7 +56,6 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">expansions</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">index_iterator</span>
 
 
 <div class="viewcode-block" id="mis">
@@ -192,25 +191,21 @@
 <span class="sd">    identity matrix of coefficients.  Can be used to specify ON bases</span>
 <span class="sd">    for vector- and tensor-valued sets as well.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">ExpansionSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">shape</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">():</span>
-            <span class="n">num_components</span> <span class="o">=</span> <span class="mi">1</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">flat_shape</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
-            <span class="n">num_components</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">flat_shape</span><span class="p">)</span>
+        <span class="n">num_components</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
         <span class="n">num_exp_functions</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span>
         <span class="n">num_members</span> <span class="o">=</span> <span class="n">num_components</span> <span class="o">*</span> <span class="n">num_exp_functions</span>
         <span class="n">embedded_degree</span> <span class="o">=</span> <span class="n">degree</span>
 
         <span class="c1"># set up coefficients</span>
-        <span class="k">if</span> <span class="n">shape</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">shape</span> <span class="o">==</span> <span class="p">():</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_members</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_members</span><span class="p">,</span> <span class="o">*</span><span class="n">shape</span><span class="p">,</span> <span class="n">num_exp_functions</span><span class="p">))</span>
             <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="n">exp_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_exp_functions</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">index_iterator</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
                 <span class="n">cur_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span><span class="o">+</span><span class="n">num_exp_functions</span><span class="p">)</span>
                 <span class="n">coeffs</span><span class="p">[(</span><span class="n">cur_bf</span><span class="p">,</span> <span class="o">*</span><span class="n">idx</span><span class="p">,</span> <span class="n">exp_bf</span><span class="p">)]</span> <span class="o">=</span> <span class="mf">1.0</span>
                 <span class="n">cur</span> <span class="o">+=</span> <span class="n">num_exp_functions</span>
@@ -340,7 +335,7 @@
         <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_members</span><span class="p">,</span> <span class="o">*</span><span class="n">shape</span><span class="p">,</span> <span class="n">num_exp_functions</span><span class="p">))</span>
         <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">exp_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_exp_functions</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">index_iterator</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;</span> <span class="n">j</span><span class="p">:</span>
                 <span class="k">continue</span>
             <span class="n">cur_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span><span class="o">+</span><span class="n">num_exp_functions</span><span class="p">)</span>
@@ -375,7 +370,7 @@
         <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_members</span><span class="p">,</span> <span class="o">*</span><span class="n">shape</span><span class="p">,</span> <span class="n">num_exp_functions</span><span class="p">))</span>
         <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">exp_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_exp_functions</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">index_iterator</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="n">size</span><span class="o">-</span><span class="mi">1</span> <span class="ow">and</span> <span class="n">j</span> <span class="o">==</span> <span class="n">size</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
                 <span class="k">continue</span>
             <span class="n">cur_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span><span class="o">+</span><span class="n">num_exp_functions</span><span class="p">)</span>

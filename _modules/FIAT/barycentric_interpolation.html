@@ -46,7 +46,6 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">reference_element</span><span class="p">,</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">polynomial_set</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">index_iterator</span>
 
 
 <div class="viewcode-block" id="get_lagrange_points">
@@ -158,34 +157,29 @@
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangePolynomialSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LagrangePolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="nb">tuple</span><span class="p">()):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">()):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">LINE</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid reference element type.&quot;</span><span class="p">)</span>
 
         <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">LagrangeLineExpansionSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">)</span>
         <span class="n">degree</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">degree</span>
-        <span class="k">if</span> <span class="n">shape</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">():</span>
-            <span class="n">num_components</span> <span class="o">=</span> <span class="mi">1</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">flat_shape</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ravel</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
-            <span class="n">num_components</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">flat_shape</span><span class="p">)</span>
+        <span class="n">num_components</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
         <span class="n">num_exp_functions</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span>
         <span class="n">num_members</span> <span class="o">=</span> <span class="n">num_components</span> <span class="o">*</span> <span class="n">num_exp_functions</span>
         <span class="n">embedded_degree</span> <span class="o">=</span> <span class="n">degree</span>
 
         <span class="c1"># set up coefficients</span>
-        <span class="k">if</span> <span class="n">shape</span> <span class="o">==</span> <span class="nb">tuple</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">shape</span> <span class="o">==</span> <span class="p">():</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_members</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;d&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">coeffs_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_members</span><span class="p">,</span> <span class="o">*</span><span class="n">shape</span><span class="p">,</span> <span class="n">num_exp_functions</span><span class="p">)</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">coeffs_shape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
-            <span class="c1"># use functional&#39;s index_iterator function</span>
-            <span class="n">cur_bf</span> <span class="o">=</span> <span class="mi">0</span>
-            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">index_iterator</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
-                <span class="k">for</span> <span class="n">exp_bf</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_exp_functions</span><span class="p">):</span>
-                    <span class="n">cur_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">cur_bf</span><span class="p">,</span> <span class="o">*</span><span class="n">idx</span><span class="p">,</span> <span class="n">exp_bf</span><span class="p">)</span>
-                    <span class="n">coeffs</span><span class="p">[</span><span class="n">cur_idx</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
-                    <span class="n">cur_bf</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">exp_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_exp_functions</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
+                <span class="n">cur_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span><span class="o">+</span><span class="n">num_exp_functions</span><span class="p">)</span>
+                <span class="n">coeffs</span><span class="p">[(</span><span class="n">cur_bf</span><span class="p">,</span> <span class="o">*</span><span class="n">idx</span><span class="p">,</span> <span class="n">exp_bf</span><span class="p">)]</span> <span class="o">=</span> <span class="mf">1.0</span>
+                <span class="n">cur</span> <span class="o">+=</span> <span class="n">num_exp_functions</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">embedded_degree</span><span class="p">,</span> <span class="n">expansion_set</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span></div>
 
