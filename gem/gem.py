@@ -274,6 +274,7 @@ class Literal(Constant):
 
     def __new__(cls, array, dtype=None):
         array = asarray(array)
+
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -702,14 +703,29 @@ class Indexed(Scalar):
         if isinstance(aggregate, ComponentTensor):
             B, = aggregate.children
             jj = aggregate.multiindex
+            ii = multiindex
+            # Avoid recursion and just attempt to simplify some common patterns
+            # as the result of this method is not cached.
             if isinstance(B, Indexed):
                 C, = B.children
                 kk = B.multiindex
-                if all(j in kk for j in jj):
-                    ii = tuple(multiindex)
+                if isinstance(C, ListTensor):
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
-                    return Indexed(C, ll)
+                    B = Indexed(C, ll)
+                    jj = tuple(j for j in jj if j not in kk)
+                    ii = tuple(rep[j] for j in jj)
+                    if len(ii) == 0:
+                        return B
+
+            if isinstance(B, Indexed):
+                C, = B.children
+                kk = B.multiindex
+                if not isinstance(C, ComponentTensor) or all(isinstance(i, Index) for i in ii):
+                    if all(j in kk for j in jj):
+                        rep = dict(zip(jj, ii))
+                        ll = tuple(rep.get(k, k) for k in kk)
+                        return Indexed(C, ll)
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
@@ -722,6 +738,7 @@ class Indexed(Scalar):
                 new_indices.append(i)
             elif isinstance(i, VariableIndex):
                 new_indices.extend(i.expression.free_indices)
+
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
         return self
