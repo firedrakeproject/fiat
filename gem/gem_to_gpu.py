@@ -263,11 +263,12 @@ def to_triton(assignments, temporaries):
             outer = []
             for i, (command, idx) in enumerate(summands):
                 # need to ensure that block index remains the first index
-                if any(outer in idx for outer in outer_idx):
+                block_indices =  [v for vs in outer_idx.values() for v in vs]
+                if any(outer in idx for outer in block_indices):
                     slicing = "["
                     for axis in idx:
-                        if axis in outer_idx:
-                            slicing += ":, None, "
+                        if axis in block_indices and axis == "BLOCK_SIZE_C":
+                            slicing += len(outer) * "None," + ":, None, "
                             idx = list(idx)
                             idx.remove(axis)
                             idx = tuple(idx)
@@ -278,8 +279,9 @@ def to_triton(assignments, temporaries):
                         summands[i] = (command, idx)
             commands = [s[0] for s in summands]
             index = [s[1] for s in summands]
-            new_shape0 = list([i.count for i in index[0]])
-            new_shape1 = list([i.count for i in index[1]])
+            # integer reps of the indices
+            new_shape0 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[0]])
+            new_shape1 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[1]])
             if not all([i0 == i1 or i0 == tuple() or i1 == tuple() for i0, i1 in zip(index[0][::-1], index[1][::-1])]):
                 # Empty axis need to be added to allow broadcasting
                 idx0 = len(index[0]) - 1
@@ -327,11 +329,13 @@ def to_triton(assignments, temporaries):
         prod = "*".join(commands)
         if len(index) > 1:
             raise NotImplementedError("IndexSum with multiple children")
-        sum_index = list(set(index[0]) - set(expr.free_indices + outer_idx))
+        sum_index = list(set(index[0]) - set(expr.free_indices + tuple([idx for val in outer_idx.values() for idx in val])))
         if len(sum_index) > 1:
             raise NotImplementedError("Index Summing over multiple indices at once")
-        sum_axis = list(index[0]).index(sum_index[0])
-        return f"tl.sum({prod}, {sum_axis})", outer_idx + expr.free_indices 
+        index_list = list(index[0])
+        sum_axis = index_list.index(sum_index[0])
+        index_list.pop(sum_axis)
+        return f"tl.sum({prod}, {sum_axis})", tuple(index_list)
 
     @_recurse.register(gem.Sum)
     def _recurse_sum(expr, outer_idx):
@@ -506,7 +510,7 @@ def to_triton(assignments, temporaries):
     @_recurse.register(gem.Variable)
     def _recurse_variable(expr, outer_idx):
         args[expr.name] = expr.shape 
-        return expr.name, outer_idx 
+        return expr.name, tuple(outer_idx["vars"]) 
 
     @_recurse.register(gem.Zero)
     def _recurse_identity(expr, outer_idx):
@@ -526,16 +530,16 @@ def to_triton(assignments, temporaries):
             val = arrays["counter"]
             arrays[expr] = (f"t{val}", expr.array)
             arrays["counter"] += 1
-        return arrays[expr][0], tuple()
+        return arrays[expr][0], tuple(outer_idx["temps"])
 
     def next_pow2(val):
-        return np.power(2, np.ceil(np.log2(val)))
+        return int(np.power(2, np.ceil(np.log2(val))))
 
     def func_decl(*args):
         return ["@triton.jit", f"def triton_kernel({", ".join(args)}):"]
 
     from firedrake.device import compute_device
-    block_dims = tuple([block[0] for block in compute_device.blocks])
+    block_dims = compute_device.block_dims()
     counter = 0
     temp_assigns = []
     strs = []
@@ -550,20 +554,24 @@ def to_triton(assignments, temporaries):
         strs += [f"\t{v}_res={e}"]
     kernel_args = {"arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "BLocks":[]}
      
-    temp_vars = ["\tpid = tl.program_id(axis=0)"]
+    pids = []
+    for i, block in enumerate(block_dims['vars'] + block_dims['temps']): 
+        pids += [f"\tpid_{block[-1]} = tl.program_id(axis={i})"]
+
+    temp_vars = []
     for name, size in args.items():
         kernel_args["arrays"] += [(name, None)]
-        size = ("BLOCK_SIZE_C",) + size
+        size = tuple([block[0] for block in compute_device.blocks["vars"]]) + size 
         stride_acc = 1
         for i, dim in enumerate(reversed(size)):
             kernel_args["strides"] += [(name + f"_stride{i}", stride_acc)]
             if not isinstance(dim, str):
                 kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
-                kernel_args["sizes_actual"] += [(name + f"_size{i}", dim)]
+                kernel_args["sizes_actual"] += [(name + f"_size{i}", int(dim))]
                 stride_acc *= dim
                 temp_vars += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
             else:
-                temp_vars += [f"\t{name}_offsets{i} = pid * {dim} + tl.arange(0, {dim})"]
+                temp_vars += [f"\t{name}_offsets{i} = pid_{dim[-1]} * {dim} + tl.arange(0, {dim})"]
         # TODO put in case where dimension has blocks over it
         offsets = f"\t{name}_offsets ="
         mask = f"\t{name}_mask = {name}_offsets < "
@@ -584,18 +592,24 @@ def to_triton(assignments, temporaries):
             continue
         name, array = val
         kernel_args["arrays"] += [(name, array)]
+        size = tuple([block[0] for block in compute_device.blocks["temps"]]) + array.shape[len(compute_device.blocks["temps"]):]
         strides = []
         stride_acc = 1
-        for i, dim in enumerate(reversed(array.shape)):
-            kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
-            kernel_args["sizes_actual"] += [(name + f"_size{i}", dim)]
+        for i, dim in enumerate(reversed(size)):
             kernel_args["strides"] += [(name + f"_stride{i}", stride_acc)]
-            stride_acc *= dim
-            temp_vars += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
+            if not isinstance(dim, str):
+                kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
+                kernel_args["sizes_actual"] += [(name + f"_size{i}", int(dim))]
+                stride_acc *= dim
+                temp_vars += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
+            else:
+                temp_vars += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {dim})) % size_{dim[-1]}"]
+                kernel_args["sizes_actual"] += [(name + f"_size{i}", f"{dim} if {dim} * pid_{dim[-1]} < size_{dim[-1]} else {dim} * pid_{dim[-1]} - size_{dim[-1]}")]
+                kernel_args["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
         offsets = f"\t{name}_offsets ="
         mask = f"\t{name}_mask = {name}_offsets < "
-        for i in range(len(array.shape)):
-            slicing = ",".join(["None" if j == i else ":" for j in range(len(array.shape))])
+        for i in range(len(size)):
+            slicing = ",".join(["None" if j == i else ":" for j in range(len(size))])
             offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
             if i < len(size):
                 mask += f" ({name}_offsets{i}*{name}_stride{i} + {name}_size{i})[{slicing}] + "
@@ -604,14 +618,14 @@ def to_triton(assignments, temporaries):
 
         temp_vars += [offsets[:-2], mask[:-2], ptr, load]
             
-    kernel_args["blocks"] = compute_device.blocks 
+    kernel_args["blocks"] = compute_device.block_dims() 
     for key, val in temps.items():
         if key != "counter":
             temp_vars += [f"\t{val[0]} = {val[1][0]}"]
             #temp_vars += ["\tbreakpoint()"]
     #strs += [f"tl.store({output} + offsets, {v}, mask=mask"]
 
-    #temp_vars += [f"\tbreakpoint()"]
+    temp_vars += [f"\tbreakpoint()"]
 
     for key, val in declare.items():
         if key != "counter" and val[0][0] == "t":
@@ -619,10 +633,11 @@ def to_triton(assignments, temporaries):
         elif key != "counter":
             temp_vars += [f"\t{val[0]} = {repr(val[1])[1:-1]}"]
 
-    const_exprs =kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"] 
-    const_exprs = [f"\t{exp[0]}:tl.constexpr = {int(exp[1])}" for exp in const_exprs]
+    const_exprs = kernel_args["sizes_pow2"] + kernel_args["sizes_actual"] + kernel_args["strides"] 
+    const_exprs = [f"\t{exp[0]}:tl.constexpr = {exp[1]}" for exp in const_exprs]
     array_exprs = [exp[0] for exp in kernel_args["arrays"]]
-    arg_list = array_exprs + [f"{block[0]}:tl.constexpr" for block in kernel_args["blocks"]] 
+    block_dim_args = [f"size_{block[0][-1]}" for block in compute_device.blocks['vars'] + compute_device.blocks['temps']] 
+    arg_list = array_exprs + block_dim_args + [f"{block}:tl.constexpr" for block in block_dims['vars'] + block_dims['temps']] 
     # this ordering probably needs work
     if "A" in arg_list:
         a_idx = arg_list.index("A")
@@ -632,5 +647,5 @@ def to_triton(assignments, temporaries):
         arg_list = [a] + arg_list
         kernel_args["arrays"] = [a2] + kernel_args["arrays"]
         strs += [f"\ttl.store(A_ptr + A_offsets, A_res, mask = A_mask)"] 
-    res = "\n".join(func_decl(*arg_list) + const_exprs + temp_vars + strs)
+    res = "\n".join(func_decl(*arg_list) + pids + const_exprs + temp_vars + strs)
     return res, kernel_args
