@@ -273,7 +273,6 @@ class Literal(Constant):
 
     def __new__(cls, array, dtype=None):
         array = asarray(array)
-
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -294,7 +293,7 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
-        return tuple(self.array.flat) == tuple(other.array.flat)
+        return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
         return hash((type(self), self.shape, tuple(self.array.flat)))
@@ -737,7 +736,6 @@ class Indexed(Scalar):
                 new_indices.append(i)
             elif isinstance(i, VariableIndex):
                 new_indices.extend(i.expression.free_indices)
-
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
         return self
