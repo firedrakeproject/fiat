@@ -273,6 +273,9 @@ class Literal(Constant):
 
     def __new__(cls, array, dtype=None):
         array = asarray(array)
+        if numpy.allclose(array, 0, 1e-14):
+            return Zero(array.shape)
+
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -690,6 +693,7 @@ class Indexed(Scalar):
                 # All indices fixed
                 sub = aggregate.array[multiindex]
                 return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
+
             elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
                 # Some indices fixed
                 slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
@@ -719,11 +723,19 @@ class Indexed(Scalar):
             if isinstance(B, Indexed):
                 C, = B.children
                 kk = B.multiindex
-                if not isinstance(C, ComponentTensor) or all(isinstance(i, Index) for i in ii):
-                    if all(j in kk for j in jj):
-                        rep = dict(zip(jj, ii))
-                        ll = tuple(rep.get(k, k) for k in kk)
+                if all(j in kk for j in jj):
+                    rep = dict(zip(jj, ii))
+                    ll = tuple(rep.get(k, k) for k in kk)
+                    if isinstance(C, ComponentTensor):
+                        if (all(isinstance(i, Index) for i in ii)
+                            or all(isinstance(l, Integral) or (l in C.multiindex) for l in ll)):
+                            return Indexed(C, ll)
+                    else:
                         return Indexed(C, ll)
+
+            if len(ii) < len(multiindex):
+                aggregate = ComponentTensor(B, jj)
+                multiindex = ii
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
