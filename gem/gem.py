@@ -97,7 +97,7 @@ class Node(NodeBase, metaclass=NodeMeta):
     def __sub__(self, other):
         return componentwise(
             Sum, self,
-            componentwise(Product, Literal(-1), as_gem(other)))
+            componentwise(Product, minus, as_gem(other)))
 
     def __rsub__(self, other):
         return as_gem(other).__sub__(self)
@@ -273,6 +273,9 @@ class Literal(Constant):
 
     def __new__(cls, array, dtype=None):
         array = asarray(array)
+        if numpy.allclose(array, 0, 1e-14):
+            return Zero(array.shape)
+
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -293,7 +296,7 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
-        return tuple(self.array.flat) == tuple(other.array.flat)
+        return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
         return hash((type(self), self.shape, tuple(self.array.flat)))
@@ -684,12 +687,49 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
-        # All indices fixed
-        if all(isinstance(i, int) for i in multiindex):
-            if isinstance(aggregate, Constant):
-                return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
-            elif isinstance(aggregate, ListTensor):
-                return aggregate.array[multiindex]
+        # Simplify Literal and ListTensor
+        if isinstance(aggregate, (Constant, ListTensor)):
+            if all(isinstance(i, int) for i in multiindex):
+                # All indices fixed
+                sub = aggregate.array[multiindex]
+                return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
+
+            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
+                # Some indices fixed
+                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
+                sub = aggregate.array[slices]
+                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
+                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
+
+        # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
+        if isinstance(aggregate, ComponentTensor):
+            B, = aggregate.children
+            jj = aggregate.multiindex
+            ii = multiindex
+            if isinstance(B, Indexed):
+                C, = B.children
+                kk = B.multiindex
+                if isinstance(C, ListTensor):
+                    rep = dict(zip(jj, ii))
+                    ll = tuple(rep.get(k, k) for k in kk)
+                    B = Indexed(C, ll)
+                    jj = tuple(j for j in jj if j not in kk)
+                    ii = tuple(rep[j] for j in jj)
+                    if len(ii) == 0:
+                        return B
+
+            if isinstance(B, Indexed):
+                C, = B.children
+                kk = B.multiindex
+                ff = C.free_indices
+                if all((j in kk) and (j not in ff) for j in jj):
+                    rep = dict(zip(jj, ii))
+                    ll = tuple(rep.get(k, k) for k in kk)
+                    return Indexed(C, ll)
+
+            if len(ii) < len(multiindex):
+                aggregate = ComponentTensor(B, jj)
+                multiindex = ii
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
@@ -835,6 +875,11 @@ class ComponentTensor(Node):
         if isinstance(expression, Zero):
             return Zero(shape, dtype=expression.dtype)
 
+        # Index folding
+        if isinstance(expression, Indexed):
+            if multiindex == expression.multiindex:
+                return expression.children[0]
+
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
         self.multiindex = multiindex
@@ -891,8 +936,16 @@ class ListTensor(Node):
         dtype = Node.inherit_dtype_from_children(tuple(array.flat))
 
         # Handle children with shape
-        child_shape = array.flat[0].shape
+        e0 = array.flat[0]
+        child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
+
+        # Index folding
+        if child_shape == array.shape:
+            if all(isinstance(elem, Indexed) for elem in array.flat):
+                if all(elem.children == e0.children for elem in array.flat[1:]):
+                    if all(elem.multiindex == idx for elem, idx in zip(array.flat, numpy.ndindex(array.shape))):
+                        return e0.children[0]
 
         if child_shape:
             # Destroy structure
@@ -1218,6 +1271,7 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
+minus = Literal(-1)
 
 
 # Syntax sugar
