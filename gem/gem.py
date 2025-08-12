@@ -706,13 +706,13 @@ class Indexed(Scalar):
             if isinstance(B, Indexed):
                 C, = B.children
                 kk = B.multiindex
-                if isinstance(C, ListTensor):
+                if not isinstance(C, ComponentTensor):
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     B = Indexed(C, ll)
                     jj = tuple(j for j in jj if j not in kk)
                     ii = tuple(rep[j] for j in jj)
-                    if len(ii) == 0:
+                    if not ii:
                         return B
 
             if isinstance(B, Indexed):
@@ -723,10 +723,6 @@ class Indexed(Scalar):
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
                     return Indexed(C, ll)
-
-            if len(ii) < len(multiindex):
-                aggregate = ComponentTensor(B, jj)
-                multiindex = ii
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
