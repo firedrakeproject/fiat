@@ -97,7 +97,7 @@ class Node(NodeBase, metaclass=NodeMeta):
     def __sub__(self, other):
         return componentwise(
             Sum, self,
-            componentwise(Product, Literal(-1), as_gem(other)))
+            componentwise(Product, minus, as_gem(other)))
 
     def __rsub__(self, other):
         return as_gem(other).__sub__(self)
@@ -706,8 +706,6 @@ class Indexed(Scalar):
             B, = aggregate.children
             jj = aggregate.multiindex
             ii = multiindex
-            # Avoid recursion and just attempt to simplify some common patterns
-            # as the result of this method is not cached.
             if isinstance(B, Indexed):
                 C, = B.children
                 kk = B.multiindex
@@ -723,15 +721,11 @@ class Indexed(Scalar):
             if isinstance(B, Indexed):
                 C, = B.children
                 kk = B.multiindex
-                if all(j in kk for j in jj):
+                ff = C.free_indices
+                if all((j in kk) and (j not in ff) for j in jj):
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
-                    if isinstance(C, ComponentTensor):
-                        if (all(isinstance(i, Index) for i in ii)
-                            or all(isinstance(l, Integral) or (l in C.multiindex) for l in ll)):
-                            return Indexed(C, ll)
-                    else:
-                        return Indexed(C, ll)
+                    return Indexed(C, ll)
 
             if len(ii) < len(multiindex):
                 aggregate = ComponentTensor(B, jj)
@@ -1277,6 +1271,7 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
+minus = Literal(-1)
 
 
 # Syntax sugar
