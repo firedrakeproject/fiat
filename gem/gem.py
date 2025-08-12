@@ -895,6 +895,25 @@ class IndexSum(Scalar):
         if isinstance(summand, Zero):
             return summand
 
+        # No indices case
+        multiindex = tuple(multiindex)
+        if not multiindex:
+            return summand
+
+        # Flatten nested sums
+        if isinstance(summand, IndexSum):
+            A, = summand.children
+            return IndexSum(A, summand.multiindex + multiindex)
+
+        # Factor out common factors
+        if isinstance(summand, Product):
+            a, b = summand.children
+            if all(i not in a.free_indices for i in multiindex):
+                return Product(a, IndexSum(b, multiindex))
+
+            if all(i not in b.free_indices for i in multiindex):
+                return Product(IndexSum(a, multiindex), b)
+
         # Unroll singleton sums
         unroll = tuple(index for index in multiindex if index.extent <= 1)
         if unroll:
@@ -903,11 +922,6 @@ class IndexSum(Scalar):
                               (0,) * len(unroll))
             multiindex = tuple(index for index in multiindex
                                if index not in unroll)
-
-        # No indices case
-        multiindex = tuple(multiindex)
-        if not multiindex:
-            return summand
 
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
