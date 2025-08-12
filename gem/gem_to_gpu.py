@@ -538,6 +538,40 @@ def to_triton(assignments, temporaries):
     def func_decl(*args):
         return ["@triton.jit", f"def triton_kernel({", ".join(args)}):"]
 
+    def construct_array_arguments(name, value, shape, blocks, kernel_args):
+        kernel_args["arrays"] += [(name, value)]
+        size = tuple([block[0] for block in blocks]) + shape 
+        res = []
+        stride_acc = 1
+        print(list(enumerate(reversed(size))))
+        for dim, i in reversed(list(zip(size, range(len(size))))):
+            kernel_args["strides"] += [(name + f"_stride{i}", stride_acc)]
+            if not isinstance(dim, str):
+                kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
+                kernel_args["sizes_actual"] += [(name + f"_size{i}", int(dim))]
+                stride_acc *= dim
+                res += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
+            else:
+                res += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {dim})) % size_{dim[-1]}"]
+                kernel_args["sizes_actual"] += [(name + f"_size{i}", f"{dim} if {dim} * pid_{dim[-1]} < size_{dim[-1]} else {dim} * pid_{dim[-1]} - size_{dim[-1]}")]
+                kernel_args["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
+        # TODO put in case where dimension has blocks over it
+        offsets = f"\t{name}_offsets ="
+        mask = f"\t{name}_mask = {name}_offsets < "
+        block = f"\t{name}"
+        for i in range(0, len(size)):
+            slicing = ",".join([":" if j == i else "None" for j in range(len(size))])
+            offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
+            if i < len(size) - 1:
+                mask += f" ({name}_offsets{i}*{name}_stride{i})[{slicing}] + "
+            else:
+                mask += f"{name}_size{i}"
+        ptr = f"\t{name}_ptr = {name}"
+        load = f"\t{name} = tl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
+
+        res += [offsets[:-2], mask, ptr, load]
+        return res, kernel_args
+
     from firedrake.device import compute_device
     block_dims = compute_device.block_dims()
     counter = 0
@@ -560,64 +594,17 @@ def to_triton(assignments, temporaries):
 
     temp_vars = []
     for name, size in args.items():
-        kernel_args["arrays"] += [(name, None)]
-        size = tuple([block[0] for block in compute_device.blocks["vars"]]) + size 
-        stride_acc = 1
-        for i, dim in enumerate(reversed(size)):
-            kernel_args["strides"] += [(name + f"_stride{i}", stride_acc)]
-            if not isinstance(dim, str):
-                kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
-                kernel_args["sizes_actual"] += [(name + f"_size{i}", int(dim))]
-                stride_acc *= dim
-                temp_vars += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
-            else:
-                temp_vars += [f"\t{name}_offsets{i} = pid_{dim[-1]} * {dim} + tl.arange(0, {dim})"]
-        # TODO put in case where dimension has blocks over it
-        offsets = f"\t{name}_offsets ="
-        mask = f"\t{name}_mask = {name}_offsets < "
-        block = f"\t{name}"
-        for i in range(0, len(size)):
-            slicing = ",".join(["None" if j == i else ":" for j in range(len(size))])
-            offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
-            if 0 < i < len(size):
-                mask += f" ({name}_offsets{i}*{name}_stride{i} + {name}_size{i-1})[{slicing}] + "
-        ptr = f"\t{name}_ptr = {name}"
-        load = f"\t{name} = tl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
-
-
-        temp_vars += [offsets[:-2], mask[:-2], ptr, load]
+        res, kernel_args = construct_array_arguments(name, None, size, compute_device.blocks["vars"], kernel_args)
+        temp_vars += res
 
     for val in arrays.values():
         if isinstance(val, int):
             continue
         name, array = val
-        kernel_args["arrays"] += [(name, array)]
-        size = tuple([block[0] for block in compute_device.blocks["temps"]]) + array.shape[len(compute_device.blocks["temps"]):]
-        strides = []
-        stride_acc = 1
-        for i, dim in enumerate(reversed(size)):
-            kernel_args["strides"] += [(name + f"_stride{i}", stride_acc)]
-            if not isinstance(dim, str):
-                kernel_args["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
-                kernel_args["sizes_actual"] += [(name + f"_size{i}", int(dim))]
-                stride_acc *= dim
-                temp_vars += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
-            else:
-                temp_vars += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {dim})) % size_{dim[-1]}"]
-                kernel_args["sizes_actual"] += [(name + f"_size{i}", f"{dim} if {dim} * pid_{dim[-1]} < size_{dim[-1]} else {dim} * pid_{dim[-1]} - size_{dim[-1]}")]
-                kernel_args["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
-        offsets = f"\t{name}_offsets ="
-        mask = f"\t{name}_mask = {name}_offsets < "
-        for i in range(len(size)):
-            slicing = ",".join(["None" if j == i else ":" for j in range(len(size))])
-            offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
-            if i < len(size):
-                mask += f" ({name}_offsets{i}*{name}_stride{i} + {name}_size{i})[{slicing}] + "
-        ptr = f"\t{name}_ptr = {name}"
-        load = f"\t{name} = tl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
+        replaced_dims = len(compute_device.blocks["temps"])
+        res, kernel_args = construct_array_arguments(name, array, array.shape[replaced_dims:], compute_device.blocks["temps"], kernel_args)
+        temp_vars += res        
 
-        temp_vars += [offsets[:-2], mask[:-2], ptr, load]
-            
     kernel_args["blocks"] = compute_device.block_dims() 
     for key, val in temps.items():
         if key != "counter":
@@ -625,7 +612,7 @@ def to_triton(assignments, temporaries):
             #temp_vars += ["\tbreakpoint()"]
     #strs += [f"tl.store({output} + offsets, {v}, mask=mask"]
 
-    temp_vars += [f"\tbreakpoint()"]
+    #temp_vars += [f"\tbreakpoint()"]
 
     for key, val in declare.items():
         if key != "counter" and val[0][0] == "t":
