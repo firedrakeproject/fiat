@@ -273,7 +273,7 @@ class Literal(Constant):
 
     def __new__(cls, array, dtype=None):
         array = asarray(array)
-        if numpy.allclose(array, 0, 1e-14):
+        if numpy.allclose(array, 0, atol=1e-13):
             return Zero(array.shape)
 
         return super(Literal, cls).__new__(cls)
