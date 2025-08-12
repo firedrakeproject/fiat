@@ -182,10 +182,14 @@ def macro_stokes_space(ref_el, degree, bubble=False, full_macro=False):
         dP = dP.get_nodal_basis()
     else:
         dP = ONPolynomialSet(K, degree-1)
-        dP = dP.take(range(1, len(dP)))
+    # div of bubbles is mean free
+    dP = dP.take(range(1, len(dP)))
 
+    # project div(V0) into dP
     dP_at_qpts = dP.tabulate(Q.get_points())[(0,) * sd]
     C = inner(dP_at_qpts, div_test, Q.get_weights())
+
+    # Modified bubbles with div in dP
     MB = V0.recombine(S[:, nullspace_dim:].T).recombine(C)
 
     Pmacro = ONPolynomialSet(ref_el, degree, shape=shape, variant="bubble")
@@ -395,6 +399,9 @@ class DivStokesDual(dual_set.DualSet):
         nodes = []
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
 
+        # Interior dof
+        nodes.append(IntegralMoment(ref_el, Q, numpy.ones(Q.get_weights().shape)))
+
         # Vertex dofs
         for entity in top[0]:
             pt, = ref_el.make_points(0, entity, degree)
@@ -406,9 +413,6 @@ class DivStokesDual(dual_set.DualSet):
             for entity in top[1]:
                 Q_edge, phis = map_duals(ref_el, 1, entity, Q_ref, Phis)
                 nodes.extend(IntegralMoment(ref_el, Q_edge, phi) for phi in phis)
-
-        # Interior dof
-        nodes.append(IntegralMoment(ref_el, Q, numpy.ones(Q.get_weights().shape)))
 
         # Throwaway dofs
         B = Bernstein(ref_el, degree)
