@@ -691,13 +691,6 @@ class Indexed(Scalar):
                 sub = aggregate.array[multiindex]
                 return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
 
-            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
-                # Some indices fixed
-                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
-                sub = aggregate.array[slices]
-                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
-                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
-
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         if isinstance(aggregate, ComponentTensor):
             B, = aggregate.children
@@ -953,12 +946,23 @@ class ListTensor(Node):
         child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
 
-        # Index folding
-        if child_shape == array.shape:
-            if all(isinstance(elem, Indexed) for elem in array.flat):
-                if all(elem.children == e0.children for elem in array.flat[1:]):
+        # Simplify [v[j] for j in range(n)] -> v
+        if all(isinstance(elem, Indexed) for elem in array.flat):
+            tensor = e0.children[0]
+            if array.shape + child_shape == tensor.shape:
+                if all(elem.children[0] == tensor for elem in array.flat[1:]):
                     if all(elem.multiindex == idx for elem, idx in zip(array.flat, numpy.ndindex(array.shape))):
-                        return e0.children[0]
+                        return tensor
+
+        # Simplify [v[j, :] for j in range(n)] -> v
+        if all(isinstance(elem, ComponentTensor) and isinstance(elem.children[0], Indexed)
+               for elem in array.flat):
+            tensor = e0.children[0].children[0]
+            if array.shape + child_shape == tensor.shape:
+                if all(elem.children[0].children[0] == tensor for elem in array.flat[1:]):
+                    if all(elem.children[0].multiindex == idx + elem.multiindex
+                           for idx, elem in zip(numpy.ndindex(array.shape), array.flat)):
+                        return tensor
 
         if child_shape:
             # Destroy structure
