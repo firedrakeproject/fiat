@@ -97,8 +97,8 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
     if "FIREDRAKE_USE_GPU" in os.environ:
         print("Generating triton string")
-        #res, args = to_triton_wrapper(assignments, temporaries)
-        res, args, _ = to_triton(assignments, temporaries)
+        res, args = to_triton_wrapper(assignments, temporaries)
+        #res, args, _ = to_triton(assignments, temporaries)
         add_kernel_string(res, args, "triton")
         return (res, tuple(args))
     # Prepare ImperoC (Impero AST + other data for code generation)
