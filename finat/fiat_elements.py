@@ -178,7 +178,7 @@ class FiatElement(FiniteElementBase):
         esd = self.cell.construct_subelement(entity_dim).get_spatial_dimension()
         assert isinstance(refcoords, gem.Node) and refcoords.shape == (esd,)
 
-        return point_evaluation(self._element, order, refcoords, (entity_dim, entity_i))
+        return point_evaluation(self, order, refcoords, (entity_dim, entity_i))
 
     @cached_property
     def _dual_basis(self):
@@ -272,46 +272,77 @@ class FiatElement(FiniteElementBase):
             return result
 
 
-def point_evaluation(fiat_element, order, refcoords, entity):
-    # Coordinates on the reference entity (SymPy)
-    esd, = refcoords.shape
-    Xi = sp.symbols('X Y Z')[:esd]
+def point_evaluation(finat_element, order, ps, entity):
+    fiat_element = finat_element._element
 
+    # Coordinates on the reference entity (GEM)
+    Xi = tuple(gem.Indexed(ps, i) for i in np.ndindex(ps.shape))
+    if finat_element.complex.is_macrocell():
+        # Coordinates on the reference entity (SymPy)
+        points = [sp.symbols('X Y Z')[:len(Xi)]]
+        # Convert SymPy expression to GEM
+        mapper = gem.node.Memoizer(sympy2gem)
+        mapper.bindings = dict(zip(points[0], Xi))
+        mapper = np.vectorize(mapper)
+    else:
+        points = [Xi]
+        mapper = None
+
+    fiat_result = fiat_element.tabulate(order, points, entity)
+
+    value_shape = finat_element.value_shape
+    value_size = np.prod(value_shape, dtype=int)
     space_dimension = fiat_element.space_dimension()
-    value_size = np.prod(fiat_element.value_shape(), dtype=int)
-    fiat_result = fiat_element.tabulate(order, [Xi], entity)
+
+    if finat_element.space_dimension() == space_dimension:
+        beta = finat_element.get_indices()
+        index_shape = tuple(index.extent for index in beta)
+    else:
+        index_shape = (space_dimension,)
+        beta = tuple(gem.Index(extent=i) for i in index_shape)
+        assert len(beta) == len(finat_element.get_indices())
+
+    zeta = finat_element.get_value_indices()
+    basis_indices = beta + zeta
+
     result = {}
     for alpha, fiat_table in fiat_result.items():
         if isinstance(fiat_table, Exception):
             result[alpha] = gem.Failure((space_dimension,) + fiat_element.value_shape(), fiat_table)
             continue
 
-        # Convert SymPy expression to GEM
-        mapper = gem.node.Memoizer(sympy2gem)
-        mapper.bindings = {s: gem.Indexed(refcoords, (i,))
-                           for i, s in enumerate(Xi)}
-        gem_table = np.vectorize(mapper)(fiat_table)
+        derivative = sum(alpha)
+        fiat_table = fiat_table.reshape(space_dimension, value_size, -1)
+        if mapper is not None:
+            fiat_table = mapper(fiat_table)
 
-        table_roll = gem_table.reshape(space_dimension, value_size).transpose()
-
-        exprs = []
-        for table in table_roll:
-            exprs.append(gem.ListTensor(table.reshape(space_dimension)))
-        if fiat_element.value_shape():
-            beta = (gem.Index(extent=space_dimension),)
-            zeta = tuple(gem.Index(extent=d)
-                         for d in fiat_element.value_shape())
-            result[alpha] = gem.ComponentTensor(
-                gem.Indexed(
-                    gem.ListTensor(np.array(
-                        [gem.Indexed(expr, beta) for expr in exprs]
-                    ).reshape(fiat_element.value_shape())),
-                    zeta),
-                beta + zeta
-            )
+        point_indices = ()
+        if fiat_table.dtype == object:
+            assert len(points) == 1
+        elif derivative == finat_element.degree and not finat_element.complex.is_macrocell():
+            # Make sure numerics satisfies theory
+            fiat_table = fiat_table[..., 0]
+        elif derivative > finat_element.degree:
+            # Make sure numerics satisfies theory
+            assert np.allclose(fiat_table, 0.0)
+            fiat_table = np.zeros(fiat_table.shape[:-1])
         else:
-            expr, = exprs
-            result[alpha] = expr
+            point_indices = ps.indices
+
+        point_shape = tuple(index.extent for index in point_indices)
+        table_shape = index_shape + value_shape + point_shape
+        table_indices = basis_indices + point_indices
+
+        fiat_table = fiat_table.reshape(table_shape)
+        if fiat_table.dtype == object:
+            gem_table = gem.ListTensor(fiat_table)
+        else:
+            gem_table = gem.Literal(fiat_table)
+
+        expr = gem.Indexed(gem_table, table_indices)
+        expr = gem.ComponentTensor(expr, basis_indices)
+        result[alpha] = expr
+
     return result
 
 

@@ -1275,6 +1275,8 @@ def as_gem(expr):
         return expr
     elif isinstance(expr, Number):
         return Literal(expr)
+    elif isinstance(expr, numpy.ndarray):
+        return ListTensor(expr) if expr.dtype == object else Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
 
