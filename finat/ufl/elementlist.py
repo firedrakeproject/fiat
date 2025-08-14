@@ -152,7 +152,7 @@ register_alias("Lobatto",
 register_alias("Lob",
                lambda family, dim, order, degree: ("Gauss-Lobatto-Legendre", order))
 
-register_element("Bernstein", None, 0, H1, "identity", (1, None), simplices)
+register_element("Bernstein", None, 0, H1, "identity", (1, None), any_cell)
 
 
 # Let Nedelec H(div) elements be aliases to BDMs/RTs
