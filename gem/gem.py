@@ -874,6 +874,11 @@ class ComponentTensor(Node):
             if multiindex == expression.multiindex:
                 return expression.children[0]
 
+        # Flatten nested ComponentTensors
+        if isinstance(expression, ComponentTensor):
+            A, = expression.children
+            return ComponentTensor(A, expression.multiindex + multiindex)
+
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
         self.multiindex = multiindex
