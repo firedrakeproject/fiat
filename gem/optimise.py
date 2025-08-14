@@ -177,7 +177,7 @@ _constant_fold_zero.register(Node)(reuse_if_untouched)
 
 @_constant_fold_zero.register(Literal)
 def _constant_fold_zero_literal(node, self):
-    if (node.array == 0).all():
+    if numpy.array_equal(node.array, 0):
         # All zeros, make symbolic zero
         return Zero(node.shape)
     else:
