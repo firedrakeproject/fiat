@@ -657,8 +657,8 @@ def _(node, self):
         # Unrolling
         summand = self(node.children[0])
         shape = tuple(index.extent for index in unroll)
-        unrolled = Sum(*(Indexed(ComponentTensor(summand, unroll), alpha)
-                         for alpha in numpy.ndindex(shape)))
+        tensor = ComponentTensor(summand, unroll)
+        unrolled = Sum(*(Indexed(tensor, alpha) for alpha in numpy.ndindex(shape)))
         return IndexSum(unrolled, tuple(index for index in node.multiindex
                                         if index not in unroll))
     else:
