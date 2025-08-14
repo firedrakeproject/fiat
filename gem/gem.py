@@ -901,6 +901,15 @@ class IndexSum(Scalar):
         if isinstance(summand, Zero):
             return summand
 
+        # Unroll singleton sums
+        unroll = tuple(index for index in multiindex if index.extent <= 1)
+        if unroll:
+            assert numpy.prod([index.extent for index in unroll]) == 1
+            summand = Indexed(ComponentTensor(summand, unroll),
+                              (0,) * len(unroll))
+            multiindex = tuple(index for index in multiindex
+                               if index not in unroll)
+
         # No indices case
         multiindex = tuple(multiindex)
         if not multiindex:
@@ -919,15 +928,6 @@ class IndexSum(Scalar):
 
             if all(i not in b.free_indices for i in multiindex):
                 return Product(IndexSum(a, multiindex), b)
-
-        # Unroll singleton sums
-        unroll = tuple(index for index in multiindex if index.extent <= 1)
-        if unroll:
-            assert numpy.prod([index.extent for index in unroll]) == 1
-            summand = Indexed(ComponentTensor(summand, unroll),
-                              (0,) * len(unroll))
-            multiindex = tuple(index for index in multiindex
-                               if index not in unroll)
 
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
@@ -958,7 +958,7 @@ class ListTensor(Node):
             tensor = e0.children[0]
             if array.shape + child_shape == tensor.shape:
                 if all(elem.children[0] == tensor for elem in array.flat[1:]):
-                    if all(elem.multiindex == idx for elem, idx in zip(array.flat, numpy.ndindex(array.shape))):
+                    if all(elem.multiindex == idx for idx, elem in numpy.ndenumerate(array)):
                         return tensor
 
         # Simplify [v[j, :] for j in range(n)] -> v
@@ -968,15 +968,19 @@ class ListTensor(Node):
             if array.shape + child_shape == tensor.shape:
                 if all(elem.children[0].children[0] == tensor for elem in array.flat[1:]):
                     if all(elem.children[0].multiindex == idx + elem.multiindex
-                           for idx, elem in zip(numpy.ndindex(array.shape), array.flat)):
+                           for idx, elem in numpy.ndenumerate(array)):
                         return tensor
+
+        # Flatten nested ListTensors
+        if all(isinstance(elem, ListTensor) for elem in array.flat):
+            return ListTensor(asarray([elem.array for elem in array.flat]).reshape(array.shape + child_shape))
 
         if child_shape:
             # Destroy structure
             direct_array = numpy.empty(array.shape + child_shape, dtype=object)
-            for alpha in numpy.ndindex(array.shape):
+            for alpha, elem in numpy.ndenumerate(array):
                 for beta in numpy.ndindex(child_shape):
-                    direct_array[alpha + beta] = Indexed(array[alpha], beta)
+                    direct_array[alpha + beta] = Indexed(elem, beta)
             array = direct_array
 
         # Constant folding
