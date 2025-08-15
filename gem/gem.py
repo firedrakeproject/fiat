@@ -688,8 +688,15 @@ class Indexed(Scalar):
         if isinstance(aggregate, (Constant, ListTensor)):
             if all(isinstance(i, int) for i in multiindex):
                 # All indices fixed
+                if isinstance(aggregate, Identity):
+                    i, j = multiindex
+                    return one if i == j else Zero()
+
                 sub = aggregate.array[multiindex]
                 return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
+
+            if len(multiindex) < 3:
+                pass
 
             elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
                 # Some indices fixed
@@ -922,11 +929,16 @@ class IndexSum(Scalar):
         # Factor out common factors
         if isinstance(summand, Product):
             a, b = summand.children
-            if all(i not in a.free_indices for i in multiindex):
+            aidx = set(a.free_indices).intersection(multiindex)
+            if not aidx:
                 return Product(a, IndexSum(b, multiindex))
-
-            if all(i not in b.free_indices for i in multiindex):
+            bidx = set(b.free_indices).intersection(multiindex)
+            if not bidx:
                 return Product(IndexSum(a, multiindex), b)
+
+            if aidx != bidx:
+                if (not aidx.intersection(bidx) and aidx.union(bidx) == set(multiindex)):
+                    return Product(IndexSum(a, tuple(aidx)), IndexSum(b, tuple(bidx)))
 
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
