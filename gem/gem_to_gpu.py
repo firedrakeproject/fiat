@@ -232,7 +232,7 @@ def to_cupy(assignments):
     res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
     return res, arg_list
 
-def to_triton(assignments, temporaries, temps=None):
+def to_triton(func_name, assignments, temporaries, temps=None):
 
     args = {}
     if temps is None:
@@ -270,7 +270,7 @@ def to_triton(assignments, temporaries, temps=None):
                 if any(outer in idx for outer in block_indices):
                     slicing = "["
                     for axis in idx:
-                        if axis in block_indices and axis == "BLOCK_SIZE_C":
+                        if axis in block_indices:
                             slicing += len(outer) * "None," + ":, None, "
                             idx = list(idx)
                             idx.remove(axis)
@@ -286,6 +286,7 @@ def to_triton(assignments, temporaries, temps=None):
             new_shape0 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[0]])
             new_shape1 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[1]])
             if not all([i0 == i1 or i0 == tuple() or i1 == tuple() for i0, i1 in zip(index[0][::-1], index[1][::-1])]):
+                breakpoint()
                 # Empty axis need to be added to allow broadcasting
                 idx0 = len(index[0]) - 1
                 idx1 = len(index[1]) - 1
@@ -316,6 +317,10 @@ def to_triton(assignments, temporaries, temps=None):
                             commands[i] = commands[i] + "[" + slices[2:]
                         
             result_shape = np.broadcast_shapes(tuple(new_shape0), tuple(new_shape1))
+            if len(outer) > 1:
+                # not sure this is general, but c block needs to be on the outside
+                outer.reverse()
+                breakpoint()
             all_indices = set([i for s in summands for i in s[1]])
             result = tuple([i for i_count in result_shape for i in all_indices if i.count == i_count])
             index = tuple(outer) + result 
@@ -484,6 +489,9 @@ def to_triton(assignments, temporaries, temps=None):
             res_str = f"{chld}_{i[0]}" 
         else:
             res_str = chld
+        if any([i in outer_idx['temps'] for i in idx]):
+            index = idx + expr.index_ordering()[sum([i in outer_idx['temps'] for i in idx]):]
+            return res_str, index 
         return res_str, idx + expr.index_ordering()
 
     @_recurse.register(gem.FlexiblyIndexed)
@@ -535,42 +543,8 @@ def to_triton(assignments, temporaries, temps=None):
             arrays["counter"] += 1
         return arrays[expr][0], tuple(outer_idx["temps"])
 
-    def next_pow2(val):
-        return int(np.power(2, np.ceil(np.log2(val))))
 
 
-    def construct_array_arguments(name, value, shape, blocks, kernel_data):
-        kernel_data["arrays"] += [(name, value)]
-        size = tuple([block[0] for block in blocks]) + shape 
-        res = []
-        stride_acc = 1
-        for dim, i in reversed(list(zip(size, range(len(size))))):
-            kernel_data["strides"] += [(name + f"_stride{i}", stride_acc)]
-            if not isinstance(dim, str):
-                kernel_data["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
-                kernel_data["sizes_actual"] += [(name + f"_size{i}", int(dim))]
-                stride_acc *= dim
-                res += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
-            else:
-                res += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {dim})) % size_{dim[-1]}"]
-                kernel_data["sizes_actual"] += [(name + f"_size{i}", f"{dim} if {dim} * pid_{dim[-1]} < size_{dim[-1]} else {dim} * pid_{dim[-1]} - size_{dim[-1]}")]
-                kernel_data["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
-        # TODO put in case where dimension has blocks over it
-        offsets = f"\t{name}_offsets ="
-        mask = f"\t{name}_mask = {name}_offsets < "
-        block = f"\t{name}"
-        for i in range(0, len(size)):
-            slicing = ",".join([":" if j == i else "None" for j in range(len(size))])
-            offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
-            if i < len(size) - 1:
-                mask += f" ({name}_offsets{i}*{name}_stride{i})[{slicing}] + "
-            else:
-                mask += f"{name}_size{i}"
-        ptr = f"\t{name}_ptr = {name}"
-        load = f"\t{name} = tl.load({name} + {name}_offsets, mask={name}_mask, other=0)"
-
-        res += [offsets[:-2], mask, ptr, load]
-        return res, kernel_data
 
     from firedrake.device import compute_device
     block_dims = compute_device.block_dims()
@@ -588,7 +562,7 @@ def to_triton(assignments, temporaries, temps=None):
         assert v_idx == e_idx
         stores += [f"\t{v}_res={e}"]
 
-    kernel_data = {"arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "insns": [], "pids" : []}
+    kernel_data = {"entrypoint": func_name, "arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "insns": [], "pids" : []}
      
     for i, block in enumerate(block_dims['vars'] + block_dims['temps']): #
         kernel_data["pids"] += [f"\tpid_{block[-1]} = tl.program_id(axis={i})"]
@@ -615,6 +589,7 @@ def to_triton(assignments, temporaries, temps=None):
     else:
         for expr in used_temps:
             name, (_, shape) = used_temps[expr]
+            breakpoint()
             shape = tuple([s if isinstance(s, str) else s.extent for s in list(shape)])
             if len(expr.shape) > 0:
                 shape = shape +  expr.shape[len(shape):]
@@ -631,8 +606,38 @@ def to_triton(assignments, temporaries, temps=None):
      
     return res, kernel_data, temps
 
-def func_decl(*args):
-    return ["@triton.jit", f"def triton_kernel({", ".join(args)}):"]
+def next_pow2(val):
+    return int(np.power(2, np.ceil(np.log2(val))))
+
+def func_decl(func_name, *args, jit=True):
+    res = []
+    if jit:
+        res += ["@triton.jit"]
+    return res + [f"def {func_name}({", ".join(args)}):"]
+
+def construct_array_arguments(name, value, shape, blocks, kernel_data, load=True):
+    kernel_data["arrays"] += [(name, value)]
+    size = tuple([block[0] for block in blocks]) + shape 
+    res = []
+    stride_acc = 1
+    for dim, i in reversed(list(zip(size, range(len(size))))):
+        kernel_data["strides"] += [(name + f"_stride{i}", stride_acc)]
+        if not isinstance(dim, str):
+            kernel_data["sizes_pow2"] += [(name + f"_dim{i}", next_pow2(dim))]
+            kernel_data["sizes_actual"] += [(name + f"_size{i}", int(dim))]
+            stride_acc *= dim
+            res += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
+        else:
+            res += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {dim})) % size_{dim[-1]}"]
+            kernel_data["sizes_actual"] += [(name + f"_size{i}", f"{dim} if {dim} * pid_{dim[-1]} < size_{dim[-1]} else {dim} * pid_{dim[-1]} - size_{dim[-1]}")]
+            kernel_data["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
+    offsets, mask = construct_offsets(name, len(size))
+    ptr = f"\t{name}_ptr = {name}"
+    res += [offsets, mask, ptr]
+    if load:
+        res += [f"\t{name} = tl.load({name} + {name}_offsets, mask={name}_mask, other=0)"]
+
+    return res, kernel_data
 
 def kernel_data_to_str(kernel_data):
     from firedrake.device import compute_device
@@ -654,19 +659,63 @@ def kernel_data_to_str(kernel_data):
         arg_list = [a] + arg_list
         kernel_data["arrays"] = [a2] + kernel_data["arrays"]
         kernel_data["insns"] += [f"\ttl.store(A_ptr + A_offsets, A_res, mask = A_mask)"] 
-    res = "\n".join(func_decl(*arg_list) + kernel_data["pids"] + const_exprs + kernel_data["insns"])
+    res = "\n".join(func_decl(kernel_data["entrypoint"], *arg_list) + kernel_data["pids"] + const_exprs + kernel_data["insns"])
     return res, kernel_data
 
+def construct_offsets(name, num_dims):
+    # TODO put in case where dimension has blocks over it
+    offsets = f"\t{name}_offsets ="
+    mask = f"\t{name}_mask = {name}_offsets < "
+    block = f"\t{name}"
+    for i in range(0, num_dims):
+        slicing = ",".join([":" if j == i else "None" for j in range(num_dims)])
+        offsets += f" {name}_offsets{i}[{slicing}]*{name}_stride{i} +"
+        if i < num_dims - 1:
+            mask += f" ({name}_offsets{i}*{name}_stride{i})[{slicing}] + "
+        else:
+            mask += f"{name}_size{i}"
+    return offsets[:-2], mask
+
+
 def to_triton_wrapper(assignments, temporaries):
-    first_kernel = to_triton([], temporaries)
-    second_kernel = to_triton(assignments, [], temps=first_kernel[2])
-    for array in second_kernel[1]['arrays']:
+    str1, data1, temps1 = to_triton("subkernel1", [], temporaries)
+    str2, data2, temps2 = to_triton("subkernel2", assignments, [], temps=temps1)
+    args = [exp[0] for exp in data1["arrays"]]
+    args1 = args.copy()
+    array_decl = []
+    for array in data2['arrays']:
+        full_arr_sizes = [(size, int(name[-1])) if not isinstance(size, str) else (f"size_{size[-1]}", int(name[-1])) for name, size in data2["sizes_actual"] if name[:-6] == array[0]]
+        arr_sizes = [(size, int(name[-1])) if not isinstance(size,str) else (f"BLOCK_SIZE_{size[-1]}", int(name[-1])) for name, size in data2["sizes_actual"] if name[:-6] == array[0]]
+        full_arr_sizes.sort(key=lambda a: a[1])
+        arr_sizes.sort(key=lambda a: a[1])
+        #block sizes should be replaced by overall dims
         if array[0] != "A":
-            first_kernel[1]['arrays'] = [(f"{array[0]}_out", None)] + first_kernel[1]['arrays']
-            first_kernel[1]["sizes_pow2"] = [(f"{array[0]}_out{name[-5:]}", size) for name, size in second_kernel[1]["sizes_pow2"] if name[:-5] == array[0]] + first_kernel[1]['sizes_pow2']
-            first_kernel[1]["sizes_actual"] = [(f"{array[0]}_out{name[-6:]}", size) for name, size in second_kernel[1]["sizes_actual"] if name[:-6] == array[0]] + first_kernel[1]['sizes_actual']
-            first_kernel[1]["strides"] = [(f"{array[0]}_out{name[-8:]}", size) for name, size in second_kernel[1]["strides"] if name[:-8] == array[0]] + first_kernel[1]['strides']
-            first_kernel[1]["insns"] += [f"\ttl.store({array[0]}_out + {array[0]}_out_offsets, {array[0]}, mask = {array[0]}_mask"]
-            # how to get the offsets and masks
-    new_first, first_data = kernel_data_to_str(first_kernel[1])
+            offsets, data1 = construct_array_arguments(f"{array[0]}", None, tuple([a[0] for a in arr_sizes]), [], data1, load=False)
+            args1 += [f"{array[0]}"]
+            data1["insns"] = offsets + data1["insns"]
+            data1["insns"] += [f"\ttl.store({array[0]}_ptr + {array[0]}_offsets, {array[0]}, mask = {array[0]}_mask)"]
+            array_decl += [f"\t{array[0]} = torch.from_numpy(np.zeros_like(({','.join([str(a[0]) for a in full_arr_sizes])})))"]
+    new_str1, data1 = kernel_data_to_str(data1)
+
+    res_str = [new_str1, str2]
+    grid = ""
+    blocks = data1["blocks"]
+    grid_sizes = []
+    block_size = []
+    block_args = []
+    output_var = data2["arrays"][0]
+    for name in blocks['vars'] + blocks['temps']:
+        block_size += [f"size_{name[-1]}"]
+        block_args += [f"{name}"]
+        grid_sizes += [f"triton.cdiv(size_{name[-1]}, meta['{name}'])"]
+    wrapper_func = func_decl("triton_kernel", *([output_var[0]] + args + block_size + block_args), jit=False) + array_decl
+    wrapper_func += [f"\tgrid = lambda meta: ({'*'.join(grid_sizes)}, )"]
+    wrapper_func += [f"\tsubkernel1[grid]({','.join(args1 + block_size + block_args)})"]
+    wrapper_func += [f"\tsubkernel2[grid]({','.join([a[0] for a in data2['arrays']] + block_size + block_args)})"]
+    res_data = {"arrays": [output_var] + [a for a in data1["arrays"] if a[0] in args]}
+    res = "\n".join([new_str1, str2] + wrapper_func) 
     breakpoint()
+
+    return res, res_data
+    
+    
