@@ -15,16 +15,36 @@ class RestrictedDualSet(DualSet):
         indices = list(sorted(indices))
         ref_el = dual.get_reference_element()
         nodes_old = dual.get_nodes()
+        entity_permutations_old = dual.get_entity_permutations()
         entity_ids = {}
         nodes = []
+        entity_permutations = {} if entity_permutations_old is not None else None
+        dof_counter = 0
         for d, entities in dual.get_entity_ids().items():
             entity_ids[d] = {}
+            if entity_permutations_old is not None:
+                entity_permutations[d] = {}
             for entity, dofs in entities.items():
-                entity_ids[d][entity] = [indices.index(dof)
-                                         for dof in dofs if dof in indices]
+                entity_ids[d][entity] = []
+                _old_new_map = {}
+                dof_counter_local = 0
+                for i, dof in enumerate(dofs):
+                    if dof not in indices:
+                        continue
+                    entity_ids[d][entity].append(dof_counter)
+                    _old_new_map[i] = dof_counter_local
+                    dof_counter += 1
+                    dof_counter_local += 1
+                    nodes.append(nodes_old[dof])
+                if entity_permutations_old is not None:
+                    entity_permutations[d][entity] = {
+                        o: [_old_new_map[i] for i in perm if i in _old_new_map]
+                        for o, perm in entity_permutations_old[d][entity].items()
+                    }
+        assert dof_counter == len(indices)
         nodes = [nodes_old[i] for i in indices]
         self._dual = dual
-        super().__init__(nodes, ref_el, entity_ids)
+        super().__init__(nodes, ref_el, entity_ids, entity_permutations=entity_permutations)
 
     def get_indices(self, restriction_domain, take_closure=True):
         """Return the list of dofs with support on a given restriction domain.
