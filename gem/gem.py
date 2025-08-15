@@ -329,7 +329,7 @@ class Sum(Scalar):
             a, b = args
         except ValueError:
             # Handle more than two arguments
-            return reduce(Sum, args)
+            return Zero() if len(args) == 0 else reduce(Sum, args)
         assert not a.shape
         assert not b.shape
 
@@ -341,6 +341,26 @@ class Sum(Scalar):
 
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children((a, b)))
+
+        # Factor out common factors
+        if isinstance(a, Product) and isinstance(b, Product):
+            a1, a2 = a.children
+            b1, b2 = b.children
+            if a1 == b1:
+                return Product(a1, Sum(a2, b2))
+            elif a2 == b2:
+                return Product(Sum(a1, b1), a2)
+            elif a1 == b2:
+                return Product(a1, Sum(a2, b1))
+            elif a2 == b1:
+                return Product(Sum(a1, b2), a2)
+
+        # Factor out common denominators
+        if isinstance(a, Division) and isinstance(b, Division):
+            a1, a2 = a.children
+            b1, b2 = b.children
+            if a2 == b2:
+                return Division(Sum(a1, b1), a2)
 
         self = super(Sum, cls).__new__(cls)
         self.children = a, b
@@ -371,6 +391,16 @@ class Product(Scalar):
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
+        if isinstance(a, Division):
+            a1, a2 = a.children
+            if b == a2:
+                return a1
+
+        if isinstance(b, Division):
+            b1, b2 = b.children
+            if a == b2:
+                return b1
+
         self = super(Product, cls).__new__(cls)
         self.children = a, b
         return self
@@ -391,6 +421,9 @@ class Division(Scalar):
 
         if b == one:
             return a
+
+        if a == b:
+            return one
 
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children((a, b)))
@@ -684,6 +717,13 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
+        if isinstance(aggregate, Identity):
+            i, j = multiindex
+            if i == j:
+                return one
+            elif all(isinstance(k, int) for k in multiindex):
+                return Zero()
+
         # Simplify Literal and ListTensor
         if isinstance(aggregate, (Constant, ListTensor)):
             if all(isinstance(i, int) for i in multiindex):
@@ -695,7 +735,10 @@ class Indexed(Scalar):
                 # Some indices fixed
                 slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
                 sub = aggregate.array[slices]
-                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
+                if isinstance(aggregate, Constant):
+                    sub = Literal(sub, dtype=aggregate.dtype)
+                elif sub.shape:
+                    sub = ListTensor(sub)
                 return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
 
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
@@ -922,11 +965,16 @@ class IndexSum(Scalar):
         # Factor out common factors
         if isinstance(summand, Product):
             a, b = summand.children
-            if all(i not in a.free_indices for i in multiindex):
+            aidx = set(a.free_indices).intersection(multiindex)
+            if not aidx:
                 return Product(a, IndexSum(b, multiindex))
-
-            if all(i not in b.free_indices for i in multiindex):
+            bidx = set(b.free_indices).intersection(multiindex)
+            if not bidx:
                 return Product(IndexSum(a, multiindex), b)
+
+            if aidx != bidx:
+                if (not aidx.intersection(bidx) and aidx.union(bidx) == set(multiindex)):
+                    return Product(IndexSum(a, tuple(aidx)), IndexSum(b, tuple(bidx)))
 
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
