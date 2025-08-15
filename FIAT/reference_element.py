@@ -1359,6 +1359,9 @@ class TensorProductCell(Cell):
         numpy.put_along_axis(a, ai, 1, axis=2)
         return a
 
+    def is_macrocell(self):
+        return any(c.is_macrocell() for c in self.cells)
+
 
 class Hypercube(Cell):
     """Abstract class for a reference hypercube"""
