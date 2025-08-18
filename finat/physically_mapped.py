@@ -266,6 +266,9 @@ class MappedTabulation(Mapping):
     on the requested derivatives."""
 
     def __init__(self, M, ref_tabulation):
+
+        M, = gem.optimise.constant_fold_zero((M,))
+        M = gem.optimise.aggressive_unroll(M)
         self.M = M
         self.ref_tabulation = ref_tabulation
         # we expect M to be sparse with O(1) nonzeros per row
@@ -276,16 +279,17 @@ class MappedTabulation(Mapping):
         self._tabulation_cache = {}
 
     def matvec(self, table):
-        # basis recombination using hand-rolled sparse-dense matrix multiplication
-        ii = gem.indices(len(table.shape)-1)
+        """Basis recombination using hand-rolled sparse-dense matrix multiplication."""
+        table = gem.optimise.ffc_rounding(table, 1E-13)
+        # return gem.optimise.aggressive_unroll(self.M @ table)
+
+        ii = tuple(gem.Index(extent=s) for s in table.shape[1:])
         phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
+
         # the sum approach is faster than calling numpy.dot or gem.IndexSum
         exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
                  for i, js in enumerate(self.csr)]
-
-        val = gem.ListTensor(exprs)
-        # val = self.M @ table
-        return gem.optimise.aggressive_unroll(val)
+        return gem.ListTensor(exprs)
 
     def __getitem__(self, alpha):
         try:

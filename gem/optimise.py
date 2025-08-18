@@ -314,7 +314,7 @@ def delta_elimination(sum_indices, factors):
                    for index in (f.i, f.j) if index in sum_indices]
     while delta_queue:
         delta, from_ = delta_queue[0]
-        to_, = list({delta.i, delta.j} - {from_})
+        to_, = {delta.i, delta.j} - {from_}
 
         sum_indices.remove(from_)
 
@@ -344,7 +344,7 @@ def associate(operator, operands):
     def count(pair):
         """Operation count to reduce a pair of GEM expressions"""
         a, b = pair
-        extents = [i.extent for i in set().union(a.free_indices, b.free_indices)]
+        extents = [i.extent for i in set(a.free_indices + b.free_indices)]
         return numpy.prod(extents, dtype=int)
 
     flops = 0

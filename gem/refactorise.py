@@ -190,8 +190,8 @@ def _collect_monomials(expression, self):
         atomics = common_atomics + tuple(map(applier, a))
 
         # All free indices that appear in atomic terms
-        atomic_indices = set().union(*[atomic.free_indices
-                                       for atomic in atomics])
+        atomic_indices = set().union(*(atomic.free_indices
+                                       for atomic in atomics))
 
         # Sum indices that appear in atomic terms
         # (will go to the result :py:class:`Monomial`)

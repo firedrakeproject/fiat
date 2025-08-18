@@ -291,9 +291,14 @@ class Literal(Constant):
     def is_equal(self, other):
         if type(self) is not type(other):
             return False
+
         if self.shape != other.shape:
             return False
-        return numpy.array_equal(self.array, other.array)
+
+        if numpy.array_equal(self.array, other.array):
+            self.array == other.array
+            return True
+        return False
 
     def get_hash(self):
         return hash((type(self), self.shape, tuple(self.array.flat)))
@@ -311,7 +316,7 @@ class Literal(Constant):
 class Variable(Terminal):
     """Symbolic variable tensor"""
 
-    __slots__ = ('name', 'shape')
+    __slots__ = ('name', 'shape', 'children')
     __front__ = ('name', 'shape')
     __back__ = ('dtype',)
 
@@ -319,6 +324,7 @@ class Variable(Terminal):
         self.name = name
         self.shape = shape
         self._dtype = dtype
+        self.children = ()
 
 
 class Sum(Scalar):
@@ -329,7 +335,7 @@ class Sum(Scalar):
             a, b = args
         except ValueError:
             # Handle more than two arguments
-            return reduce(Sum, args)
+            return Zero() if len(args) == 0 else reduce(Sum, args)
         assert not a.shape
         assert not b.shape
 
@@ -341,6 +347,26 @@ class Sum(Scalar):
 
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children((a, b)))
+
+        # Factor out common factors
+        if isinstance(a, Product) and isinstance(b, Product):
+            a1, a2 = a.children
+            b1, b2 = b.children
+            if a1 == b1:
+                return Product(a1, Sum(a2, b2))
+            elif a2 == b2:
+                return Product(Sum(a1, b1), a2)
+            elif a1 == b2:
+                return Product(a1, Sum(a2, b1))
+            elif a2 == b1:
+                return Product(Sum(a1, b2), a2)
+
+        # Factor out common denominators
+        if isinstance(a, Division) and isinstance(b, Division):
+            a1, a2 = a.children
+            b1, b2 = b.children
+            if a2 == b2:
+                return Division(Sum(a1, b1), a2)
 
         self = super(Sum, cls).__new__(cls)
         self.children = a, b
@@ -360,16 +386,38 @@ class Product(Scalar):
         assert not b.shape
 
         # Constant folding
-        if isinstance(a, Zero) or isinstance(b, Zero):
-            return Zero()
+        if isinstance(a, Zero):
+            return a
+        if isinstance(b, Zero):
+            return b
 
         if a == one:
             return b
         if b == one:
             return a
 
+        if isinstance(a, Division):
+            a1, a2 = a.children
+            if b == a2:
+                return a1
+
+        if isinstance(b, Division):
+            b1, b2 = b.children
+            if a == b2:
+                return b1
+
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children((a, b)))
+
+        if isinstance(a, Division):
+            a1, a2 = a.children
+            if b == a2:
+                return a1
+
+        if isinstance(b, Division):
+            b1, b2 = b.children
+            if a == b2:
+                return b1
 
         self = super(Product, cls).__new__(cls)
         self.children = a, b
@@ -387,10 +435,28 @@ class Division(Scalar):
         if isinstance(b, Zero):
             raise ValueError("division by zero")
         if isinstance(a, Zero):
-            return Zero()
+            return a
 
         if b == one:
             return a
+        if a == b:
+            return one
+
+        if isinstance(a, Division) and isinstance(b, Division):
+            a1, a2 = a.children
+            b1, b2 = b.children
+            return Division(Product(a1, b2), Product(a2, b1))
+
+        if isinstance(a, Division):
+            a1, a2 = a.children
+            return Division(a1, Product(a2, b))
+
+        if isinstance(b, Division):
+            b1, b2 = b.children
+            return Division(Product(a, b2), b1)
+
+        if a == b:
+            return one
 
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children((a, b)))
@@ -684,6 +750,13 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
+        if isinstance(aggregate, Identity):
+            i, j = multiindex
+            if i == j:
+                return one
+            elif all(isinstance(k, int) for k in multiindex):
+                return Zero()
+
         # Simplify Literal and ListTensor
         if isinstance(aggregate, (Constant, ListTensor)):
             if all(isinstance(i, int) for i in multiindex):
@@ -695,14 +768,14 @@ class Indexed(Scalar):
                 sub = aggregate.array[multiindex]
                 return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
 
-            if len(multiindex) < 3:
-                pass
-
             elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
                 # Some indices fixed
                 slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
                 sub = aggregate.array[slices]
-                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
+                if isinstance(aggregate, Constant):
+                    sub = Literal(sub, dtype=aggregate.dtype)
+                elif sub.shape:
+                    sub = ListTensor(sub)
                 return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
 
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
@@ -880,11 +953,6 @@ class ComponentTensor(Node):
             if multiindex == expression.multiindex:
                 return expression.children[0]
 
-        # Flatten nested ComponentTensors
-        if isinstance(expression, ComponentTensor):
-            A, = expression.children
-            return ComponentTensor(A, expression.multiindex + multiindex)
-
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
         self.multiindex = multiindex
@@ -935,10 +1003,11 @@ class IndexSum(Scalar):
             bidx = set(b.free_indices).intersection(multiindex)
             if not bidx:
                 return Product(IndexSum(a, multiindex), b)
-
             if aidx != bidx:
                 if (not aidx.intersection(bidx) and aidx.union(bidx) == set(multiindex)):
-                    return Product(IndexSum(a, tuple(aidx)), IndexSum(b, tuple(bidx)))
+                    aidx = tuple(i for i in multiindex if i in a.free_indices)
+                    bidx = tuple(i for i in multiindex if i in b.free_indices)
+                    return Product(IndexSum(a, aidx), IndexSum(b, bidx))
 
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
@@ -1023,6 +1092,8 @@ class ListTensor(Node):
         """Common subexpression eliminating equality predicate."""
         if type(self) is not type(other):
             return False
+        if self.array is other.array:
+            return True
         if numpy.array_equal(self.array, other.array):
             self.array = other.array
             return True

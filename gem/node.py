@@ -92,7 +92,11 @@ class Node(object):
         """
         if type(self) is not type(other):
             return False
-        return self._arguments == other._arguments
+
+        if self._arguments == other._arguments:
+            self.children = other.children
+            return True
+        return False
 
     def get_hash(self):
         """Hash function.
