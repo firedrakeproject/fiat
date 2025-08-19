@@ -396,16 +396,6 @@ class Product(Scalar):
         if b == one:
             return a
 
-        if isinstance(a, Division):
-            a1, a2 = a.children
-            if b == a2:
-                return a1
-
-        if isinstance(b, Division):
-            b1, b2 = b.children
-            if a == b2:
-                return b1
-
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
