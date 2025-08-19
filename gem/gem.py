@@ -347,32 +347,6 @@ class Sum(Scalar):
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
-        # Factor out common factors
-        if isinstance(a, Product) or isinstance(b, Product):
-            if isinstance(a, Product):
-                a1, a2 = a.children
-            else:
-                a1, a2 = one, a
-            if isinstance(b, Product):
-                b1, b2 = b.children
-            else:
-                b1, b2 = one, b
-            if a1 == b1:
-                return Product(a1, Sum(a2, b2))
-            elif a2 == b2:
-                return Product(Sum(a1, b1), a2)
-            elif a1 == b2:
-                return Product(a1, Sum(a2, b1))
-            elif a2 == b1:
-                return Product(Sum(a1, b2), a2)
-
-        # Factor out common denominators
-        if isinstance(a, Division) and isinstance(b, Division):
-            a1, a2 = a.children
-            b1, b2 = b.children
-            if a2 == b2:
-                return Division(Sum(a1, b1), a2)
-
         self = super(Sum, cls).__new__(cls)
         self.children = a, b
         return self
@@ -404,16 +378,6 @@ class Product(Scalar):
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
-        if isinstance(a, Division):
-            a1, a2 = a.children
-            if b == a2:
-                return a1
-
-        if isinstance(b, Division):
-            b1, b2 = b.children
-            if a == b2:
-                return b1
-
         self = super(Product, cls).__new__(cls)
         self.children = a, b
         return self
@@ -434,21 +398,6 @@ class Division(Scalar):
 
         if b == one:
             return a
-        if a == b:
-            return one
-
-        if isinstance(a, Division) and isinstance(b, Division):
-            a1, a2 = a.children
-            b1, b2 = b.children
-            return Division(Product(a1, b2), Product(a2, b1))
-
-        if isinstance(a, Division):
-            a1, a2 = a.children
-            return Division(a1, Product(a2, b))
-
-        if isinstance(b, Division):
-            b1, b2 = b.children
-            return Division(Product(a, b2), b1)
 
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children((a, b)))
