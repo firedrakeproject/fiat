@@ -266,9 +266,9 @@ class MappedTabulation(Mapping):
     on the requested derivatives."""
 
     def __init__(self, M, ref_tabulation):
-
-        M, = gem.optimise.constant_fold_zero((M,))
         M = gem.optimise.aggressive_unroll(M)
+        M, = gem.optimise.constant_fold_zero((M,))
+
         self.M = M
         self.ref_tabulation = ref_tabulation
         # we expect M to be sparse with O(1) nonzeros per row

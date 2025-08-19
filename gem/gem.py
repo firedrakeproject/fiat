@@ -348,9 +348,15 @@ class Sum(Scalar):
             return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         # Factor out common factors
-        if isinstance(a, Product) and isinstance(b, Product):
-            a1, a2 = a.children
-            b1, b2 = b.children
+        if isinstance(a, Product) or isinstance(b, Product):
+            if isinstance(a, Product):
+                a1, a2 = a.children
+            else:
+                a1, a2 = one, a
+            if isinstance(b, Product):
+                b1, b2 = b.children
+            else:
+                b1, b2 = one, b
             if a1 == b1:
                 return Product(a1, Sum(a2, b2))
             elif a2 == b2:
@@ -443,9 +449,6 @@ class Division(Scalar):
         if isinstance(b, Division):
             b1, b2 = b.children
             return Division(Product(a, b2), b1)
-
-        if a == b:
-            return one
 
         if isinstance(a, Constant) and isinstance(b, Constant):
             return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children((a, b)))
