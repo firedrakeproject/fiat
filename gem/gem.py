@@ -316,7 +316,7 @@ class Literal(Constant):
 class Variable(Terminal):
     """Symbolic variable tensor"""
 
-    __slots__ = ('name', 'shape', 'children')
+    __slots__ = ('name', 'shape')
     __front__ = ('name', 'shape')
     __back__ = ('dtype',)
 
@@ -324,7 +324,6 @@ class Variable(Terminal):
         self.name = name
         self.shape = shape
         self._dtype = dtype
-        self.children = ()
 
 
 class Sum(Scalar):
