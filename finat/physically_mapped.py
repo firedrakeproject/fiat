@@ -327,10 +327,6 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         result = super().basis_evaluation(order, ps, entity=entity)
         return self.map_tabulation(result, coordinate_mapping)
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
-        result = super().point_evaluation(order, refcoords, entity=entity)
-        return self.map_tabulation(result, coordinate_mapping)
-
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
     """Base class for directly defined elements such as direct

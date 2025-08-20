@@ -1333,12 +1333,16 @@ def extract_type(expressions, klass):
 def Piecewise(*args):
     """Represents a piecewise function.
 
-    Each argument is a 2-tuple defining an expression and condition.
+    Parameters
+    ----------
+    *args
+        Each argument is a 2-tuple defining an expression and condition.
 
     Returns
     -------
     Node
-        A GEM nested Conditional.
+        A nested Conditional.
+
     """
     expr = None
     pieces = []

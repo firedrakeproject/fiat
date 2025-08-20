@@ -4,7 +4,7 @@ import numpy as np
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSet
+from finat.point_set import PointSet, PointSingleton
 
 try:
     from firedrake_citations import Citations
@@ -96,10 +96,12 @@ class FiatElement(FiniteElementBase):
         :param ps: the point set.
         :param entity: the cell entity on which to tabulate.
         '''
-        space_dimension = self._element.space_dimension()
-        value_size = np.prod(self._element.value_shape(), dtype=int)
-        fiat_result = self._element.tabulate(order, ps.points, entity)
-        result = {}
+        fiat_element = self._element
+        fiat_result = fiat_element.tabulate(order, ps.points, entity)
+
+        value_shape = self.value_shape
+        value_size = np.prod(value_shape, dtype=int)
+        space_dimension = fiat_element.space_dimension()
         # In almost all cases, we have
         # self.space_dimension() == self._element.space_dimension()
         # But for Bell, FIAT reports 21 basis functions,
@@ -107,51 +109,49 @@ class FiatElement(FiniteElementBase):
         # basis functions, and the additional 3 are for
         # dealing with transformations between physical
         # and reference space).
-        index_shape = (self._element.space_dimension(),)
+        if self.space_dimension() == space_dimension:
+            beta = self.get_indices()
+            index_shape = tuple(index.extent for index in beta)
+        else:
+            index_shape = (space_dimension,)
+            beta = tuple(gem.Index(extent=i) for i in index_shape)
+            assert len(beta) == len(self.get_indices())
+
+        zeta = self.get_value_indices()
+        basis_indices = beta + zeta
+
+        result = {}
         for alpha, fiat_table in fiat_result.items():
             if isinstance(fiat_table, Exception):
-                result[alpha] = gem.Failure(self.index_shape + self.value_shape, fiat_table)
+                shape = ps.points.shape[:-1] + index_shape + value_shape
+                result[alpha] = gem.Failure(shape, fiat_table)
                 continue
 
             derivative = sum(alpha)
-            shp = (space_dimension, value_size, *ps.points.shape[:-1])
-            table_roll = np.moveaxis(fiat_table.reshape(shp), 0, -1)
+            fiat_table = fiat_table.reshape(space_dimension, value_size, -1)
 
-            exprs = []
-            for table in table_roll:
-                if derivative == self.degree and not self.complex.is_macrocell():
-                    # Make sure numerics satisfies theory
-                    exprs.append(gem.Literal(table[0]))
-                elif derivative > self.degree:
-                    # Make sure numerics satisfies theory
-                    assert np.allclose(table, 0.0)
-                    exprs.append(gem.Literal(np.zeros(self.index_shape)))
-                else:
-                    point_indices = ps.indices
-                    point_shape = tuple(index.extent for index in point_indices)
-
-                    exprs.append(gem.partial_indexed(
-                        gem.Literal(table.reshape(point_shape + index_shape)),
-                        point_indices
-                    ))
-            if self.value_shape:
-                # As above, this extent may be different from that
-                # advertised by the finat element.
-                beta = tuple(gem.Index(extent=i) for i in index_shape)
-                assert len(beta) == len(self.get_indices())
-
-                zeta = self.get_value_indices()
-                result[alpha] = gem.ComponentTensor(
-                    gem.Indexed(
-                        gem.ListTensor(np.array(
-                            [gem.Indexed(expr, beta) for expr in exprs]
-                        ).reshape(self.value_shape)),
-                        zeta),
-                    beta + zeta
-                )
+            point_indices = ()
+            if derivative == self.degree and not self.complex.is_macrocell():
+                # Make sure numerics satisfies theory
+                fiat_table = fiat_table[..., 0]
+            elif derivative > self.degree:
+                # Make sure numerics satisfies theory
+                assert np.allclose(fiat_table, 0.0)
+                fiat_table = np.zeros(fiat_table.shape[:-1])
             else:
-                expr, = exprs
-                result[alpha] = expr
+                point_indices = ps.indices
+
+            point_shape = tuple(index.extent for index in point_indices)
+            table_shape = index_shape + value_shape + point_shape
+            table_indices = basis_indices + point_indices
+
+            fiat_table = fiat_table.reshape(table_shape)
+            gem_table = gem.as_gem(fiat_table)
+
+            expr = gem.Indexed(gem_table, table_indices)
+            expr = gem.ComponentTensor(expr, basis_indices)
+            result[alpha] = expr
+
         return result
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
@@ -176,7 +176,11 @@ class FiatElement(FiniteElementBase):
         esd = self.cell.construct_subelement(entity_dim).get_spatial_dimension()
         assert isinstance(refcoords, gem.Node) and refcoords.shape == (esd,)
 
-        return point_evaluation(self, order, refcoords, (entity_dim, entity_i))
+        # Coordinates on the reference entity (GEM)
+        Xi = tuple(gem.Indexed(refcoords, i) for i in np.ndindex(refcoords.shape))
+        ps = PointSingleton(Xi)
+        return self.basis_evaluation(order, ps, entity=entity,
+                                     coordinate_mapping=coordinate_mapping)
 
     @cached_property
     def _dual_basis(self):
@@ -268,69 +272,6 @@ class FiatElement(FiniteElementBase):
         else:
             result, = mappings
             return result
-
-
-def point_evaluation(finat_element, order, ps, entity):
-    fiat_element = finat_element._element
-
-    # Coordinates on the reference entity (GEM)
-    Xi = tuple(gem.Indexed(ps, i) for i in np.ndindex(ps.shape))
-    points = [Xi]
-
-    fiat_result = fiat_element.tabulate(order, points, entity)
-
-    value_shape = finat_element.value_shape
-    value_size = np.prod(value_shape, dtype=int)
-    space_dimension = fiat_element.space_dimension()
-
-    if finat_element.space_dimension() == space_dimension:
-        beta = finat_element.get_indices()
-        index_shape = tuple(index.extent for index in beta)
-    else:
-        index_shape = (space_dimension,)
-        beta = tuple(gem.Index(extent=i) for i in index_shape)
-        assert len(beta) == len(finat_element.get_indices())
-
-    zeta = finat_element.get_value_indices()
-    basis_indices = beta + zeta
-
-    result = {}
-    for alpha, fiat_table in fiat_result.items():
-        if isinstance(fiat_table, Exception):
-            result[alpha] = gem.Failure((space_dimension,) + fiat_element.value_shape(), fiat_table)
-            continue
-
-        derivative = sum(alpha)
-        fiat_table = fiat_table.reshape(space_dimension, value_size, -1)
-
-        point_indices = ()
-        if fiat_table.dtype == object:
-            assert len(points) == 1
-        elif derivative == finat_element.degree and not finat_element.complex.is_macrocell():
-            # Make sure numerics satisfies theory
-            fiat_table = fiat_table[..., 0]
-        elif derivative > finat_element.degree:
-            # Make sure numerics satisfies theory
-            assert np.allclose(fiat_table, 0.0)
-            fiat_table = np.zeros(fiat_table.shape[:-1])
-        else:
-            point_indices = ps.indices
-
-        point_shape = tuple(index.extent for index in point_indices)
-        table_shape = index_shape + value_shape + point_shape
-        table_indices = basis_indices + point_indices
-
-        fiat_table = fiat_table.reshape(table_shape)
-        if fiat_table.dtype == object:
-            gem_table = gem.ListTensor(fiat_table)
-        else:
-            gem_table = gem.Literal(fiat_table)
-
-        expr = gem.Indexed(gem_table, table_indices)
-        expr = gem.ComponentTensor(expr, basis_indices)
-        result[alpha] = expr
-
-    return result
 
 
 class Regge(FiatElement):  # symmetric matrix valued
