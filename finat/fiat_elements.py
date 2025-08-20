@@ -1,12 +1,10 @@
 import FIAT
 import gem
 import numpy as np
-import sympy as sp
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
 from finat.point_set import PointSet
-from finat.sympy2gem import sympy2gem
 
 try:
     from firedrake_citations import Citations
@@ -277,16 +275,7 @@ def point_evaluation(finat_element, order, ps, entity):
 
     # Coordinates on the reference entity (GEM)
     Xi = tuple(gem.Indexed(ps, i) for i in np.ndindex(ps.shape))
-    if finat_element.complex.is_macrocell():
-        # Coordinates on the reference entity (SymPy)
-        points = [sp.symbols('X Y Z')[:len(Xi)]]
-        # Convert SymPy expression to GEM
-        mapper = gem.node.Memoizer(sympy2gem)
-        mapper.bindings = dict(zip(points[0], Xi))
-        mapper = np.vectorize(mapper)
-    else:
-        points = [Xi]
-        mapper = None
+    points = [Xi]
 
     fiat_result = fiat_element.tabulate(order, points, entity)
 
@@ -313,8 +302,6 @@ def point_evaluation(finat_element, order, ps, entity):
 
         derivative = sum(alpha)
         fiat_table = fiat_table.reshape(space_dimension, value_size, -1)
-        if mapper is not None:
-            fiat_table = mapper(fiat_table)
 
         point_indices = ()
         if fiat_table.dtype == object:
