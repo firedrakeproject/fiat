@@ -106,6 +106,12 @@ def test_quadrilateral_variant_spectral_q():
     assert isinstance(element.product.factors[1], finat.GaussLobattoLegendre)
 
 
+def test_quadrilateral_bernstein():
+    element = create_element(finat.ufl.FiniteElement('Bernstein', ufl.quadrilateral, 3))
+    assert isinstance(element.product.factors[0], finat.Bernstein)
+    assert isinstance(element.product.factors[1], finat.Bernstein)
+
+
 def test_quadrilateral_variant_spectral_dq():
     element = create_element(finat.ufl.FiniteElement('DQ', ufl.quadrilateral, 1, variant='spectral'))
     assert isinstance(element.product.factors[0], finat.GaussLegendre)
