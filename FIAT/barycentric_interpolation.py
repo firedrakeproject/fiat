@@ -38,10 +38,11 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
         numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
 
     # Replace 0/0 with 1.0
-    if isinstance(pts.flat[0], gem.Node):
-        one = gem.Literal(1.0)
-        for i in numpy.ndindex(phi.shape):
-            phi[i] = gem.Conditional(gem.Comparison("!=", phi[i], phi[i]), one, phi[i])
+    if pts.dtype == object:
+        if isinstance(pts.flat[0], gem.Node):
+            one = gem.Literal(1.0)
+            for i in numpy.ndindex(phi.shape):
+                phi[i] = gem.Conditional(gem.Comparison("!=", phi[i], phi[i]), one, phi[i])
     else:
         phi[phi != phi] = 1.0
 
