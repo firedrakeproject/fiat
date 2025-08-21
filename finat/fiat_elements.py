@@ -136,7 +136,8 @@ class FiatElement(FiniteElementBase):
                 fiat_table = fiat_table[..., 0]
             elif derivative > self.degree:
                 # Make sure numerics satisfies theory
-                assert np.allclose(fiat_table, 0.0)
+                if fiat_table.dtype != object:
+                    assert np.allclose(fiat_table, 0.0)
                 fiat_table = np.zeros(fiat_table.shape[:-1])
             else:
                 point_indices = ps.indices
