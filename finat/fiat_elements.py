@@ -128,7 +128,6 @@ class FiatElement(FiniteElementBase):
                 continue
 
             derivative = sum(alpha)
-            fiat_table = fiat_table.reshape(space_dimension, value_size, -1)
 
             point_indices = ()
             if derivative == self.degree and not self.complex.is_macrocell():
@@ -139,14 +138,15 @@ class FiatElement(FiniteElementBase):
                                 for X in gem.extract_type(pt, gem.Variable)}
                     gem_table = gem.as_gem(fiat_table)
                     val, = gem.interpreter.evaluate((gem_table,), bindings=bindings)
-                    fiat_table = val.arr.T
+                    fiat_table = val.arr.transpose((*range(1, val.arr.ndim), 0))
 
+                fiat_table = fiat_table.reshape(space_dimension, value_size, -1)
                 fiat_table = fiat_table[..., 0]
             elif derivative > self.degree:
                 # Make sure numerics satisfies theory
                 if fiat_table.dtype != object:
                     assert np.allclose(fiat_table, 0.0)
-                fiat_table = np.zeros(fiat_table.shape[:-1])
+                fiat_table = np.zeros((space_dimension, value_size))
             else:
                 point_indices = ps.indices
 
