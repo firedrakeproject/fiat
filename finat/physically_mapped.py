@@ -281,7 +281,6 @@ class MappedTabulation(Mapping):
     def matvec(self, table):
         """Basis recombination using hand-rolled sparse-dense matrix multiplication."""
         table = gem.optimise.ffc_rounding(table, 1E-13)
-        # return gem.optimise.aggressive_unroll(self.M @ table)
 
         ii = tuple(gem.Index(extent=s) for s in table.shape[1:])
         phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
@@ -289,6 +288,8 @@ class MappedTabulation(Mapping):
         # the sum approach is faster than calling numpy.dot or gem.IndexSum
         exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
                  for i, js in enumerate(self.csr)]
+
+        # return gem.optimise.aggressive_unroll(self.M @ table)
         return gem.ListTensor(exprs)
 
     def __getitem__(self, alpha):
@@ -329,10 +330,6 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
-        return self.map_tabulation(result, coordinate_mapping)
-
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
-        result = super().point_evaluation(order, refcoords, entity=entity)
         return self.map_tabulation(result, coordinate_mapping)
 
 
