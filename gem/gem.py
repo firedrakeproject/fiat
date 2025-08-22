@@ -36,7 +36,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
-           'Inverse', 'Solve', 'extract_type', 'uint_type']
+           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -123,6 +123,21 @@ class Node(NodeBase, metaclass=NodeMeta):
 
     def __rmatmul__(self, other):
         return as_gem(other).__matmul__(self)
+
+    def __abs__(self):
+        return componentwise(lambda x: MathFunction("abs", x), self)
+
+    def __lt__(self, other):
+        return componentwise(lambda x, y: Comparison("<", x, y), self, other)
+
+    def __gt__(self, other):
+        return componentwise(lambda x, y: Comparison(">", x, y), self, other)
+
+    def __le__(self, other):
+        return componentwise(lambda x, y: Comparison("<=", x, y), self, other)
+
+    def __ge__(self, other):
+        return componentwise(lambda x, y: Comparison(">=", x, y), self, other)
 
     @property
     def T(self):
@@ -272,7 +287,6 @@ class Literal(Constant):
     __back__ = ('dtype',)
 
     def __new__(cls, array, dtype=None):
-        array = asarray(array)
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -553,8 +567,8 @@ class LogicalOr(Scalar):
         self.children = a, b
 
 
-class Conditional(Node):
-    __slots__ = ('children', 'shape')
+class Conditional(Scalar):
+    __slots__ = ('children',)
 
     def __new__(cls, condition, then, else_):
         assert not condition.shape
@@ -567,7 +581,6 @@ class Conditional(Node):
 
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
-        self.shape = then.shape
         self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
@@ -1267,6 +1280,14 @@ def as_gem(expr):
         return expr
     elif isinstance(expr, Number):
         return Literal(expr)
+    elif isinstance(expr, (bool, numpy.bool)):
+        return Literal(bool(expr))
+    elif isinstance(expr, numpy.ndarray):
+        if expr.dtype == object:
+            expr = numpy.vectorize(as_gem)(expr)
+            return ListTensor(expr)
+        else:
+            return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
 
@@ -1301,3 +1322,31 @@ def as_gem_uint(expr):
 def extract_type(expressions, klass):
     """Collects objects of type klass in expressions."""
     return tuple(node for node in traversal(expressions) if isinstance(node, klass))
+
+
+def Piecewise(*args):
+    """Represents a piecewise function.
+
+    Parameters
+    ----------
+    *args
+        Each argument is a 2-tuple defining an expression and condition.
+
+    Returns
+    -------
+    Node
+        A nested Conditional.
+
+    """
+    expr = None
+    pieces = []
+    for v, c in args:
+        if isinstance(c, (bool, numpy.bool)) and c:
+            expr = as_gem(v)
+            break
+        pieces.append((as_gem(v), as_gem(c)))
+    if expr is None:
+        expr = Literal(float("nan"))
+    for v, c in reversed(pieces):
+        expr = Conditional(c, v, expr)
+    return expr
