@@ -98,10 +98,6 @@ class FiatElement(FiniteElementBase):
         '''
         fiat_element = self._element
         fiat_result = fiat_element.tabulate(order, ps.points, entity)
-
-        value_shape = self.value_shape
-        value_size = np.prod(value_shape, dtype=int)
-        space_dimension = fiat_element.space_dimension()
         # In almost all cases, we have
         # self.space_dimension() == self._element.space_dimension()
         # But for Bell, FIAT reports 21 basis functions,
@@ -109,6 +105,8 @@ class FiatElement(FiniteElementBase):
         # basis functions, and the additional 3 are for
         # dealing with transformations between physical
         # and reference space).
+        value_shape = self.value_shape
+        space_dimension = fiat_element.space_dimension()
         if self.space_dimension() == space_dimension:
             beta = self.get_indices()
             index_shape = tuple(index.extent for index in beta)
@@ -128,7 +126,6 @@ class FiatElement(FiniteElementBase):
                 continue
 
             derivative = sum(alpha)
-
             point_indices = ()
             if derivative == self.degree and not self.complex.is_macrocell():
                 # Make sure numerics satisfies theory
@@ -140,27 +137,23 @@ class FiatElement(FiniteElementBase):
                     val, = gem.interpreter.evaluate((gem_table,), bindings=bindings)
                     fiat_table = val.arr.transpose((*range(1, val.arr.ndim), 0))
 
-                fiat_table = fiat_table.reshape(space_dimension, value_size, -1)
+                fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
                 fiat_table = fiat_table[..., 0]
             elif derivative > self.degree:
                 # Make sure numerics satisfies theory
                 if fiat_table.dtype != object:
                     assert np.allclose(fiat_table, 0.0)
-                fiat_table = np.zeros((space_dimension, value_size))
+                fiat_table = np.zeros(index_shape + value_shape)
             else:
                 point_indices = ps.indices
 
-            point_shape = tuple(index.extent for index in point_indices)
-            table_shape = index_shape + value_shape + point_shape
-            table_indices = basis_indices + point_indices
+            point_shape = tuple(i.extent for i in point_indices)
+            fiat_table = fiat_table.reshape(index_shape + value_shape + point_shape)
 
-            fiat_table = fiat_table.reshape(table_shape)
             gem_table = gem.as_gem(fiat_table)
-
-            expr = gem.Indexed(gem_table, table_indices)
+            expr = gem.Indexed(gem_table, basis_indices + point_indices)
             expr = gem.ComponentTensor(expr, basis_indices)
             result[alpha] = expr
-
         return result
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):

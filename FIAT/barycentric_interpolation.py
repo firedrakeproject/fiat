@@ -6,7 +6,6 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2021
 
-import gem
 import numpy
 from FIAT import reference_element, expansions, polynomial_set
 
@@ -25,28 +24,26 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
-    if pts.dtype == object and not isinstance(pts.flat[0], gem.Node):
-        from sympy import simplify
-        sp_simplify = numpy.vectorize(simplify)
-    else:
-        sp_simplify = lambda x: x
-
+    sp_simplify = lambda x: x
     phi = numpy.add.outer(-nodes, pts.flatten())
     with numpy.errstate(divide='ignore', invalid='ignore'):
-        numpy.reciprocal(phi, out=phi)
-        numpy.multiply(phi, wts[:, None], out=phi)
-        numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
+        numpy.divide(wts[:, None], phi, out=phi)
+        numpy.divide(phi, numpy.sum(phi, axis=0, keepdims=True), out=phi)
+    phi = phi.reshape(-1, *pts.shape[:-1])
 
     # Replace 0/0 with 1.0
     if pts.dtype == object:
-        if isinstance(pts.flat[0], gem.Node):
+        import gem
+        if any(isinstance(Xi, gem.Node) for Xi in pts.flat):
             one = gem.Literal(1.0)
-            for i in numpy.ndindex(phi.shape):
-                phi[i] = gem.Conditional(gem.Comparison("!=", phi[i], phi[i]), one, phi[i])
+            for i, u in numpy.ndenumerate(phi):
+                phi[i] = gem.Conditional(gem.Comparison("!=", u, u), one, u)
+        else:
+            from sympy import simplify
+            sp_simplify = numpy.vectorize(simplify)
     else:
         phi[phi != phi] = 1.0
 
-    phi = phi.reshape(-1, *pts.shape[:-1])
     phi = sp_simplify(phi)
     results = {(0,): phi}
     for r in range(1, order+1):

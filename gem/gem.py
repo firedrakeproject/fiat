@@ -287,7 +287,6 @@ class Literal(Constant):
     __back__ = ('dtype',)
 
     def __new__(cls, array, dtype=None):
-        array = asarray(array)
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -568,8 +567,8 @@ class LogicalOr(Scalar):
         self.children = a, b
 
 
-class Conditional(Node):
-    __slots__ = ('children', 'shape')
+class Conditional(Scalar):
+    __slots__ = ('children',)
 
     def __new__(cls, condition, then, else_):
         assert not condition.shape
@@ -582,7 +581,6 @@ class Conditional(Node):
 
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
-        self.shape = then.shape
         self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
@@ -1293,7 +1291,11 @@ def as_gem(expr):
     elif isinstance(expr, (bool, numpy.bool)):
         return Literal(bool(expr))
     elif isinstance(expr, numpy.ndarray):
-        return ListTensor(expr) if expr.dtype == object else Literal(expr)
+        if expr.dtype == object:
+            expr = numpy.vectorize(as_gem)(expr)
+            return ListTensor(expr)
+        else:
+            return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
 
