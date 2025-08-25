@@ -24,6 +24,7 @@ class RestrictedDualSet(DualSet):
                                          for dof in dofs if dof in indices]
         nodes = [nodes_old[i] for i in indices]
         self._dual = dual
+
         super().__init__(nodes, ref_el, entity_ids)
 
     def get_indices(self, restriction_domain, take_closure=True):
@@ -34,6 +35,10 @@ class RestrictedDualSet(DualSet):
         """
         # Call get_indices on the parent class to support multiple restriction domains
         return type(self._dual).get_indices(self, restriction_domain, take_closure=take_closure)
+
+    def __getattr__(self, name):
+        val = getattr(self._dual, name)
+        return val
 
 
 class RestrictedElement(CiarletElement):
@@ -69,4 +74,4 @@ class RestrictedElement(CiarletElement):
         assert all(e_mapping == mapping_new[0] for e_mapping in mapping_new)
 
         # Call constructor of CiarletElement
-        super().__init__(poly_set, dual, 0, element.get_formdegree(), mapping_new[0])
+        super().__init__(poly_set, dual, element.degree(), element.get_formdegree(), mapping_new[0])
