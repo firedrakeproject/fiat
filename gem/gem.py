@@ -97,7 +97,7 @@ class Node(NodeBase, metaclass=NodeMeta):
     def __sub__(self, other):
         return componentwise(
             Sum, self,
-            componentwise(Product, minus, as_gem(other)))
+            componentwise(Product, Literal(-1), as_gem(other)))
 
     def __rsub__(self, other):
         return as_gem(other).__sub__(self)
@@ -874,11 +874,6 @@ class ComponentTensor(Node):
             if multiindex == expression.multiindex:
                 return expression.children[0]
 
-        # Flatten nested ComponentTensors
-        if isinstance(expression, ComponentTensor):
-            A, = expression.children
-            return ComponentTensor(A, expression.multiindex + multiindex)
-
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
         self.multiindex = multiindex
@@ -919,15 +914,6 @@ class IndexSum(Scalar):
         if isinstance(summand, IndexSum):
             A, = summand.children
             return IndexSum(A, summand.multiindex + multiindex)
-
-        # Factor out common factors
-        if isinstance(summand, Product):
-            a, b = summand.children
-            if all(i not in a.free_indices for i in multiindex):
-                return Product(a, IndexSum(b, multiindex))
-
-            if all(i not in b.free_indices for i in multiindex):
-                return Product(IndexSum(a, multiindex), b)
 
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
@@ -1299,7 +1285,6 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
-minus = Literal(-1)
 
 
 # Syntax sugar
