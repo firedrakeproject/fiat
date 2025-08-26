@@ -24,30 +24,26 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     via the second barycentric interpolation formula. See Berrut and Trefethen (2004)
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
-    sp_simplify = lambda x: x
-    phi = numpy.add.outer(-nodes, pts.flatten())
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        numpy.divide(wts[:, None], phi, out=phi)
-        numpy.divide(phi, numpy.sum(phi, axis=0, keepdims=True), out=phi)
-    phi = phi.reshape(-1, *pts.shape[:-1])
-
-    # Replace 0/0 with 1.0
     if pts.dtype == object:
-        import gem
-        if any(isinstance(Xi, gem.Node) for Xi in pts.flat):
-            one = gem.as_gem(1.0)
-            for i, u in numpy.ndenumerate(phi):
-                phi[i] = gem.Conditional(gem.Comparison("!=", u, u), one, u)
-        else:
-            from sympy import simplify
-            sp_simplify = numpy.vectorize(simplify)
+        # Do not use barycentric interpolation at unknown points
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        n = len(nodes)
+        phis = [wts[i] * numpy.prod(phi[[*range(0, i), *range(i+1, n)]], axis=0)
+                for i in range(n)]
+        phi = numpy.asarray(phis)
     else:
+        # Use the second barycentric interpolation formula
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        with numpy.errstate(divide='ignore', invalid='ignore'):
+            numpy.divide(wts[:, None], phi, out=phi)
+            numpy.divide(phi, numpy.sum(phi, axis=0, keepdims=True), out=phi)
+        # Replace nan with one
         phi[phi != phi] = 1.0
 
-    phi = sp_simplify(phi)
+    phi = phi.reshape(-1, *pts.shape[:-1])
     results = {(0,): phi}
     for r in range(1, order+1):
-        phi = sp_simplify(numpy.dot(dmat, phi))
+        phi = numpy.dot(dmat, phi)
         results[(r,)] = phi
     return results
 
