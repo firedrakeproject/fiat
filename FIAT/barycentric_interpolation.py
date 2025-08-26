@@ -35,7 +35,7 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     if pts.dtype == object:
         import gem
         if any(isinstance(Xi, gem.Node) for Xi in pts.flat):
-            one = gem.Literal(1.0)
+            one = gem.as_gem(1.0)
             for i, u in numpy.ndenumerate(phi):
                 phi[i] = gem.Conditional(gem.Comparison("!=", u, u), one, u)
         else:
