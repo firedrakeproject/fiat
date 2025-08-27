@@ -128,19 +128,22 @@ class FiatElement(FiniteElementBase):
             derivative = sum(alpha)
             point_indices = ()
             if derivative == self.degree and not self.complex.is_macrocell():
-                # Make sure numerics satisfies theory
+                # Ensure a cellwise constant tabulation
                 if fiat_table.dtype == object:
+                    # Eliminate Variables by forcing numerical evaluation
                     bindings = {X: np.zeros(X.shape)
                                 for pt in ps.points
                                 for X in gem.extract_type(pt, gem.Variable)}
                     gem_table = gem.as_gem(fiat_table)
+                    ndim = len(gem_table.free_indices)
                     val, = gem.interpreter.evaluate((gem_table,), bindings=bindings)
-                    fiat_table = val.arr.transpose((*range(1, val.arr.ndim), 0))
+                    fiat_table = val.arr.transpose((*range(ndim, val.arr.ndim), *range(ndim)))
 
                 fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
+                assert np.allclose(fiat_table, fiat_table[..., 0, None])
                 fiat_table = fiat_table[..., 0]
             elif derivative > self.degree:
-                # Make sure numerics satisfies theory
+                # Ensure a zero tabulation
                 if fiat_table.dtype != object:
                     assert np.allclose(fiat_table, 0.0)
                 fiat_table = np.zeros(index_shape + value_shape)
