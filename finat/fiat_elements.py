@@ -121,8 +121,7 @@ class FiatElement(FiniteElementBase):
         result = {}
         for alpha, fiat_table in fiat_result.items():
             if isinstance(fiat_table, Exception):
-                shape = ps.points.shape[:-1] + index_shape + value_shape
-                result[alpha] = gem.Failure(shape, fiat_table)
+                result[alpha] = gem.Failure(index_shape + value_shape, fiat_table)
                 continue
 
             derivative = sum(alpha)
