@@ -132,8 +132,7 @@ class FiatElement(FiniteElementBase):
                 if fiat_table.dtype == object:
                     # Eliminate Variables by forcing numerical evaluation
                     bindings = {X: np.zeros(X.shape)
-                                for pt in ps.points
-                                for X in gem.extract_type(pt, gem.Variable)}
+                                for X in gem.extract_type(ps.expression, gem.Variable)}
                     gem_table = gem.as_gem(fiat_table)
                     ndim = len(gem_table.free_indices)
                     val, = gem.interpreter.evaluate((gem_table,), bindings=bindings)
