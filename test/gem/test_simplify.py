@@ -14,7 +14,24 @@ def A():
     return A
 
 
-def test_listtensor_from_indexed(A):
+@pytest.fixture
+def X():
+    return gem.Variable("X", (2, 2))
+
+
+def test_listtensor_from_indexed(X):
+    k = gem.Index()
+    elems = [gem.Indexed(X, (k, *i)) for i in numpy.ndindex(X.shape[1:])]
+    tensor = gem.ListTensor(numpy.reshape(elems, X.shape[1:]))
+
+    assert isinstance(tensor, gem.ComponentTensor)
+    j = tensor.multiindex
+    expected = gem.partial_indexed(X, (k,))
+    expected = gem.ComponentTensor(gem.Indexed(expected, j), j)
+    assert tensor == expected
+
+
+def test_listtensor_from_fixed_indexed(A):
     elems = [gem.Indexed(A, i) for i in numpy.ndindex(A.shape)]
     tensor = gem.ListTensor(numpy.reshape(elems, A.shape))
     assert tensor == A

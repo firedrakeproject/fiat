@@ -939,15 +939,17 @@ class ListTensor(Node):
         child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
 
-        # Simplify [v[j] for j in range(n)] -> v
+        # Simplify [v[multiindex, j] for j in range(n)] -> partial_indexed(v, multiindex)
         if all(isinstance(elem, Indexed) for elem in array.flat):
             tensor = e0.children[0]
-            if array.shape + child_shape == tensor.shape:
+            multiindex = tuple(i for i in e0.multiindex if not isinstance(i, Integral))
+            index_shape = tuple(i.extent for i in multiindex)
+            if index_shape + array.shape + child_shape == tensor.shape:
                 if all(elem.children[0] == tensor for elem in array.flat[1:]):
-                    if all(elem.multiindex == idx for idx, elem in numpy.ndenumerate(array)):
-                        return tensor
+                    if all(elem.multiindex == multiindex + idx for idx, elem in numpy.ndenumerate(array)):
+                        return partial_indexed(tensor, multiindex)
 
-        # Simplify [v[j, :] for j in range(n)] -> v
+        # Simplify [v[j, ...] for j in range(n)] -> v
         if all(isinstance(elem, ComponentTensor) and isinstance(elem.children[0], Indexed)
                for elem in array.flat):
             tensor = e0.children[0].children[0]
