@@ -130,7 +130,7 @@ class FiatElement(FiniteElementBase):
                 # Ensure a cellwise constant tabulation
                 if fiat_table.dtype == object:
                     # Eliminate Variables by forcing numerical evaluation
-                    bindings = {X: np.zeros(X.shape)
+                    bindings = {X: np.random.random_sample(X.shape)
                                 for X in gem.extract_type(ps.expression, gem.Variable)}
                     gem_table = gem.as_gem(fiat_table)
                     ndim = len(gem_table.free_indices)
