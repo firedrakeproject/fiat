@@ -15,7 +15,7 @@ indices.
 """
 
 from abc import ABCMeta
-from itertools import chain
+from itertools import chain, repeat
 from functools import reduce
 from operator import attrgetter
 from numbers import Integral, Number
@@ -986,7 +986,7 @@ class Delta(Scalar, Terminal):
     def __new__(cls, i, j, dtype=None):
         if isinstance(i, tuple) and isinstance(j, tuple):
             # Handle multiindices
-            return Product(*map(Delta, i, j))
+            return Product(*map(Delta, i, j, repeat(dtype)))
         assert isinstance(i, IndexBase)
         assert isinstance(j, IndexBase)
 
@@ -998,25 +998,17 @@ class Delta(Scalar, Terminal):
         if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
 
-        if isinstance(i, Integral):
-            return Indexed(Literal(numpy.eye(j.extent)[i]), (j,))
-
-        if isinstance(j, Integral):
-            return Indexed(Literal(numpy.eye(i.extent)[j]), (i,))
-
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
         # Set up free indices
-        free_indices = []
-        for index in (i, j):
-            if isinstance(index, Index):
-                free_indices.append(index)
-            elif isinstance(index, VariableIndex):
-                raise NotImplementedError("Can not make Delta with VariableIndex")
+        free_indices = [index for index in (i, j) if isinstance(index, Index)]
         self.free_indices = tuple(unique(free_indices))
         self._dtype = dtype
         return self
+
+    def reconstruct(self, *args):
+        return Delta(*args, dtype=self.dtype)
 
 
 class Inverse(Node):
