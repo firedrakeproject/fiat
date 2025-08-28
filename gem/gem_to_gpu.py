@@ -222,7 +222,8 @@ def to_cupy(assignments):
             temp_vars += [f"\t{val[0]} = cp.{repr(val[1])}"]
         elif key != "counter":
             temp_vars += [f"\t{val[0]} = {repr(val[1])[1:-1]}"]
-    
+    temp_vars += [f"\tprint(is7)"] 
+    strs += [f"\tprint(A)"] 
     arg_list = list(args.keys())
     # this ordering probably needs work
     if "A" in arg_list:
@@ -232,13 +233,15 @@ def to_cupy(assignments):
     res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
     return res, arg_list
 
-def to_triton(func_name, assignments, temporaries, temps=None):
+def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_block_indices=None):
 
     args = {}
     if temps is None:
         temps = {}
     arrays = {"counter": 0} 
-    used_temps = {} 
+    used_temps = {}
+    if prev_block_indices is None:
+        prev_block_indices = {}
     subbed_indices = {}
 
     def recurse(expr, outer_idx=tuple()):
@@ -246,7 +249,14 @@ def to_triton(func_name, assignments, temporaries, temps=None):
             return _recurse(expr, outer_idx)
         if expr not in used_temps:
             used_temps[expr] = temps[expr]
-        return temps[expr][0], temps[expr][1][1]
+        shape = temps[expr][1][1]
+        if len(temporaries) == 0:
+            breakpoint()
+        #removed_indices = [prev_block_indices[s] for s in prev_block_indices if prev_block_indices[s] not in outer_idx["vars"] + outer_idx["temps"]]
+        #shape = [s if s not in removed_indices else list(prev_block_indices.keys())[list(prev_block_indices.values()).index(s)] for s in shape]
+        #shape = [s for s in shape if s in outer_idx["vars"] + outer_idx["temps"] or not isinstance(s, str)] 
+        print(temps[expr][0], shape, temps[expr][1][1])
+        return temps[expr][0], tuple(shape)
 
     @singledispatch
     def _recurse(expr, outer_idx):
@@ -285,8 +295,6 @@ def to_triton(func_name, assignments, temporaries, temps=None):
                     elif axis in outer_idx["temps"]:
                         if axis not in inner:
                             inner += [axis]
-                        if not isinstance(axis, str):
-                            breakpoint()
                         idx = list(idx)
                         idx.remove(axis)
                         idx = tuple(idx)
@@ -295,6 +303,10 @@ def to_triton(func_name, assignments, temporaries, temps=None):
                 summands[i] = (command, idx)
             commands = [s[0] for s in summands]
             index = [s[1] for s in summands]
+            if "inter4" in commands:
+                breakpoint()
+            if any([i in subbed_indices.keys() or i in subbed_indices.values() for i in idx for idx in index]):
+                breakpoint()
             # integer reps of the indices
             new_shape0 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[0]])
             new_shape1 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[1]])
@@ -329,13 +341,8 @@ def to_triton(func_name, assignments, temporaries, temps=None):
                             commands[i] = commands[i] + "[" + slices[2:]
                         
             result_shape = np.broadcast_shapes(tuple(new_shape0), tuple(new_shape1))
-            #if len(outer) > 0:
-            # not sure this is general, but c block needs to be on the outside
-            #outer.reverse()
             all_indices = set([i for s in summands for i in s[1]])
             result = tuple([i for i_count in result_shape for i in all_indices if i.count == i_count])
-            if len(inner) > 1:
-                breakpoint()
             index = tuple(outer + inner) + result 
         else:
             index = index_without_empty[0]
@@ -507,7 +514,8 @@ def to_triton(func_name, assignments, temporaries, temps=None):
             res_str = chld
         if any([i in outer_idx['temps'] for i in idx]):
             replace_num = sum([i in outer_idx['temps'] for i in idx])
-            index = idx + expr.index_ordering()[sum([i in outer_idx['temps'] for i in idx]):]
+            #index = idx + expr.index_ordering()[sum([i in outer_idx['temps'] for i in idx]):]
+            index = idx[replace_num:] + expr.index_ordering()
             for i in range(replace_num):
                 subbed_indices[expr.index_ordering()[i]] = idx[i] 
             return res_str, index 
@@ -541,8 +549,7 @@ def to_triton(func_name, assignments, temporaries, temps=None):
     def _recurse_variable(expr, outer_idx):
         args[expr.name] = expr.shape 
         if expr.name[0] == 'w':
-            # quadrature weights are dependent on quadrature block, not cell block
-            return expr.name, tuple(outer_idx["temps"])
+            return expr.name, tuple()
         return expr.name, tuple(outer_idx["vars"]) 
 
     @_recurse.register(gem.Zero)
@@ -563,12 +570,13 @@ def to_triton(func_name, assignments, temporaries, temps=None):
             val = arrays["counter"]
             arrays[expr] = (f"t{val}", expr.array)
             arrays["counter"] += 1
-        return arrays[expr][0], tuple(outer_idx["temps"]) 
+        # outer_idx["temps"]
+        return arrays[expr][0], tuple() 
 
 
 
-    from firedrake.device import compute_device
-    block_dims = compute_device.block_dims()
+    block_dims = {"vars":[block[0] for block in blocks["vars"]],
+                  "temps":[block[0] for block in blocks["temps"]]} 
     counter = 0
     temp_assigns = []
     stores = []
@@ -583,8 +591,8 @@ def to_triton(func_name, assignments, temporaries, temps=None):
         #assert v_idx == e_idx
         stores += [f"\t{v}_res={e}"]
 
-    kernel_data = {"entrypoint": func_name, "arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "insns": [], "pids" : []}
-    kernel_data["blocks"] = compute_device.blocks 
+    kernel_data = {"entrypoint": func_name, "arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "insns": [], "pids" : [], "extra_blocks":[]}
+    kernel_data["blocks"] = blocks 
      
     for i, block in enumerate(block_dims['vars'] + block_dims['temps']): #
         kernel_data["pids"] += [f"\tpid_{block[-1]} = tl.program_id(axis={i})"]
@@ -599,7 +607,7 @@ def to_triton(func_name, assignments, temporaries, temps=None):
         if isinstance(val, int):
             continue
         name, array = val
-        replaced_dims = len(compute_device.blocks["temps"])
+        replaced_dims = len(block_dims["temps"])
         size = tuple([block for block in block_dims["temps"]]) + array.shape[replaced_dims:]
         res, kernel_data = construct_array_arguments(name, array, size, kernel_data)
         kernel_data["insns"] += res        
@@ -612,23 +620,24 @@ def to_triton(func_name, assignments, temporaries, temps=None):
     else:
         for expr in used_temps:
             name, (_, shape) = used_temps[expr]
-            shape = tuple([s if isinstance(s, str) else s.extent for s in list(shape)])
-            replaced_dims = len(compute_device.blocks["temps"])
+            shape = [s if isinstance(s, str) else s.extent for s in list(shape)]
+            replaced_dims = sum([isinstance(s, str) and s not in block_dims["vars"] for s in shape]) 
             if len(expr.shape) > 0:
-                shape = shape +  expr.shape[len([s for s in shape if s not in compute_device.blocks["vars"]]):]
-            res, kernel_data = construct_array_arguments(name, None, shape, kernel_data)
+                shape = shape +  list(expr.shape[replaced_dims:])
+            for i, s in enumerate(shape):
+                if isinstance(s, str) and s not in block_dims["vars"] + block_dims["temps"]:
+                   shape[i] = f"size_{s[-1]}"
+                   if (s, None, None) not in kernel_data["extra_blocks"]:
+                       extra_pid = [f"\tpid_{s[-1]} = 0"]
+                       kernel_data["pids"] += extra_pid
+                       kernel_data["extra_blocks"] += [(s, None, None)]
+        
+            res, kernel_data = construct_array_arguments(name, None, tuple(shape), kernel_data)
             kernel_data["insns"] = res + kernel_data["insns"]
-
-    #stores += [f"tl.store({output} + offsets, {v}, mask=mask"]
-    #if len(temporaries) == 0:
-    #kernel_data["insns"] += [f"\tbreakpoint()"]
 
     kernel_data["insns"] +=  stores
     res, kernel_data = kernel_data_to_str(kernel_data)
-    #res = "\n".join(func_decl(*arg_list) + pids + const_exprs + array_loading + temp_vars + stores)
-
-     
-    return res, kernel_data, temps
+    return res, kernel_data, temps, subbed_indices
 
 def next_pow2(val):
     return int(np.power(2, np.ceil(np.log2(val))))
@@ -656,9 +665,12 @@ def construct_array_arguments(name, value, shape, kernel_data, load=True):
             stride_acc += [dim]
             res += [f"\t{name}_offsets{i} = tl.arange(0, {name}_dim{i})"]
         else:
-            res += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {dim})) "]
+            res += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {name}_dim{i})) "]
             kernel_data["sizes_actual"] += [(name + f"_size{i}", f"{dim} * (pid_{dim[-1]}+1) if {dim} * (pid_{dim[-1]}+1) < size_{dim[-1]} else size_{dim[-1]}")]
-            kernel_data["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
+            if dim in [block[0] for block in blocks]:
+                kernel_data["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
+            else:
+                kernel_data["sizes_pow2"] += [(name + f"_dim{i}", f"dim_{dim[-1]}")]
             stride_acc += [f"size_{dim[-1]}"]
     offsets, mask = construct_offsets(name, len(shape))
     ptr = f"\t{name}_ptr = {name}"
@@ -669,15 +681,15 @@ def construct_array_arguments(name, value, shape, kernel_data, load=True):
     return res, kernel_data
 
 def kernel_data_to_str(kernel_data):
-    from firedrake.device import compute_device
-
     block_dims = kernel_data["blocks"]
+    extra_blocks = kernel_data["extra_blocks"]
     const_exprs =  kernel_data["sizes_pow2"] + kernel_data["sizes_actual"] + kernel_data["strides"]
 
     const_exprs = [f"\t{exp[0]}:tl.constexpr = {exp[1]}" for exp in const_exprs]
     array_exprs = [exp[0] for exp in kernel_data["arrays"]]
-    block_dim_args = [f"size_{block[0][-1]}" for block in compute_device.blocks['vars'] + compute_device.blocks['temps']] 
-    arg_list = array_exprs + block_dim_args + [f"{block}:tl.constexpr" for block, _, _ in block_dims['vars'] + block_dims['temps']] 
+    pow2_extra = [f"dim_{block[0][-1]}:tl.constexpr" for block in extra_blocks]
+    block_dim_args = [f"size_{block[0][-1]}:tl.constexpr" for block in block_dims['vars'] + block_dims['temps'] + extra_blocks] 
+    arg_list = array_exprs + block_dim_args + pow2_extra + [f"{block}:tl.constexpr" for block, _, _ in block_dims['vars'] + block_dims['temps']] 
 
     # this ordering probably needs work
     if "A" in arg_list:
@@ -687,9 +699,9 @@ def kernel_data_to_str(kernel_data):
         a2 = kernel_data["arrays"].pop(a_idx2)
         arg_list = [a] + arg_list
         kernel_data["arrays"] = [a2] + kernel_data["arrays"]
-        kernel_data["insns"] += [f"\ttl.store(A_ptr + A_offsets, A_res, mask = A_mask)"] 
+        kernel_data["insns"] += [f"\ttl.atomic_add(A_ptr + A_offsets, A_res, mask = A_mask)"] 
     res = "\n".join(func_decl(kernel_data["entrypoint"], *arg_list) + kernel_data["pids"] + const_exprs + kernel_data["insns"])
-    return res, kernel_data
+    return res + "\n", kernel_data
 
 def construct_offsets(name, num_dims):
     # TODO put in case where dimension has blocks over it
@@ -708,8 +720,9 @@ def construct_offsets(name, num_dims):
 
 def to_triton_wrapper(assignments, temporaries):
     from firedrake.device import compute_device
-    str1, data1, temps1 = to_triton("subkernel1", [], temporaries)
-    str2, data2, temps2 = to_triton("subkernel2", assignments, [], temps=temps1)
+    vars_blocks = {"vars": compute_device.blocks["vars"], "temps":[]}
+    str1, data1, temps1, subs1 = to_triton("subkernel1", [], temporaries, compute_device.blocks)
+    str2, data2, temps2, subs2 = to_triton("subkernel2", assignments, [], vars_blocks, temps1, subs1)
     args = [exp[0] for exp in data1["arrays"]]
     args1 = args.copy()
     array_decl = []
@@ -746,10 +759,21 @@ def to_triton_wrapper(assignments, temporaries):
     wrapper_func += [f"\tprint(inter6)"]
     wrapper_func += [f"\tprint(inter4)"]
     #wrapper_func += [f"\tbreakpoint()"]
+    grid_sizes = []
+    block_args = []
+    for name, _, _ in blocks['vars']:
+        block_args += [f"{name}"]
+        grid_sizes += [f"triton.cdiv(size_{name[-1]}, meta['{name}'])"]
+    for name, _, _ in data2["extra_blocks"]:
+        wrapper_func += [f"\tdim_{name[-1]} = int(np.power(2, np.ceil(np.log2(size_{name[-1]}))))"]
+        block_size += [f"dim_{name[-1]}"]
+    wrapper_func += [f"\tgrid = lambda meta: ({','.join(grid_sizes)}, )"]
     wrapper_func += [f"\tsubkernel2[grid]({','.join([a[0] for a in data2['arrays']] + block_size + block_args)})"]
+    wrapper_func += [f"\tprint(A)"]
+    wrapper_func += [f"\tbreakpoint()"]
     res_data = {"arrays": [output_var] + [a for a in data1["arrays"] if a[0] in args], "sizes_pow2":[], "sizes_actual":[]}
     res = "\n".join([new_str1, str2] + wrapper_func) 
-
+    breakpoint()
     return res, res_data
     
     
