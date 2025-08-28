@@ -727,8 +727,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     # assert singleton point
-    pt = numpy.reshape(pt, (sd,))
-
+    pt = pt.reshape((sd,))
     if isinstance(pt[0], gem.Node):
         import gem as backend
     else:
