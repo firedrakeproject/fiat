@@ -306,7 +306,7 @@ def _evaluate_componenttensor(e, self):
 
 @_evaluate.register(gem.FlexiblyIndexed)
 def _evaluate_flexiblyindexed(e, self):
-    """FlexiblyIndexed first slices and then reshapes."""
+    """Flexibly indexed first slices and then reshapes."""
     val = self(e.children[0])
     assert len(val.fids) == 0
 
