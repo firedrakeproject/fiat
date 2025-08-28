@@ -124,22 +124,17 @@ class FiatElement(FiniteElementBase):
                 result[alpha] = gem.Failure(index_shape + value_shape, fiat_table)
                 continue
 
-            derivative = sum(alpha)
             point_indices = ()
+            replace_indices = ()
+            derivative = sum(alpha)
             if derivative == self.degree and not self.complex.is_macrocell():
                 # Ensure a cellwise constant tabulation
                 if fiat_table.dtype == object:
-                    # Eliminate Variables by forcing numerical evaluation
-                    bindings = {X: np.random.random_sample(X.shape)
-                                for X in gem.extract_type(ps.expression, gem.Variable)}
-                    gem_table = gem.as_gem(fiat_table)
-                    ndim = len(gem_table.free_indices)
-                    val, = gem.interpreter.evaluate((gem_table,), bindings=bindings)
-                    fiat_table = val.arr.transpose((*range(ndim, val.arr.ndim), *range(ndim)))
-
-                fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
-                assert np.allclose(fiat_table, fiat_table[..., 0, None])
-                fiat_table = fiat_table[..., 0]
+                    replace_indices = tuple((i, 0) for i in ps.expression.free_indices)
+                else:
+                    fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
+                    assert np.allclose(fiat_table, fiat_table[..., 0, None])
+                    fiat_table = fiat_table[..., 0]
             elif derivative > self.degree:
                 # Ensure a zero tabulation
                 if fiat_table.dtype != object:
@@ -150,10 +145,12 @@ class FiatElement(FiniteElementBase):
 
             point_shape = tuple(i.extent for i in point_indices)
             fiat_table = fiat_table.reshape(index_shape + value_shape + point_shape)
-
             gem_table = gem.as_gem(fiat_table)
             expr = gem.Indexed(gem_table, basis_indices + point_indices)
             expr = gem.ComponentTensor(expr, basis_indices)
+            if replace_indices:
+                expr, = gem.optimise.remove_componenttensors((expr,), subst=replace_indices)
+
             result[alpha] = expr
         return result
 

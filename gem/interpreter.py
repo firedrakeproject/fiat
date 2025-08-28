@@ -4,7 +4,6 @@ An interpreter for GEM trees.
 import numpy
 import operator
 from collections import OrderedDict
-from numbers import Integral
 from functools import singledispatch
 import itertools
 
@@ -287,29 +286,6 @@ def _evaluate_indexed(e, self):
     return Result(val[idx], val.fids + fids)
 
 
-@_evaluate.register(gem.FlexiblyIndexed)
-def _evaluate_flexiblyindexed(e, self):
-    val = self(e.children[0])
-
-    assert all(isinstance(index, gem.Index) and isinstance(stride, Integral)
-               for (offset, idxs) in e.dim2idxs for (index, stride) in idxs)
-
-    fids = e.index_ordering()
-    shape = tuple(i.extent for i in fids)
-    strides = (1, *numpy.cumprod(val.arr.shape, dtype=int))
-    dim2idxs = e.dim2idxs
-
-    def index_mapping(idx):
-        indices = iter(idx)
-        cur = sum(s * sum((j*stride for (index, stride), j in zip(idxs, indices)), offset)
-                  for (offset, idxs), s in zip(dim2idxs, strides))
-        return cur
-
-    vidx = list(map(index_mapping, numpy.ndindex(shape)))
-    sub = val.arr.flatten()[vidx].reshape(shape)
-    return Result(sub, val.fids + fids)
-
-
 @_evaluate.register(gem.ComponentTensor)
 def _evaluate_componenttensor(e, self):
     """Component tensors map free indices to shape."""
@@ -324,10 +300,37 @@ def _evaluate_componenttensor(e, self):
     # Now the bound free indices
     for i in e.multiindex:
         axes.append(val.fids.index(i))
-    # Now the existing shape
-    axes.extend(range(len(val.fshape), len(val.tshape)))
     return Result(numpy.transpose(val.arr, axes=axes),
                   tuple(fids))
+
+
+@_evaluate.register(gem.FlexiblyIndexed)
+def _evaluate_flexiblyindexed(e, self):
+    """FlexiblyIndexed first slices and then reshapes."""
+    val = self(e.children[0])
+    assert len(val.fids) == 0
+
+    idx = []
+    axes = []
+    for offset, idxs in e.dim2idxs:
+        if isinstance(offset, gem.Node):
+            offset = self(offset)
+        if len(idxs) == 0:
+            idx.append(offset)
+            continue
+
+        indices, strides = zip(*idxs)
+        strides = tuple(self(stride) if isinstance(stride, gem.Node) else stride for stride in strides)
+        assert all(isinstance(i, gem.Index) for i in indices)
+        last = sum(((i.extent-1) * stride for i, stride in zip(indices, strides)), offset)
+        idx.append(slice(offset, last + 1))
+        ndim = len(axes)
+        axes.extend(sorted(range(ndim, ndim + len(strides)), key=lambda i: strides[i], reverse=True))
+
+    fids = e.index_ordering()
+    shape = tuple(i.extent for i in fids)
+    arr = val[idx].reshape(numpy.asarray(shape)[axes]).transpose(numpy.argsort(axes))
+    return Result(arr, fids)
 
 
 @_evaluate.register(gem.IndexSum)
