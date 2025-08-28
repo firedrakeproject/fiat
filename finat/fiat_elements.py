@@ -127,7 +127,7 @@ class FiatElement(FiniteElementBase):
             point_indices = ()
             replace_indices = ()
             derivative = sum(alpha)
-            if derivative == self.degree and not self.complex.is_macrocell():
+            if derivative == self.degree and self.complex.is_simplex():
                 # Ensure a cellwise constant tabulation
                 if fiat_table.dtype == object:
                     replace_indices = tuple((i, 0) for i in ps.expression.free_indices)
