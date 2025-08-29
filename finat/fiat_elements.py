@@ -121,26 +121,22 @@ class FiatElement(FiniteElementBase):
         result = {}
         for alpha, fiat_table in fiat_result.items():
             if isinstance(fiat_table, Exception):
-                shape = ps.points.shape[:-1] + index_shape + value_shape
-                result[alpha] = gem.Failure(shape, fiat_table)
+                result[alpha] = gem.Failure(index_shape + value_shape, fiat_table)
                 continue
 
-            derivative = sum(alpha)
             point_indices = ()
-            if derivative == self.degree and not self.complex.is_macrocell():
-                # Make sure numerics satisfies theory
+            replace_indices = ()
+            derivative = sum(alpha)
+            if derivative == self.degree and self.complex.is_simplex():
+                # Ensure a cellwise constant tabulation
                 if fiat_table.dtype == object:
-                    bindings = {X: np.zeros(X.shape)
-                                for pt in ps.points
-                                for X in gem.extract_type(pt, gem.Variable)}
-                    gem_table = gem.as_gem(fiat_table)
-                    val, = gem.interpreter.evaluate((gem_table,), bindings=bindings)
-                    fiat_table = val.arr.transpose((*range(1, val.arr.ndim), 0))
-
-                fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
-                fiat_table = fiat_table[..., 0]
+                    replace_indices = tuple((i, 0) for i in ps.expression.free_indices)
+                else:
+                    fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
+                    assert np.allclose(fiat_table, fiat_table[..., 0, None])
+                    fiat_table = fiat_table[..., 0]
             elif derivative > self.degree:
-                # Make sure numerics satisfies theory
+                # Ensure a zero tabulation
                 if fiat_table.dtype != object:
                     assert np.allclose(fiat_table, 0.0)
                 fiat_table = np.zeros(index_shape + value_shape)
@@ -149,10 +145,12 @@ class FiatElement(FiniteElementBase):
 
             point_shape = tuple(i.extent for i in point_indices)
             fiat_table = fiat_table.reshape(index_shape + value_shape + point_shape)
-
             gem_table = gem.as_gem(fiat_table)
             expr = gem.Indexed(gem_table, basis_indices + point_indices)
             expr = gem.ComponentTensor(expr, basis_indices)
+            if replace_indices:
+                expr, = gem.optimise.remove_componenttensors((expr,), subst=replace_indices)
+
             result[alpha] = expr
         return result
 

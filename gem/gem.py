@@ -128,17 +128,20 @@ class Node(NodeBase, metaclass=NodeMeta):
     def __abs__(self):
         return componentwise(lambda x: MathFunction("abs", x), self)
 
+    def __pow__(self, other):
+        return componentwise(lambda x, y: Power(x, y), self, as_gem(other))
+
     def __lt__(self, other):
-        return componentwise(lambda x, y: Comparison("<", x, y), self, other)
+        return componentwise(lambda x, y: Comparison("<", x, y), self, as_gem(other))
 
     def __gt__(self, other):
-        return componentwise(lambda x, y: Comparison(">", x, y), self, other)
+        return componentwise(lambda x, y: Comparison(">", x, y), self, as_gem(other))
 
     def __le__(self, other):
-        return componentwise(lambda x, y: Comparison("<=", x, y), self, other)
+        return componentwise(lambda x, y: Comparison("<=", x, y), self, as_gem(other))
 
     def __ge__(self, other):
-        return componentwise(lambda x, y: Comparison(">=", x, y), self, other)
+        return componentwise(lambda x, y: Comparison(">=", x, y), self, as_gem(other))
 
     @property
     def T(self):
@@ -326,6 +329,9 @@ class Literal(Constant):
     @property
     def shape(self):
         return self.array.shape
+
+    def __bool__(self):
+        return bool(self.value)
 
 
 class Variable(Terminal):
@@ -1449,7 +1455,7 @@ def Piecewise(*args):
     expr = None
     pieces = []
     for v, c in args:
-        if isinstance(c, (bool, numpy.bool)) and c:
+        if isinstance(c, (bool, numpy.bool, Literal)) and c:
             expr = as_gem(v)
             break
         pieces.append((as_gem(v), as_gem(c)))
