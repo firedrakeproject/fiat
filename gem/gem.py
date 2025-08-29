@@ -325,6 +325,9 @@ class Literal(Constant):
     def shape(self):
         return self.array.shape
 
+    def __bool__(self):
+        return bool(self.value)
+
 
 class Variable(Terminal):
     """Symbolic variable tensor"""
@@ -1346,7 +1349,7 @@ def Piecewise(*args):
     expr = None
     pieces = []
     for v, c in args:
-        if isinstance(c, (bool, numpy.bool)) and c:
+        if isinstance(c, (bool, numpy.bool, Literal)) and c:
             expr = as_gem(v)
             break
         pieces.append((as_gem(v), as_gem(c)))
