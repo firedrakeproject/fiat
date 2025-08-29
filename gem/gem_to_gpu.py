@@ -250,8 +250,6 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         if expr not in used_temps:
             used_temps[expr] = temps[expr]
         shape = temps[expr][1][1]
-        if len(temporaries) == 0:
-            breakpoint()
         #removed_indices = [prev_block_indices[s] for s in prev_block_indices if prev_block_indices[s] not in outer_idx["vars"] + outer_idx["temps"]]
         #shape = [s if s not in removed_indices else list(prev_block_indices.keys())[list(prev_block_indices.values()).index(s)] for s in shape]
         #shape = [s for s in shape if s in outer_idx["vars"] + outer_idx["temps"] or not isinstance(s, str)] 
@@ -283,7 +281,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
                 #if any(outer in idx for outer in block_indices):
                 slicing = "["
                 for axis in idx:
-                    if axis in outer_idx['vars']:
+                    if axis.name == "cell":
                         if i > 0:
                             # if cell index is on the right child, create extra axis to enable product
                             slicing +=  ":, None, "
@@ -550,7 +548,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         args[expr.name] = expr.shape 
         if expr.name[0] == 'w':
             return expr.name, tuple()
-        return expr.name, tuple(outer_idx["vars"]) 
+        return expr.name, tuple() 
 
     @_recurse.register(gem.Zero)
     def _recurse_identity(expr, outer_idx):
@@ -575,8 +573,10 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
 
 
 
-    block_dims = {"vars":[block[0] for block in blocks["vars"]],
-                  "temps":[block[0] for block in blocks["temps"]]} 
+    block_dims = {"vars":[],
+                  "temps":[]} 
+    #block_dims = {"vars":[block[0] for block in blocks["vars"]],
+    #             "temps":[block[0] for block in blocks["temps"]]} 
     counter = 0
     temp_assigns = []
     stores = []
@@ -590,7 +590,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         v, v_idx = recurse(var, block_dims)
         #assert v_idx == e_idx
         stores += [f"\t{v}_res={e}"]
-
+    breakpoint()
     kernel_data = {"entrypoint": func_name, "arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "insns": [], "pids" : [], "extra_blocks":[]}
     kernel_data["blocks"] = blocks 
      
