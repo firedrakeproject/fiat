@@ -943,7 +943,7 @@ class ListTensor(Node):
         if all(isinstance(elem, Indexed) for elem in array.flat):
             tensor = e0.children[0]
             multiindex = tuple(i for i in e0.multiindex if not isinstance(i, Integral))
-            index_shape = tuple(i.extent for i in multiindex)
+            index_shape = tuple(i.extent for i in multiindex if isinstance(i, Index))
             if index_shape + array.shape + child_shape == tensor.shape:
                 if all(elem.children[0] == tensor for elem in array.flat[1:]):
                     if all(elem.multiindex == multiindex + idx for idx, elem in numpy.ndenumerate(array)):
