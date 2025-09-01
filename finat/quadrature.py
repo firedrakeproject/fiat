@@ -54,7 +54,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
         return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 
     fiat_rule = fiat_scheme(ref_el, degree, scheme)
-    return QuadratureRule(PointSet(fiat_rule.get_points()), fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
+    return QuadratureRule(PointSet(fiat_rule.get_points(), index_names=["quad"]), fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 
 
 class AbstractQuadratureRule(metaclass=ABCMeta):

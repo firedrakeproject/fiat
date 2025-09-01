@@ -139,7 +139,7 @@ class PointSet(AbstractPointSet):
     """A basic point set with no internal structure representing a vector of
     points."""
 
-    def __init__(self, points):
+    def __init__(self, points, index_names=None):
         """Build a PointSet from a vector of points
 
         :arg points: A vector of N points of shape (N, D) where D is the
@@ -147,6 +147,15 @@ class PointSet(AbstractPointSet):
         points = numpy.asarray(points)
         assert len(points.shape) == 2
         self.points = points
+
+        if index_names is None:
+            index_names = []
+        
+        for i in range(len(self.points.shape[:-1])):
+            if i >= len(index_names):
+                index_names += [None]
+
+        self.index_names = index_names
 
     def __repr__(self):
         return f"{type(self).__name__}({self.points!r})"
@@ -157,7 +166,8 @@ class PointSet(AbstractPointSet):
 
     @cached_property
     def indices(self):
-        return tuple(gem.Index(extent=N) for N in self.points.shape[:-1])
+        return tuple(gem.Index(extent=N,name=name) for N, name in zip(self.points.shape[:-1], self.index_names))
+        #return tuple(gem.Index(extent=N) for N in self.points.shape[:-1])
 
     @cached_property
     def expression(self):
@@ -176,7 +186,7 @@ class GaussLegendrePointSet(PointSet):
     This facilitates implementing discontinuous spectral elements.
     """
     def __init__(self, points):
-        super().__init__(points)
+        super().__init__(points, index_names=["quad"])
         assert self.points.shape[1] == 1
 
 
@@ -186,7 +196,7 @@ class GaussLobattoLegendrePointSet(PointSet):
     This facilitates implementing continuous spectral elements.
     """
     def __init__(self, points):
-        super().__init__(points)
+        super().__init__(points, index_names=["quad"])
         assert self.points.shape[1] == 1
 
 
