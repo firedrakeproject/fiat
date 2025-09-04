@@ -3,7 +3,38 @@ import FIAT
 import gem
 
 from finat.fiat_elements import ScalarFiatElement, Lagrange, DiscontinuousLagrange
-from finat.point_set import GaussLobattoLegendrePointSet, GaussLegendrePointSet
+from finat.point_set import GaussLobattoLegendrePointSet, GaussLegendrePointSet, KMVPointSet
+
+try:
+    from firedrake_citations import Citations
+    Citations().add("Geevers2018new", """
+@article{Geevers2018new,
+ title={New higher-order mass-lumped tetrahedral elements for wave propagation modelling},
+ author={Geevers, Sjoerd and Mulder, Wim A and van der Vegt, Jaap JW},
+ journal={SIAM journal on scientific computing},
+ volume={40},
+ number={5},
+ pages={A2830--A2857},
+ year={2018},
+ publisher={SIAM},
+ doi={https://doi.org/10.1137/18M1175549},
+}
+""")
+    Citations().add("Chin1999higher", """
+@article{chin1999higher,
+ title={Higher-order triangular and tetrahedral finite elements with mass lumping for solving the wave equation},
+ author={Chin-Joe-Kong, MJS and Mulder, Wim A and Van Veldhuizen, M},
+ journal={Journal of Engineering Mathematics},
+ volume={35},
+ number={4},
+ pages={405--426},
+ year={1999},
+ publisher={Springer},
+ doi={https://doi.org/10.1023/A:1004420829610},
+}
+""")
+except ImportError:
+    Citations = None
 
 
 class GaussLobattoLegendre(Lagrange):
@@ -56,6 +87,37 @@ class GaussLegendre(DiscontinuousLagrange):
         if entity is None or entity == (cell_dimension, 0):  # on cell interior
             space_dim = self.space_dimension()
             if isinstance(ps, GaussLegendrePointSet) and len(ps.points) == space_dim:
+                # Bingo: evaluation points match node locations!
+                spatial_dim = self.cell.get_spatial_dimension()
+                q, = ps.indices
+                r, = self.get_indices()
+                result[(0,) * spatial_dim] = gem.ComponentTensor(gem.Delta(q, r), (r,))
+        return result
+
+
+class KongMulderVeldhuizen(ScalarFiatElement):
+    """Simplicial continuous element with nodes at the KMV points."""
+
+    def __init__(self, cell, degree):
+        super().__init__(FIAT.KongMulderVeldhuizen(cell, degree))
+        if Citations is not None:
+            Citations().register("Chin1999higher")
+            Citations().register("Geevers2018new")
+
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        '''Return code for evaluating the element at known points on the
+        reference element.
+
+        :param order: return derivatives up to this order.
+        :param ps: the point set.
+        :param entity: the cell entity on which to tabulate.
+        '''
+
+        result = super().basis_evaluation(order, ps, entity)
+        cell_dimension = self.cell.get_dimension()
+        if entity is None or entity == (cell_dimension, 0):  # on cell interior
+            space_dim = self.space_dimension()
+            if isinstance(ps, KMVPointSet) and len(ps.points) == space_dim:
                 # Bingo: evaluation points match node locations!
                 spatial_dim = self.cell.get_spatial_dimension()
                 q, = ps.indices

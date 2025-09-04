@@ -37,8 +37,7 @@ import numpy
 from FIAT.quadrature import (QuadratureRule, FacetQuadratureRule, make_quadrature,
                              make_tensor_product_quadrature, map_quadrature)
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
-                                    TETRAHEDRON, TRIANGLE, UFCTetrahedron,
-                                    UFCTriangle, symmetric_simplex)
+                                    TETRAHEDRON, TRIANGLE, symmetric_simplex, ufc_simplex)
 from FIAT.macro import MacroQuadratureRule
 
 
@@ -119,16 +118,12 @@ def _kmv_lump_scheme(ref_el, degree):
     """Specialized quadrature schemes for P < 6 for KMV simplical elements."""
 
     sd = ref_el.get_spatial_dimension()
-    # set the unit element
-    if sd == 2:
-        T = UFCTriangle()
-    elif sd == 3:
-        T = UFCTetrahedron()
-    else:
+    if sd not in {2, 3}:
         raise ValueError("Dimension not supported")
 
+    T = ufc_simplex(sd)
+    x = list(T.vertices)
     if degree == 1:
-        x = ref_el.vertices
         w = numpy.arange(sd + 1, dtype=numpy.float64)
         if sd == 2:
             w[:] = 1.0 / 6.0
@@ -138,7 +133,6 @@ def _kmv_lump_scheme(ref_el, degree):
             raise ValueError("Dimension not supported")
     elif degree == 2:
         if sd == 2:
-            x = list(ref_el.vertices)
             for e in range(3):
                 x.extend(ref_el.make_points(1, e, 2))  # edge midpoints
             x.extend(ref_el.make_points(2, 0, 3))  # barycenter
@@ -147,7 +141,6 @@ def _kmv_lump_scheme(ref_el, degree):
             w[3:6] = 1.0 / 15.0
             w[6] = 9.0 / 40.0
         elif sd == 3:
-            x = list(ref_el.vertices)
             x.extend(
                 [
                     (0.0, 0.50, 0.50),
@@ -181,7 +174,6 @@ def _kmv_lump_scheme(ref_el, degree):
         if sd == 2:
             alpha = 0.2934695559090401
             beta = 0.2073451756635909
-            x = list(ref_el.vertices)
             x.extend(
                 [
                     (1 - alpha, alpha),
@@ -200,7 +192,6 @@ def _kmv_lump_scheme(ref_el, degree):
             w[3:9] = 0.02442084061702551
             w[9:12] = 0.1103885289202054
         elif sd == 3:
-            x = list(ref_el.vertices)
             x.extend(
                 [
                     (0, 0.685789657581967, 0.314210342418033),
@@ -257,7 +248,6 @@ def _kmv_lump_scheme(ref_el, degree):
                 0.4247639617258106,
                 0.130791593829745
             ]
-            x = list(ref_el.vertices)
             for e in range(3):
                 x.extend(ref_el.make_points(1, e, 2))  # edge midpoints
             x.extend(
@@ -296,7 +286,6 @@ def _kmv_lump_scheme(ref_el, degree):
             ]
             gamma = 0.7819258362551702e-01
             delta = 0.2210012187598900e-00
-            x = list(ref_el.vertices)
             for alpha in alphas:
                 x.extend(
                     [
@@ -335,7 +324,6 @@ def _kmv_lump_scheme(ref_el, degree):
 
     elif degree == 6:
         if sd == 2:
-            x = list(ref_el.vertices)
             episilon = 5.00000000000000e-1
             alphas = [
                 8.29411811106452e-2,
@@ -420,7 +408,10 @@ def _kmv_lump_scheme(ref_el, degree):
         else:
             raise ValueError("Dimension not supported")
     # Return scheme
-    return QuadratureRule(T, x, w)
+    x = numpy.asarray(x)
+    w = numpy.asarray(w)
+    x, w = map_quadrature(x, w, T, ref_el)
+    return QuadratureRule(ref_el, x, w)
 
 
 def xg_scheme(ref_el, degree):
@@ -488,7 +479,7 @@ def _triangle_scheme(ref_el, degree):
             return _fiat_scheme(ref_el, degree)
 
     # Return scheme
-    x, w = map_quadrature(x, w, UFCTriangle(), ref_el)
+    x, w = map_quadrature(x, w, ufc_simplex(2), ref_el)
     return QuadratureRule(ref_el, x, w)
 
 
@@ -517,5 +508,5 @@ def _tetrahedron_scheme(ref_el, degree):
             return _fiat_scheme(ref_el, degree)
 
     # Return scheme
-    x, w = map_quadrature(x, w, UFCTetrahedron(), ref_el)
+    x, w = map_quadrature(x, w, ufc_simplex(3), ref_el)
     return QuadratureRule(ref_el, x, w)
