@@ -9,7 +9,7 @@ from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
 from FIAT.reference_element import LINE, QUADRILATERAL, TENSORPRODUCT
 from gem.utils import safe_repr
 
-from finat.point_set import GaussLegendrePointSet, PointSet, TensorPointSet
+from finat.point_set import GaussLegendrePointSet, KMVPointSet, PointSet, TensorPointSet
 
 
 def make_quadrature(ref_el, degree, scheme="default"):
@@ -51,10 +51,14 @@ def make_quadrature(ref_el, degree, scheme="default"):
         num_points = (degree + 1 + 1) // 2  # exact integration
         fiat_rule = GaussLegendreQuadratureLineRule(ref_el, num_points)
         point_set = GaussLegendrePointSet(fiat_rule.get_points())
-        return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
+    else:
+        fiat_rule = fiat_scheme(ref_el, degree, scheme)
+        if scheme.lower() == "kmv":
+            point_set = KMVPointSet(fiat_rule.get_points())
+        else:
+            point_set = PointSet(fiat_rule.get_points())
 
-    fiat_rule = fiat_scheme(ref_el, degree, scheme)
-    return QuadratureRule(PointSet(fiat_rule.get_points()), fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
+    return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 
 
 class AbstractQuadratureRule(metaclass=ABCMeta):
