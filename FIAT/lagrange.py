@@ -83,7 +83,6 @@ class Lagrange(finite_element.CiarletElement):
             points = get_lagrange_points(dual)
             poly_set = LagrangePolynomialSet(ref_el, points)
         else:
-            poly_variant = "bubble" if ref_el.is_macrocell() else None
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant=poly_variant)
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble", scale=1)
         formdegree = 0  # 0-form
         super().__init__(poly_set, dual, degree, formdegree)
