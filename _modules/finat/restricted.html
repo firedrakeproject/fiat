@@ -75,10 +75,18 @@
 <span class="nd">@restrict</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">FiatElement</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">restrict_fiat</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="p">):</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">FiatElement</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">RestrictedElement</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">_element</span><span class="p">,</span>
-                           <span class="n">restriction_domain</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="o">=</span><span class="n">take_closure</span><span class="p">))</span>
+        <span class="n">re</span> <span class="o">=</span> <span class="n">FIAT</span><span class="o">.</span><span class="n">RestrictedElement</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">_element</span><span class="p">,</span>
+                                    <span class="n">restriction_domain</span><span class="o">=</span><span class="n">domain</span><span class="p">,</span>
+                                    <span class="n">take_closure</span><span class="o">=</span><span class="n">take_closure</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">null_element</span></div>
+        <span class="k">return</span> <span class="n">null_element</span>
+
+    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span> <span class="o">==</span> <span class="n">re</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">():</span>
+        <span class="c1"># FIAT.RestrictedElement wipes out entity_permuations.</span>
+        <span class="c1"># In case the restriction is trivial we return the original element</span>
+        <span class="c1"># to avoid reconstructing the space with an undesired permutation.</span>
+        <span class="k">return</span> <span class="n">element</span>
+    <span class="k">return</span> <span class="n">FiatElement</span><span class="p">(</span><span class="n">re</span><span class="p">)</span></div>
 
 
 

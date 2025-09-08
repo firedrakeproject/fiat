@@ -64,6 +64,7 @@
                                          <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">dofs</span> <span class="k">if</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">nodes_old</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dual</span> <span class="o">=</span> <span class="n">dual</span>
+
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
 
 <div class="viewcode-block" id="RestrictedDualSet.get_indices">
@@ -115,7 +116,7 @@
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">e_mapping</span> <span class="o">==</span> <span class="n">mapping_new</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">e_mapping</span> <span class="ow">in</span> <span class="n">mapping_new</span><span class="p">)</span>
 
         <span class="c1"># Call constructor of CiarletElement</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">(),</span> <span class="n">mapping_new</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">(),</span> <span class="n">element</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">(),</span> <span class="n">mapping_new</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
 
 </pre></div>
 
