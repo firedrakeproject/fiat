@@ -32,10 +32,18 @@ def restrict(element, domain, take_closure):
 @restrict.register(FiatElement)
 def restrict_fiat(element, domain, take_closure):
     try:
-        return FiatElement(FIAT.RestrictedElement(element._element,
-                           restriction_domain=domain, take_closure=take_closure))
+        re = FIAT.RestrictedElement(element._element,
+                                    restriction_domain=domain,
+                                    take_closure=take_closure)
     except ValueError:
         return null_element
+
+    if element.space_dimension() == re.space_dimension():
+        # FIAT.RestrictedElement wipes out entity_permuations.
+        # In case the restriction is trivial we return the original element
+        # to avoid reconstructing the space with an undesired permutation.
+        return element
+    return FiatElement(re)
 
 
 @restrict.register(PhysicallyMappedElement)
