@@ -80,7 +80,7 @@ def KongMulderVeldhuizenSpace(T, deg):
             # bubble on the facet
             elems.append(FacetBubble(T, deg + facet_bump, variant=variant))
 
-        return NodalEnrichedElement(*elems).poly_set
+        return NodalEnrichedElement(*elems).get_nodal_basis()
 
 
 class KongMulderVeldhuizenDualSet(dual_set.DualSet):
