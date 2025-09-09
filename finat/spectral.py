@@ -1,6 +1,7 @@
 import FIAT
 
 import gem
+from abc import ABC, abstractmethod
 
 from finat.fiat_elements import ScalarFiatElement, Lagrange, DiscontinuousLagrange
 from finat.point_set import GaussLobattoLegendrePointSet, GaussLegendrePointSet, KMVPointSet
@@ -37,8 +38,14 @@ except ImportError:
     Citations = None
 
 
-class SpectralElement(ScalarFiatElement):
+class SpectralElement(metaclass=ABCMeta):
     """Base class to implement spectral elements."""
+    
+    @property
+    @abstractmethod
+    def point_set_family(self):
+        """The PointSet subclass on which this element tabulates to a Delta."""
+        pass
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at known points on the
@@ -77,7 +84,7 @@ class GaussLegendre(SpectralElement, DiscontinuousLagrange):
         super(DiscontinuousLagrange, self).__init__(FIAT.GaussLegendre(cell, degree))
 
 
-class KongMulderVeldhuizen(SpectralElement):
+class KongMulderVeldhuizen(SpectralElement, ScalarFiatElement):
     """Simplicial continuous element with nodes at the KMV points."""
     point_set_family = KMVPointSet
 
