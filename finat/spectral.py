@@ -1,7 +1,7 @@
 import FIAT
 
 import gem
-from abc import ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 from finat.fiat_elements import ScalarFiatElement, Lagrange, DiscontinuousLagrange
 from finat.point_set import GaussLobattoLegendrePointSet, GaussLegendrePointSet, KMVPointSet
@@ -40,7 +40,7 @@ except ImportError:
 
 class SpectralElement(metaclass=ABCMeta):
     """Base class to implement spectral elements."""
-    
+
     @property
     @abstractmethod
     def point_set_family(self):
