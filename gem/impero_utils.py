@@ -11,7 +11,7 @@ from itertools import chain, groupby
 
 from gem.node import traversal, collect_refcount
 from gem import gem, impero as imp, optimise, scheduling
-from gem.gem_to_gpu import to_cupy, to_triton, to_triton_wrapper
+from gem.gem_to_gpu import to_cupy, to_triton, to_triton_wrapper, to_mlir
 
 import os
 from firedrake.device import add_kernel_string
@@ -97,10 +97,15 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
     if "FIREDRAKE_USE_GPU" in os.environ:
         print("Generating triton string")
-        res, args = to_triton_wrapper(assignments, temporaries)
+        insns = to_mlir(assignments)
+        # res, args = to_triton_wrapper(assignments, temporaries)
         #res, args, _ = to_triton(assignments, temporaries)
-        add_kernel_string(res, args, "triton")
-        return (res, tuple(args))
+        # add_kernel_string(res, args, "triton")
+        with open("mykernel.mlir", "w") as f:
+            f.write(insns)
+        print("Written to mykernel.mlir")
+        exit(0)
+        return (insns, tuple(args))
     # Prepare ImperoC (Impero AST + other data for code generation)
     return ImperoC(tree, temporaries, declare, indices)
 

@@ -1,4 +1,6 @@
+import numbers
 from gem import gem
+import itertools
 import numpy as np
 from functools import singledispatch
 
@@ -14,6 +16,23 @@ def construct_einsum_str(expr, index):
     idx_str += "->"
     idx_str += "".join([idx_dict[free] for free in expr.free_indices])
     return idx_str
+
+
+def mlir_contraction(expr, index):
+    idx_dict = {idx: chr(65 + i) for i, idx in enumerate(set(sum(index + [expr.free_indices], tuple())))}
+    all_indices = idx_dict.values()
+    per_index = []
+    for idx in index:
+        per_index.append([idx_dict[sub] for sub in idx])
+    out = [idx_dict[free] for free in expr.free_indices]
+
+    nice = lambda ix: ", ".join(ix)
+
+    per_index_str = ", ".join(
+        f"affine_map<({nice(all_indices)}) -> ({nice(X)})>" for X in per_index
+    )
+
+    return f"""linalg.contract indexing_maps = [{per_index_str}, affine_map<({nice(all_indices)}) -> ({nice(out)})>]"""
 
 
 def to_cupy(assignments):
@@ -171,20 +190,23 @@ def to_cupy(assignments):
     @recurse.register(gem.FlexiblyIndexed)
     def recurse_findexed(expr):
         # TODO this doesn't encapsulate the detail dim2idx
-        chld, idx = recurse(expr.children[0])
-        chld += "["
+        chld, child_insns, idx = recurse(expr.children[0])
+
+        insns = list(child_insns)
+        offsets = []
+        sizes = []
+        strides = []
+        breakpoint()
         for (off, var) in expr.dim2idxs:
-            if len(var) == 0:
-                chld += f"{off},"
-            else:
-                for (i, stride) in var:
-                    if isinstance(i, gem.Index):
-                        # chld += f"{off},:,"
-                        chld += ":,"
-                    else:
-                        breakpoint()
-        chld = chld[:-1] + "]"
-        return chld, expr.index_ordering()
+            offset_expr = off
+            for (i, stride) in var:
+                offset_expr += i*stride
+            offset_ssa = new_var()
+            offsets.append(offset_expr)
+            insns.append(offset_insn)
+
+        ssa = new_var()
+        return ssa, tuple(insns), expr.index_ordering()
 
     @recurse.register(gem.Variable)
     def recurse_variable(expr):
@@ -244,17 +266,21 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         prev_block_indices = {}
     subbed_indices = {}
 
+    mycounter = itertools.count()
+    new_var = lambda: f"%myvar{next(mycounter)}"
+
     def recurse(expr, outer_idx=tuple()):
         if expr not in temps:
             return _recurse(expr, outer_idx)
         if expr not in used_temps:
             used_temps[expr] = temps[expr]
-        shape = temps[expr][1][1]
+        # shape = temps[expr][1][1]
         #removed_indices = [prev_block_indices[s] for s in prev_block_indices if prev_block_indices[s] not in outer_idx["vars"] + outer_idx["temps"]]
         #shape = [s if s not in removed_indices else list(prev_block_indices.keys())[list(prev_block_indices.values()).index(s)] for s in shape]
         #shape = [s for s in shape if s in outer_idx["vars"] + outer_idx["temps"] or not isinstance(s, str)] 
-        print(temps[expr][0], shape, temps[expr][1][1])
-        return temps[expr][0], tuple(shape)
+        # print(temps[expr][0], shape, temps[expr][1][1])
+        # return temps[expr][0], tuple(shape)
+        return temps[expr]
 
     @singledispatch
     def _recurse(expr, outer_idx):
@@ -364,15 +390,21 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         index_list = list(index[0])
         sum_axis = index_list.index(sum_index[0])
         index_list.pop(sum_axis)
+        breakpoint()
         return f"tl.sum({prod}, {sum_axis})", tuple(index_list)
 
     @_recurse.register(gem.Sum)
     def _recurse_sum(expr, outer_idx):
         summands = [recurse(e, outer_idx) for e in expr.children]
         commands = [s[0] for s in summands]
+        breakpoint()
+        if len(commands) != 2:
+            breakpoint()
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
-        return "(" + " + ".join(commands) + ")" , index[0] 
+        breakpoint()
+        ssa = new_var()
+        return ssa, [f"{ssa} = arith.add {lhs}, {rhs}: {mytype}"], index[0] 
 
     @_recurse.register(gem.Division)
     def _recurse_div(expr, outer_idx):
@@ -381,6 +413,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
+        breakpoint()
         return f"cp.divide({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.FloorDiv)
@@ -390,6 +423,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
+        breakpoint()
         return f"cp.floor_divide({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Remainder)
@@ -399,6 +433,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
+        breakpoint()
         return f"cp.remainder({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Power)
@@ -408,6 +443,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         index = [s[1] for s in summands]
         if len(index[1]) != 0:
             raise NotImplementedError("Power: exponent must be scalar")
+        breakpoint()
         return f"libdevice.pow({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.MathFunction)
@@ -415,18 +451,21 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         chld, idx = recurse(expr.children[0], outer_idx)
         name = expr.name
         name = "tl." + name
+        breakpoint()
         return name + "(" + chld + ")", idx
 
     @_recurse.register(gem.MaxValue)
     def _recurse_max(expr, outer_idx):
         raise NotImplementedError("Max")
         chld, idx = recurse(expr.children[0], outer_idx)
+        breakpoint()
         return f"cp.max({chld})", idx
 
     @_recurse.register(gem.MinValue)
     def _recurse_min(expr, outer_idx):
         raise NotImplementedError("Min")
         chld, idx = recurse(expr.children[0], outer_idx)
+        breakpoint()
         return f"cp.min({chld})", idx
 
     @_recurse.register(gem.Comparison)
@@ -436,12 +475,14 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
+        breakpoint()
         return f"({commands[0]} {expr.operator} {commands[1]})", idx
 
     @_recurse.register(gem.LogicalNot)
     def _recurse_not(expr, outer_idx):
         raise NotImplementedError("Logical Not")
         chld, idx = recurse(expr.children[0])
+        breakpoint()
         return f"cp.logical_not({chld})", idx
 
     @_recurse.register(gem.LogicalAnd)
@@ -484,11 +525,13 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
             chld_list += [chld]
             idx_list += [idx]
         assert len(set(idx_list)) == 1
+        breakpoint()
         return str_array.format(*chld_list), idx_list[0]
 
     @_recurse.register(gem.Indexed)
     def _recurse_indexed(expr, outer_idx):
-        chld, idx = recurse(expr.children[0], outer_idx)
+        # chld, idx = recurse(expr.children[0], outer_idx)
+        recursed = recurse(expr.children[0], outer_idx)
         dim = 0
         index = []
         slice_dims = []
@@ -499,6 +542,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
                 slice_dims += [dim]
             dim += 1
         if len(index) > 0:
+            raise NotImplementedError
             prev_index = ""
             counter = 0
             if len(slice_dims) > 1:
@@ -509,6 +553,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
                 counter += 1
             res_str = f"{chld}_{i[0]}" 
         else:
+            return recursed[0], recursed[1], recursed[2] + expr.index_ordering()
             res_str = chld
         if any([i in outer_idx['temps'] for i in idx]):
             replace_num = sum([i in outer_idx['temps'] for i in idx])
@@ -524,7 +569,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         # TODO this doesn't encapsulate the detail dim2idx
         if len(outer_idx) < 1:
             breakpoint()
-        chld, idx = recurse(expr.children[0], outer_idx)
+        chld, insns, idx = recurse(expr.children[0], outer_idx)
         index = None
         for (off, var) in expr.dim2idxs:
             if len(var) == 0:
@@ -536,19 +581,20 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
                     else:
                         raise NotImplementedError("Flexibly indexed Strides")
         if index is not None:
+            raise NotImplementedError
             temps[expr] = (f"{chld}{index}",(f"_take_slice_({chld}, len({chld}.shape), 0, {index}, {chld}.shape[1]).reshape({chld}.shape[0])", idx + expr.index_ordering() ))
             res_str = f"{chld}{index}" 
         else:
+            return chld, insns, idx+expr.index_ordering()
             res_str = chld
 
+        breakpoint()
         return res_str, idx + expr.index_ordering()
 
     @_recurse.register(gem.Variable)
     def _recurse_variable(expr, outer_idx):
         args[expr.name] = expr.shape 
-        if expr.name[0] == 'w':
-            return expr.name, tuple()
-        return expr.name, tuple() 
+        return f"%{expr.name}", (), ()
 
     @_recurse.register(gem.Zero)
     def _recurse_identity(expr, outer_idx):
@@ -562,14 +608,20 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
 
     @_recurse.register(gem.Literal)
     def _recurse_literal(expr, outer_idx):
+        if expr.array.dtype != np.float64:
+            raise NotImplementedError
+
+        ssa = new_var()
         if len(expr.array.shape) == 0:
-            return str(expr.array.item()), tuple()
+            return ssa, [f"{ssa} = arith.constant {expr.array.item()} : f64"], ()
+
         if expr not in arrays.keys():
             val = arrays["counter"]
             arrays[expr] = (f"t{val}", expr.array)
             arrays["counter"] += 1
         # outer_idx["temps"]
-        return arrays[expr][0], tuple() 
+        tensor_insn = f"tensor.from_elements {', '.join(map(str, expr.array.flatten()))} : {tensor_shape(expr.shape, expr.dtype)}"
+        return ssa, [f"{ssa} = {tensor_insn}"], () 
 
 
 
@@ -581,7 +633,8 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
     temp_assigns = []
     stores = []
     for t in temporaries:
-        temps[t] = (f"inter{counter}", recurse(t, block_dims))
+        # temps[t] = (f"inter{counter}", recurse(t, block_dims))
+        temps[t] = recurse(t, block_dims)
         counter += 1
 
     # block_dims_vars = {"vars": block_dims["vars"], "temps":[]}
@@ -777,3 +830,381 @@ def to_triton_wrapper(assignments, temporaries):
     return res, res_data
     
     
+def to_mlir(assignments):
+    args = {}
+    declare = {"counter": 0}
+
+    mycounter = itertools.count()
+    # map varname to MLIR type
+    type_registry = {}
+
+    def new_name():
+        name = f"%myvar{next(mycounter)}"
+        # if name == "%myvar10":
+        #     breakpoint()
+        return name
+
+    def new_var(dtype):
+        name = new_name()
+        type_registry[name] = MLIR_DTYPES[dtype]
+        return name
+
+
+    def new_tensor(shape, dtype):
+        name = new_name()
+        type_registry[name] = tensor_shape(shape, dtype)
+        return name
+
+
+    def register_constant(value, dtype):
+        if isinstance(value, gem.Index):
+            type_registry["%{value.name}"] = "i32"
+            return f"%{value.name}", ()
+        elif isinstance(value, numbers.Number):
+            ssa = new_var(dtype)
+            return ssa, (f"{ssa} = arith.constant {value} : {MLIR_DTYPES[dtype]}",)
+        else:
+            return value, ()
+
+    def mlir_mul(vars, dtype):
+        if dtype == np.int32:
+            arith_insn = "arith.muli"
+        else:
+            assert dtype == np.float64
+            arith_insn = "arith.mulf"
+
+        varname, varinsns = register_constant(vars[0], dtype)
+
+        if len(vars) == 1:
+            return varname, varinsns
+        else:
+            ssa = new_var(dtype)
+            subvar, subinsns = mlir_mul(vars[1:], dtype)
+            return ssa, subinsns + varinsns + (f"{ssa} = {arith_insn} {varname}, {subvar} : {MLIR_DTYPES[dtype]}",)
+
+    def mlir_add(vars, dtype):
+        if dtype == np.int32:
+            arith_insn = "arith.addi"
+        else:
+            assert dtype == np.float64
+            arith_insn = "arith.addf"
+
+        varname, varinsns = register_constant(vars[0], dtype)
+
+        if len(vars) == 1:
+            return varname, varinsns
+        else:
+            ssa = new_var(dtype)
+            subvar, subinsns = mlir_add(vars[1:], dtype)
+            return ssa, subinsns + varinsns + (f"{ssa} = {arith_insn} {varname}, {subvar} : {MLIR_DTYPES[dtype]}",)
+
+    @singledispatch
+    def recurse(expr):
+        """Visit an gem expression to convert it to a cupy function..
+
+        :arg expr: GEM expression
+        """
+        raise AssertionError("unsupported expression type %s" % type(expr))
+
+    @recurse.register(gem.IndexSum)
+    def _(expr):
+        assert len(expr.children) == 1
+        child_var, child_insns, child_indices = recurse(expr.children[0])
+
+        if len(expr.multiindex) > 1:
+            raise NotImplementedError
+
+        contracted_index = expr.multiindex[0]
+        contracted_index_loc = child_indices.index(contracted_index)
+
+        shape = tuple(index.extent for i, index in enumerate(child_indices) if i != contracted_index_loc)
+        ssa = new_tensor(shape, "f64")
+        contract_insn = (
+            f"{ssa} = linalg.reduce {{arith.addf}} "
+            f"ins({child_var} : {type_registry[child_var]}) "
+            f"outs(%todo : {type_registry[ssa]}) "
+            f"dimensions = [{contracted_index_loc}]"
+        )
+
+        return ssa, child_insns + (contract_insn,), expr.free_indices
+
+
+    @recurse.register(gem.Product)
+    def recurse_indexsum(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        assert len(commands) == 2
+        subinsns = []
+        for s in summands:
+            subinsns.extend(s[1])
+        subinsns = tuple(subinsns)
+        index = [s[2] for s in summands]
+        contract_expr = mlir_contraction(expr, index)
+
+        shape = tuple(index.extent for index in expr.free_indices)
+        ssa = new_tensor(shape, "f64")
+        dtype = type_registry[ssa]
+
+        contract_insn = (
+            f"{contract_expr} "
+            f"ins({', '.join(commands)} : {', '.join([type_registry[c] for c in commands])}) "
+            f"outs({ssa} : {dtype})"
+        )
+
+        return ssa, subinsns+(contract_insn,), expr.free_indices
+
+    @recurse.register(gem.Sum)
+    def recurse_sum(expr):
+        vars = []
+        insns = []
+        indices = []
+        for e in expr.children:
+            var, child_insns, child_indices = recurse(e)
+            vars.append(var)
+            insns.extend(child_insns)
+            indices.append(child_indices)
+
+        assert len(set(indices)) == 1
+        ssa, add_insns = mlir_add(vars, np.float64)
+        return ssa, tuple(insns) + add_insns, indices[0]
+
+    @recurse.register(gem.Division)
+    def recurse_div(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.divide({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.FloorDiv)
+    def recurse_floor_div(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.floor_divide({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Remainder)
+    def recurse_remainder(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.remainder({commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Power)
+    def recurse_power(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        if len(index[1]) != 0:
+            raise NotImplementedError("Power: exponent must be scalar")
+        return f"cp.power{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.MathFunction)
+    def _(expr):
+        child_var, child_insns, idx = recurse(expr.children[0])
+        if expr.name != "abs":
+            raise NotImplementedError
+        ssa = new_name()
+        dtype = type_registry[child_var]
+        type_registry[ssa] = dtype
+        math_insn = f"{ssa} = linalg.abs {child_var} : {dtype}"
+        return ssa, child_insns + (math_insn,), idx
+
+    @recurse.register(gem.MaxValue)
+    def recurse_max(expr):
+        chld, idx = recurse(expr.children[0])
+        return f"cp.max({chld})", idx
+
+    @recurse.register(gem.MinValue)
+    def recurse_min(expr):
+        chld, idx = recurse(expr.children[0])
+        return f"cp.min({chld})", idx
+
+    @recurse.register(gem.Comparison)
+    def recurse_compare(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"({commands[0]} {expr.operator} {commands[1]})", idx
+
+    @recurse.register(gem.LogicalNot)
+    def recurse_not(expr):
+        chld, idx = recurse(expr.children[0])
+        return f"cp.logical_not({chld})", idx
+
+    @recurse.register(gem.LogicalAnd)
+    def recurse_and(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.logical_and{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.LogicalOr)
+    def recurse_or(expr):
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index)) == 1
+        return f"cp.logical_or{commands[0]}, {commands[1]})", index[0]
+
+    @recurse.register(gem.Conditional)
+    def recurse_cond(expr):
+        # children are ordered as (condition, then, else)
+        summands = [recurse(e) for e in expr.children]
+        commands = [s[0] for s in summands]
+        index = [s[1] for s in summands]
+        assert len(set(index[1:])) == 1
+        return f"(commands[1] if commands[0] else commands[2])", index[1]
+
+    @recurse.register(gem.ListTensor)
+    def recurse_list_tensor(expr):
+        str_array = repr(np.empty_like(expr.array)).replace('None', "{}")
+        str_array = "cp." + str_array.replace("object", "cp.float64")
+        chld_list = []
+        idx_list = []
+        for chld_expr in expr.array.flatten():
+            chld, idx = recurse(chld_expr)
+            chld_list += [chld]
+            idx_list += [idx]
+        assert len(set(idx_list)) == 1
+        return str_array.format(*chld_list), idx_list[0]
+
+    @recurse.register(gem.Indexed)
+    def recurse_indexed(expr):
+        chld, insns, idx = recurse(expr.children[0])
+        ssa = new_name()
+        offsets = []
+        sizes = []
+        strides = []
+        for i, size in zip(expr.multiindex, expr.children[0].shape, strict=True):
+            if isinstance(i, gem.Index):
+                offsets.append(0)
+                sizes.append(size)
+            else:
+                offsets.append(i)
+                sizes.append(1)
+            strides.append(1)
+
+        nice = lambda iterable: f"[{', '.join(map(str, iterable))}]"
+
+        in_shape = type_registry[chld]
+        out_shape = tensor_shape(sizes, "f64")  # FIXME: hardcoded type
+        type_registry[ssa] = out_shape
+        insns = insns + (f"{ssa} = tensor.extract_slice {chld}{nice(offsets)}{nice(sizes)}{nice(strides)} : {in_shape} to {out_shape}",)
+        return ssa, insns, expr.index_ordering() + idx
+
+    @recurse.register(gem.FlexiblyIndexed)
+    def recurse_findexed(expr):
+        # TODO this doesn't encapsulate the detail dim2idx
+        chld, child_insns, idx = recurse(expr.children[0])
+
+        insns = list(child_insns)
+        offsets = []
+        sizes = expr.children[0].shape
+        strides = []
+        for (off, var) in expr.dim2idxs:
+            offset_expr = [off]
+            for (i, stride) in var:
+                offset_ssa, offset_insns = mlir_mul([i, stride], np.int32)
+                offset_expr.append(offset_ssa)
+                insns.extend(offset_insns)
+            offset_ssa, moreinsns = mlir_add(offset_expr, np.int32)
+            offsets.append(offset_ssa)
+            insns.extend(moreinsns)
+
+            strides.append("1")
+
+        ssa = new_name()
+        dtype = tensor_shape(sizes, "f64")
+        type_registry[ssa] = dtype
+        newinsn = f"{ssa} = tensor.extract_slice {chld}{offsets}{sizes}{strides} : in to out"
+        return ssa, tuple(insns), expr.index_ordering()
+
+    @recurse.register(gem.Variable)
+    def recurse_variable(expr):
+        # awful hack, dtype needs propagating
+        if expr.name in {"coords", "w_0", "A"}:
+            dtype = np.float64
+        else:
+            assert expr.dtype is not None
+            dtype = expr.dtype
+
+        name = "%"+expr.name
+
+        args[expr.name] = 1
+        type_registry[name] = MLIR_DTYPES[dtype]
+        return name, (), tuple()
+
+    @recurse.register(gem.Zero)
+    def recurse_identity(expr):
+        raise NotImplementedError
+        return f"cp.zeros({expr.shape},dtype=cp.float64)", tuple()
+
+    @recurse.register(gem.Identity)
+    def recurse_identity(expr):
+        raise NotImplementedError
+        return f"cp.eye({expr.shape},dtype={expr.dtype})", tuple()
+
+    @recurse.register(gem.Literal)
+    def recurse_literal(expr):
+        name = f"%t{declare["counter"]}"
+        declare["counter"] += 1
+
+        if expr.shape:
+            dtype = tensor_shape(expr.shape, expr.dtype)
+        else:
+            dtype = MLIR_DTYPES[expr.dtype]
+
+        type_registry[name] = dtype
+        if expr not in declare.keys():
+            declare[expr] = (name, expr.array)
+        return name, (), tuple()
+
+    def func_decl(*args):
+        return [f"def cupy_kernel({", ".join(args)}):"]
+
+    insns = []
+
+    temp_vars = []
+    for key, val in declare.items():
+        if key != "counter" and val[0][0] == "t":
+            # temp_vars += [f"\t{val[0]} = cp.{repr(val[1])}"]
+            insns.append(f"%{declare[expr][0]} : tensor.put {repr(val)}")
+        elif key != "counter":
+            insns.append(f"%{declare[expr][0]}")
+            # temp_vars += [f"\t{val[0]} = {repr(val[1])[1:-1]}"]
+
+    for var, expr in assignments:
+        e, e_insns, e_idx = recurse(expr)
+        v, v_insns, v_idx = recurse(var)
+        assert set(v_idx) == set(e_idx)
+        insns.extend(e_insns)
+        insns.extend(v_insns)
+        insns.append(f"{v} = arith.addf {v}, {e}")
+
+    # arg_list = list(args.keys())
+    # # this ordering probably needs work
+    # if "A" in arg_list:
+    #     a_idx = arg_list.index("A")
+    #     a = arg_list.pop(a_idx)
+    #     arg_list = [a] + arg_list
+    # res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
+    return "\n".join(insns)
+
+
+MLIR_DTYPES = {
+    np.int32: "i32",
+    np.float64: "f64",
+    "i32": "i32",
+    "f64": "f64",
+    np.dtype(np.float64): "f64",
+    np.dtype(np.int32): "i32",
+}
+
+
+def tensor_shape(shape, dtype):
+    return f"tensor<{'x'.join(map(str, shape))}x{MLIR_DTYPES[dtype]}>"
