@@ -3,6 +3,7 @@ from gem import gem
 import itertools
 import numpy as np
 from functools import singledispatch
+import pytools
 
 
 def construct_einsum_str(expr, index):
@@ -18,11 +19,12 @@ def construct_einsum_str(expr, index):
     return idx_str
 
 
-def mlir_contraction(expr, index):
-    idx_dict = {idx: chr(65 + i) for i, idx in enumerate(set(sum(index + [expr.free_indices], tuple())))}
+def mlir_contraction(expr, child_indices):
+    indices = np.unique(sum(child_indices, ()) + expr.free_indices)
+    idx_dict = {idx: chr(65 + i) for i, idx in enumerate(indices)}
     all_indices = idx_dict.values()
     per_index = []
-    for idx in index:
+    for idx in child_indices:
         per_index.append([idx_dict[sub] for sub in idx])
     out = [idx_dict[free] for free in expr.free_indices]
 
@@ -840,8 +842,6 @@ def to_mlir(assignments):
 
     def new_name():
         name = f"%myvar{next(mycounter)}"
-        # if name == "%myvar10":
-        #     breakpoint()
         return name
 
     def new_var(dtype):
@@ -854,6 +854,17 @@ def to_mlir(assignments):
         name = new_name()
         type_registry[name] = tensor_shape(shape, dtype)
         return name
+
+    def make_empty(shape, dtype):
+        inames = []
+        insns = []
+        for x in shape:
+            iname, iinsns = register_constant(x, "index")
+            insns.extend(iinsns)
+            inames.append(iname)
+        empty = new_name()
+        insns.append(f"{empty} = tensor.empty({', '.join(inames)}) :  {dtype}")
+        return empty, tuple(insns)
 
 
     def register_constant(value, dtype):
@@ -911,6 +922,8 @@ def to_mlir(assignments):
         assert len(expr.children) == 1
         child_var, child_insns, child_indices = recurse(expr.children[0])
 
+        insns = list(child_insns)
+
         if len(expr.multiindex) > 1:
             raise NotImplementedError
 
@@ -919,39 +932,68 @@ def to_mlir(assignments):
 
         shape = tuple(index.extent for i, index in enumerate(child_indices) if i != contracted_index_loc)
         ssa = new_tensor(shape, "f64")
+
+        empty, emptyinsns = make_empty(shape, type_registry[ssa])
+        insns.extend(emptyinsns)
+
         contract_insn = (
             f"{ssa} = linalg.reduce {{arith.addf}} "
             f"ins({child_var} : {type_registry[child_var]}) "
-            f"outs(%todo : {type_registry[ssa]}) "
+            f"outs({empty} : {type_registry[ssa]}) "
             f"dimensions = [{contracted_index_loc}]"
         )
+        insns.append(contract_insn)
+        insns = tuple(insns)
 
-        return ssa, child_insns + (contract_insn,), expr.free_indices
+        return ssa, insns, expr.free_indices
 
 
     @recurse.register(gem.Product)
     def recurse_indexsum(expr):
-        summands = [recurse(e) for e in expr.children]
-        commands = [s[0] for s in summands]
-        assert len(commands) == 2
-        subinsns = []
-        for s in summands:
-            subinsns.extend(s[1])
-        subinsns = tuple(subinsns)
-        index = [s[2] for s in summands]
-        contract_expr = mlir_contraction(expr, index)
-
-        shape = tuple(index.extent for index in expr.free_indices)
-        ssa = new_tensor(shape, "f64")
-        dtype = type_registry[ssa]
-
-        contract_insn = (
-            f"{contract_expr} "
-            f"ins({', '.join(commands)} : {', '.join([type_registry[c] for c in commands])}) "
-            f"outs({ssa} : {dtype})"
+        (lhs_var, rhs_var), (lhs_insns, rhs_insns), (lhs_ixs, rhs_ixs) = zip(
+            *(recurse(e) for e in expr.children), strict=True
         )
+        shape = tuple(index.extent for index in expr.free_indices)
+        ssa = new_name()
 
-        return ssa, subinsns+(contract_insn,), expr.free_indices
+        is_scalar = lambda child: child.shape == () and child.free_indices == ()
+
+        # multiplication by a scalar
+        lhs_child, rhs_child = expr.children
+        insns = [*lhs_insns, *rhs_insns]
+        if is_scalar(lhs_child):
+            if is_scalar(rhs_child):
+                dtype = pytools.single_valued((type_registry[lhs_var], type_registry[rhs_var]))
+                contract_insn = f"{ssa} = arith.mulf {lhs_var}, {rhs_var} : {dtype}"
+            else:
+                raise NotImplementedError
+        else:
+            if is_scalar(rhs_child):
+                shape = tuple(index.extent for index in lhs_child.free_indices)
+                dtype = type_registry[lhs_var]
+                empty, emptyinsns = make_empty(shape, dtype)
+                insns.extend(emptyinsns)
+                contract_insn = (
+                    f"{ssa} = linalg.elementwise "
+                    "kind=#linalg.elementwise_kind<mul> "
+                    f"ins({rhs_var}, {lhs_var} : {type_registry[rhs_var]}, {type_registry[lhs_var]}) "
+                    f"outs({empty} : {dtype}) -> {dtype}"
+                )
+            else:
+                dtype = tensor_shape(shape, "f64")
+                empty, emptyinsns = make_empty(shape, type_registry[lhs_var])
+                insns.extend(emptyinsns)
+
+                contract_expr = mlir_contraction(expr, (lhs_ixs, rhs_ixs))
+                contract_insn = (
+                    f"{ssa} = {contract_expr} "
+                    f"ins({lhs_var}, {rhs_var} : {type_registry[lhs_var]}, {type_registry[rhs_var]}) "
+                    f"outs({empty} : {dtype}) -> {dtype}"
+                )
+        insns.append(contract_insn)
+        type_registry[ssa] = dtype
+
+        return ssa, tuple(insns), expr.free_indices
 
     @recurse.register(gem.Sum)
     def recurse_sum(expr):
@@ -1009,7 +1051,7 @@ def to_mlir(assignments):
         ssa = new_name()
         dtype = type_registry[child_var]
         type_registry[ssa] = dtype
-        math_insn = f"{ssa} = linalg.abs {child_var} : {dtype}"
+        math_insn = f"{ssa} = math.absf {child_var} : {dtype}"
         return ssa, child_insns + (math_insn,), idx
 
     @recurse.register(gem.MaxValue)
@@ -1104,7 +1146,7 @@ def to_mlir(assignments):
 
         insns = list(child_insns)
         offsets = []
-        sizes = expr.children[0].shape
+        sizes = [index.extent for index in expr.free_indices]
         strides = []
         for (off, var) in expr.dim2idxs:
             offset_expr = [off]
@@ -1118,10 +1160,19 @@ def to_mlir(assignments):
 
             strides.append("1")
 
+        nice = lambda iterable: f"[{', '.join(map(str, iterable))}]"
+
         ssa = new_name()
-        dtype = tensor_shape(sizes, "f64")
+        if not sizes:
+            dtype = "f64"
+            newinsn = f"{ssa} = tensor.extract {chld}{nice(offsets)} : {type_registry[chld]}"
+        else:
+            dtype = tensor_shape(sizes, "f64")
+            newinsn = f"{ssa} = tensor.extract_slice {chld}{nice(offsets)}{nice(sizes)}{nice(strides)} : {type_registry[chld]} to {dtype}"
+
+        insns.append(newinsn)
+
         type_registry[ssa] = dtype
-        newinsn = f"{ssa} = tensor.extract_slice {chld}{offsets}{sizes}{strides} : in to out"
         return ssa, tuple(insns), expr.index_ordering()
 
     @recurse.register(gem.Variable)
@@ -1135,8 +1186,10 @@ def to_mlir(assignments):
 
         name = "%"+expr.name
 
-        args[expr.name] = 1
-        type_registry[name] = MLIR_DTYPES[dtype]
+        dtype = tensor_shape(expr.shape, dtype)
+
+        args[expr.name] = name
+        type_registry[name] = dtype
         return name, (), tuple()
 
     @recurse.register(gem.Zero)
@@ -1156,53 +1209,50 @@ def to_mlir(assignments):
 
         if expr.shape:
             dtype = tensor_shape(expr.shape, expr.dtype)
+            insn = f"{name} = arith.constant dense<{np.array2string(expr.array, separator=",")}> : {dtype}"
         else:
             dtype = MLIR_DTYPES[expr.dtype]
+            insn = f"{name} = arith.constant {expr.array.item()} : f64"
 
         type_registry[name] = dtype
         if expr not in declare.keys():
             declare[expr] = (name, expr.array)
-        return name, (), tuple()
+        return name, (insn,), tuple()
 
-    def func_decl(*args):
-        return [f"def cupy_kernel({", ".join(args)}):"]
+    def func_decl(args):
+        args_decl = ", ".join((f"{arg}: {type_registry[arg]}" for arg in args))
+        return f"func.func @mykernel({args_decl})"
 
+    breakpoint()
     insns = []
 
-    temp_vars = []
-    for key, val in declare.items():
-        if key != "counter" and val[0][0] == "t":
-            # temp_vars += [f"\t{val[0]} = cp.{repr(val[1])}"]
-            insns.append(f"%{declare[expr][0]} : tensor.put {repr(val)}")
-        elif key != "counter":
-            insns.append(f"%{declare[expr][0]}")
-            # temp_vars += [f"\t{val[0]} = {repr(val[1])[1:-1]}"]
-
     for var, expr in assignments:
+        assert var.free_indices == expr.free_indices
         e, e_insns, e_idx = recurse(expr)
         v, v_insns, v_idx = recurse(var)
         assert set(v_idx) == set(e_idx)
         insns.extend(e_insns)
         insns.extend(v_insns)
-        insns.append(f"{v} = arith.addf {v}, {e}")
+        ssa = new_name()
+        dtype = pytools.single_valued((type_registry[v], type_registry[e]))
+        insns.append(f"{ssa} = linalg.add ins({v}, {e} : {dtype}, {dtype}) outs({ssa} : {dtype}) -> {dtype}")
 
-    # arg_list = list(args.keys())
-    # # this ordering probably needs work
-    # if "A" in arg_list:
-    #     a_idx = arg_list.index("A")
-    #     a = arg_list.pop(a_idx)
-    #     arg_list = [a] + arg_list
-    # res = "\n".join(func_decl(*arg_list) + temp_vars + strs)
+    insns = [
+        func_decl(args.values()),
+        "{",
+        *insns,
+        "}",
+    ]
     return "\n".join(insns)
 
 
 MLIR_DTYPES = {
-    np.int32: "i32",
+    np.int32: "index",
     np.float64: "f64",
-    "i32": "i32",
+    "index": "index",
     "f64": "f64",
     np.dtype(np.float64): "f64",
-    np.dtype(np.int32): "i32",
+    np.dtype(np.int32): "index",
 }
 
 
