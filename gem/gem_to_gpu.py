@@ -1335,7 +1335,7 @@ def to_mlir(assignments):
 
     generic_insn = textwrap.dedent(f"""\
     %dummy = tensor.empty() : {dummy_type}
-    linalg.generic
+    %myresult = linalg.generic
         {{
             indexing_maps = {indexing_maps_str},
             iterator_types = {iterator_types_str}
@@ -1352,7 +1352,7 @@ def to_mlir(assignments):
     insns = [
         *alloc_insns,
         generic_insn,
-        "func.return",
+        f"func.return %myresult : {out_type}",
     ]
     #
     # breakpoint()
@@ -1373,7 +1373,7 @@ def to_mlir(assignments):
         arg_name = arg_names[arg]
         func_args.append(f"{arg_name}:{ type_registry[arg_name]}")
     args_decl = ", ".join(func_args)
-    func_decl = f"func.func @mykernel({args_decl})"
+    func_decl = f"func.func @mykernel({args_decl}) -> {out_type}"
 
     insns = [
         func_decl,
