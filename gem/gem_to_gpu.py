@@ -3,28 +3,30 @@ import numpy as np
 from functools import singledispatch
 
 
-def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_block_indices=None, block_names=None):
-    "This function takes in a series of GEM expressions containing named indices, and constructs the appropriate triton code"
+def to_triton(func_name, assignments, temporaries, blocks, temps=None, block_names=None):
+    """This function takes in a series of GEM expressions containing named indices, and constructs the appropriate triton code, using the named indices to define blocks.
+
+    Arguments:
+        func_name (str): The name of the kernel being produced
+        
+    """
 
     args = {}
     if temps is None:
         temps = {}
     arrays = {"counter": 0} 
     used_temps = {}
-    if prev_block_indices is None:
-        prev_block_indices = {}
-    subbed_indices = {}
 
-    def recurse(expr, outer_idx=tuple()):
+    def recurse(expr, active_blocks=tuple()):
         if expr not in temps:
-            return _recurse(expr, outer_idx)
+            return _recurse(expr, active_blocks)
         if expr not in used_temps:
             used_temps[expr] = temps[expr]
         shape = temps[expr][1][1]
         return temps[expr][0], tuple(shape)
 
     @singledispatch
-    def _recurse(expr, outer_idx):
+    def _recurse(expr, active_blocks):
         """Visit an gem expression to convert it to a triton function..
 
         :arg expr: GEM expression
@@ -32,8 +34,9 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         raise AssertionError("unsupported expression type %s" % type(expr))
 
     @_recurse.register(gem.Product)
-    def _recurse_product(expr, outer_idx):
-        summands = [recurse(e, outer_idx) for e in expr.children]
+    def _recurse_product(expr, active_blocks):
+        #Careful logic is required here to ensure the blocks remain in the expected order
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         index_without_empty = list(set(index) - set([tuple()]))
@@ -41,41 +44,11 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
             # case where the shapes are not exactly the same
             outer = []
             inner = []
-            for i, (command, idx) in enumerate(summands):
-                # need to ensure that added block index remains the first index
-                #block_indices =  [v for vs in outer_idx.values() for v in vs]
-                block_indices =  outer_idx["vars"]
-                #if any(outer in idx for outer in block_indices):
-                slicing = "["
-                for axis in idx:
-                    if axis.name == "cell":
-                        if i > 0:
-                            # if cell index is on the right child, create extra axis to enable product
-                            slicing +=  ":, None, "
-                        if axis not in outer:
-                            outer += [axis]
-                        idx = list(idx)
-                        idx.remove(axis)
-                        idx = tuple(idx)
-                    elif axis in outer_idx["temps"]:
-                        if axis not in inner:
-                            inner += [axis]
-                        idx = list(idx)
-                        idx.remove(axis)
-                        idx = tuple(idx)
-                if len(slicing) > 1:
-                    command += slicing[:-2] + "]"
-                summands[i] = (command, idx)
-            commands = [s[0] for s in summands]
-            index = [s[1] for s in summands]
-            if "inter4" in commands:
-                breakpoint()
-            if any([i in subbed_indices.keys() or i in subbed_indices.values() for i in idx for idx in index]):
-                breakpoint()
-            # integer reps of the indices
-            new_shape0 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[0]])
-            new_shape1 = list([ord(i[-1]) if isinstance(i, str) else i.count for i in index[1]])
+            # integer representations of the indices
+            new_shape0 = list([i.count for i in index[0]])
+            new_shape1 = list([i.count for i in index[1]])
             if not all([i0 == i1 or i0 == tuple() or i1 == tuple() for i0, i1 in zip(index[0][::-1], index[1][::-1])]):
+                #case when shape matching is non trival
                 # Empty axis need to be added to allow broadcasting
                 idx0 = len(index[0]) - 1
                 idx1 = len(index[1]) - 1
@@ -90,21 +63,26 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
                         slices1 = ",:" + slices1
                     elif len(index[0]) > len(index[1]):
                         new_shape1 = new_shape1[:idx1+1] + [1] + new_shape1[idx1+1:]
-                        slices1 = "a,None" + slices1
+                        slices1 = ",None" + slices1
                         idx0 -= 1
                     elif len(index[1]) > len(index[0]):
-                        new_shape0 = new_shape1[:idx0+1] + [1] + new_shape1[idx0+1:]
+                        new_shape0 = new_shape0[:idx0+1] + [1] + new_shape0[idx0+1:]
                         slices0 = ",None" + slices0
                         idx1 -= 1
                     else:
-                        raise NotImplementedError("Equal length broadcasting")
+                        new_shape0 = new_shape0[:idx0+1] + [1] + new_shape0[idx0+1:]
+                        new_shape1 = new_shape1[:idx0] + [1] + new_shape1[idx0:]
+                        slices0 = ",:,None" + slices0
+                        slices1 = ",None,:" + slices1
+                        idx0 -= 1
+                        idx1 -= 1
+                        #raise NotImplementedError("Equal length broadcasting")
                 for i, slices in enumerate([slices0, slices1]):
                     if "None" in slices:
                         if commands[i][-1] == "]":
                             commands[i] = commands[i][:-7] + slices
                         else:
-                            commands[i] = commands[i] + "[" + slices[2:]
-                        
+                            commands[i] = commands[i] + "[" + slices[1:]
             result_shape = np.broadcast_shapes(tuple(new_shape0), tuple(new_shape1))
             all_indices = set([i for s in summands for i in s[1]])
             result = tuple([i for i_count in result_shape for i in all_indices if i.count == i_count])
@@ -115,62 +93,60 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         return "(" + " * ".join(commands) + ")", tuple(index)
     
     @_recurse.register(gem.IndexSum)
-    def _recurse_indexsum(expr, outer_idx):
-        summands = [recurse(e, outer_idx) for e in expr.children]
+    def _recurse_indexsum(expr, active_blocks):
+        # Identifies sum index from multiindex
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         prod = "*".join(commands)
         if len(index) > 1:
-            raise NotImplementedError("IndexSum with multiple children")
+            raise NotImplementedError("IndexSum: multiple children")
         sum_index = list(expr.multiindex)
-        #sum_index = list(set(index[0]) - set(expr.free_indices + tuple([idx for val in outer_idx.values() for idx in val])))
         if len(sum_index) > 1:
-            raise NotImplementedError("Index Summing over multiple indices at once")
-        if sum_index[0] in subbed_indices:
-            sum_index[0] = subbed_indices[sum_index[0]]
+            raise NotImplementedError("IndexSum: Multiple indices at once")
         index_list = list(index[0])
         sum_axis = index_list.index(sum_index[0])
         index_list.pop(sum_axis)
         return f"tl.sum({prod}, {sum_axis})", tuple(index_list)
 
     @_recurse.register(gem.Sum)
-    def _recurse_sum(expr, outer_idx):
-        summands = [recurse(e, outer_idx) for e in expr.children]
+    def _recurse_sum(expr, active_blocks):
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return "(" + " + ".join(commands) + ")" , index[0] 
 
     @_recurse.register(gem.Division)
-    def _recurse_div(expr, outer_idx):
+    def _recurse_div(expr, active_blocks):
         raise NotImplementedError("Div")
-        summands = [recurse(e, outer_idx) for e in expr.children]
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.divide({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.FloorDiv)
-    def _recurse_floor_div(expr, outer_idx):
+    def _recurse_floor_div(expr, active_blocks):
         raise NotImplementedError("FloorDiv")
-        summands = [recurse(e, outer_idx) for e in expr.children]
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.floor_divide({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Remainder)
-    def _recurse_remainder(expr, outer_idx):
+    def _recurse_remainder(expr, active_blocks):
         raise NotImplementedError("Remainder")
-        summands = [recurse(e, outer_idx) for e in expr.children]
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.remainder({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Power)
-    def _recurse_power(expr, outer_idx):
-        summands = [recurse(e, outer_idx) for e in expr.children]
+    def _recurse_power(expr, active_blocks):
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         if len(index[1]) != 0:
@@ -178,69 +154,69 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         return f"libdevice.pow({commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.MathFunction)
-    def _recurse_fn(expr, outer_idx):
-        chld, idx = recurse(expr.children[0], outer_idx)
+    def _recurse_fn(expr, active_blocks):
+        chld, idx = recurse(expr.children[0], active_blocks)
         name = expr.name
         name = "tl." + name
         return name + "(" + chld + ")", idx
 
     @_recurse.register(gem.MaxValue)
-    def _recurse_max(expr, outer_idx):
+    def _recurse_max(expr, active_blocks):
         raise NotImplementedError("Max")
-        chld, idx = recurse(expr.children[0], outer_idx)
+        chld, idx = recurse(expr.children[0], active_blocks)
         return f"cp.max({chld})", idx
 
     @_recurse.register(gem.MinValue)
-    def _recurse_min(expr, outer_idx):
+    def _recurse_min(expr, active_blocks):
         raise NotImplementedError("Min")
-        chld, idx = recurse(expr.children[0], outer_idx)
+        chld, idx = recurse(expr.children[0], active_blocks)
         return f"cp.min({chld})", idx
 
     @_recurse.register(gem.Comparison)
-    def _recurse_compare(expr, outer_idx):
+    def _recurse_compare(expr, active_blocks):
         raise NotImplementedError("Compare")
-        summands = [recurse(e, outer_idx) for e in expr.children]
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"({commands[0]} {expr.operator} {commands[1]})", idx
 
     @_recurse.register(gem.LogicalNot)
-    def _recurse_not(expr, outer_idx):
+    def _recurse_not(expr, active_blocks):
         raise NotImplementedError("Logical Not")
         chld, idx = recurse(expr.children[0])
         return f"cp.logical_not({chld})", idx
 
     @_recurse.register(gem.LogicalAnd)
-    def _recurse_and(expr, outer_idx):
+    def _recurse_and(expr, active_blocks):
         raise NotImplementedError("Logical And")
-        summands = [recurse(e, outer_idx) for e in expr.children]
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.logical_and{commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.LogicalOr)
-    def _recurse_or(expr, outer_idx):
+    def _recurse_or(expr, active_blocks):
         raise NotImplementedError("Logical Or")
-        summands = [recurse(e, outer_idx) for e in expr.children]
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index)) == 1
         return f"cp.logical_or{commands[0]}, {commands[1]})", index[0]
 
     @_recurse.register(gem.Conditional)
-    def _recurse_cond(expr, outer_idx):
+    def _recurse_cond(expr, active_blocks):
         raise NotImplementedError("Cond")
         # children are ordered as (condition, then, else)
-        summands = [recurse(e, outer_idx) for e in expr.children]
+        summands = [recurse(e, active_blocks) for e in expr.children]
         commands = [s[0] for s in summands]
         index = [s[1] for s in summands]
         assert len(set(index[1:])) == 1
         return f"(commands[1] if commands[0] else commands[2])", index[1]
 
     @_recurse.register(gem.ListTensor)
-    def _recurse_list_tensor(expr, outer_idx):
+    def _recurse_list_tensor(expr, active_blocks):
         # Should be done by creating two temporary variables for each operation 
         # on the list tensor
         # tl.cat might be worth considering here
@@ -250,18 +226,28 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         chld_list = []
         idx_list = []
         for chld_expr in expr.array.flatten():
-            chld, idx = recurse(chld_expr, outer_idx)
+            chld, idx = recurse(chld_expr, active_blocks)
             chld_list += [chld]
             idx_list += [idx]
         assert len(set(idx_list)) == 1
         return str_array.format(*chld_list), idx_list[0]
 
     @_recurse.register(gem.Indexed)
-    def _recurse_indexed(expr, outer_idx):
-        chld, idx = recurse(expr.children[0], outer_idx)
+    def _recurse_indexed(expr, active_blocks):
+        """ Uses a custom slicing function _take_slice_ to enable slicing in triton
+        This is added to the final code when the file is created
+        
+        Signature:
+        _take_slice_(array, number_dimensions, dimension_to_slice, slice_location, dimension_sliced_row, keep_dimension)
+        """
+        chld, idx = recurse(expr.children[0], active_blocks)
         dim = 0
         index = []
         slice_dims = []
+        #if isinstance(expr.children[0], gem.Literal):
+        #    previous = arrays[expr.children[0]]
+        #    if previous[2] is None:
+        #        arrays[expr.children[0]] = (previous[0], previous[1] , expr.index_ordering())
         for i in expr.multiindex:
             if not isinstance(i, gem.Index):
                 index += [(dim, i)]
@@ -283,23 +269,35 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         return res_str, idx + expr.index_ordering()
 
     @_recurse.register(gem.FlexiblyIndexed)
-    def _recurse_findexed(expr, outer_idx):
-        # Indexing the variables along any axis
-        # Shape of dim2idxs: (offset, ((index,stride), (...), ...)
-        # Currently restricted to the slicing case of only 1 dimension, ie dim2idx = (n, ())
-        # Slicing in Triton is difficult - in order to do this it may require recursive joining of subarrays
-        chld, idx = recurse(expr.children[0], outer_idx)
+    def _recurse_findexed(expr, active_blocks):
+        """
+         Indexing the variables along any axis
+         Shape of dim2idxs: (offset, ((index,stride), (...), ...)
+        Also uses the _take_slice_ function
+        """
+        chld, idx = recurse(expr.children[0], active_blocks)
+        if isinstance(expr.children[0], gem.Variable):
+            args[expr.children[0].name] = (expr.children[0].shape, expr.index_ordering())
         index = None
+        res_str = chld
         for (off, var) in expr.dim2idxs:
             if len(var) == 0:
                 index = f"{off}"
                 index_dim = len(var)
+                temps[expr] = (f"{chld}{index}",(f"_take_slice_({chld}, len({chld}.shape), {index_dim}, {index}, {chld}.shape[1]).reshape({chld}.shape[0])", idx + expr.index_ordering() ))
+                res_str = f"{chld}{index}" 
             elif off != 0:
-                # reshape, slice, reshape
                 #raise NotImplementedError("Flexibly Indexed: Too many dimensions, limit: 1")
-                index = f"{off}"
-                index_dim = len(var)
-                temps[expr] = (f"{chld}{off}",(f"{str(var)}", idx + expr.index_ordering() ))
+                last_dim = np.prod(expr.children[0].shape) / np.prod([i.extent for i in expr.index_ordering()])
+                if not last_dim.is_integer():
+                    raise ValueError("FlexiblyIndexed: Dimensions incorrect - fractional slice")
+                block_mapping = {b[0]:b[1] for b in active_blocks}
+                shape = [i.extent if i.name not in block_mapping.keys() else block_mapping[i.name] for i in expr.index_ordering()]
+                if last_dim > 1:
+                    shape += [int(last_dim)]
+                shape_pow2 = [next_pow2(s) if not isinstance(s, str) else s for s in shape]
+                temps[f"{chld}{off}_reshape"] = (f"{chld}{off}_reshape", (f"{chld}.reshape({shape_pow2})", idx+expr.index_ordering()))
+                temps[expr] = (f"{chld}{off}",(f"_take_slice_({chld}{off}_reshape, {len(var) + 1}, 0, {off}, {shape_pow2[-1]}).reshape({shape_pow2[:-1]})", idx + expr.index_ordering() ))
                 res_str=f"{chld}{off}"
             else:
                 for (i, stride) in var:
@@ -307,26 +305,20 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
                         pass
                     else:
                         raise NotImplementedError("Flexibly indexed: index is not a gem.Index")
-        if index is not None:
-            temps[expr] = (f"{chld}{index}",(f"_take_slice_({chld}, len({chld}.shape), {index_dim}, {index}, {chld}.shape[1]).reshape({chld}.shape[0])", idx + expr.index_ordering() ))
-            res_str = f"{chld}{index}" 
-        else:
-            res_str = chld
 
         return res_str, idx + expr.index_ordering()
 
     @_recurse.register(gem.Variable)
-    def _recurse_variable(expr, outer_idx):
-        args[expr.name] = expr.shape 
-        breakpoint()
+    def _recurse_variable(expr, active_blocks):
+        args[expr.name] = (expr.shape, None)
         return expr.name, tuple() 
 
     @_recurse.register(gem.Zero)
-    def _recurse_zero(expr, outer_idx):
+    def _recurse_zero(expr, active_blocks):
         return f"tl.zeros({expr.shape}, dtype=tl.float64)", tuple()
 
     @_recurse.register(gem.Identity)
-    def _recurse_identity(expr, outer_idx):
+    def _recurse_identity(expr, active_blocks):
         # Triton doesn't have a built in identity function
         # One could be written using something along the lines of:
         # y = tl.arange(0, num_elements)
@@ -339,26 +331,25 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         raise NotImplementedError("Identity")
 
     @_recurse.register(gem.Literal)
-    def _recurse_literal(expr, outer_idx):
+    def _recurse_literal(expr, active_blocks):
         #
         if len(expr.array.shape) == 0:
             return str(expr.array.item()), tuple()
         if expr not in arrays.keys():
             val = arrays["counter"]
-            arrays[expr] = (f"t{val}", expr.array)
+            arrays[expr] = (f"t{val}", expr.array, None)
             arrays["counter"] += 1
         return arrays[expr][0], tuple() 
 
 
-
-    block_dims = {"vars":[],
-                  "temps":[]} 
+    active_blocks = blocks
+    active_block_names = [b[1] for b in active_blocks]
     counter = 0
     temp_assigns = []
     existing_blocks = []
     stores = []
     for t in temporaries:
-        code_str, free_vars = recurse(t, block_dims)
+        code_str, free_vars = recurse(t, active_blocks)
         temps[t] = (f"inter{counter}", (code_str, free_vars))
         for v in free_vars:
             # FRAGILE requires no two blocks that have the same first initial
@@ -367,31 +358,37 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         counter += 1
 
     for var, expr in assignments:
-        e, e_idx = recurse(expr, block_dims)
-        v, v_idx = recurse(var, block_dims)
+        e, e_idx = recurse(expr, active_blocks)
+        v, v_idx = recurse(var, active_blocks)
         #assert v_idx == e_idx
         stores += [f"\t{v}_res={e}"]
-    #breakpoint()
+
     kernel_data = {"entrypoint": func_name, "arrays": [], "sizes_pow2":[], "sizes_actual":[], "strides":[], "insns": [], "pids" : [], "extra_blocks":[]}
     kernel_data["blocks"] = blocks 
      
-    #block_dims['vars'] + block_dims['temps']
     for i, block in enumerate(existing_blocks):
         kernel_data["pids"] += [f"\tpid_{block[-1]} = tl.program_id(axis={i})"]
 
     
-    for name, size in args.items():
-        size = tuple([block for block in existing_blocks]) + size
-        res, kernel_data = construct_array_arguments(name, None, size, kernel_data)
+    for name, (size, indices) in args.items():
+        # this may not ensure correct ordering of blocks
+        shape = tuple([block_names[i.name] for i in indices if i.name in block_names.keys()]) + size
+        res, kernel_data = construct_array_arguments(name, None, shape, kernel_data)
         kernel_data["insns"] += res
     #breakpoint()
 
     for val in arrays.values():
         if isinstance(val, int):
             continue
-        name, array = val
-        replaced_dims = len(block_dims["temps"])
-        size = tuple([block for block in block_dims["temps"]]) + array.shape[replaced_dims:]
+        name, array, indices = val
+        size = []
+        shape = array.shape
+        if indices is not None:
+            for i in indices:
+                if i.name in [b[0] for b in active_blocks]:
+                   size += [block_names[i.name]]
+                   shape = shape[1:]
+        size += shape
         res, kernel_data = construct_array_arguments(name, array, size, kernel_data)
         kernel_data["insns"] += res        
 
@@ -405,11 +402,9 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
         for expr in used_temps:
             name, (_, shape) = used_temps[expr]
             shape = [s if isinstance(s, str) else s.extent for s in list(shape)]
-            replaced_dims = sum([isinstance(s, str) and s not in block_dims["vars"] for s in shape]) 
-            if len(expr.shape) > 0:
-                shape = shape +  list(expr.shape[replaced_dims:])
             for i, s in enumerate(shape):
-                if isinstance(s, str) and s not in block_dims["vars"] + block_dims["temps"]:
+                if isinstance(s, str) and s not in active_block_names:
+                   breakpoint()
                    shape[i] = f"size_{s[-1]}"
                    if (s, None, None) not in kernel_data["extra_blocks"]:
                        extra_pid = [f"\tpid_{s[-1]} = 0"]
@@ -421,7 +416,7 @@ def to_triton(func_name, assignments, temporaries, blocks, temps=None, prev_bloc
 
     kernel_data["insns"] +=  stores
     res, kernel_data = kernel_data_to_str(kernel_data)
-    return res, kernel_data, temps, subbed_indices
+    return res, kernel_data, temps
 
 def next_pow2(val):
     return int(np.power(2, np.ceil(np.log2(val))))
@@ -435,11 +430,9 @@ def func_decl(func_name, *args, jit=True):
 def construct_array_arguments(name, value, shape, kernel_data, load=True):
     # Given information about the arrays, construct the string to load the array and add its information to kernel data
     kernel_data["arrays"] += [(name, value)]
-    blocks = kernel_data["blocks"]["vars"] + kernel_data["blocks"]["temps"]
+    blocks = kernel_data["blocks"]
     res = []
     stride_acc = []
-    if name == "coords":
-        breakpoint()
     for dim, i in reversed(list(zip(shape, range(len(shape))))):
         if all([isinstance(s, int) for s in stride_acc]):
             stride = int(np.prod(stride_acc))
@@ -454,7 +447,7 @@ def construct_array_arguments(name, value, shape, kernel_data, load=True):
         else:
             res += [f"\t{name}_offsets{i} = (pid_{dim[-1]} * {dim} + tl.arange(0, {name}_dim{i})) "]
             kernel_data["sizes_actual"] += [(name + f"_size{i}", f"{dim} * (pid_{dim[-1]}+1) if {dim} * (pid_{dim[-1]}+1) < size_{dim[-1]} else size_{dim[-1]}")]
-            if dim in [block[0] for block in blocks]:
+            if dim in [block[1] for block in blocks]:
                 kernel_data["sizes_pow2"] += [(name + f"_dim{i}", f"{dim}")]
             else:
                 kernel_data["sizes_pow2"] += [(name + f"_dim{i}", f"dim_{dim[-1]}")]
@@ -472,12 +465,11 @@ def kernel_data_to_str(kernel_data):
     block_dims = kernel_data["blocks"]
     extra_blocks = kernel_data["extra_blocks"]
     const_exprs =  kernel_data["sizes_pow2"] + kernel_data["sizes_actual"] + kernel_data["strides"]
-
     const_exprs = [f"\t{exp[0]}:tl.constexpr = {exp[1]}" for exp in const_exprs]
     array_exprs = [exp[0] for exp in kernel_data["arrays"]]
-    pow2_extra = [f"dim_{block[0][-1]}:tl.constexpr" for block in extra_blocks]
-    block_dim_args = [f"size_{block[0][-1]}:tl.constexpr" for block in block_dims['vars'] + block_dims['temps'] + extra_blocks] 
-    arg_list = array_exprs + block_dim_args + pow2_extra + [f"{block}:tl.constexpr" for block, _, _ in block_dims['vars'] + block_dims['temps']] 
+    pow2_extra = [f"dim_{block[1][-1]}:tl.constexpr" for block in extra_blocks]
+    block_dim_args = [f"size_{block[1][-1]}:tl.constexpr" for block in block_dims + extra_blocks] 
+    arg_list = array_exprs + block_dim_args + pow2_extra + [f"{block}:tl.constexpr" for _,block, _, _ in block_dims] 
 
     # A is the output array so needes to be treated separately and will be passed first
     if "A" in arg_list:
@@ -512,9 +504,10 @@ def to_triton_wrapper(assignments, temporaries):
     # The second will produce the final result
     # The two launches ensure synchronisation of data between the two kernels. 
     from firedrake.device import compute_device
-    vars_blocks = {"vars": compute_device.blocks["vars"], "temps":[]}
-    str1, data1, temps1, subs1 = to_triton("subkernel1", [], temporaries, compute_device.blocks, block_names=compute_device.block_names)
-    str2, data2, temps2, subs2 = to_triton("subkernel2", assignments, [], vars_blocks, temps1, subs1,block_names=compute_device.block_names)
+    str1, data1, temps1 = to_triton("subkernel1", [], temporaries, compute_device.blocks[0], block_names=compute_device.block_names)
+    str2, data2, temps2 = to_triton("subkernel2", assignments, [], compute_device.blocks[1], temps1, block_names=compute_device.block_names)
+
+
     args = [exp[0] for exp in data1["arrays"]]
     args1 = args.copy()
     array_decl = []
@@ -540,7 +533,7 @@ def to_triton_wrapper(assignments, temporaries):
     block_size = []
     block_args = []
     output_var = data2["arrays"][0]
-    for name, _, _ in blocks['vars'] + blocks['temps']:
+    for _, name, _, _ in compute_device.blocks[0]:
         block_size += [f"size_{name[-1]}"]
         block_args += [f"{name}"]
         grid_sizes += [f"triton.cdiv(size_{name[-1]}, meta['{name}'])"]
@@ -553,7 +546,7 @@ def to_triton_wrapper(assignments, temporaries):
     #wrapper_func += [f"\tbreakpoint()"]
     grid_sizes = []
     block_args = []
-    for name, _, _ in blocks['vars']:
+    for _,name, _, _ in compute_device.blocks[1]:
         block_args += [f"{name}"]
         grid_sizes += [f"triton.cdiv(size_{name[-1]}, meta['{name}'])"]
     for name, _, _ in data2["extra_blocks"]:
