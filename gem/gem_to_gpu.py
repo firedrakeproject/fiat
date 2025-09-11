@@ -871,8 +871,11 @@ def to_mlir(assignments):
 
     def register_constant(value, dtype):
         if isinstance(value, gem.Index):
-            type_registry["%{value.name}"] = "i32"
-            return f"%{value.name}", ()
+            loc = index_map[value]
+            assignee = new_name()
+            insn = f"{assignee} = linalg.index {loc} : index"
+            type_registry[assignee] = "i32"
+            return assignee, (insn,)
         elif isinstance(value, numbers.Number):
             ssa = new_var(dtype)
             return ssa, (f"{ssa} = arith.constant {value} : {MLIR_DTYPES[dtype]}",)
@@ -1136,7 +1139,18 @@ def to_mlir(assignments):
     @recurse.register(gem.Indexed)
     def recurse_indexed(expr):
         # everything scalar here, do nothing
-        return recurse(just_one(expr.children))
+        child_var, child_insns = recurse(just_one(expr.children))
+
+        insns = list(child_insns)
+        assignee = new_name()
+        type_registry[assignee] = "f64"
+        offsets = []
+        for i in expr.free_indices:
+            x, y = register_constant(i, "index")
+            offsets.append(x)
+            insns.extend(y)
+        extract_insn = f"{assignee} = tensor.extract {child_var}{listify(offsets)} : {type_registry[child_var]}"
+        return assignee, (*insns, extract_insn)
         # chld, insns = recurse(just_one(expr.children))
         # ssa = new_name()
         # offsets = []
@@ -1162,10 +1176,11 @@ def to_mlir(assignments):
     @recurse.register(gem.FlexiblyIndexed)
     def recurse_findexed(expr):
         # TODO this doesn't encapsulate the detail dim2idx
-        chld, child_insns = recurse(just_one(expr.children))
+        child = just_one(expr.children)
+        chld, child_insns = recurse(child)
 
         assignee = new_name()
-        type_registry[assignee] = type_registry[chld]
+        type_registry[assignee] = "f64"
 
         insns = list(child_insns)
         offsets = []
@@ -1249,6 +1264,16 @@ def to_mlir(assignments):
     (var, expr), = assignments
 
     args = collect_args(expr)
+
+    arg_names = {}
+    for arg in args:
+        arg_name = new_name()
+        arg_names[arg] = arg_name
+        if arg.shape:
+            type_registry[arg_name] = tensor_shape(arg.shape, np.float64)
+        else:
+            type_registry[arg_name] = "f64"
+
     indices = collect_indices(expr)
 
     # map from a 'gem.Index' to its 'linalg.index' location
@@ -1256,72 +1281,103 @@ def to_mlir(assignments):
 
     iterator_types = []
     for index in indices:
-        iterator_type = "reduction" if index in expr.free_indices else "parallel"
+        iterator_type = "\"parallel\"" if index in expr.free_indices else "\"reduction\""
         iterator_types.append(iterator_type)
     iterator_types_str = listify(iterator_types)
 
     indexing_maps = []
-    for arg, arg_indices in args.items():
-        input_str = ", ".join(map(str, index_map.values()))
-        output_str = ", ".join(map(str, (index_map[index] for index in arg_indices)))
-        indexing_map = f"affine_map<({input_str}) -> ({output_str})>"
-        indexing_maps.append(indexing_map)
+    input_str = ", ".join(map(as_letter, index_map.values()))
+    output_str = ", ".join(map(as_letter, (index_map[index] for index in var.free_indices)))
+    indexing_map = f"affine_map<({input_str}) -> ({output_str})>"
+    indexing_maps.append(indexing_map)
     indexing_maps_str = listify(indexing_maps)
 
     out_name = "%out"
-    out_type = tensor_shape(var.shape, np.float64)
+    out_type = tensor_shape(just_one(var.children).shape, np.float64)
+    arg_names[var] = out_name
+    type_registry[out_name] = out_type
 
-    ins_names = arg_names.values()
-    ins_types = (type_registry[arg_name] for arg_name in args.values())
-    ins_str = f"{', '.join(ins_names)} : {', '.join(ins_types)}"
+    input_args = []
+    alloc_insns = []
+    for arg in args:
+        if isinstance(arg, gem.Variable):
+            input_args.append(arg)
+        else:
+            assert isinstance(arg, gem.Literal)
+            arg_name = arg_names[arg]
+            if arg.shape:
+                alloc_insn = f"{arg_name} = arith.constant dense<{np.array2string(arg.array, separator=",")}> : {type_registry[arg_name]}"
+            else:
+                alloc_insn = f"{arg_name} = arith.constant {arg.array.item()} : {type_registry[arg_name]}"
+            alloc_insns.append(alloc_insn)
+
+    # ins_names = arg_names.values()
+    # ins_types = (type_registry[arg_name] for arg_name in arg_names.values())
+    # ins_str = f"{', '.join(ins_names)} : {', '.join(ins_types)}"
 
     # The names of the arguments to the 'linalg.generic' block
-    block_args = {}
-    for arg in args:
-        arg_name = new_name()
-        block_args[arg] = arg_name
-        type_registry[arg_name] = MLIR_DTYPES[arg.dtype or np.float64]  # because some things don't have this, argh!
+    block_args = arg_names.copy()
+    block_args[just_one(var.children)] = out_name
+    # for arg in args:
+    #     arg_name = new_name()
+    #     block_args[arg] = arg_name
+    #     type_registry[arg_name] = MLIR_DTYPES[arg.dtype or np.float64]  # because some things don't have this, argh!
 
     block_args_str = listify((*block_args.values(), "%bout"))
 
     block_var, block_insns = recurse(expr)
 
-    insn = textwrap.dedent(f"""\
+    generic_insn = textwrap.dedent(f"""\
     linalg.generic
         {{
-            indexing_maps = {indexing_maps_str}
+            indexing_maps = {indexing_maps_str},
             iterator_types = {iterator_types_str}
         }}
-        ins({ins_str})
         outs({out_name}: {out_type})
         {{
-            ^bb0({block_args_str}) :
+            ^bb0(%bout : f64) :
             {'\n        '.join(block_insns)}
             %inc = arith.addf %bout, {block_var}: f64
             linalg.yield %inc : f64
-        }}""")
-
-    breakpoint()
-    insns = []
-
-    for var, expr in assignments:
-        assert var.free_indices == expr.free_indices
-        e, e_insns, e_idx = recurse(expr)
-        v, v_insns, v_idx = recurse(var)
-        assert set(v_idx) == set(e_idx)
-        insns.extend(e_insns)
-        insns.extend(v_insns)
-        ssa = new_name()
-        dtype = pytools.single_valued((type_registry[v], type_registry[e]))
-        insns.append(f"{ssa} = linalg.add ins({v}, {e} : {dtype}, {dtype}) outs({ssa} : {dtype}) -> {dtype}")
+        }} -> {out_type}""")
 
     insns = [
-        func_decl(args.values()),
+        *alloc_insns,
+        generic_insn,
+    ]
+    #
+    # breakpoint()
+    # insns = []
+    #
+    # for var, expr in assignments:
+    #     assert var.free_indices == expr.free_indices
+    #     e, e_insns, e_idx = recurse(expr)
+    #     v, v_insns, v_idx = recurse(var)
+    #     assert set(v_idx) == set(e_idx)
+    #     insns.extend(e_insns)
+    #     insns.extend(v_insns)
+    #     ssa = new_name()
+    #     dtype = pytools.single_valued((type_registry[v], type_registry[e]))
+    #     insns.append(f"{ssa} = linalg.add ins({v}, {e} : {dtype}, {dtype}) outs({ssa} : {dtype}) -> {dtype}")
+    func_args = []
+    for arg in (*input_args, var):
+        arg_name = arg_names[arg]
+        func_args.append(f"{arg_name}:{ type_registry[arg_name]}")
+    args_decl = ", ".join(func_args)
+    func_decl = f"func.func @mykernel({args_decl})"
+
+    insns = [
+        func_decl,
         "{",
         *insns,
         "}",
     ]
-    return "\n".join(insns)
+    result = "\n".join(insns)
+    # breakpoint()
+    with open("mykernel.mlir", "w") as f:
+        f.write(result)
+    print("done")
+    exit()
 
 
 MLIR_DTYPES = {
@@ -1335,6 +1391,7 @@ MLIR_DTYPES = {
 
 
 def tensor_shape(shape, dtype):
+    assert shape
     return f"tensor<{'x'.join(map(str, shape))}x{MLIR_DTYPES[dtype]}>"
 
 
@@ -1410,3 +1467,7 @@ class TensorType(Type):
 
 def listify(iterable):
     return f"[{', '.join(map(str, iterable))}]"
+
+
+def as_letter(i):
+    return chr(i + 65)
