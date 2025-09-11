@@ -1288,6 +1288,10 @@ def to_mlir(assignments):
     indexing_maps = []
     input_str = ", ".join(map(as_letter, index_map.values()))
     output_str = ", ".join(map(as_letter, (index_map[index] for index in var.free_indices)))
+    indexing_map = f"affine_map<({input_str}) -> ({input_str})>"
+    indexing_maps.append(indexing_map)
+    input_str = ", ".join(map(as_letter, index_map.values()))
+    output_str = ", ".join(map(as_letter, (index_map[index] for index in var.free_indices)))
     indexing_map = f"affine_map<({input_str}) -> ({output_str})>"
     indexing_maps.append(indexing_map)
     indexing_maps_str = listify(indexing_maps)
@@ -1327,15 +1331,19 @@ def to_mlir(assignments):
 
     block_var, block_insns = recurse(expr)
 
+    dummy_type = tensor_shape((index.extent for index in indices), "f64")
+
     generic_insn = textwrap.dedent(f"""\
+    %dummy = tensor.empty() : {dummy_type}
     linalg.generic
         {{
             indexing_maps = {indexing_maps_str},
             iterator_types = {iterator_types_str}
         }}
+        ins(%dummy: {dummy_type})
         outs({out_name}: {out_type})
         {{
-            ^bb0(%bout : f64) :
+            ^bb0(%bdummy: f64, %bout : f64) :
             {'\n        '.join(block_insns)}
             %inc = arith.addf %bout, {block_var}: f64
             linalg.yield %inc : f64
@@ -1344,6 +1352,7 @@ def to_mlir(assignments):
     insns = [
         *alloc_insns,
         generic_insn,
+        "func.return",
     ]
     #
     # breakpoint()
