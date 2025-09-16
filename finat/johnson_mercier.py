@@ -2,14 +2,14 @@ import FIAT
 from gem import ListTensor
 
 from finat.aw import _facet_transform
+from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 class JohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric matrix valued
     def __init__(self, cell, degree=1, variant=None):
-        if Citations is not None:
-            Citations().register("Gopalakrishnan2024")
+        cite("Gopalakrishnan2024")
         self._indices = slice(None, None)
         super().__init__(FIAT.JohnsonMercier(cell, degree, variant=variant))
 

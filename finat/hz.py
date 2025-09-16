@@ -1,15 +1,15 @@
 """Implementation of the Hu-Zhang finite elements."""
 import FIAT
 from gem import ListTensor
+from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.aw import _facet_transform, _evaluation_transform
 
 
 class HuZhang(PhysicallyMappedElement, FiatElement):
     def __init__(self, cell, degree=3, variant=None):
-        if Citations is not None:
-            Citations().register("Hu2015")
+        cite("Hu2015")
         self.variant = variant
         super().__init__(FIAT.HuZhang(cell, degree, variant=variant))
 
