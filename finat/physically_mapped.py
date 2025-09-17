@@ -266,6 +266,9 @@ class MappedTabulation(Mapping):
     on the requested derivatives."""
 
     def __init__(self, M, ref_tabulation):
+        M = gem.optimise.aggressive_unroll(M)
+        M, = gem.optimise.constant_fold_zero((M,))
+
         self.M = M
         self.ref_tabulation = ref_tabulation
         # we expect M to be sparse with O(1) nonzeros per row
@@ -283,9 +286,8 @@ class MappedTabulation(Mapping):
         exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
                  for i, js in enumerate(self.csr)]
 
-        val = gem.ListTensor(exprs)
-        # val = self.M @ table
-        return gem.optimise.aggressive_unroll(val)
+        # return gem.optimise.aggressive_unroll(self.M @ table)
+        return gem.ListTensor(exprs)
 
     def __getitem__(self, alpha):
         try:
@@ -325,10 +327,6 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
-        return self.map_tabulation(result, coordinate_mapping)
-
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
-        result = super().point_evaluation(order, refcoords, entity=entity)
         return self.map_tabulation(result, coordinate_mapping)
 
 
