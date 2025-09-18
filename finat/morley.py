@@ -3,15 +3,15 @@ import numpy
 
 from gem import ListTensor, partial_indexed, Literal, Power
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 class Morley(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=2):
-        if Citations is not None:
-            Citations().register("Morley1971")
-            Citations().register("MingXu2006")
+        cite("Morley1971")
+        cite("MingXu2006")
         super().__init__(FIAT.Morley(cell, degree=degree))
 
     def basis_transformation(self, coordinate_mapping):

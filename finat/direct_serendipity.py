@@ -12,15 +12,15 @@ from FIAT.polynomial_set import mis
 from FIAT.reference_element import UFCQuadrilateral
 from gem.utils import cached_property
 
+from finat.citations import cite
 from finat.finiteelementbase import FiniteElementBase
-from finat.physically_mapped import Citations, DirectlyDefinedElement
+from finat.physically_mapped import DirectlyDefinedElement
 from finat.sympy2gem import sympy2gem
 
 
 class DirectSerendipity(DirectlyDefinedElement, FiniteElementBase):
     def __init__(self, cell, degree):
-        if Citations is not None:
-            Citations().register("Arbogast2017")
+        cite("Arbogast2017")
 
         # These elements only known currently on quads
         assert isinstance(cell, UFCQuadrilateral)

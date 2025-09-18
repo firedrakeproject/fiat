@@ -2,16 +2,16 @@ import FIAT
 
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.piola_mapped import normal_tangential_edge_transform
 from copy import deepcopy
 
 
 class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
     def __init__(self, cell, degree=3):
-        if Citations is not None:
-            Citations().register("Mardal2002")
+        cite("Mardal2002")
         super().__init__(FIAT.MardalTaiWinther(cell, degree))
 
         reduced_dofs = deepcopy(self._element.entity_dofs())

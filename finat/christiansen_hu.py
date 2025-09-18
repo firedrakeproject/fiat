@@ -1,11 +1,10 @@
 import FIAT
 
-from finat.physically_mapped import Citations
+from finat.citations import cite
 from finat.piola_mapped import PiolaBubbleElement
 
 
 class ChristiansenHu(PiolaBubbleElement):
     def __init__(self, cell, degree=1):
-        if Citations is not None:
-            Citations().register("ChristiansenHu2019")
+        cite("ChristiansenHu2019")
         super().__init__(FIAT.ChristiansenHu(cell, degree))

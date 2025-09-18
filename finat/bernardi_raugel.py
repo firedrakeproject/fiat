@@ -1,13 +1,12 @@
 import FIAT
 
-from finat.physically_mapped import Citations
+from finat.citations import cite
 from finat.piola_mapped import PiolaBubbleElement
 
 
 class BernardiRaugel(PiolaBubbleElement):
     def __init__(self, cell, order=1):
-        if Citations is not None:
-            Citations().register("BernardiRaugel1985")
+        cite("BernardiRaugel1985")
         super().__init__(FIAT.BernardiRaugel(cell, order=order))
 
 

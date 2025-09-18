@@ -2,18 +2,18 @@ import FIAT
 from math import comb
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.argyris import _vertex_transform, _edge_transform, _normal_tangential_transform
 from copy import deepcopy
 
 
 class HsiehCloughTocher(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=3, avg=False):
-        if Citations is not None:
-            Citations().register("Clough1965")
-            if degree > 3:
-                Citations().register("Groselj2022")
+        cite("Clough1965")
+        if degree > 3:
+            cite("Groselj2022")
         self.avg = avg
         super().__init__(FIAT.HsiehCloughTocher(cell, degree))
 
@@ -39,8 +39,7 @@ class HsiehCloughTocher(PhysicallyMappedElement, ScalarFiatElement):
 
 class ReducedHsiehCloughTocher(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=3):
-        if Citations is not None:
-            Citations().register("Clough1965")
+        cite("Clough1965")
         super().__init__(FIAT.HsiehCloughTocher(cell, reduced=True))
 
         reduced_dofs = deepcopy(self._element.entity_dofs())
