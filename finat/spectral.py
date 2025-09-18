@@ -60,7 +60,6 @@ class KongMulderVeldhuizen(SpectralElement, ScalarFiatElement):
 
     def __init__(self, cell, degree):
         super(ScalarFiatElement, self).__init__(FIAT.KongMulderVeldhuizen(cell, degree))
-        sd = cell.get_spatial_dimension()
         cite("Chin1999higher")
         cite("Geevers2018new")
 
