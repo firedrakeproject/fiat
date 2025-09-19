@@ -1,9 +1,10 @@
+from functools import cached_property
 from sympy import symbols, legendre, Array, diff
 import numpy as np
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import mis
-from FIAT.reference_element import compute_unflattening_map, flatten_reference_cube
+from FIAT.reference_element import flatten_reference_cube
 
 x, y, z = symbols('x y z')
 variables = (x, y, z)
@@ -24,8 +25,8 @@ def choose_ijk_total(degree):
     return top // (2 * bottom)
 
 
-class TrimmedSerendipity(FiniteElement):
-    def __init__(self, ref_el, degree, mapping):
+class TrimmedSerendipityCurl(FiniteElement):
+    def __init__(self, ref_el, degree):
         if degree < 1:
             raise Exception("Trimmed serendipity elements only valid for k >= 1")
 
@@ -85,33 +86,18 @@ class TrimmedSerendipity(FiniteElement):
 
             cur += 2*triangular_number(degree - 2) + degree
 
-        topology = ref_el.get_topology()
-        unflattening_map = compute_unflattening_map(topology)
-        unflattened_entity_ids = {}
-        for dim in sorted(flat_topology):
-            unflattened_entity_ids[dim] = {}
-            for entity in sorted(flat_topology[dim]):
-                unflat_dim, unflat_entity = unflattening_map[(dim, entity)]
-                unflattened_entity_ids[unflat_dim][unflat_entity] = entity_ids[dim][entity]
         self.flat_el = flat_el
-
         nodes = [None] * cur
-        dual = DualSet(nodes, ref_el, unflattened_entity_ids)
+        dual = DualSet(nodes, ref_el, entity_ids)
         formdegree = 1
         super().__init__(ref_el=ref_el,
                          dual=dual,
                          order=degree,
                          formdegree=formdegree,
-                         mapping=mapping)
+                         mapping="covariant piola")
 
     def degree(self):
         return self.get_order()
-
-    def dual_basis(self):
-        raise NotImplementedError("dual_basis is not implemented for trimmed serendipity")
-
-    def get_coeffs(self):
-        raise NotImplementedError("get_coeffs not implemented for trimmed serendipity")
 
     def tabulate(self, order, points, entity=None):
 
@@ -146,15 +132,19 @@ class TrimmedSerendipity(FiniteElement):
     def value_shape(self):
         return (self.fdim,)
 
-    def dmats(self):
-        raise NotImplementedError
+    def dual_basis(self):
+        raise NotImplementedError(f"dual_basis is not implemented for {type(self).__name__}")
 
+    def get_coeffs(self):
+        raise NotImplementedError(f"get_coeffs not implemented for {type(self).__name__}")
 
-class TrimmedSerendipityCurl(TrimmedSerendipity):
-    def __init__(self, ref_el, degree):
+    @cached_property
+    def basis(self):
+        degree = self.degree()
         if degree < 1:
             raise Exception("Trimmed serendipity face elements only valid for k >= 1")
 
+        ref_el = self.get_reference_element()
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
@@ -188,9 +178,6 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 IL = ()
 
             Sminus_list = EL + FL + IL
-            self.basis = {(0, 0, 0): Array(Sminus_list)}
-            super(TrimmedSerendipityCurl, self).__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
-
         else:
             # Put all 2 dimensional stuff here.
             if degree < 1:
@@ -203,8 +190,9 @@ class TrimmedSerendipityCurl(TrimmedSerendipity):
                 FL = ()
 
             Sminus_list = EL + FL
-            self.basis = {(0, 0): Array(Sminus_list)}
-            super().__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
+
+        basis = {(0,) * dim: Array(Sminus_list)}
+        return basis
 
 
 def e_lambda_1_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
