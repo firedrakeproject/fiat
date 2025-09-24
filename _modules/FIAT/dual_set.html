@@ -47,12 +47,15 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">functional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_unflattening_map</span>
 
 
 <div class="viewcode-block" id="DualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DualSet</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">()</span> <span class="o">!=</span> <span class="nb">max</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">):</span>
+            <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">unflatten_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
         <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span> <span class="o">=</span> <span class="n">merge_entities</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span> <span class="o">=</span> <span class="n">nodes</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_el</span>
@@ -323,6 +326,21 @@
             <span class="n">entity_closure_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">e</span><span class="p">]</span> <span class="o">=</span> <span class="n">ids</span>
 
     <span class="k">return</span> <span class="n">entity_closure_ids</span></div>
+
+
+
+<div class="viewcode-block" id="unflatten_entity_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.unflatten_entity_ids">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unflatten_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reconstruct entity_ids to match the entities of ref_el.&quot;&quot;&quot;</span>
+    <span class="n">topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+    <span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">topology</span><span class="p">)</span>
+    <span class="n">unflattened_entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="p">)}</span>
+    <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+            <span class="n">unflat_dim</span><span class="p">,</span> <span class="n">unflat_entity</span> <span class="o">=</span> <span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">)]</span>
+            <span class="n">unflattened_entity_ids</span><span class="p">[</span><span class="n">unflat_dim</span><span class="p">][</span><span class="n">unflat_entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">unflattened_entity_ids</span></div>
 
 
 
