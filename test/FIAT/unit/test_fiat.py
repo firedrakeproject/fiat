@@ -59,7 +59,7 @@ from FIAT.christiansen_hu import ChristiansenHu                 # noqa: F401
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1          # noqa: F401
 from FIAT.guzman_neilan import GuzmanNeilanSecondKindH1         # noqa: F401
 from FIAT.johnson_mercier import JohnsonMercier                 # noqa: F401
-from FIAT.bubble import Bubble
+from FIAT.bubble import Bubble, FacetBubble                     # noqa: F401
 from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
@@ -320,8 +320,15 @@ elements = [
     "Histopolation(I, 1)",
     "Histopolation(I, 2)",
     "Bubble(I, 2)",
+    "Bubble(I, 2, 'integral')",
     "Bubble(T, 3)",
+    "Bubble(T, 3, 'integral')",
     "Bubble(S, 4)",
+    "Bubble(S, 4, 'integral')",
+    "FacetBubble(T, 2)",
+    "FacetBubble(T, 2, 'integral')",
+    "FacetBubble(S, 3)",
+    "FacetBubble(S, 3, 'integral')",
     "RestrictedElement(Lagrange(I, 2), restriction_domain='facet')",
     "RestrictedElement(Lagrange(T, 2), restriction_domain='vertex')",
     "RestrictedElement(Lagrange(T, 3), restriction_domain='facet')",
@@ -343,6 +350,7 @@ elements = [
     "CubicHermite(T)",
     "CubicHermite(S)",
     "Morley(T)",
+    "Morley(S)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
     "MardalTaiWinther(T, 3)",

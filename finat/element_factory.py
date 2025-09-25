@@ -167,11 +167,18 @@ def convert_finiteelement(element, **kwargs):
 
         codim = 1 if element.family() == "Boundary Quadrature" else 0
         return finat.make_quadrature_element(cell, degree, scheme, codim), set()
-    lmbda = supported_elements[element.family()]
-    if element.family() == "Real" and element.cell.cellname() in {"quadrilateral", "hexahedron"}:
-        lmbda = None
-        element = finat.ufl.FiniteElement("DQ", element.cell, 0)
-    if lmbda is None:
+
+    make_finat_element = supported_elements[element.family()]
+
+    if element.cell.cellname() in {"quadrilateral", "hexahedron"}:
+        # Reconstruct Real and Bernstein on tensor product cells
+        if element.family() == "Real":
+            make_finat_element = None
+            element = finat.ufl.FiniteElement("DQ", element.cell, 0)
+        elif element.family() == "Bernstein":
+            make_finat_element = None
+
+    if make_finat_element is None:
         if element.cell.cellname() == "quadrilateral":
             # Handle quadrilateral short names like RTCF and RTCE.
             element = element.reconstruct(cell=quadrilateral_tpc)
@@ -184,6 +191,7 @@ def convert_finiteelement(element, **kwargs):
         finat_elem, deps = _create_element(element, **kwargs)
         return finat.FlattenedDimensions(finat_elem), deps
 
+    deps = set()
     finat_kwargs = {}
     kind = element.variant()
     if kind is None:
@@ -191,51 +199,52 @@ def convert_finiteelement(element, **kwargs):
 
     if element.family() == "Lagrange":
         if kind in ['spectral', 'mimetic']:
-            lmbda = finat.GaussLobattoLegendre
+            make_finat_element = finat.GaussLobattoLegendre
         elif element.cell.cellname() == "interval" and kind in cg_interval_variants:
-            lmbda = cg_interval_variants[kind]
+            make_finat_element = cg_interval_variants[kind]
         elif any(map(kind.startswith, ['integral', 'demkowicz', 'fdm'])):
-            lmbda = finat.IntegratedLegendre
+            make_finat_element = finat.IntegratedLegendre
             finat_kwargs["variant"] = kind
         elif kind in ['mgd', 'feec', 'qb', 'mse']:
-            degree = element.degree()
-            shift_axes = kwargs["shift_axes"]
-            restriction = kwargs["restriction"]
+            make_finat_element = finat.RuntimeTabulated
+            finat_kwargs["variant"] = kind
+            finat_kwargs["shift_axes"] = kwargs["shift_axes"]
+            finat_kwargs["restriction"] = kwargs["restriction"]
             deps = {"shift_axes", "restriction"}
-            return finat.RuntimeTabulated(cell, degree, variant=kind, shift_axes=shift_axes, restriction=restriction), deps
         else:
             # Let FIAT handle the general case
-            lmbda = finat.Lagrange
+            make_finat_element = finat.Lagrange
             finat_kwargs["variant"] = kind
 
     elif element.family() in ["Discontinuous Lagrange", "Discontinuous Lagrange L2"]:
         if kind == 'spectral':
-            lmbda = finat.GaussLegendre
+            make_finat_element = finat.GaussLegendre
         elif kind == 'mimetic':
-            lmbda = finat.Histopolation
+            make_finat_element = finat.Histopolation
         elif element.cell.cellname() == "interval" and kind in dg_interval_variants:
-            lmbda = dg_interval_variants[kind]
+            make_finat_element = dg_interval_variants[kind]
         elif any(map(kind.startswith, ['integral', 'demkowicz', 'fdm'])):
-            lmbda = finat.Legendre
+            make_finat_element = finat.Legendre
             finat_kwargs["variant"] = kind
         elif kind in ['mgd', 'feec', 'qb', 'mse']:
-            degree = element.degree()
-            shift_axes = kwargs["shift_axes"]
-            restriction = kwargs["restriction"]
+            make_finat_element = finat.RuntimeTabulated
+            finat_kwargs["variant"] = kind
+            finat_kwargs["shift_axes"] = kwargs["shift_axes"]
+            finat_kwargs["restriction"] = kwargs["restriction"]
+            finat_kwargs["continuous"] = False
             deps = {"shift_axes", "restriction"}
-            return finat.RuntimeTabulated(cell, degree, variant=kind, shift_axes=shift_axes, restriction=restriction, continuous=False), deps
         else:
             # Let FIAT handle the general case
-            lmbda = finat.DiscontinuousLagrange
+            make_finat_element = finat.DiscontinuousLagrange
             finat_kwargs["variant"] = kind
 
-    elif element.family() == "HDiv Trace":
+    elif element.family() in {"HDiv Trace", "Bubble", "FacetBubble"}:
         finat_kwargs["variant"] = kind
 
     elif element.variant() is not None:
         finat_kwargs["variant"] = element.variant()
 
-    return lmbda(cell, element.degree(), **finat_kwargs), set()
+    return make_finat_element(cell, element.degree(), **finat_kwargs), deps
 
 
 # Element modifiers and compound element types

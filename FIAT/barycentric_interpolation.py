@@ -8,7 +8,6 @@
 
 import numpy
 from FIAT import reference_element, expansions, polynomial_set
-from FIAT.functional import index_iterator
 
 
 def get_lagrange_points(nodes):
@@ -94,33 +93,28 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):
 
-    def __init__(self, ref_el, pts, shape=tuple()):
+    def __init__(self, ref_el, pts, shape=()):
         if ref_el.get_shape() != reference_element.LINE:
             raise ValueError("Invalid reference element type.")
 
         expansion_set = LagrangeLineExpansionSet(ref_el, pts)
         degree = expansion_set.degree
-        if shape == tuple():
-            num_components = 1
-        else:
-            flat_shape = numpy.ravel(shape)
-            num_components = numpy.prod(flat_shape)
+        num_components = numpy.prod(shape, dtype=int)
         num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
 
         # set up coefficients
-        if shape == tuple():
+        if shape == ():
             coeffs = numpy.eye(num_members, dtype="d")
         else:
             coeffs_shape = (num_members, *shape, num_exp_functions)
             coeffs = numpy.zeros(coeffs_shape, "d")
-            # use functional's index_iterator function
-            cur_bf = 0
-            for idx in index_iterator(shape):
-                for exp_bf in range(num_exp_functions):
-                    cur_idx = (cur_bf, *idx, exp_bf)
-                    coeffs[cur_idx] = 1.0
-                    cur_bf += 1
+            cur = 0
+            exp_bf = range(num_exp_functions)
+            for idx in numpy.ndindex(shape):
+                cur_bf = range(cur, cur+num_exp_functions)
+                coeffs[(cur_bf, *idx, exp_bf)] = 1.0
+                cur += num_exp_functions
 
         super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)

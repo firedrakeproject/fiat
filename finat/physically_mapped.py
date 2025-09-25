@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+from collections.abc import Mapping
 
 import gem
 import numpy
@@ -93,6 +94,19 @@ try:
   number =       1,
   pages =        {20-24},
   doi =          {10.1243/03093247V061020}
+}
+""")
+    Citations().add("MingXu2006", """
+@article{MingXu2006,
+  doi = {10.1007/s00211-005-0662-x},
+  title={{The Morley element for fourth order elliptic equations in any dimensions}},
+  author={Ming, Wang and Xu, Jinchao},
+  journal={Numerische Mathematik},
+  volume={103},
+  number={1},
+  pages={155--169},
+  year={2006},
+  publisher={Springer}
 }
 """)
     Citations().add("Mardal2002", """
@@ -247,6 +261,46 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
     pass
 
 
+class MappedTabulation(Mapping):
+    """A lazy tabulation dict that applies the basis transformation only
+    on the requested derivatives."""
+
+    def __init__(self, M, ref_tabulation):
+        self.M = M
+        self.ref_tabulation = ref_tabulation
+        # we expect M to be sparse with O(1) nonzeros per row
+        # for each row, get the column index of each nonzero entry
+        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
+               for i in range(M.shape[0])]
+        self.csr = csr
+        self._tabulation_cache = {}
+
+    def matvec(self, table):
+        # basis recombination using hand-rolled sparse-dense matrix multiplication
+        ii = gem.indices(len(table.shape)-1)
+        phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
+        # the sum approach is faster than calling numpy.dot or gem.IndexSum
+        exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
+                 for i, js in enumerate(self.csr)]
+
+        val = gem.ListTensor(exprs)
+        # val = self.M @ table
+        return gem.optimise.aggressive_unroll(val)
+
+    def __getitem__(self, alpha):
+        try:
+            return self._tabulation_cache[alpha]
+        except KeyError:
+            result = self.matvec(self.ref_tabulation[alpha])
+            return self._tabulation_cache.setdefault(alpha, result)
+
+    def __iter__(self):
+        return iter(self.ref_tabulation)
+
+    def __len__(self):
+        return len(self.ref_tabulation)
+
+
 class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     """A mixin that applies a "physical" transformation to tabulated
     basis functions."""
@@ -264,24 +318,10 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         :arg coordinate_mapping: Object providing physical geometry."""
         pass
 
-    def map_tabulation(self, tabulation, coordinate_mapping):
+    def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
-
         M = self.basis_transformation(coordinate_mapping)
-        # we expect M to be sparse with O(1) nonzeros per row
-        # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
-               for i in range(M.shape[0])]
-
-        def matvec(table):
-            # basis recombination using hand-rolled sparse-dense matrix multiplication
-            table = [gem.partial_indexed(table, (j,)) for j in range(M.shape[1])]
-            # the sum approach is faster than calling numpy.dot or gem.IndexSum
-            expressions = [sum(M.array[i, j] * table[j] for j in js) for i, js in enumerate(csr)]
-            val = gem.ListTensor(expressions)
-            return gem.optimise.aggressive_unroll(val)
-
-        return {alpha: matvec(tabulation[alpha]) for alpha in tabulation}
+        return MappedTabulation(M, ref_tabulation)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)

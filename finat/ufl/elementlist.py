@@ -115,7 +115,7 @@ register_element("Mardal-Tai-Winther", "MTW", 1, H1, "contravariant Piola", (3, 
 register_element("Hermite", "HER", 0, H1, "custom", (3, 3), simplices)
 register_element("Argyris", "ARG", 0, H2, "custom", (5, None), ("triangle",))
 register_element("Bell", "BELL", 0, H2, "custom", (5, 5), ("triangle",))
-register_element("Morley", "MOR", 0, H2, "custom", (2, 2), ("triangle",))
+register_element("Morley", "MOR", 0, H2, "custom", (2, 2), simplices[1:])
 
 # Macro elements
 register_element("QuadraticPowellSabin6", "PS6", 0, H2, "custom", (2, 2), ("triangle",))
@@ -152,7 +152,7 @@ register_alias("Lobatto",
 register_alias("Lob",
                lambda family, dim, order, degree: ("Gauss-Lobatto-Legendre", order))
 
-register_element("Bernstein", None, 0, H1, "identity", (1, None), simplices)
+register_element("Bernstein", None, 0, H1, "identity", (1, None), any_cell)
 
 
 # Let Nedelec H(div) elements be aliases to BDMs/RTs

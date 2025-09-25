@@ -8,37 +8,6 @@ from finat.finiteelementbase import FiniteElementBase
 from finat.point_set import PointSet
 from finat.sympy2gem import sympy2gem
 
-try:
-    from firedrake_citations import Citations
-    Citations().add("Geevers2018new", """
-@article{Geevers2018new,
- title={New higher-order mass-lumped tetrahedral elements for wave propagation modelling},
- author={Geevers, Sjoerd and Mulder, Wim A and van der Vegt, Jaap JW},
- journal={SIAM journal on scientific computing},
- volume={40},
- number={5},
- pages={A2830--A2857},
- year={2018},
- publisher={SIAM},
- doi={https://doi.org/10.1137/18M1175549},
-}
-""")
-    Citations().add("Chin1999higher", """
-@article{chin1999higher,
- title={Higher-order triangular and tetrahedral finite elements with mass lumping for solving the wave equation},
- author={Chin-Joe-Kong, MJS and Mulder, Wim A and Van Veldhuizen, M},
- journal={Journal of Engineering Mathematics},
- volume={35},
- number={4},
- pages={405--426},
- year={1999},
- publisher={Springer},
- doi={https://doi.org/10.1023/A:1004420829610},
-}
-""")
-except ImportError:
-    Citations = None
-
 
 class FiatElement(FiniteElementBase):
     """Base class for finite elements for which the tabulation is provided
@@ -326,13 +295,13 @@ class HellanHerrmannJohnson(FiatElement):  # symmetric matrix valued
 
 
 class GopalakrishnanLedererSchoberlFirstKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree, variant=variant))
 
 
 class GopalakrishnanLedererSchoberlSecondKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree, variant=variant))
 
 
 class ScalarFiatElement(FiatElement):
@@ -348,13 +317,13 @@ class Bernstein(ScalarFiatElement):
 
 
 class Bubble(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.Bubble(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.Bubble(cell, degree, variant=variant))
 
 
 class FacetBubble(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.FacetBubble(cell, degree))
+    def __init__(self, cell, degree, variant=None):
+        super().__init__(FIAT.FacetBubble(cell, degree, variant=variant))
 
 
 class CrouzeixRaviart(ScalarFiatElement):
@@ -365,14 +334,6 @@ class CrouzeixRaviart(ScalarFiatElement):
 class Lagrange(ScalarFiatElement):
     def __init__(self, cell, degree, variant=None):
         super().__init__(FIAT.Lagrange(cell, degree, variant=variant))
-
-
-class KongMulderVeldhuizen(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.KongMulderVeldhuizen(cell, degree))
-        if Citations is not None:
-            Citations().register("Chin1999higher")
-            Citations().register("Geevers2018new")
 
 
 class DiscontinuousLagrange(ScalarFiatElement):
