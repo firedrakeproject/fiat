@@ -38,7 +38,7 @@
   <h1>Source code for finat.guzman_neilan</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">Citations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.piola_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">PiolaBubbleElement</span>
 
 
@@ -47,8 +47,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">GuzmanNeilanFirstKindH1</span><span class="p">(</span><span class="n">PiolaBubbleElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Pk^d enriched with Guzman-Neilan bubbles.&quot;&quot;&quot;</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GuzmanNeilan2018&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;GuzmanNeilan2018&quot;</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">GuzmanNeilanFirstKindH1</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">))</span></div>
 
 
@@ -58,8 +57,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">GuzmanNeilanSecondKindH1</span><span class="p">(</span><span class="n">PiolaBubbleElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;C0 Pk^d(Alfeld) enriched with Guzman-Neilan bubbles.&quot;&quot;&quot;</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GuzmanNeilan2018&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;GuzmanNeilan2018&quot;</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">GuzmanNeilanSecondKindH1</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">))</span></div>
 
 
@@ -78,8 +76,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">GuzmanNeilanH1div</span><span class="p">(</span><span class="n">PiolaBubbleElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Alfeld-Sorokina nodally enriched with Guzman-Neilan bubbles.&quot;&quot;&quot;</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;GuzmanNeilan2018&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;GuzmanNeilan2018&quot;</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">GuzmanNeilanH1div</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">))</span></div>
 
 </pre></div>

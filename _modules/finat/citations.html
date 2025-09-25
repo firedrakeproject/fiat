@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>finat.citations &#8212; FInite element Automatic Tabulator (FIAT) 2025.7.0.dev0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=a4f7ffb5"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.7.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.citations</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for finat.citations</h1><div class="highlight"><pre>
+<span></span><span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">petsctools</span>
+
+    <span class="n">cite</span> <span class="o">=</span> <span class="n">petsctools</span><span class="o">.</span><span class="n">cite</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">petsctools</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="c1"># dummy function to use when petsctools not available</span>
+<div class="viewcode-block" id="cite">
+<a class="viewcode-back" href="../../finat.html#finat.citations.cite">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cite</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">pass</span></div>
+
+
+<span class="k">if</span> <span class="n">petsctools</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Kirby2018zany&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@Article{Kirby2018zany,</span>
+<span class="s2">  author =       {Robert C. Kirby},</span>
+<span class="s2">  title =        {A general approach to transforming finite elements},</span>
+<span class="s2">  journal =      {SMAI Journal of Computational Mathematics},</span>
+<span class="s2">  year =         2018,</span>
+<span class="s2">  volume =       4,</span>
+<span class="s2">  pages =        {197-224},</span>
+<span class="s2">  doi =          {10.5802/smai-jcm.33},</span>
+<span class="s2">  archiveprefix =</span><span class="si">{arXiv}</span><span class="s2">,</span>
+<span class="s2">  eprint =       </span><span class="si">{1706.09017}</span><span class="s2">,</span>
+<span class="s2">  primaryclass = </span><span class="si">{math.NA}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Kirby2019zany&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@Article{Kirby:2019,</span>
+<span class="s2">  author =       {Robert C. Kirby and Lawrence Mitchell},</span>
+<span class="s2">  title =        {Code generation for generally mapped finite</span>
+<span class="s2">                  elements},</span>
+<span class="s2">  journal =      {ACM Transactions on Mathematical Software},</span>
+<span class="s2">  year =         2019,</span>
+<span class="s2">  volume =       45,</span>
+<span class="s2">  number =       41,</span>
+<span class="s2">  pages =        {41:1--41:23},</span>
+<span class="s2">  doi =          {10.1145/3361745},</span>
+<span class="s2">  archiveprefix =</span><span class="si">{arXiv}</span><span class="s2">,</span>
+<span class="s2">  eprint =       </span><span class="si">{1808.05513}</span><span class="s2">,</span>
+<span class="s2">  primaryclass = </span><span class="si">{cs.MS}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Clough1965&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@inproceedings{Clough1965,</span>
+<span class="s2">  author =       {R. W. Clough, J. L. Tocher},</span>
+<span class="s2">  title =        {Finite element stiffness matrices for analysis of plate bending},</span>
+<span class="s2">  booktitle =    {Proc. of the First Conf. on Matrix Methods in Struct. Mech},</span>
+<span class="s2">  year =         1965,</span>
+<span class="s2">  pages =        {515-546},</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Argyris1968&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@Article{Argyris1968,</span>
+<span class="s2">  author =       {J. H. Argyris and I. Fried and D. W. Scharpf},</span>
+<span class="s2">  title =        {{The TUBA family of plate elements for the matrix</span>
+<span class="s2">                  displacement method}},</span>
+<span class="s2">  journal =      {The Aeronautical Journal},</span>
+<span class="s2">  year =         1968,</span>
+<span class="s2">  volume =       72,</span>
+<span class="s2">  pages =        {701-709},</span>
+<span class="s2">  doi =          {10.1017/S000192400008489X}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Bell1969&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@Article{Bell1969,</span>
+<span class="s2">  author =       {Kolbein Bell},</span>
+<span class="s2">  title =        {A refined triangular plate bending finite element},</span>
+<span class="s2">  journal =      {International Journal for Numerical Methods in</span>
+<span class="s2">                  Engineering},</span>
+<span class="s2">  year =         1969,</span>
+<span class="s2">  volume =       1,</span>
+<span class="s2">  number =       1,</span>
+<span class="s2">  pages =        {101-122},</span>
+<span class="s2">  doi =          {10.1002/nme.1620010108}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Ciarlet1972&quot;</span><span class="p">,</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@Article{Ciarlet1972,</span>
+<span class="s2">  author =       {P. G. Ciarlet and P. A. Raviart},</span>
+<span class="s2">  title =        {{General Lagrange and Hermite interpolation in</span>
+<span class="s2">                  $\mathbb</span><span class="si">{R}</span><span class="s2">^n$ with applications to finite element</span>
+<span class="s2">                  methods}},</span>
+<span class="s2">  journal =      {Archive for Rational Mechanics and Analysis},</span>
+<span class="s2">  year =         1972,</span>
+<span class="s2">  volume =       46,</span>
+<span class="s2">  number =       3,</span>
+<span class="s2">  pages =        {177-199},</span>
+<span class="s2">  doi =          {10.1007/BF0025245}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Morley1971&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@Article{Morley1971,</span>
+<span class="s2">  author =       {L. S. D. Morley},</span>
+<span class="s2">  title =        {The constant-moment plate-bending element},</span>
+<span class="s2">  journal =      {The Journal of Strain Analysis for Engineering</span>
+<span class="s2">                  Design},</span>
+<span class="s2">  year =         1971,</span>
+<span class="s2">  volume =       6,</span>
+<span class="s2">  number =       1,</span>
+<span class="s2">  pages =        {20-24},</span>
+<span class="s2">  doi =          {10.1243/03093247V061020}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;MingXu2006&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{MingXu2006,</span>
+<span class="s2">  doi = {10.1007/s00211-005-0662-x},</span>
+<span class="s2">  title={{The Morley element for fourth order elliptic equations in any dimensions}},</span>
+<span class="s2">  author={Ming, Wang and Xu, Jinchao},</span>
+<span class="s2">  journal={Numerische Mathematik},</span>
+<span class="s2">  volume=</span><span class="si">{103}</span><span class="s2">,</span>
+<span class="s2">  number=</span><span class="si">{1}</span><span class="s2">,</span>
+<span class="s2">  pages={155--169},</span>
+<span class="s2">  year=</span><span class="si">{2006}</span><span class="s2">,</span>
+<span class="s2">  publisher=</span><span class="si">{Springer}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Mardal2002&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{Mardal2002,</span>
+<span class="s2">        doi = {10.1137/s0036142901383910},</span>
+<span class="s2">        year = 2002,</span>
+<span class="s2">        volume = </span><span class="si">{40}</span><span class="s2">,</span>
+<span class="s2">        number = </span><span class="si">{5}</span><span class="s2">,</span>
+<span class="s2">        pages = {1605--1631},</span>
+<span class="s2">        author = {Mardal, K.-A.~ and Tai, X.-C.~ and Winther, R.~},</span>
+<span class="s2">        title = {A robust finite element method for {Darcy--Stokes} flow},</span>
+<span class="s2">        journal = {{SIAM} Journal on Numerical Analysis}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Arnold2002&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{Arnold2002,</span>
+<span class="s2">        doi = {10.1007/s002110100348},</span>
+<span class="s2">        year = 2002,</span>
+<span class="s2">        volume = </span><span class="si">{92}</span><span class="s2">,</span>
+<span class="s2">        number = </span><span class="si">{3}</span><span class="s2">,</span>
+<span class="s2">        pages = {401--419},</span>
+<span class="s2">        author = {Arnold, R.~N.~ and Winther, R.~},</span>
+<span class="s2">        title = {Mixed finite elements for elasticity},</span>
+<span class="s2">        journal = {Numerische Mathematik}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Arnold2003&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{arnold2003,</span>
+<span class="s2">        doi = {10.1142/s0218202503002507},</span>
+<span class="s2">        year = 2003,</span>
+<span class="s2">        volume = </span><span class="si">{13}</span><span class="s2">,</span>
+<span class="s2">        number = </span><span class="si">{03}</span><span class="s2">,</span>
+<span class="s2">        pages = {295--307},</span>
+<span class="s2">        author = {Arnold, D.~N.~ and Winther, R.~},</span>
+<span class="s2">        title = {Nonconforming mixed elements for elasticity},</span>
+<span class="s2">        journal = {Mathematical Models and Methods in Applied Sciences}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Hu2015&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{Hu2015,</span>
+<span class="s2">      author = {Hu, J.~ and Zhang, S.~},</span>
+<span class="s2">      title = {A family of conforming mixed finite elements for linear elasticity on triangular grids},</span>
+<span class="s2">      year = </span><span class="si">{2015}</span><span class="s2">,</span>
+<span class="s2">      month = jan,</span>
+<span class="s2">      archiveprefix = </span><span class="si">{arXiv}</span><span class="s2">,</span>
+<span class="s2">      eprint = </span><span class="si">{1406.7457}</span><span class="s2">,</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Arbogast2017&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@techreport{Arbogast2017,</span>
+<span class="s2">  title={Direct serendipity finite elements on convex quadrilaterals},</span>
+<span class="s2">  author={Arbogast, T and Tao, Z},</span>
+<span class="s2">  year=</span><span class="si">{2017}</span><span class="s2">,</span>
+<span class="s2">  institution={Tech. Rep. ICES REPORT 17-28, Institute for Computational Engineering and Sciences}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Gopalakrishnan2024&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{gopalakrishnan2024johnson,</span>
+<span class="s2">  title={{The Johnson-Mercier elasticity element in any dimensions}},</span>
+<span class="s2">  author={Gopalakrishnan, J and Guzman, J and Lee, J J},</span>
+<span class="s2">  journal={arXiv preprint arXiv:2403.13189},</span>
+<span class="s2">  year=</span><span class="si">{2024}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Groselj2022&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{groselj2022generalized,</span>
+<span class="s2">  title={{Generalized C1 Clough--Tocher splines for CAGD and FEM}},</span>
+<span class="s2">  author={Gro{</span><span class="se">\v</span><span class="si">{s}</span><span class="s2">}elj, Jan and Knez, Marjeta},</span>
+<span class="s2">  journal={Computer Methods in Applied Mechanics and Engineering},</span>
+<span class="s2">  volume=</span><span class="si">{395}</span><span class="s2">,</span>
+<span class="s2">  pages=</span><span class="si">{114983}</span><span class="s2">,</span>
+<span class="s2">  year=</span><span class="si">{2022}</span><span class="s2">,</span>
+<span class="s2">  publisher=</span><span class="si">{Elsevier}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;PowellSabin1977&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{powell1977piecewise,</span>
+<span class="s2">  title={Piecewise quadratic approximations on triangles},</span>
+<span class="s2">  author={Powell, Michael JD and Sabin, Malcolm A},</span>
+<span class="s2">  journal={ACM Transactions on Mathematical Software},</span>
+<span class="s2">  volume=</span><span class="si">{3}</span><span class="s2">,</span>
+<span class="s2">  number=</span><span class="si">{4}</span><span class="s2">,</span>
+<span class="s2">  pages={316--325},</span>
+<span class="s2">  year=</span><span class="si">{1977}</span><span class="s2">,</span>
+<span class="s2">  publisher={ACM New York, NY, USA}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;AlfeldSorokina2016&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{alfeld2016linear,</span>
+<span class="s2">  title={Linear differential operators on bivariate spline spaces and spline vector fields},</span>
+<span class="s2">  author={Alfeld, Peter and Sorokina, Tatyana},</span>
+<span class="s2">  journal={BIT Numerical Mathematics},</span>
+<span class="s2">  volume=</span><span class="si">{56}</span><span class="s2">,</span>
+<span class="s2">  number=</span><span class="si">{1}</span><span class="s2">,</span>
+<span class="s2">  pages={15--32},</span>
+<span class="s2">  year=</span><span class="si">{2016}</span><span class="s2">,</span>
+<span class="s2">  publisher=</span><span class="si">{Springer}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;ArnoldQin1992&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{arnold1992quadratic,</span>
+<span class="s2">  title={{Quadratic velocity/linear pressure Stokes elements}},</span>
+<span class="s2">  author={Arnold, Douglas N and Qin, Jinshui},</span>
+<span class="s2">  journal={Advances in computer methods for partial differential equations},</span>
+<span class="s2">  volume=</span><span class="si">{7}</span><span class="s2">,</span>
+<span class="s2">  pages={28--34},</span>
+<span class="s2">  year=</span><span class="si">{1992}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;ChristiansenHu2019&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{christiansen2019finite,</span>
+<span class="s2">  title={A finite element for Stokes with a commuting diagram },</span>
+<span class="s2">  author={Christiansen, Snorre H and Hu, Kaibo},</span>
+<span class="s2">  journal={Mathematical Analysis in Fluid and Gas Dynamics},</span>
+<span class="s2">  volume=</span><span class="si">{2107}</span><span class="s2">,</span>
+<span class="s2">  pages={172--183},</span>
+<span class="s2">  year=</span><span class="si">{2019}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;GuzmanNeilan2018&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{guzman2018infsup,</span>
+<span class="s2">    author = {Guzm</span><span class="se">\&#39;</span><span class="si">{a}</span><span class="s2">n, Johnny and Neilan, Michael},</span>
+<span class="s2">    title = {{Inf-Sup Stable Finite Elements on Barycentric Refinements Producing Divergence--Free Approximations in Arbitrary Dimensions}},</span>
+<span class="s2">    journal = {SIAM Journal on Numerical Analysis},</span>
+<span class="s2">    volume = </span><span class="si">{56}</span><span class="s2">,</span>
+<span class="s2">    number = </span><span class="si">{5}</span><span class="s2">,</span>
+<span class="s2">    pages = {2826-2844},</span>
+<span class="s2">    year = </span><span class="si">{2018}</span><span class="s2">,</span>
+<span class="s2">    doi = {10.1137/17M1153467}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;BernardiRaugel1985&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{bernardi-raugel-0,</span>
+<span class="s2">    AUTHOR = {Bernardi, Christine and Raugel, Genevi</span><span class="se">\\</span><span class="s2">`eve},</span>
+<span class="s2">     TITLE = {Analysis of some finite elements for the </span><span class="si">{Stokes}</span><span class="s2"> problem},</span>
+<span class="s2">   JOURNAL = {Mathematics of Computation},</span>
+<span class="s2">    VOLUME = </span><span class="si">{44}</span><span class="s2">,</span>
+<span class="s2">      YEAR = </span><span class="si">{1985}</span><span class="s2">,</span>
+<span class="s2">       DOI = {10.1090/S0025-5718-1985-0771031-7},</span>
+<span class="s2">     PAGES = {{71--79}}</span>
+<span class="s2">}&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Geevers2018new&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{Geevers2018new,</span>
+<span class="s2"> title={New higher-order mass-lumped tetrahedral elements for wave propagation modelling},</span>
+<span class="s2"> author={Geevers, Sjoerd and Mulder, Wim A and van der Vegt, Jaap JW},</span>
+<span class="s2"> journal={SIAM journal on scientific computing},</span>
+<span class="s2"> volume=</span><span class="si">{40}</span><span class="s2">,</span>
+<span class="s2"> number=</span><span class="si">{5}</span><span class="s2">,</span>
+<span class="s2"> pages={A2830--A2857},</span>
+<span class="s2"> year=</span><span class="si">{2018}</span><span class="s2">,</span>
+<span class="s2"> publisher=</span><span class="si">{SIAM}</span><span class="s2">,</span>
+<span class="s2"> doi={https://doi.org/10.1137/18M1175549},</span>
+<span class="s2">}</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+    <span class="n">petsctools</span><span class="o">.</span><span class="n">add_citation</span><span class="p">(</span><span class="s2">&quot;Chin1999higher&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">@article{chin1999higher,</span>
+<span class="s2"> title={Higher-order triangular and tetrahedral finite elements with mass lumping for solving the wave equation},</span>
+<span class="s2"> author={Chin-Joe-Kong, MJS and Mulder, Wim A and Van Veldhuizen, M},</span>
+<span class="s2"> journal={Journal of Engineering Mathematics},</span>
+<span class="s2"> volume=</span><span class="si">{35}</span><span class="s2">,</span>
+<span class="s2"> number=</span><span class="si">{4}</span><span class="s2">,</span>
+<span class="s2"> pages={405--426},</span>
+<span class="s2"> year=</span><span class="si">{1999}</span><span class="s2">,</span>
+<span class="s2"> publisher=</span><span class="si">{Springer}</span><span class="s2">,</span>
+<span class="s2"> doi={https://doi.org/10.1023/A:1004420829610},</span>
+<span class="s2">}</span>
+<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.7.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">finat.citations</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Firedrake Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    </div>
+  </body>
+</html>

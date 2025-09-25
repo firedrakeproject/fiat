@@ -76,6 +76,14 @@ finat.christiansen\_hu module
    :show-inheritance:
    :undoc-members:
 
+finat.citations module
+----------------------
+
+.. automodule:: finat.citations
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 finat.cube module
 -----------------
 

@@ -40,16 +40,16 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">ListTensor</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.argyris</span><span class="w"> </span><span class="kn">import</span> <span class="n">_edge_transform</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.fiat_elements</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScalarFiatElement</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">Citations</span><span class="p">,</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
 
 
 <div class="viewcode-block" id="QuadraticPowellSabin6">
 <a class="viewcode-back" href="../../finat.html#finat.powell_sabin.QuadraticPowellSabin6">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadraticPowellSabin6</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">ScalarFiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;PowellSabin1977&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;PowellSabin1977&quot;</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">QuadraticPowellSabin6</span><span class="p">(</span><span class="n">cell</span><span class="p">))</span>
 
 <div class="viewcode-block" id="QuadraticPowellSabin6.basis_transformation">
@@ -82,8 +82,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadraticPowellSabin12</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">ScalarFiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">avg</span> <span class="o">=</span> <span class="n">avg</span>
-        <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;PowellSabin1977&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;PowellSabin1977&quot;</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">QuadraticPowellSabin12</span><span class="p">(</span><span class="n">cell</span><span class="p">))</span>
 
 <div class="viewcode-block" id="QuadraticPowellSabin12.basis_transformation">

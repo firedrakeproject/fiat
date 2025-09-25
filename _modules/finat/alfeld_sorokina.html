@@ -40,8 +40,9 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">ListTensor</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.fiat_elements</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiatElement</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">Citations</span><span class="p">,</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.piola_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">piola_inverse</span>
 
 
@@ -49,8 +50,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.alfeld_sorokina.AlfeldSorokina">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AlfeldSorokina</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">FiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">Citations</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">Citations</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">&quot;AlfeldSorokina2016&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;AlfeldSorokina2016&quot;</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">AlfeldSorokina</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
 
 <div class="viewcode-block" id="AlfeldSorokina.basis_transformation">
