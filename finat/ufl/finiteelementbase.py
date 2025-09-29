@@ -15,7 +15,7 @@ from abc import abstractmethod, abstractproperty
 from hashlib import md5
 
 from ufl import pullback
-from ufl.cell import AbstractCell, as_cell
+from ufl.cell import AbstractCell, as_cell as as_cell_ufl
 from ufl.finiteelement import AbstractFiniteElement
 from ufl.utils.sequences import product
 
@@ -266,3 +266,11 @@ class FiniteElementBase(AbstractFiniteElement):
             return pullback.physical_pullback
 
         raise ValueError(f"Unsupported mapping: {self.mapping()}")
+
+    
+def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...]) -> AbstractCell:
+    if isinstance(cell, str):
+        from fuse import constructCellComplex
+        return constructCellComplex(cell)
+    else:
+        return as_cell_ufl(cell)
