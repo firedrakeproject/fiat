@@ -40,6 +40,14 @@ jobs:
         run: DATA_REPO_GIT="" python -m pytest --cov=FIAT/ test/FIAT
       - name: Test FInAT
         run: DATA_REPO_GIT="" python -m pytest --cov=finat/ --cov=gem/ test/finat
+      - name: Test FIAT with FUSE
+        run: |
+          python - pip install git+https://github.com/firedrakeproject/fuse.git
+          FIREDRAKE_USE_FUSE=1 DATA_REPO_GIT="" python -m pytest test/FIAT
+      - name: Test FInAT with FUSE
+        run: |
+          python - pip install git+https://github.com/firedrakeproject/fuse.git
+          FIREDRAKE_USE_FUSE=1 DATA_REPO_GIT="" python -m pytest test/finat
       - name: Coveralls
         if: ${{ github.repository == 'FEniCS/fiat' && github.head_ref == '' && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11' }}
         env:
