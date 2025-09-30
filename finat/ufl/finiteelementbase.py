@@ -20,7 +20,6 @@ from ufl.finiteelement import AbstractFiniteElement
 from ufl.utils.sequences import product
 
 
-
 class FiniteElementBase(AbstractFiniteElement):
     """Base class for all finite elements."""
     __slots__ = ("_family", "_cell", "_degree", "_quad_scheme",
@@ -273,7 +272,7 @@ def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...]) -> AbstractCell
     import os
     try:
         import fuse
-    except:
+    except ModuleNotFoundError:
         fuse = None
     if isinstance(cell, str) and bool(os.getenv("FIREDRAKE_USE_FUSE", 0)):
         if fuse:
