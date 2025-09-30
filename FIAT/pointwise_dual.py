@@ -68,3 +68,17 @@ def compute_pointwise_dual(el, pts):
         nds.append(Functional(T, el.value_shape(), dict(pt_dict), {}, "node"))
 
     return DualSet(nds, T, el.entity_dofs())
+
+
+def make_entity_ids(ref_el, points, tol=1e-12):
+    """The topological association in a dictionary"""
+    top = ref_el.topology
+    invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
+    bary = ref_el.compute_barycentric_coordinates(points)
+
+    entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+    for i in np.lexsort(bary.T):
+        verts = tuple(np.flatnonzero(abs(bary[i]) > tol))
+        dim, entity = invtop[verts]
+        entity_ids[dim][entity].append(i)
+    return entity_ids
