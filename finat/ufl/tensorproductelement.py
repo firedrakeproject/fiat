@@ -13,8 +13,8 @@
 
 from itertools import chain
 
-from ufl.cell import TensorProductCell, as_cell
-from finat.ufl.finiteelementbase import FiniteElementBase
+from ufl.cell import TensorProductCell
+from finat.ufl.finiteelementbase import FiniteElementBase, as_cell
 from ufl.sobolevspace import DirectionalSobolevSpace
 
 

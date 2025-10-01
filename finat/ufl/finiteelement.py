@@ -11,9 +11,9 @@
 # Modified by Massimiliano Leoni, 2016
 # Modified by Matthew Scroggs, 2023
 
-from ufl.cell import TensorProductCell, as_cell
+from ufl.cell import TensorProductCell
 from finat.ufl.elementlist import canonical_element_description, simplices
-from finat.ufl.finiteelementbase import FiniteElementBase
+from finat.ufl.finiteelementbase import FiniteElementBase, as_cell
 from ufl.utils.formatting import istr
 
 

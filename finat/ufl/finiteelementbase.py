@@ -15,7 +15,7 @@ from abc import abstractmethod, abstractproperty
 from hashlib import md5
 
 from ufl import pullback
-from ufl.cell import AbstractCell, as_cell
+from ufl.cell import AbstractCell, as_cell as as_cell_ufl
 from ufl.finiteelement import AbstractFiniteElement
 from ufl.utils.sequences import product
 
@@ -266,3 +266,18 @@ class FiniteElementBase(AbstractFiniteElement):
             return pullback.physical_pullback
 
         raise ValueError(f"Unsupported mapping: {self.mapping()}")
+
+
+def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...]) -> AbstractCell:
+    import os
+    try:
+        import fuse
+    except ModuleNotFoundError:
+        fuse = None
+    if isinstance(cell, str) and bool(os.getenv("FIREDRAKE_USE_FUSE", 0)):
+        if fuse:
+            return fuse.constructCellComplex(cell)
+        else:
+            raise ModuleNotFoundError("FIREDRAKE_USE_FUSE is active but fuse is not installed")
+    else:
+        return as_cell_ufl(cell)
