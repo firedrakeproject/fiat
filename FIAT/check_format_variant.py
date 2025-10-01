@@ -33,14 +33,12 @@ def check_format_variant(variant, degree):
         variant = "integral"
     interpolant_degree = None
 
-    match = re.match(r"^integral(?:\((\d+)\))?$", variant)
+    match = re.match(r"^integral(?:\((-?\d+)\))?$", variant)
     if match:
         variant = "integral"
         extra_degree, = match.groups()
         extra_degree = int(extra_degree) if extra_degree is not None else 0
         interpolant_degree = degree + extra_degree
-        if interpolant_degree < degree:
-            raise ValueError("Warning, quadrature degree should be at least %s" % degree)
 
     if variant not in {"point", "integral"}:
         raise ValueError('Choose either variant="point" or variant="integral"'

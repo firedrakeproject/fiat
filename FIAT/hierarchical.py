@@ -18,18 +18,25 @@ from FIAT.P0 import P0
 
 def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None):
     """Tabulate the L2-duals of the hierarchical C0 basis."""
-    if ref_el.get_spatial_dimension() == 0:
+    dim = ref_el.get_spatial_dimension()
+    if dim == 0:
         quad_scheme = None
         degree = 0
     if interpolant_deg is None:
         interpolant_deg = degree
 
-    Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
-    B = make_bubbles(ref_el, degree, codim=codim, scale="orthonormal")
-    P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
-    M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)
-    phis = numpy.linalg.solve(M, P_at_qpts)
-    phis = numpy.dot(B.get_coeffs(), phis)
+    if interpolant_deg >= degree:
+        Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
+        B = make_bubbles(ref_el, degree, codim=codim, scale="orthonormal")
+        P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
+        M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)
+        phis = numpy.linalg.solve(M, P_at_qpts)
+        phis = numpy.dot(B.get_coeffs(), phis)
+    else:
+        k = max(degree - dim - 1, 0)
+        Q = parse_quadrature_scheme(ref_el, k + degree, quad_scheme)
+        P = ONPolynomialSet(ref_el, k, scale="L2 piola")
+        phis = P.tabulate(Q.get_points())[(0,) * dim]
     return Q, phis
 
 
