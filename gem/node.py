@@ -3,6 +3,7 @@ expression DAG languages."""
 
 import collections
 import gem
+from itertools import repeat
 
 
 class Node(object):
@@ -36,14 +37,18 @@ class Node(object):
 
         Internally used utility function.
         """
-        front_args = [getattr(self, name) for name in self.__front__]
-        back_args = [getattr(self, name) for name in self.__back__]
+        front_args = (getattr(self, name) for name in self.__front__)
+        back_args = (getattr(self, name) for name in self.__back__)
 
-        return tuple(front_args) + tuple(children) + tuple(back_args)
+        return (*front_args, *children, *back_args)
+
+    @property
+    def _arguments(self):
+        return self._cons_args(self.children)
 
     def __reduce__(self):
         # Gold version:
-        return type(self), self._cons_args(self.children)
+        return type(self), self._arguments
 
     def reconstruct(self, *args):
         """Reconstructs the node with new children from
@@ -54,8 +59,8 @@ class Node(object):
         return type(self)(*self._cons_args(args))
 
     def __repr__(self):
-        cons_args = self._cons_args(self.children)
-        return "%s(%s)" % (type(self).__name__, ", ".join(map(repr, cons_args)))
+        repr_args = ', '.join(map(repr, self._arguments))
+        return f"{type(self).__name__}({repr_args})"
 
     def __eq__(self, other):
         """Provides equality testing with quick positive and negative
@@ -87,9 +92,7 @@ class Node(object):
         """
         if type(self) is not type(other):
             return False
-        self_consargs = self._cons_args(self.children)
-        other_consargs = other._cons_args(other.children)
-        return self_consargs == other_consargs
+        return self._arguments == other._arguments
 
     def get_hash(self):
         """Hash function.
@@ -97,7 +100,7 @@ class Node(object):
         This is the method to potentially override in derived classes,
         not :meth:`__hash__`.
         """
-        return hash((type(self),) + self._cons_args(self.children))
+        return hash((type(self), *self._arguments))
 
 
 def _make_traversal_children(node):
@@ -235,8 +238,7 @@ class Memoizer(object):
             return self.cache[node]
         except KeyError:
             result = self.function(node, self)
-            self.cache[node] = result
-            return result
+            return self.cache.setdefault(node, result)
 
 
 class MemoizerArg(object):
@@ -259,14 +261,13 @@ class MemoizerArg(object):
             return self.cache[cache_key]
         except KeyError:
             result = self.function(node, self, arg)
-            self.cache[cache_key] = result
-            return result
+            return self.cache.setdefault(cache_key, result)
 
 
 def reuse_if_untouched(node, self):
     """Reuse if untouched recipe"""
-    new_children = list(map(self, node.children))
-    if all(nc == c for nc, c in zip(new_children, node.children)):
+    new_children = tuple(map(self, node.children))
+    if new_children == node.children:
         return node
     else:
         return node.reconstruct(*new_children)
@@ -274,8 +275,8 @@ def reuse_if_untouched(node, self):
 
 def reuse_if_untouched_arg(node, self, arg):
     """Reuse if touched recipe propagating an extra argument"""
-    new_children = [self(child, arg) for child in node.children]
-    if all(nc == c for nc, c in zip(new_children, node.children)):
+    new_children = tuple(map(self, node.children, repeat(arg)))
+    if new_children == node.children:
         return node
     else:
         return node.reconstruct(*new_children)
