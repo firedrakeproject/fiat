@@ -117,20 +117,18 @@ def replace_indices_delta(node, self, subst):
 
 @replace_indices.register(Indexed)
 def replace_indices_indexed(node, self, subst):
+    multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
     child, = node.children
-    substitute = dict(subst)
-    multiindex = []
-    for i in node.multiindex:
-        multiindex.append(_replace_indices_atomic(i, self, subst))
     if isinstance(child, ComponentTensor):
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
+        substitute = dict(subst)
         substitute.update(zip(child.multiindex, multiindex))
         return self(child.children[0], tuple(sorted(substitute.items())))
     else:
         # Replace indices
         new_child = self(child, subst)
-        if new_child == child and multiindex == node.multiindex:
+        if multiindex == node.multiindex and new_child == child:
             return node
         else:
             return Indexed(new_child, multiindex)
@@ -138,9 +136,6 @@ def replace_indices_indexed(node, self, subst):
 
 @replace_indices.register(FlexiblyIndexed)
 def replace_indices_flexiblyindexed(node, self, subst):
-    child, = node.children
-    assert not child.free_indices
-
     dim2idxs = tuple(
         (
             offset if isinstance(offset, Integral) else _replace_indices_atomic(offset, self, subst),
@@ -149,6 +144,8 @@ def replace_indices_flexiblyindexed(node, self, subst):
         for offset, idxs in node.dim2idxs
     )
 
+    child, = node.children
+    assert not child.free_indices
     if dim2idxs == node.dim2idxs:
         return node
     else:
@@ -192,7 +189,7 @@ def _constant_fold_zero_listtensor(node, self):
     new_children = list(map(self, node.children))
     if all(isinstance(nc, Zero) for nc in new_children):
         return Zero(node.shape)
-    elif all(nc == c for nc, c in zip(new_children, node.children)):
+    elif new_children == node.children:
         return node
     else:
         return node.reconstruct(*new_children)
@@ -211,7 +208,7 @@ def constant_fold_zero(exprs):
     otherwise Literal `0`s would be reintroduced.
     """
     mapper = Memoizer(_constant_fold_zero)
-    return [mapper(e) for e in exprs]
+    return list(map(mapper, exprs))
 
 
 def _select_expression(expressions, index):
@@ -262,9 +259,9 @@ def _select_expression(expressions, index):
         assert all(len(e.children) == len(expr.children) for e in expressions)
         assert len(expr.children) > 0
 
-        return expr.reconstruct(*[_select_expression(nth_children, index)
-                                  for nth_children in zip(*[e.children
-                                                            for e in expressions])])
+        return expr.reconstruct(*(_select_expression(nth_children, index)
+                                  for nth_children in zip(*(e.children
+                                                            for e in expressions))))
 
     raise NotImplementedError("No rule for factorising expressions of this kind.")
 

@@ -190,6 +190,15 @@ class GaussLobattoLegendrePointSet(PointSet):
         assert self.points.shape[1] == 1
 
 
+class KMVPointSet(PointSet):
+    """KMV quadrature points on the simplex.
+
+    This facilitates implementing continuous spectral elements.
+    """
+    def __init__(self, points):
+        super().__init__(points)
+
+
 class TensorPointSet(AbstractPointSet):
 
     def __init__(self, factors):
