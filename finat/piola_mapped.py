@@ -61,7 +61,7 @@ def normal_tangential_edge_transform(fiat_cell, J, detJ, f):
     alpha = Jn @ Jt
     beta = Jt @ Jt
     # Compute the last row of inv([[1, 0], [alpha/detJ, beta/detJ]])
-    row = (-1 * alpha / beta, detJ / beta)
+    row = (-alpha / beta, detJ / beta)
     return row
 
 
@@ -84,8 +84,8 @@ def normal_tangential_face_transform(fiat_cell, J, detJ, f):
     det1 = A[2, 0] * A[0, 1] - A[2, 1] * A[0, 0]
     det2 = A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
     scale = detJ / det0
-    rows = ((-1 * det1 / det0, -1 * scale * A[2, 1], scale * A[2, 0]),
-            (-1 * det2 / det0, scale * A[1, 1], -1 * scale * A[1, 0]))
+    rows = ((-det1 / det0, -scale * A[2, 1], scale * A[2, 0]),
+            (-det2 / det0, scale * A[1, 1], -scale * A[1, 0]))
     return rows
 
 
