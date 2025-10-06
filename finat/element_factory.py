@@ -160,7 +160,7 @@ def convert_finiteelement(element, **kwargs):
 
     make_finat_element = supported_elements[element.family()]
 
-    if element.cell.cellname() in {"quadrilateral", "hexahedron"}:
+    if element.cell.cellname in {"quadrilateral", "hexahedron"}:
         # Reconstruct Real and Bernstein on tensor product cells
         if element.family() == "Real":
             make_finat_element = None
@@ -169,10 +169,10 @@ def convert_finiteelement(element, **kwargs):
             make_finat_element = None
 
     if make_finat_element is None:
-        if element.cell.cellname() == "quadrilateral":
+        if element.cell.cellname == "quadrilateral":
             # Handle quadrilateral short names like RTCF and RTCE.
             element = element.reconstruct(cell=quadrilateral_tpc)
-        elif element.cell.cellname() == "hexahedron":
+        elif element.cell.cellname == "hexahedron":
             # Handle hexahedron short names like NCF and NCE.
             element = element.reconstruct(cell=hexahedron_tpc)
         else:
@@ -190,7 +190,7 @@ def convert_finiteelement(element, **kwargs):
     if element.family() == "Lagrange":
         if kind in ['spectral', 'mimetic']:
             make_finat_element = finat.GaussLobattoLegendre
-        elif element.cell.cellname() == "interval" and kind in cg_interval_variants:
+        elif element.cell.cellname == "interval" and kind in cg_interval_variants:
             make_finat_element = cg_interval_variants[kind]
         elif any(map(kind.startswith, ['integral', 'demkowicz', 'fdm'])):
             make_finat_element = finat.IntegratedLegendre
@@ -211,7 +211,7 @@ def convert_finiteelement(element, **kwargs):
             make_finat_element = finat.GaussLegendre
         elif kind == 'mimetic':
             make_finat_element = finat.Histopolation
-        elif element.cell.cellname() == "interval" and kind in dg_interval_variants:
+        elif element.cell.cellname == "interval" and kind in dg_interval_variants:
             make_finat_element = dg_interval_variants[kind]
         elif any(map(kind.startswith, ['integral', 'demkowicz', 'fdm'])):
             make_finat_element = finat.Legendre
@@ -287,7 +287,7 @@ def convert_tensorproductelement(element, **kwargs):
     deps = set()
     for elem in element.factor_elements:
         kwargs["shift_axes"] = shift_axes + dim_offset
-        dim_offset += elem.cell.topological_dimension()
+        dim_offset += elem.cell.topological_dimension
         finat_elem, ds = _create_element(elem, **kwargs)
         elements.append(finat_elem)
         deps.update(ds)
