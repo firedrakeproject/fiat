@@ -47,7 +47,7 @@ class HDivElement(FiniteElementBase):
         cell = element.cell
         degree = element.degree()
         quad_scheme = element.quadrature_scheme()
-        reference_value_shape = (element.cell.topological_dimension(),)
+        reference_value_shape = (element.cell.topological_dimension,)
 
         # Skipping TensorProductElement constructor! Bad code smell, refactor to avoid this non-inheritance somehow.
         FiniteElementBase.__init__(self, family, cell, degree,
@@ -106,7 +106,7 @@ class HCurlElement(FiniteElementBase):
         degree = element.degree()
         quad_scheme = element.quadrature_scheme()
         cell = element.cell
-        reference_value_shape = (cell.topological_dimension(),)  # TODO: Is this right?
+        reference_value_shape = (cell.topological_dimension,)  # TODO: Is this right?
         # Skipping TensorProductElement constructor! Bad code smell,
         # refactor to avoid this non-inheritance somehow.
         FiniteElementBase.__init__(self, family, cell, degree, quad_scheme,
@@ -194,7 +194,7 @@ class WithMapping(FiniteElementBase):
     @property
     def reference_value_shape(self):
         """Doc."""
-        tdim = self.cell.topological_dimension()
+        tdim = self.cell.topological_dimension
         mapping = self.mapping()
         if mapping in {"covariant Piola", "contravariant Piola"}:
             return (tdim,)

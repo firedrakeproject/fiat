@@ -56,7 +56,7 @@ def tensor_name(request):
 
 @pytest.fixture(params=[ufl.interval, ufl.triangle,
                         ufl.quadrilateral],
-                ids=lambda x: x.cellname(),
+                ids=lambda x: x.cellname,
                 scope="module")
 def ufl_A(request, tensor_name):
     if request.param == ufl.quadrilateral:

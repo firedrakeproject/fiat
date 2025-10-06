@@ -45,10 +45,10 @@ class FiniteElement(FiniteElementBase):
                 canonical_element_description(family, cell, degree, form_degree)
 
             if family in ["RTCF", "RTCE"]:
-                cell_h, cell_v = cell.sub_cells()
-                if cell_h.cellname() != "interval":
+                cell_h, cell_v = cell.sub_cells
+                if cell_h.cellname != "interval":
                     raise ValueError(f"{family} is available on TensorProductCell(interval, interval) only.")
-                if cell_v.cellname() != "interval":
+                if cell_v.cellname != "interval":
                     raise ValueError(f"{family} is available on TensorProductCell(interval, interval) only.")
 
                 C_elt = FiniteElement("CG", "interval", degree, variant=variant)
@@ -63,10 +63,10 @@ class FiniteElement(FiniteElementBase):
                     return EnrichedElement(HCurl(CxD_elt), HCurl(DxC_elt))
 
             elif family == "NCF":
-                cell_h, cell_v = cell.sub_cells()
-                if cell_h.cellname() != "quadrilateral":
+                cell_h, cell_v = cell.sub_cells
+                if cell_h.cellname != "quadrilateral":
                     raise ValueError(f"{family} is available on TensorProductCell(quadrilateral, interval) only.")
-                if cell_v.cellname() != "interval":
+                if cell_v.cellname != "interval":
                     raise ValueError(f"{family} is available on TensorProductCell(quadrilateral, interval) only.")
 
                 Qc_elt = FiniteElement("RTCF", "quadrilateral", degree, variant=variant)
@@ -79,10 +79,10 @@ class FiniteElement(FiniteElementBase):
                                        HDiv(TensorProductElement(Qd_elt, Ic_elt, cell=cell)))
 
             elif family == "NCE":
-                cell_h, cell_v = cell.sub_cells()
-                if cell_h.cellname() != "quadrilateral":
+                cell_h, cell_v = cell.sub_cells
+                if cell_h.cellname != "quadrilateral":
                     raise ValueError(f"{family} is available on TensorProductCell(quadrilateral, interval) only.")
-                if cell_v.cellname() != "interval":
+                if cell_v.cellname != "interval":
                     raise ValueError(f"{family} is available on TensorProductCell(quadrilateral, interval) only.")
 
                 Qc_elt = FiniteElement("Q", "quadrilateral", degree, variant=variant)
@@ -98,23 +98,23 @@ class FiniteElement(FiniteElementBase):
                 if family == "Q":
                     family = "CG"
                 return TensorProductElement(*[FiniteElement(family, c, degree, variant=variant)
-                                              for c in cell.sub_cells()],
+                                              for c in cell.sub_cells],
                                             cell=cell)
 
             elif family == "DQ":
                 def dq_family(cell):
                     """Doc."""
-                    return "DG" if cell.cellname() in simplices else "DQ"
+                    return "DG" if cell.cellname in simplices else "DQ"
                 return TensorProductElement(*[FiniteElement(dq_family(c), c, degree, variant=variant)
-                                              for c in cell.sub_cells()],
+                                              for c in cell.sub_cells],
                                             cell=cell)
 
             elif family == "DQ L2":
                 def dq_family_l2(cell):
                     """Doc."""
-                    return "DG L2" if cell.cellname() in simplices else "DQ L2"
+                    return "DG L2" if cell.cellname in simplices else "DQ L2"
                 return TensorProductElement(*[FiniteElement(dq_family_l2(c), c, degree, variant=variant)
-                                              for c in cell.sub_cells()],
+                                              for c in cell.sub_cells],
                                             cell=cell)
 
         return super().__new__(cls)
