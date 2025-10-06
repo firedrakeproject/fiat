@@ -9,7 +9,7 @@ version = "2025.11.0.dev0"
 dependencies = [
   # TODO RELEASE
   # UNDO ME
-  "fenics-ufl @ git+https://github.com/FEniCS/ufl.git@schnellerhase/fix_169)",
+  "fenics-ufl @ git+https://github.com/FEniCS/ufl.git@schnellerhase/fix_169",
   "numpy>=1.16",
   "recursivenodes",
   "scipy",
