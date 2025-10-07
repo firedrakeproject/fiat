@@ -213,7 +213,18 @@ class FiatElement(FiniteElementBase):
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
                 Qdense[idx] = value
+            # Compress repeated points
+            repeated_pts = tuple(map(tuple, np.round(allpts, decimals=12)))
+            unique_pts = list(dict.fromkeys(repeated_pts))
+            if len(unique_pts) < len(repeated_pts):
+                Qrepeated = Qdense
+                Qshape = (Qshape[0], len(unique_pts), *Qshape[2:])
+                Qdense = np.zeros(Qshape, dtype=np.float64)
+                for j, i in enumerate(map(unique_pts.index, repeated_pts)):
+                    Qdense[:, i, ...] += Qrepeated[:, j, ...]
+                allpts = unique_pts
             Q = gem.Literal(Qdense)
+
         return Q, np.asarray(allpts)
 
     @property

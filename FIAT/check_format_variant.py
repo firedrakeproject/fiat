@@ -103,6 +103,11 @@ def parse_quadrature_scheme(ref_el, degree, quad_scheme=None):
         if opt in supported_splits:
             splitting = supported_splits[opt]
             ref_el = splitting(ref_el)
+        elif opt.startswith("KMV") and opt != "KMV":
+            match = re.match(r"^KMV(?:\((\d+)\))?$", opt)
+            degree, = match.groups()
+            degree = int(degree)
+            scheme = "KMV"
         else:
             scheme = opt
     return create_quadrature(ref_el, degree, scheme or "default")
