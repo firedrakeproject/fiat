@@ -11,14 +11,13 @@
 
 import numpy
 from FIAT import finite_element, polynomial_set, dual_set, functional
-from FIAT.check_format_variant import check_format_variant
-from FIAT.quadrature_schemes import create_quadrature
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.quadrature import FacetQuadratureRule
 
 
 class CrouzeixRaviartDualSet(dual_set.DualSet):
 
-    def __init__(self, ref_el, degree, variant, interpolant_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg, quad_scheme):
         # Get topology dictionary
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
@@ -38,13 +37,14 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
                     continue
                 facet = ref_el.construct_subelement(dim)
                 if dim == 0:
-                    Q_facet = create_quadrature(facet, degree + interpolant_deg-1)
+                    Q_facet = parse_quadrature_scheme(facet, degree + interpolant_deg-1, quad_scheme)
                     Phis = numpy.ones((1, len(Q_facet.pts)))
                 else:
                     k = degree - 1 if dim == sd-1 else degree - (1+dim)
                     if k < 0:
                         continue
-                    Q_facet = create_quadrature(facet, k + interpolant_deg)
+                    Q_facet = parse_quadrature_scheme(facet, k + interpolant_deg, quad_scheme)
+
                     poly_set = polynomial_set.ONPolynomialSet(facet, k)
                     Phis = poly_set.tabulate(Q_facet.get_points())[(0,) * dim]
 
@@ -80,7 +80,7 @@ class CrouzeixRaviart(finite_element.CiarletElement):
     Dual basis:        Evaluation at points or integral moments
     """
 
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
         if degree % 2 != 1:
             raise ValueError("Crouzeix-Raviart only defined for odd degree")
 
@@ -89,5 +89,5 @@ class CrouzeixRaviart(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
-        dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg)
+        dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg, quad_scheme)
         super().__init__(poly_set, dual, degree)

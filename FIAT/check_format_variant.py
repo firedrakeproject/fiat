@@ -39,6 +39,8 @@ def check_format_variant(variant, degree):
         extra_degree, = match.groups()
         extra_degree = int(extra_degree) if extra_degree is not None else 0
         interpolant_degree = degree + extra_degree
+        if interpolant_degree < degree:
+            raise ValueError(f"Quadrature degree should be at least {degree}")
 
     if variant not in {"point", "integral"}:
         raise ValueError('Choose either variant="point" or variant="integral"'
