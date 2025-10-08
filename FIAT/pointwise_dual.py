@@ -70,7 +70,7 @@ def compute_pointwise_dual(el, pts):
     return DualSet(nds, T, el.entity_dofs())
 
 
-def make_entity_ids(ref_el, points, tol=1e-12):
+def make_entity_ids(ref_el, points, tol=1e-10):
     """The topological association in a dictionary"""
     top = ref_el.topology
     invtop = {top[d][e]: (d, e) for d in top for e in top[d]}

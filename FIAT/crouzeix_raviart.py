@@ -44,7 +44,6 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
                     if k < 0:
                         continue
                     Q_facet = parse_quadrature_scheme(facet, k + interpolant_deg, quad_scheme)
-
                     poly_set = polynomial_set.ONPolynomialSet(facet, k)
                     Phis = poly_set.tabulate(Q_facet.get_points())[(0,) * dim]
 
