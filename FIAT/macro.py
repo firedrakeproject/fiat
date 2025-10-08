@@ -406,6 +406,24 @@ class MacroQuadratureRule(QuadratureRule):
             Q_cur = FacetQuadratureRule(ref_el, parent_dim, entity, Q_ref)
             pts.extend(Q_cur.pts)
             wts.extend(Q_cur.wts)
+
+        # Merge points on facets, if any
+        rtol = 1E-12
+        bary = ref_el.compute_barycentric_coordinates(pts)
+        if numpy.isclose(bary, 0, rtol=rtol).any():
+            iorder = numpy.lexsort(bary.T)
+            iprev = iorder[0]
+            unique_pts = [pts[iprev]]
+            unique_wts = [wts[iprev]]
+            for icur in iorder[1:]:
+                if numpy.allclose(bary[icur], bary[iprev], rtol=rtol):
+                    unique_wts[-1] += wts[icur]
+                else:
+                    unique_pts.append(pts[icur])
+                    unique_wts.append(wts[icur])
+                iprev = icur
+            pts = unique_pts
+            wts = unique_wts
         pts = tuple(pts)
         wts = tuple(wts)
         super().__init__(ref_el, pts, wts)

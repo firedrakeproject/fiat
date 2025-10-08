@@ -39,6 +39,8 @@ def check_format_variant(variant, degree):
         extra_degree, = match.groups()
         extra_degree = int(extra_degree) if extra_degree is not None else 0
         interpolant_degree = degree + extra_degree
+        if interpolant_degree < degree:
+            raise ValueError(f"Quadrature degree should be at least {degree}")
 
     if variant not in {"point", "integral"}:
         raise ValueError('Choose either variant="point" or variant="integral"'
@@ -103,6 +105,11 @@ def parse_quadrature_scheme(ref_el, degree, quad_scheme=None):
         if opt in supported_splits:
             splitting = supported_splits[opt]
             ref_el = splitting(ref_el)
+        elif opt.startswith("KMV") and opt != "KMV":
+            match = re.match(r"^KMV(?:\((\d+)\))?$", opt)
+            degree, = match.groups()
+            degree = int(degree)
+            scheme = "KMV"
         else:
             scheme = opt
     return create_quadrature(ref_el, degree, scheme or "default")
