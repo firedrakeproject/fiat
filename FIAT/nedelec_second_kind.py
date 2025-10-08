@@ -67,7 +67,7 @@ class NedelecSecondKindDual(DualSet):
         ids[0] = {i: [] for i in sorted(cell.topology[0])}
 
         # (degree+1) degrees of freedom per entity of codimension 1 (edges)
-        (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
+        (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg, quad_scheme)
         dofs.extend(edge_dofs)
 
         # Include face degrees of freedom if 3D
@@ -82,12 +82,12 @@ class NedelecSecondKindDual(DualSet):
 
         return (dofs, ids)
 
-    def _generate_edge_dofs(self, cell, degree, offset, variant, interpolant_deg):
+    def _generate_edge_dofs(self, cell, degree, offset, variant, interpolant_deg, quad_scheme):
         """Generate degrees of freedom (dofs) for entities of
         codimension 1 (edges)."""
 
         if variant == "integral":
-            return self._generate_facet_dofs(1, cell, degree, offset, variant, interpolant_deg)
+            return self._generate_facet_dofs(1, cell, degree, offset, variant, interpolant_deg, quad_scheme)
 
         # (degree+1) tangential component point evaluation degrees of
         # freedom per entity of codimension 1 (edges)
