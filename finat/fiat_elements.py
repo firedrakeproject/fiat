@@ -344,7 +344,7 @@ class CrouzeixRaviart(ScalarFiatElement):
 
 class Lagrange(ScalarFiatElement):
     def __init__(self, cell, degree, **kwargs):
-        super().__init__(FIAT.Lagrange(cell, degree, *kwargs))
+        super().__init__(FIAT.Lagrange(cell, degree, **kwargs))
 
 
 class DiscontinuousLagrange(ScalarFiatElement):
