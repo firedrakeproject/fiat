@@ -2,15 +2,15 @@ import FIAT
 import numpy
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.piola_mapped import piola_inverse
 
 
 class AlfeldSorokina(PhysicallyMappedElement, FiatElement):
     def __init__(self, cell, degree=2):
-        if Citations is not None:
-            Citations().register("AlfeldSorokina2016")
+        cite("AlfeldSorokina2016")
         super().__init__(FIAT.AlfeldSorokina(cell, degree))
 
     def basis_transformation(self, coordinate_mapping):
