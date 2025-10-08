@@ -26,12 +26,6 @@ def make_quadrature(ref_el, degree, scheme="default"):
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
     """
-
-    if hasattr(scheme, "dual_basis"):
-        Q, point_set = scheme.dual_basis
-        weights = numpy.ones((len(point_set.points),))
-        return QuadratureRule(point_set, weights, ref_el=ref_el)
-
     if ref_el.get_shape() == TENSORPRODUCT:
         try:
             degree = tuple(degree)
