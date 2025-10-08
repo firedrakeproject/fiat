@@ -120,28 +120,21 @@ class FiniteElement(FiniteElementBase):
         return super().__new__(cls)
 
     def __init__(self,
-                 family: str,
-                 cell: str | None = None,
-                 degree: int | None = None,
-                 form_degree: int | tuple | None = None,
-                 quad_scheme: str | None = None,
-                 variant: str | None = None):
-        """Create a finite element.
+                 family,
+                 cell=None,
+                 degree=None,
+                 form_degree=None,
+                 quad_scheme=None,
+                 variant=None):
+        """Create finite element.
 
-        Parameters
-        ----------
-        family
-            The finite element family.
-        cell
-            The geometric cell.
-        degree
-            The polynomial degree.
-        form_degree
-            The form degree (FEEC notation, used when field is viewed as k-form).
-        quad_scheme
-            The quadrature scheme.
-        variant
-            Hint for the local basis function variant.
+        :arg family: The finite element family
+        :arg cell: The geometric cell
+        :arg degree: The polynomial degree (optional)
+        :arg form_degree: The form degree (FEEC notation, used when field is
+            viewed as k-form)
+        :arg quad_scheme: The quadrature scheme (optional)
+        :arg variant: Hint for the local basis function variant (optional)
 
         """
         # Note: Unfortunately, dolfin sometimes passes None for
