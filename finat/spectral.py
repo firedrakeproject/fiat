@@ -3,39 +3,9 @@ import FIAT
 import gem
 from abc import ABCMeta, abstractmethod
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement, Lagrange, DiscontinuousLagrange
 from finat.point_set import GaussLobattoLegendrePointSet, GaussLegendrePointSet, KMVPointSet
-
-try:
-    from firedrake_citations import Citations
-    Citations().add("Geevers2018new", """
-@article{Geevers2018new,
- title={New higher-order mass-lumped tetrahedral elements for wave propagation modelling},
- author={Geevers, Sjoerd and Mulder, Wim A and van der Vegt, Jaap JW},
- journal={SIAM journal on scientific computing},
- volume={40},
- number={5},
- pages={A2830--A2857},
- year={2018},
- publisher={SIAM},
- doi={https://doi.org/10.1137/18M1175549},
-}
-""")
-    Citations().add("Chin1999higher", """
-@article{chin1999higher,
- title={Higher-order triangular and tetrahedral finite elements with mass lumping for solving the wave equation},
- author={Chin-Joe-Kong, MJS and Mulder, Wim A and Van Veldhuizen, M},
- journal={Journal of Engineering Mathematics},
- volume={35},
- number={4},
- pages={405--426},
- year={1999},
- publisher={Springer},
- doi={https://doi.org/10.1023/A:1004420829610},
-}
-""")
-except ImportError:
-    Citations = None
 
 
 class SpectralElement(metaclass=ABCMeta):
@@ -90,24 +60,23 @@ class KongMulderVeldhuizen(SpectralElement, ScalarFiatElement):
 
     def __init__(self, cell, degree):
         super(ScalarFiatElement, self).__init__(FIAT.KongMulderVeldhuizen(cell, degree))
-        if Citations is not None:
-            sd = cell.get_spatial_dimension()
-            Citations().register("Chin1999higher" if sd == 2 else "Geevers2018new")
+        cite("Chin1999higher")
+        cite("Geevers2018new")
 
 
 class Legendre(ScalarFiatElement):
     """DG element with Legendre polynomials."""
 
-    def __init__(self, cell, degree, **kwargs):
-        fiat_element = FIAT.Legendre(cell, degree, **kwargs)
+    def __init__(self, cell, degree, variant=None):
+        fiat_element = FIAT.Legendre(cell, degree, variant=variant)
         super().__init__(fiat_element)
 
 
 class IntegratedLegendre(ScalarFiatElement):
     """CG element with integrated Legendre polynomials."""
 
-    def __init__(self, cell, degree, **kwargs):
-        fiat_element = FIAT.IntegratedLegendre(cell, degree, **kwargs)
+    def __init__(self, cell, degree, variant=None):
+        fiat_element = FIAT.IntegratedLegendre(cell, degree, variant=variant)
         super().__init__(fiat_element)
 
 
