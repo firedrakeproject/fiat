@@ -234,10 +234,6 @@ def convert_finiteelement(element, **kwargs):
     elif element.variant() is not None:
         finat_kwargs["variant"] = element.variant()
 
-    quad_scheme = element.quadrature_scheme()
-    if quad_scheme is not None:
-        finat_kwargs["quad_scheme"] = quad_scheme
-
     return make_finat_element(cell, element.degree(), **finat_kwargs), deps
 
 
