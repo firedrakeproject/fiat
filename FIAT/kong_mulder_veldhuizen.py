@@ -6,6 +6,7 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
+import numpy
 from FIAT import (
     finite_element,
     dual_set,
@@ -19,7 +20,20 @@ from FIAT import (
 )
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import TRIANGLE, TETRAHEDRON
-from FIAT.pointwise_dual import make_entity_ids
+
+
+def _get_entity_ids(ref_el, points, tol=1e-12):
+    """The topological association in a dictionary"""
+    top = ref_el.topology
+    invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
+    bary = ref_el.compute_barycentric_coordinates(points)
+
+    entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+    for i in numpy.lexsort(bary.T):
+        verts = tuple(numpy.flatnonzero(abs(bary[i]) > tol))
+        dim, entity = invtop[verts]
+        entity_ids[dim][entity].append(i)
+    return entity_ids
 
 
 def bump(T, deg):
@@ -74,7 +88,7 @@ class KongMulderVeldhuizenDualSet(dual_set.DualSet):
 
     def __init__(self, ref_el, degree):
         lr = create_quadrature(ref_el, degree, scheme="KMV")
-        entity_ids = make_entity_ids(ref_el, lr.get_points())
+        entity_ids = _get_entity_ids(ref_el, lr.get_points())
         nodes = [functional.PointEvaluation(ref_el, x) for x in lr.pts]
         super(KongMulderVeldhuizenDualSet, self).__init__(nodes, ref_el, entity_ids)
 

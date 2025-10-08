@@ -1,6 +1,5 @@
 import re
 
-from FIAT.quadrature_schemes import create_quadrature
 from FIAT.macro import IsoSplit, AlfeldSplit, WorseyFarinSplit, PowellSabinSplit, PowellSabin12Split
 
 # dicts mapping Lagrange variant names to recursivenodes family names
@@ -29,20 +28,21 @@ supported_splits = {
 
 def check_format_variant(variant, degree):
     splitting, variant = parse_lagrange_variant(variant, integral=True)
+
     if variant is None:
         variant = "integral"
-    interpolant_degree = None
 
-    match = re.match(r"^integral(?:\((-?\d+)\))?$", variant)
+    match = re.match(r"^integral(?:\((\d+)\))?$", variant)
     if match:
         variant = "integral"
         extra_degree, = match.groups()
         extra_degree = int(extra_degree) if extra_degree is not None else 0
         interpolant_degree = degree + extra_degree
         if interpolant_degree < degree:
-            raise ValueError(f"Quadrature degree should be at least {degree}")
-
-    if variant not in {"point", "integral"}:
+            raise ValueError("Warning, quadrature degree should be at least %s" % degree)
+    elif variant == "point":
+        interpolant_degree = None
+    else:
         raise ValueError('Choose either variant="point" or variant="integral"'
                          'or variant="integral(q)"')
 
@@ -95,21 +95,3 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
     if len(splitting_args) > 0:
         splitting = lambda T: call_split(T, *splitting_args, point_variant or "gll")
     return splitting, point_variant
-
-
-def parse_quadrature_scheme(ref_el, degree, quad_scheme=None):
-    scheme = None
-    if quad_scheme is None:
-        quad_scheme = ""
-    for opt in quad_scheme.split(","):
-        if opt in supported_splits:
-            splitting = supported_splits[opt]
-            ref_el = splitting(ref_el)
-        elif opt.startswith("KMV") and opt != "KMV":
-            match = re.match(r"^KMV(?:\((\d+)\))?$", opt)
-            degree, = match.groups()
-            degree = int(degree)
-            scheme = "KMV"
-        else:
-            scheme = opt
-    return create_quadrature(ref_el, degree, scheme or "default")
