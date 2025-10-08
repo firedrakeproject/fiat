@@ -14,7 +14,7 @@
 from finat.ufl.finiteelementbase import FiniteElementBase
 from ufl.sobolevspace import L2
 
-valid_restriction_domains = ("interior", "facet", "ridge", "face", "edge", "vertex", "reduced")
+valid_restriction_domains = ("interior", "facet", "face", "edge", "vertex", "reduced")
 
 
 class RestrictedElement(FiniteElementBase):

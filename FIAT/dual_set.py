@@ -216,8 +216,6 @@ class DualSet(object):
             dim = 2
         elif restriction_domain == "facet":
             dim = self.get_reference_element().get_spatial_dimension() - 1
-        elif restriction_domain == "ridge":
-            dim = self.get_reference_element().get_spatial_dimension() - 2
         else:
             raise RuntimeError("Invalid restriction domain")
 
