@@ -24,7 +24,6 @@ def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme
         degree = 0
     if interpolant_deg is None:
         interpolant_deg = degree
-
     Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
     B = make_bubbles(ref_el, degree, codim=codim, scale="orthonormal")
     P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())

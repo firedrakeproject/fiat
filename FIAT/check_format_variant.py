@@ -98,6 +98,27 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
 
 
 def parse_quadrature_scheme(ref_el, degree, quad_scheme=None):
+    """Return a quadrature rule by parsing quad_scheme options.
+
+    Parameters
+    ----------
+    ref_el: Cell
+        The integration cell.
+    degree: int
+        The maximum degree of polynomials to be integrated exactly.
+    quad_scheme: str
+        A single option or comma-separated pair indicating the
+        quadrature rule (default, KMV, etc) and the type of splitting to give a
+        composite rule (Alfeld, Powell-Sabin, iso).  Specifying KMV(p)
+        overrides degree to produce the lumped scheme for order-p KMV/GLL
+        elements.
+
+    Returns
+    -------
+    QuadratureRule
+        The quadrature rule.
+
+    """
     scheme = None
     if quad_scheme is None:
         quad_scheme = ""
