@@ -94,7 +94,7 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         if ref_el.shape not in {LINE, TRIANGLE, TETRAHEDRON}:
-            raise ValueError("KMV is only valid for triangles and tetrahedrals")
+            raise ValueError("KMV is only valid for simplices of dimension <= 3.")
         if degree > 6 and ref_el.shape == TRIANGLE:
             raise NotImplementedError("Only P < 7 for triangles are implemented.")
         if degree > 3 and ref_el.shape == TETRAHEDRON:
