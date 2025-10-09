@@ -6,17 +6,13 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-from FIAT import (
-    finite_element,
-    dual_set,
-    functional,
-)
+from FIAT import finite_element, functional, dual_set
 from FIAT.check_format_variant import parse_lagrange_variant
+from FIAT.expansions import polynomial_entity_ids
+from FIAT.polynomial_set import ONPolynomialSet
+from FIAT.pointwise_dual import make_entity_ids
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import LINE, TRIANGLE, TETRAHEDRON
-from FIAT.pointwise_dual import make_entity_ids
-from FIAT.polynomial_set import ONPolynomialSet
-from FIAT.expansions import polynomial_entity_ids
 import math
 
 
@@ -107,4 +103,4 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
 
         dual = KongMulderVeldhuizenDualSet(ref_el, degree)
         formdegree = 0  # 0-form
-        super().__init__(S, dual, degree + max(bump(ref_el, degree) or (0,)), formdegree)
+        super().__init__(S, dual, S.degree, formdegree)
