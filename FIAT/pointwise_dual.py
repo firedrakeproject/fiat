@@ -72,13 +72,22 @@ def compute_pointwise_dual(el, pts):
 
 def make_entity_ids(ref_el, points, tol=1e-10):
     """The topological association in a dictionary"""
-    top = ref_el.topology
+    sd = ref_el.get_spatial_dimension()
+    top = ref_el.get_topology()
     invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
-    bary = ref_el.compute_barycentric_coordinates(points)
-
     entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-    for i in np.lexsort(bary.T):
-        verts = tuple(np.flatnonzero(abs(bary[i]) > tol))
-        dim, entity = invtop[verts]
-        entity_ids[dim][entity].append(i)
+
+    seen = set()
+    for cell in top[sd]:
+        cell_verts = top[sd][cell]
+        bary = ref_el.compute_barycentric_coordinates(points, entity=(sd, cell))
+        for i in np.lexsort(bary.T).tolist():
+            if (i in seen) or (bary[i] < -tol).any():
+                continue
+            entity_verts = np.flatnonzero(bary[i] > tol)
+            verts = tuple(cell_verts[v] for v in entity_verts)
+            dim, entity = invtop[verts]
+            entity_ids[dim][entity].append(i)
+            seen.add(i)
+    assert len(seen) == len(points)
     return entity_ids

@@ -407,23 +407,26 @@ class MacroQuadratureRule(QuadratureRule):
             pts.extend(Q_cur.pts)
             wts.extend(Q_cur.wts)
 
-        # Merge points on facets, if any
-        rtol = 1E-12
-        bary = ref_el.compute_barycentric_coordinates(pts)
-        if numpy.isclose(bary, 0, rtol=rtol).any():
-            iorder = numpy.lexsort(bary.T)
-            iprev = iorder[0]
-            unique_pts = [pts[iprev]]
-            unique_wts = [wts[iprev]]
-            for icur in iorder[1:]:
-                if numpy.allclose(bary[icur], bary[iprev], rtol=rtol):
-                    unique_wts[-1] += wts[icur]
-                else:
-                    unique_pts.append(pts[icur])
-                    unique_wts.append(wts[icur])
-                iprev = icur
-            pts = unique_pts
-            wts = unique_wts
+        # Collapse repeated points if any of them lie on facets
+        atol = 1E-10
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+        for cell in top[sd]:
+            bary = ref_el.compute_barycentric_coordinates(pts, entity=(sd, cell))
+            if numpy.isclose(bary, 0, atol=atol).any():
+                iorder = numpy.lexsort(bary.T)
+                iprev = iorder[0]
+                unique_pts = [pts[iprev]]
+                unique_wts = [wts[iprev]]
+                for icur in iorder[1:]:
+                    if numpy.allclose(bary[icur], bary[iprev], atol=atol):
+                        unique_wts[-1] += wts[icur]
+                    else:
+                        unique_pts.append(pts[icur])
+                        unique_wts.append(wts[icur])
+                    iprev = icur
+                pts = unique_pts
+                wts = unique_wts
         pts = tuple(pts)
         wts = tuple(wts)
         super().__init__(ref_el, pts, wts)

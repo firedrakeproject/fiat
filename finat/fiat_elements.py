@@ -213,7 +213,7 @@ class FiatElement(FiniteElementBase):
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
                 Qdense[idx] = value
-            # Compress repeated points
+            # Collapse repeated points, if any
             repeated_pts = tuple(map(tuple, np.round(allpts, decimals=12)))
             unique_pts = list(dict.fromkeys(repeated_pts))
             if len(unique_pts) < len(repeated_pts):
