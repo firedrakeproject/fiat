@@ -129,6 +129,8 @@ def r_to_codim(restriction, dim):
         return 0
     elif restriction == "facet":
         return 1
+    elif restriction == "ridge":
+        return 2
     elif restriction == "face":
         return dim - 2
     elif restriction == "edge":
@@ -145,6 +147,8 @@ def codim_to_r(codim, dim):
         return "interior"
     elif codim == 1:
         return "facet"
+    elif codim == 2:
+        return "ridge"
     elif d == 0:
         return "vertex"
     elif d == 1:
