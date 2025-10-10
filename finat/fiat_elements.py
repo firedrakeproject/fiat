@@ -200,6 +200,17 @@ class FiatElement(FiniteElementBase):
             assert len(js) == 2
             Q = gem.ComponentTensor(gem.Delta(*js), js)
         else:
+            # Collapse repeated points
+            cur = -1
+            unique_points = []
+            unique_indices = [None]*len(allpts)
+            atol = 1E-12
+            for i in reversed(np.lexsort(np.transpose(allpts))):
+                if not any(np.allclose(x, allpts[i], atol=atol) for x in reversed(unique_points)):
+                    unique_points.append(allpts[i])
+                    cur += 1
+                unique_indices[i] = cur
+            allpts = tuple(unique_points)
             # temporary until sparse literals are implemented in GEM which will
             # automatically convert a dictionary of keys internally.
             # TODO the below is unnecessarily slow and would be sped up
@@ -210,19 +221,11 @@ class FiatElement(FiniteElementBase):
                 Qshape = tuple(s + 1 for s in tuple(Q)[0])
             else:
                 Qshape = tuple(s + 1 for s in map(max, *Q))
+            Qshape = Qshape[:1] + (len(allpts),) + Qshape[2:]
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
-                Qdense[idx] = value
-            # Collapse repeated points, if any
-            repeated_pts = tuple(map(tuple, np.round(allpts, decimals=12)))
-            unique_pts = list(dict.fromkeys(repeated_pts))
-            if len(unique_pts) < len(repeated_pts):
-                Qrepeated = Qdense
-                Qshape = (Qshape[0], len(unique_pts), *Qshape[2:])
-                Qdense = np.zeros(Qshape, dtype=np.float64)
-                for j, i in enumerate(map(unique_pts.index, repeated_pts)):
-                    Qdense[:, i, ...] += Qrepeated[:, j, ...]
-                allpts = unique_pts
+                idx = idx[:1] + (unique_indices[idx[1]],) + idx[2:]
+                Qdense[idx] += value
             Q = gem.Literal(Qdense)
 
         return Q, np.asarray(allpts)
