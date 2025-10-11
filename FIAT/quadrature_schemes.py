@@ -34,7 +34,9 @@ Background on the schemes:
 
 import numpy
 
-from FIAT.quadrature import (QuadratureRule, FacetQuadratureRule, make_quadrature,
+from FIAT.quadrature import (FacetQuadratureRule,
+                             GaussLobattoLegendreQuadratureLineRule,
+                             QuadratureRule, make_quadrature,
                              make_tensor_product_quadrature, map_quadrature)
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, symmetric_simplex, ufc_simplex)
@@ -118,7 +120,10 @@ def _kmv_lump_scheme(ref_el, degree):
     """Specialized quadrature schemes for P < 6 for KMV simplical elements."""
 
     sd = ref_el.get_spatial_dimension()
-    if sd not in {2, 3}:
+    if sd == 1:
+        num_points = degree + 1
+        return GaussLobattoLegendreQuadratureLineRule(ref_el, num_points)
+    elif sd > 3:
         raise ValueError("Dimension not supported")
 
     T = ufc_simplex(sd)

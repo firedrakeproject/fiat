@@ -200,6 +200,19 @@ class FiatElement(FiniteElementBase):
             assert len(js) == 2
             Q = gem.ComponentTensor(gem.Delta(*js), js)
         else:
+            # Collapse repeated points
+            unique_points = []
+            unique_indices = [None]*len(allpts)
+            atol = 1E-12
+            for i in range(len(allpts)):
+                for j in reversed(range(len(unique_points))):
+                    if np.allclose(unique_points[j], allpts[i], atol=atol):
+                        unique_indices[i] = j
+                        break
+                if unique_indices[i] is None:
+                    unique_indices[i] = len(unique_points)
+                    unique_points.append(allpts[i])
+            allpts = tuple(unique_points)
             # temporary until sparse literals are implemented in GEM which will
             # automatically convert a dictionary of keys internally.
             # TODO the below is unnecessarily slow and would be sped up
@@ -210,10 +223,13 @@ class FiatElement(FiniteElementBase):
                 Qshape = tuple(s + 1 for s in tuple(Q)[0])
             else:
                 Qshape = tuple(s + 1 for s in map(max, *Q))
+            Qshape = Qshape[:1] + (len(allpts),) + Qshape[2:]
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
-                Qdense[idx] = value
+                idx = idx[:1] + (unique_indices[idx[1]],) + idx[2:]
+                Qdense[idx] += value
             Q = gem.Literal(Qdense)
+
         return Q, np.asarray(allpts)
 
     @property
@@ -285,23 +301,23 @@ def point_evaluation(fiat_element, order, refcoords, entity):
 
 
 class Regge(FiatElement):  # symmetric matrix valued
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Regge(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Regge(cell, degree, **kwargs))
 
 
 class HellanHerrmannJohnson(FiatElement):  # symmetric matrix valued
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.HellanHerrmannJohnson(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.HellanHerrmannJohnson(cell, degree, **kwargs))
 
 
 class GopalakrishnanLedererSchoberlFirstKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree, **kwargs))
 
 
 class GopalakrishnanLedererSchoberlSecondKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree, **kwargs))
 
 
 class ScalarFiatElement(FiatElement):
@@ -317,28 +333,28 @@ class Bernstein(ScalarFiatElement):
 
 
 class Bubble(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Bubble(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Bubble(cell, degree, **kwargs))
 
 
 class FacetBubble(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.FacetBubble(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.FacetBubble(cell, degree, **kwargs))
 
 
 class CrouzeixRaviart(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.CrouzeixRaviart(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.CrouzeixRaviart(cell, degree, **kwargs))
 
 
 class Lagrange(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Lagrange(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Lagrange(cell, degree, **kwargs))
 
 
 class DiscontinuousLagrange(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.DiscontinuousLagrange(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.DiscontinuousLagrange(cell, degree, **kwargs))
 
 
 class Histopolation(ScalarFiatElement):
@@ -366,8 +382,8 @@ class DiscontinuousTaylor(ScalarFiatElement):
 
 
 class HDivTrace(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.HDivTrace(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.HDivTrace(cell, degree, **kwargs))
 
 
 class VectorFiatElement(FiatElement):
@@ -377,8 +393,8 @@ class VectorFiatElement(FiatElement):
 
 
 class RaviartThomas(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.RaviartThomas(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.RaviartThomas(cell, degree, **kwargs))
 
 
 class TrimmedSerendipityFace(VectorFiatElement):
@@ -418,8 +434,8 @@ class TrimmedSerendipityCurl(VectorFiatElement):
 
 
 class BrezziDouglasMarini(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.BrezziDouglasMarini(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.BrezziDouglasMarini(cell, degree, **kwargs))
 
 
 class BrezziDouglasMariniCubeEdge(VectorFiatElement):
@@ -446,10 +462,10 @@ class BrezziDouglasFortinMarini(VectorFiatElement):
 
 
 class Nedelec(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Nedelec(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Nedelec(cell, degree, **kwargs))
 
 
 class NedelecSecondKind(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.NedelecSecondKind(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.NedelecSecondKind(cell, degree, **kwargs))

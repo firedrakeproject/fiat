@@ -1,13 +1,12 @@
 from FIAT import finite_element, dual_set, polynomial_set, expansions
-from FIAT.check_format_variant import check_format_variant
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.functional import TensorBidirectionalIntegralMoment as BidirectionalMoment
-from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.restricted import RestrictedElement
 
 
 class GLSDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, degree, quad_scheme=None):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         nodes = []
@@ -21,7 +20,7 @@ class GLSDual(dual_set.DualSet):
                 continue
 
             ref_facet = ref_el.construct_subelement(dim)
-            Q_ref = create_quadrature(ref_facet, degree + q)
+            Q_ref = parse_quadrature_scheme(ref_facet, degree + q, quad_scheme)
             P = polynomial_set.ONPolynomialSet(ref_facet, q, scale=1)
             phis = P.tabulate(Q_ref.get_points())[(0,) * dim]
 
@@ -55,7 +54,7 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
     the weak symmetry constraint.
 
     """
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
 
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         assert variant == "integral"
@@ -64,14 +63,14 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
-        dual = GLSDual(ref_el, degree)
+        dual = GLSDual(ref_el, degree, quad_scheme=quad_scheme)
         sd = ref_el.get_spatial_dimension()
         formdegree = (1, sd-1)
         mapping = "covariant contravariant piola"
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
 
 
-def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree, variant=None):
+def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree, variant=None, quad_scheme=None):
     """The GLS element used for the Mass-Conserving mixed Stress (MCS)
     formulation for Stokes flow.
 
@@ -80,7 +79,7 @@ def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree, variant=None):
 
     Reference: https://doi.org/10.1093/imanum/drz022
     """
-    fe = GopalakrishnanLedererSchoberlSecondKind(ref_el, degree, variant=variant)
+    fe = GopalakrishnanLedererSchoberlSecondKind(ref_el, degree, variant=variant, quad_scheme=quad_scheme)
     entity_dofs = fe.entity_dofs()
     sd = ref_el.get_spatial_dimension()
     facet = ref_el.construct_subelement(sd-1)
