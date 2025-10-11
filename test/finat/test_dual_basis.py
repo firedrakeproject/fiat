@@ -7,7 +7,7 @@ from FIAT import ufc_simplex
 @pytest.mark.parametrize("dim", (2, 3))
 def test_collapse_repeated_points(dim):
     # Construct CR using face moments with a composite lumped scheme
-    # Here the quadrature points lie on the edges and we expect the dual
+    # Here the quadrature points lie on the ridges and we expect the dual
     # to collapse repeated points
     cell = ufc_simplex(dim)
     CR = finat.CrouzeixRaviart(cell, 1, variant="integral", quad_scheme="powell-sabin,KMV(2)")
