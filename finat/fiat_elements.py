@@ -201,15 +201,17 @@ class FiatElement(FiniteElementBase):
             Q = gem.ComponentTensor(gem.Delta(*js), js)
         else:
             # Collapse repeated points
-            cur = -1
             unique_points = []
             unique_indices = [None]*len(allpts)
             atol = 1E-12
-            for i in reversed(np.lexsort(np.transpose(allpts))):
-                if not any(np.allclose(x, allpts[i], atol=atol) for x in reversed(unique_points)):
+            for i in range(len(allpts)):
+                for j in reversed(range(len(unique_points))):
+                    if np.allclose(unique_points[j], allpts[i], atol=atol):
+                        unique_indices[i] = j
+                        break
+                if unique_indices[i] is None:
+                    unique_indices[i] = len(unique_points)
                     unique_points.append(allpts[i])
-                    cur += 1
-                unique_indices[i] = cur
             allpts = tuple(unique_points)
             # temporary until sparse literals are implemented in GEM which will
             # automatically convert a dictionary of keys internally.
