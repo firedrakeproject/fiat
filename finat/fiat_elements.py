@@ -173,6 +173,20 @@ class FiatElement(FiniteElementBase):
                 kend = kstart + len(pts)
                 seen[pts] = kstart, kend
                 allpts.extend(pts)
+        # We might still have repeated points from quadratures with points on
+        # the boundary of the integration domain.
+        unique_points = []
+        unique_indices = [None]*len(allpts)
+        atol = 1E-12
+        for i in range(len(allpts)):
+            for j in reversed(range(len(unique_points))):
+                if np.allclose(unique_points[j], allpts[i], atol=atol):
+                    unique_indices[i] = j
+                    break
+            if unique_indices[i] is None:
+                unique_indices[i] = len(unique_points)
+                unique_points.append(allpts[i])
+        allpts = unique_points
         # Build Q.
         # Q is a tensor of weights (of total rank R) to contract with a unique
         # vector of points to evaluate at, giving a tensor (of total rank R-1)
@@ -189,7 +203,7 @@ class FiatElement(FiniteElementBase):
             point_dict = dual.get_point_dict()
             pts = tuple(sorted(point_dict.keys()))
             kstart, kend = seen[pts]
-            for p, k in zip(pts, range(kstart, kend)):
+            for p, k in zip(pts, unique_indices[kstart:kend]):
                 for weight, cmp in point_dict[p]:
                     Q[(i, k, *cmp)] = weight
         if all(len(set(key)) == 1 and np.isclose(weight, 1) and len(key) == 2
@@ -200,19 +214,6 @@ class FiatElement(FiniteElementBase):
             assert len(js) == 2
             Q = gem.ComponentTensor(gem.Delta(*js), js)
         else:
-            # Collapse repeated points
-            unique_points = []
-            unique_indices = [None]*len(allpts)
-            atol = 1E-12
-            for i in range(len(allpts)):
-                for j in reversed(range(len(unique_points))):
-                    if np.allclose(unique_points[j], allpts[i], atol=atol):
-                        unique_indices[i] = j
-                        break
-                if unique_indices[i] is None:
-                    unique_indices[i] = len(unique_points)
-                    unique_points.append(allpts[i])
-            allpts = tuple(unique_points)
             # temporary until sparse literals are implemented in GEM which will
             # automatically convert a dictionary of keys internally.
             # TODO the below is unnecessarily slow and would be sped up
@@ -223,13 +224,10 @@ class FiatElement(FiniteElementBase):
                 Qshape = tuple(s + 1 for s in tuple(Q)[0])
             else:
                 Qshape = tuple(s + 1 for s in map(max, *Q))
-            Qshape = Qshape[:1] + (len(allpts),) + Qshape[2:]
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
-                idx = idx[:1] + (unique_indices[idx[1]],) + idx[2:]
-                Qdense[idx] += value
+                Qdense[idx] = value
             Q = gem.Literal(Qdense)
-
         return Q, np.asarray(allpts)
 
     @property
