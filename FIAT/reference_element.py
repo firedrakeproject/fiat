@@ -802,23 +802,25 @@ class SimplicialComplex(Cell):
 
     def point_entity_ids(self, points, tol=1e-10):
         """Return the topological entity association for points on this cell."""
-        sd = self.get_spatial_dimension()
         top = self.get_topology()
-        invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
-
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-        seen = set()
+        invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
+        sd = self.get_spatial_dimension()
+        seen = []
         for cell in top[sd]:
             cell_verts = top[sd][cell]
             bary = self.compute_barycentric_coordinates(points, entity=(sd, cell))
-            for i in numpy.lexsort(bary.T).tolist():
-                if (i in seen) or (bary[i] < -tol).any():
-                    continue
+            distance_to_cell = 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
+            points_in_cell = numpy.flatnonzero(distance_to_cell <= tol)
+            candidates = numpy.setdiff1d(points_in_cell, seen)
+            for i in candidates.tolist():
                 entity_verts = numpy.flatnonzero(bary[i] > tol)
                 verts = tuple(cell_verts[v] for v in entity_verts)
                 dim, entity = invtop[verts]
                 entity_ids[dim][entity].append(i)
-                seen.add(i)
+                seen.append(i)
+            if len(seen) == len(points):
+                break
         return entity_ids
 
     def extract_extrinsic_orientation(self, o):
