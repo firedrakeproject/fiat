@@ -170,45 +170,19 @@
     <span class="n">T</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span>
     <span class="n">x</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">T</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">w</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">6.0</span>
-        <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-            <span class="n">w</span><span class="p">[:]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">24.0</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">),),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">w</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">T</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="c1"># entity barycenter</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">T</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="n">dim</span><span class="p">]:</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">T</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">dim</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">),),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># edge midpoints</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>  <span class="c1"># barycenter</span>
-            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
             <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">40.0</span>
             <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">15.0</span>
             <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">9.0</span> <span class="o">/</span> <span class="mf">40.0</span>
         <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                <span class="p">]</span>
-            <span class="p">)</span>
-            <span class="c1"># in facets</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="mf">0.33333333333333337</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.3333333333333333</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                <span class="p">]</span>
-            <span class="p">)</span>
-            <span class="c1"># in the cell</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">([(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">4</span><span class="p">)])</span>
-            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">15</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
             <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mf">17.0</span> <span class="o">/</span> <span class="mf">5040.0</span>
             <span class="n">w</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">10</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="mf">315.0</span>
             <span class="n">w</span><span class="p">[</span><span class="mi">10</span><span class="p">:</span><span class="mi">14</span><span class="p">]</span> <span class="o">=</span> <span class="mf">9.0</span> <span class="o">/</span> <span class="mf">560.0</span>
@@ -216,111 +190,73 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
 
-    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.2934695559090401</span>
-            <span class="n">beta</span> <span class="o">=</span> <span class="mf">0.2073451756635909</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                <span class="p">]</span>  <span class="c1"># edge points</span>
-            <span class="p">)</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)]</span>
-            <span class="p">)</span>  <span class="c1"># points in center of cell</span>
-            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.007436456512410291</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.02442084061702551</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">9</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1103885289202054</span>
-        <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                <span class="p">]</span>
-            <span class="p">)</span>  <span class="c1"># 12 points on edges of facets (0--&gt;1--&gt;2)</span>
+    <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Degree not supported&quot;</span><span class="p">)</span>
 
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                <span class="p">]</span>
-            <span class="p">)</span>  <span class="c1"># 12 points (3 points on each facet, 1st two parallel to edge 0)</span>
-            <span class="n">alpha</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">6</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                <span class="p">]</span>
-            <span class="p">)</span>  <span class="c1"># 4 points inside the cell</span>
-            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00068688236002531922325120561367839</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">16</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0015107814913526136472998739890272</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">16</span><span class="p">:</span><span class="mi">28</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0050062894680040258624242888174649</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">28</span><span class="p">:</span><span class="mi">32</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.021428571428571428571428571428571</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.2113248654051871</span>  <span class="c1"># 0.2113248654051871</span>
+        <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.314210342418033</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.685789657581967</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="p">)</span>  <span class="c1"># 12 points on edges of facets (0--&gt;1--&gt;2)</span>
+
+        <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.5690355937288492</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.21548220313557542</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="p">)</span>  <span class="c1"># 12 points (3 points on each facet, 1st two parallel to edge 0)</span>
+        <span class="n">alpha</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">6</span>
+        <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">),</span>
+                <span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="p">)</span>  <span class="c1"># 4 points inside the cell</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">),),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">4</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.00068688236002531922325120561367839</span>
+        <span class="n">w</span><span class="p">[</span><span class="mi">4</span><span class="p">:</span><span class="mi">16</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0015107814913526136472998739890272</span>
+        <span class="n">w</span><span class="p">[</span><span class="mi">16</span><span class="p">:</span><span class="mi">28</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0050062894680040258624242888174649</span>
+        <span class="n">w</span><span class="p">[</span><span class="mi">28</span><span class="p">:</span><span class="mi">32</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.021428571428571428571428571428571</span>
+
+    <span class="k">elif</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.2934695559090401</span><span class="p">]</span>
+            <span class="n">betas</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.2073451756635909</span><span class="p">]</span>
+            <span class="n">gammas</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">deltas</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.2113248654051871</span><span class="p">]</span>  <span class="c1"># 0.2113248654051871</span>
             <span class="n">betas</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="mf">0.4247639617258106</span><span class="p">,</span>
                 <span class="mf">0.130791593829745</span>
             <span class="p">]</span>
-            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># edge midpoints</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                <span class="p">]</span>  <span class="c1"># edge points</span>
-            <span class="p">)</span>
-            <span class="k">for</span> <span class="n">beta</span> <span class="ow">in</span> <span class="n">betas</span><span class="p">:</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="p">[(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)]</span>
-                <span class="p">)</span>  <span class="c1"># points in center of cell</span>
-            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">18</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.003174603174603175</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0126984126984127</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.01071428571428571</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.07878121446939182</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">15</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.05058386489568756</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">gammas</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">deltas</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
             <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="mf">0.3632980741536860e-00</span><span class="p">,</span>
                 <span class="mf">0.1322645816327140e-00</span>
@@ -330,47 +266,9 @@
                 <span class="mf">0.2568591072619591e-00</span><span class="p">,</span>
                 <span class="mf">0.5752768441141011e-01</span>
             <span class="p">]</span>
-            <span class="n">gamma</span> <span class="o">=</span> <span class="mf">0.7819258362551702e-01</span>
-            <span class="n">delta</span> <span class="o">=</span> <span class="mf">0.2210012187598900e-00</span>
-            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">]</span>  <span class="c1"># edge points</span>
-                <span class="p">)</span>
-            <span class="k">for</span> <span class="n">beta</span> <span class="ow">in</span> <span class="n">betas</span><span class="p">:</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="p">[(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)]</span>
-                <span class="p">)</span>  <span class="c1"># points in center of cell</span>
-            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                <span class="p">[</span>
-                    <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
-                <span class="p">]</span>  <span class="c1"># edge points</span>
-            <span class="p">)</span>
-            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">30</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.7094239706792450e-03</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.6190565003676629e-02</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">9</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.3480578640489211e-02</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">15</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.3453043037728279e-01</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">18</span><span class="p">:</span><span class="mi">21</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.4590123763076286e-01</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">21</span><span class="p">:</span><span class="mi">24</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1162613545961757e-01</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">24</span><span class="p">:</span><span class="mi">30</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.2727857596999626e-01</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
-
-    <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">episilon</span> <span class="o">=</span> <span class="mf">5.00000000000000e-1</span>
+            <span class="n">gammas</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.7819258362551702e-01</span><span class="p">]</span>
+            <span class="n">deltas</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.2210012187598900e-00</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
             <span class="n">alphas</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="mf">8.29411811106452e-2</span><span class="p">,</span>
                 <span class="mf">2.68649695592714e-1</span><span class="p">,</span>
@@ -388,71 +286,75 @@
                 <span class="mf">6.99812197147049e-1</span><span class="p">,</span>
                 <span class="mf">2.43089592364562e-1</span><span class="p">,</span>
             <span class="p">]</span>
-            <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span>
-                <span class="mf">5.35113520281665e-4</span><span class="p">,</span>
-                <span class="mf">4.29435346026293e-3</span><span class="p">,</span>
-                <span class="mf">3.02990950926060e-3</span><span class="p">,</span>
-                <span class="mf">3.16396316646563e-3</span><span class="p">,</span>
-                <span class="mf">2.43035184285235e-2</span><span class="p">,</span>
-                <span class="mf">1.66312091329395e-2</span><span class="p">,</span>
-                <span class="mf">3.42178857644876e-2</span><span class="p">,</span>
-                <span class="mf">1.73480160090330e-2</span><span class="p">,</span>
-                <span class="mf">1.98004044953264e-2</span><span class="p">,</span>
-            <span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Degree not supported&quot;</span><span class="p">)</span>
 
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># edge midpoints for even degree</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">T</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">T</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
             <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
                 <span class="p">[</span>
-                    <span class="p">(</span><span class="n">episilon</span><span class="p">,</span> <span class="n">episilon</span><span class="p">),</span>
-                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">episilon</span><span class="p">),</span>
-                    <span class="p">(</span><span class="n">episilon</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                <span class="p">]</span>
-            <span class="p">)</span>  <span class="c1"># edge midpoints (class 2 points)</span>
-            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
-                    <span class="p">]</span>  <span class="c1"># edge points (sets of class 3 points)</span>
-                <span class="p">)</span>
-
-            <span class="k">for</span> <span class="n">beta</span> <span class="ow">in</span> <span class="n">betas</span><span class="p">:</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)</span>
-                    <span class="p">]</span>  <span class="c1"># interior points on bisector (sets of class 5 points)</span>
-                <span class="p">)</span>
-
-            <span class="k">for</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">gammas</span><span class="p">,</span> <span class="n">deltas</span><span class="p">):</span>
-                <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
-                    <span class="p">[</span>
-                        <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
-                        <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
-                        <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
-                    <span class="p">]</span>  <span class="c1"># interior points (sets of class 6 points)</span>
-                <span class="p">)</span>
-
-            <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">39</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># class 1 points (vertices)</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># class 2 points</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>  <span class="c1"># class 3 points</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">18</span><span class="p">:</span><span class="mi">21</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span>  <span class="c1"># class 5 points</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">21</span><span class="p">:</span><span class="mi">24</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">24</span><span class="p">:</span><span class="mi">27</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">6</span><span class="p">]</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">27</span><span class="p">:</span><span class="mi">33</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">7</span><span class="p">]</span>  <span class="c1"># class 6 points</span>
-            <span class="n">w</span><span class="p">[</span><span class="mi">33</span><span class="p">:</span><span class="mi">39</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="mi">8</span><span class="p">]</span>
-
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">alpha</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">alpha</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">),</span>
+                <span class="p">]</span>  <span class="c1"># edge points (sets of class 3 points)</span>
+            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">beta</span> <span class="ow">in</span> <span class="n">betas</span><span class="p">:</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">beta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">beta</span><span class="p">)</span>
+                <span class="p">]</span>  <span class="c1"># interior points on bisector (sets of class 5 points)</span>
+            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">gammas</span><span class="p">,</span> <span class="n">deltas</span><span class="p">):</span>
+            <span class="n">x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">delta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">gamma</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
+                    <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">,</span> <span class="n">gamma</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">delta</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">gamma</span> <span class="o">-</span> <span class="n">delta</span><span class="p">),</span>
+                <span class="p">]</span>  <span class="c1"># interior points (sets of class 6 points)</span>
+            <span class="p">)</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">),),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">numpy</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.007436456512410291</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.02442084061702551</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">9</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1103885289202054</span>
+        <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.003174603174603175</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0126984126984127</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.01071428571428571</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.07878121446939182</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">15</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.05058386489568756</span>
+        <span class="k">elif</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.7094239706792450e-03</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">9</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.6190565003676629e-02</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">9</span><span class="p">:</span><span class="mi">15</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.3480578640489211e-02</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">15</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.3453043037728279e-01</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">18</span><span class="p">:</span><span class="mi">21</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.4590123763076286e-01</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">21</span><span class="p">:</span><span class="mi">24</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1162613545961757e-01</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">24</span><span class="p">:</span><span class="mi">30</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.2727857596999626e-01</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">0</span><span class="p">:</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">5.35113520281665e-4</span>  <span class="c1"># class 1 points (vertices)</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">3</span><span class="p">:</span><span class="mi">6</span><span class="p">]</span> <span class="o">=</span> <span class="mf">4.29435346026293e-3</span>  <span class="c1"># class 2 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">6</span><span class="p">:</span><span class="mi">12</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.02990950926060e-3</span>  <span class="c1"># class 3 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">12</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.16396316646563e-3</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">18</span><span class="p">:</span><span class="mi">21</span><span class="p">]</span> <span class="o">=</span> <span class="mf">2.43035184285235e-2</span>  <span class="c1"># class 5 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">21</span><span class="p">:</span><span class="mi">24</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.66312091329395e-2</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">24</span><span class="p">:</span><span class="mi">27</span><span class="p">]</span> <span class="o">=</span> <span class="mf">3.42178857644876e-2</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">27</span><span class="p">:</span><span class="mi">33</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.73480160090330e-2</span>  <span class="c1"># class 6 points</span>
+            <span class="n">w</span><span class="p">[</span><span class="mi">33</span><span class="p">:</span><span class="mi">39</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.98004044953264e-2</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
+
     <span class="c1"># Return scheme</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
     <span class="n">w</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
