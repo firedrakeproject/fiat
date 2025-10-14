@@ -813,6 +813,7 @@ class SimplicialComplex(Cell):
             distance_to_cell = 0.5 * abs(numpy.sum(abs(bary) - bary, axis=-1))
             points_in_cell = numpy.flatnonzero(distance_to_cell <= tol)
             candidates = numpy.setdiff1d(points_in_cell, seen)
+            candidates = candidates[numpy.lexsort(bary[candidates].T)]
             for i in candidates.tolist():
                 entity_verts = numpy.flatnonzero(bary[i] > tol)
                 verts = tuple(cell_verts[v] for v in entity_verts)
