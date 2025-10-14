@@ -347,6 +347,13 @@
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Should be implemented in a subclass.&quot;</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Cell.point_entity_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.point_entity_ids">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_entity_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1E-10</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the topological entity association for points on this cell.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Should be implemented in a subclass.&quot;</span><span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="Cell.symmetry_group_size">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Cell.symmetry_group_size">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
@@ -965,6 +972,33 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="n">entity</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">epsilon</span></div>
 
 
+<div class="viewcode-block" id="SimplicialComplex.point_entity_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.point_entity_ids">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_entity_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the topological entity association for points on this cell.&quot;&quot;&quot;</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="n">invtop</span> <span class="o">=</span> <span class="p">{</span><span class="n">top</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">e</span><span class="p">]:</span> <span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">top</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">d</span><span class="p">]}</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">cell</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]:</span>
+            <span class="n">cell_verts</span> <span class="o">=</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">cell</span><span class="p">]</span>
+            <span class="n">bary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">cell</span><span class="p">))</span>
+            <span class="n">distance_to_cell</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">bary</span><span class="p">)</span> <span class="o">-</span> <span class="n">bary</span><span class="p">,</span> <span class="n">axis</span><span class="o">=-</span><span class="mi">1</span><span class="p">))</span>
+            <span class="n">points_in_cell</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">distance_to_cell</span> <span class="o">&lt;=</span> <span class="n">tol</span><span class="p">)</span>
+            <span class="n">candidates</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">setdiff1d</span><span class="p">(</span><span class="n">points_in_cell</span><span class="p">,</span> <span class="n">seen</span><span class="p">)</span>
+            <span class="n">candidates</span> <span class="o">=</span> <span class="n">candidates</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">lexsort</span><span class="p">(</span><span class="n">bary</span><span class="p">[</span><span class="n">candidates</span><span class="p">]</span><span class="o">.</span><span class="n">T</span><span class="p">)]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">candidates</span><span class="o">.</span><span class="n">tolist</span><span class="p">():</span>
+                <span class="n">entity_verts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">bary</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">tol</span><span class="p">)</span>
+                <span class="n">verts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">cell_verts</span><span class="p">[</span><span class="n">v</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">entity_verts</span><span class="p">)</span>
+                <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span> <span class="o">=</span> <span class="n">invtop</span><span class="p">[</span><span class="n">verts</span><span class="p">]</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                <span class="n">seen</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">seen</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">):</span>
+                <span class="k">break</span>
+        <span class="k">return</span> <span class="n">entity_ids</span></div>
+
+
 <div class="viewcode-block" id="SimplicialComplex.extract_extrinsic_orientation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">extract_extrinsic_orientation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
@@ -1538,6 +1572,25 @@
                    <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">point_slices</span><span class="p">))</span></div>
 
 
+<div class="viewcode-block" id="TensorProductCell.point_entity_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.point_entity_ids">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_entity_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the topological entity association for points on this cell.&quot;&quot;&quot;</span>
+        <span class="n">points</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
+        <span class="n">point_slices</span> <span class="o">=</span> <span class="n">TensorProductCell</span><span class="o">.</span><span class="n">_split_slices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">())</span>
+        <span class="n">factor_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">point_entity_ids</span><span class="p">(</span><span class="n">points</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">s</span><span class="p">],</span> <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">)</span>
+                      <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cells</span><span class="p">,</span> <span class="n">point_slices</span><span class="p">)]</span>
+
+        <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="k">for</span> <span class="n">dims</span> <span class="ow">in</span> <span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="n">factor_ids</span><span class="p">):</span>
+            <span class="n">pieces</span> <span class="o">=</span> <span class="p">[</span><span class="n">A</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="k">for</span> <span class="n">A</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">factor_ids</span><span class="p">,</span> <span class="n">dims</span><span class="p">)]</span>
+            <span class="k">for</span> <span class="n">entity</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">product</span><span class="p">(</span><span class="o">*</span><span class="n">pieces</span><span class="p">)):</span>
+                <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="nb">set</span><span class="p">(</span><span class="n">A</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">e</span><span class="p">])</span> <span class="k">for</span> <span class="n">A</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">factor_ids</span><span class="p">,</span> <span class="n">dims</span><span class="p">,</span> <span class="n">entities</span><span class="p">)]</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">dims</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="o">*</span><span class="n">ids</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">entity_ids</span></div>
+
+
 <div class="viewcode-block" id="TensorProductCell.symmetry_group_size">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.TensorProductCell.symmetry_group_size">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">symmetry_group_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
@@ -1763,6 +1816,20 @@
 
 <span class="sd">        For more information see the docstring for the UFCSimplex method.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">distance_to_point_l1</span><span class="p">(</span><span class="n">point</span><span class="p">,</span> <span class="n">rescale</span><span class="o">=</span><span class="n">rescale</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Hypercube.point_entity_ids">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.reference_element.Hypercube.point_entity_ids">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">point_entity_ids</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1E-10</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the topological entity association for points on this cell.&quot;&quot;&quot;</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">product_ids</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">product</span><span class="o">.</span><span class="n">point_entity_ids</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">topology</span><span class="p">:</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">topology</span><span class="p">[</span><span class="n">dim</span><span class="p">]:</span>
+                <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unflattening_map</span><span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">)]</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="n">product_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">e</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">entity_ids</span></div>
 
 
 <div class="viewcode-block" id="Hypercube.symmetry_group_size">

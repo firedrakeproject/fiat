@@ -38,6 +38,7 @@
   <h1>Source code for FIAT.check_format_variant</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.macro</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsoSplit</span><span class="p">,</span> <span class="n">AlfeldSplit</span><span class="p">,</span> <span class="n">WorseyFarinSplit</span><span class="p">,</span> <span class="n">PowellSabinSplit</span><span class="p">,</span> <span class="n">PowellSabin12Split</span>
 
 <span class="c1"># dicts mapping Lagrange variant names to recursivenodes family names</span>
@@ -68,21 +69,20 @@
 <a class="viewcode-back" href="../../FIAT.html#FIAT.check_format_variant.check_format_variant">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
     <span class="n">splitting</span><span class="p">,</span> <span class="n">variant</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">integral</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
     <span class="k">if</span> <span class="n">variant</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">variant</span> <span class="o">=</span> <span class="s2">&quot;integral&quot;</span>
+    <span class="n">interpolant_degree</span> <span class="o">=</span> <span class="kc">None</span>
 
-    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^integral(?:\((\d+)\))?$&quot;</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^integral(?:\((-?\d+)\))?$&quot;</span><span class="p">,</span> <span class="n">variant</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
         <span class="n">variant</span> <span class="o">=</span> <span class="s2">&quot;integral&quot;</span>
         <span class="n">extra_degree</span><span class="p">,</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
         <span class="n">extra_degree</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">extra_degree</span><span class="p">)</span> <span class="k">if</span> <span class="n">extra_degree</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
         <span class="n">interpolant_degree</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">extra_degree</span>
         <span class="k">if</span> <span class="n">interpolant_degree</span> <span class="o">&lt;</span> <span class="n">degree</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Warning, quadrature degree should be at least </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">degree</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;point&quot;</span><span class="p">:</span>
-        <span class="n">interpolant_degree</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Quadrature degree should be at least </span><span class="si">{</span><span class="n">degree</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">variant</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;point&quot;</span><span class="p">,</span> <span class="s2">&quot;integral&quot;</span><span class="p">}:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Choose either variant=&quot;point&quot; or variant=&quot;integral&quot;&#39;</span>
                          <span class="s1">&#39;or variant=&quot;integral(q)&quot;&#39;</span><span class="p">)</span>
 
@@ -138,6 +138,48 @@
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">splitting_args</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="n">splitting</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">T</span><span class="p">:</span> <span class="n">call_split</span><span class="p">(</span><span class="n">T</span><span class="p">,</span> <span class="o">*</span><span class="n">splitting_args</span><span class="p">,</span> <span class="n">point_variant</span> <span class="ow">or</span> <span class="s2">&quot;gll&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">splitting</span><span class="p">,</span> <span class="n">point_variant</span></div>
+
+
+
+<div class="viewcode-block" id="parse_quadrature_scheme">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.check_format_variant.parse_quadrature_scheme">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">parse_quadrature_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a quadrature rule by parsing quad_scheme options.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ref_el: Cell</span>
+<span class="sd">        The integration cell.</span>
+<span class="sd">    degree: int</span>
+<span class="sd">        The maximum degree of polynomials to be integrated exactly.</span>
+<span class="sd">    quad_scheme: str</span>
+<span class="sd">        A single option or comma-separated pair indicating the</span>
+<span class="sd">        quadrature rule (default, KMV, etc) and the type of splitting to give a</span>
+<span class="sd">        composite rule (Alfeld, Powell-Sabin, iso).  Specifying KMV(p)</span>
+<span class="sd">        overrides degree to produce the lumped scheme for order-p KMV/GLL</span>
+<span class="sd">        elements.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    QuadratureRule</span>
+<span class="sd">        The quadrature rule.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">scheme</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">quad_scheme</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">quad_scheme</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">opt</span> <span class="ow">in</span> <span class="n">quad_scheme</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">opt</span> <span class="ow">in</span> <span class="n">supported_splits</span><span class="p">:</span>
+            <span class="n">splitting</span> <span class="o">=</span> <span class="n">supported_splits</span><span class="p">[</span><span class="n">opt</span><span class="p">]</span>
+            <span class="n">ref_el</span> <span class="o">=</span> <span class="n">splitting</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;KMV&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">opt</span> <span class="o">!=</span> <span class="s2">&quot;KMV&quot;</span><span class="p">:</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^KMV(?:\((\d+)\))?$&quot;</span><span class="p">,</span> <span class="n">opt</span><span class="p">)</span>
+            <span class="n">degree</span><span class="p">,</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">groups</span><span class="p">()</span>
+            <span class="n">degree</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">degree</span><span class="p">)</span>
+            <span class="n">scheme</span> <span class="o">=</span> <span class="s2">&quot;KMV&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">scheme</span> <span class="o">=</span> <span class="n">opt</span>
+    <span class="k">return</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span> <span class="ow">or</span> <span class="s2">&quot;default&quot;</span><span class="p">)</span></div>
 
 </pre></div>
 

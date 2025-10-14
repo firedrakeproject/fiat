@@ -489,7 +489,7 @@ divergence. This works on any simplex and for all polynomial degrees.</p>
 <span id="fiat-argyris-module"></span><h2>FIAT.argyris module<a class="headerlink" href="#module-FIAT.argyris" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.argyris.Argyris">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.argyris.</span></span><span class="sig-name descname"><span class="pre">Argyris</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/argyris.html#Argyris"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.argyris.Argyris" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.argyris.</span></span><span class="sig-name descname"><span class="pre">Argyris</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/argyris.html#Argyris"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.argyris.Argyris" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The Argyris finite element.</p>
 <dl class="field-list simple">
@@ -511,7 +511,7 @@ degree required for unisolvence plus q.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.argyris.ArgyrisDualSet">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.argyris.</span></span><span class="sig-name descname"><span class="pre">ArgyrisDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/argyris.html#ArgyrisDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.argyris.ArgyrisDualSet" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.argyris.</span></span><span class="sig-name descname"><span class="pre">ArgyrisDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/argyris.html#ArgyrisDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.argyris.ArgyrisDualSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
@@ -782,13 +782,13 @@ points.</p>
 <span id="fiat-brezzi-douglas-marini-module"></span><h2>FIAT.brezzi_douglas_marini module<a class="headerlink" href="#module-FIAT.brezzi_douglas_marini" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.brezzi_douglas_marini.BDMDualSet">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.brezzi_douglas_marini.</span></span><span class="sig-name descname"><span class="pre">BDMDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/brezzi_douglas_marini.html#BDMDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.brezzi_douglas_marini.BDMDualSet" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.brezzi_douglas_marini.</span></span><span class="sig-name descname"><span class="pre">BDMDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/brezzi_douglas_marini.html#BDMDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.brezzi_douglas_marini.BDMDualSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.brezzi_douglas_marini.BrezziDouglasMarini">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.brezzi_douglas_marini.</span></span><span class="sig-name descname"><span class="pre">BrezziDouglasMarini</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/brezzi_douglas_marini.html#BrezziDouglasMarini"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.brezzi_douglas_marini.BrezziDouglasMarini" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.brezzi_douglas_marini.</span></span><span class="sig-name descname"><span class="pre">BrezziDouglasMarini</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/brezzi_douglas_marini.html#BrezziDouglasMarini"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.brezzi_douglas_marini.BrezziDouglasMarini" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The BDM element</p>
 <dl class="field-list simple">
@@ -1034,21 +1034,21 @@ an array of 1s with the same shape as x. This function does that.</p>
 <span id="fiat-bubble-module"></span><h2>FIAT.bubble module<a class="headerlink" href="#module-FIAT.bubble" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.bubble.Bubble">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.bubble.</span></span><span class="sig-name descname"><span class="pre">Bubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bubble.html#Bubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bubble.Bubble" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.bubble.</span></span><span class="sig-name descname"><span class="pre">Bubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bubble.html#Bubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bubble.Bubble" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.bubble.CodimBubble" title="FIAT.bubble.CodimBubble"><code class="xref py py-class docutils literal notranslate"><span class="pre">CodimBubble</span></code></a></p>
 <p>The bubble finite element: the dofs of the Lagrange FE in the interior of the cell</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.bubble.CodimBubble">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.bubble.</span></span><span class="sig-name descname"><span class="pre">CodimBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bubble.html#CodimBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bubble.CodimBubble" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.bubble.</span></span><span class="sig-name descname"><span class="pre">CodimBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bubble.html#CodimBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bubble.CodimBubble" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.restricted.RestrictedElement" title="FIAT.restricted.RestrictedElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">RestrictedElement</span></code></a></p>
 <p>Bubbles of a certain codimension.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.bubble.FacetBubble">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.bubble.</span></span><span class="sig-name descname"><span class="pre">FacetBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bubble.html#FacetBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bubble.FacetBubble" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.bubble.</span></span><span class="sig-name descname"><span class="pre">FacetBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bubble.html#FacetBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bubble.FacetBubble" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.bubble.CodimBubble" title="FIAT.bubble.CodimBubble"><code class="xref py py-class docutils literal notranslate"><span class="pre">CodimBubble</span></code></a></p>
 <p>The facet bubble finite element: the dofs of the Lagrange FE in the interior of the facets</p>
 </dd></dl>
@@ -1068,6 +1068,34 @@ an array of 1s with the same shape as x. This function does that.</p>
 <p>variant may be a single option or comma-separated pair
 indicating the dof type (integral, equispaced, spectral, etc)
 and the type of splitting to give a macro-element (Alfeld, Powell-Sabin, iso)</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.check_format_variant.parse_quadrature_scheme">
+<span class="sig-prename descclassname"><span class="pre">FIAT.check_format_variant.</span></span><span class="sig-name descname"><span class="pre">parse_quadrature_scheme</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/check_format_variant.html#parse_quadrature_scheme"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.check_format_variant.parse_quadrature_scheme" title="Link to this definition">¶</a></dt>
+<dd><p>Return a quadrature rule by parsing quad_scheme options.</p>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>ref_el: Cell</dt><dd><p>The integration cell.</p>
+</dd>
+<dt>degree: int</dt><dd><p>The maximum degree of polynomials to be integrated exactly.</p>
+</dd>
+<dt>quad_scheme: str</dt><dd><p>A single option or comma-separated pair indicating the
+quadrature rule (default, KMV, etc) and the type of splitting to give a
+composite rule (Alfeld, Powell-Sabin, iso).  Specifying KMV(p)
+overrides degree to produce the lumped scheme for order-p KMV/GLL
+elements.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>QuadratureRule</dt><dd><p>The quadrature rule.</p>
+</dd>
+</dl>
+</section>
 </dd></dl>
 
 </section>
@@ -1094,7 +1122,7 @@ this space is agumented with rotated facet bubbles if reduced = False.</p>
 <span id="fiat-crouzeix-raviart-module"></span><h2>FIAT.crouzeix_raviart module<a class="headerlink" href="#module-FIAT.crouzeix_raviart" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.crouzeix_raviart.CrouzeixRaviart">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.crouzeix_raviart.</span></span><span class="sig-name descname"><span class="pre">CrouzeixRaviart</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/crouzeix_raviart.html#CrouzeixRaviart"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.crouzeix_raviart.CrouzeixRaviart" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.crouzeix_raviart.</span></span><span class="sig-name descname"><span class="pre">CrouzeixRaviart</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/crouzeix_raviart.html#CrouzeixRaviart"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.crouzeix_raviart.CrouzeixRaviart" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The Crouzeix-Raviart finite element:</p>
 <p>K:                 Triangle/Tetrahedron
@@ -1104,7 +1132,7 @@ Dual basis:        Evaluation at points or integral moments</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.crouzeix_raviart.CrouzeixRaviartDualSet">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.crouzeix_raviart.</span></span><span class="sig-name descname"><span class="pre">CrouzeixRaviartDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/crouzeix_raviart.html#CrouzeixRaviartDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.crouzeix_raviart.CrouzeixRaviartDualSet" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.crouzeix_raviart.</span></span><span class="sig-name descname"><span class="pre">CrouzeixRaviartDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/crouzeix_raviart.html#CrouzeixRaviartDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.crouzeix_raviart.CrouzeixRaviartDualSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
@@ -2559,13 +2587,13 @@ Gauss-Radau points.</p>
 <span id="fiat-gopalakrishnan-lederer-schoberl-module"></span><h2>FIAT.gopalakrishnan_lederer_schoberl module<a class="headerlink" href="#module-FIAT.gopalakrishnan_lederer_schoberl" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.gopalakrishnan_lederer_schoberl.GLSDual">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.gopalakrishnan_lederer_schoberl.</span></span><span class="sig-name descname"><span class="pre">GLSDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/gopalakrishnan_lederer_schoberl.html#GLSDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.gopalakrishnan_lederer_schoberl.GLSDual" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.gopalakrishnan_lederer_schoberl.</span></span><span class="sig-name descname"><span class="pre">GLSDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/gopalakrishnan_lederer_schoberl.html#GLSDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.gopalakrishnan_lederer_schoberl.GLSDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.gopalakrishnan_lederer_schoberl.GopalakrishnanLedererSchoberlFirstKind">
-<span class="sig-prename descclassname"><span class="pre">FIAT.gopalakrishnan_lederer_schoberl.</span></span><span class="sig-name descname"><span class="pre">GopalakrishnanLedererSchoberlFirstKind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/gopalakrishnan_lederer_schoberl.html#GopalakrishnanLedererSchoberlFirstKind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.gopalakrishnan_lederer_schoberl.GopalakrishnanLedererSchoberlFirstKind" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.gopalakrishnan_lederer_schoberl.</span></span><span class="sig-name descname"><span class="pre">GopalakrishnanLedererSchoberlFirstKind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/gopalakrishnan_lederer_schoberl.html#GopalakrishnanLedererSchoberlFirstKind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.gopalakrishnan_lederer_schoberl.GopalakrishnanLedererSchoberlFirstKind" title="Link to this definition">¶</a></dt>
 <dd><p>The GLS element used for the Mass-Conserving mixed Stress (MCS)
 formulation for Stokes flow.</p>
 <p>GLS^1(k) is the space of trace-free polynomials of degree k with
@@ -2575,7 +2603,7 @@ continuous normal-tangential components of degree k-1.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.gopalakrishnan_lederer_schoberl.GopalakrishnanLedererSchoberlSecondKind">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.gopalakrishnan_lederer_schoberl.</span></span><span class="sig-name descname"><span class="pre">GopalakrishnanLedererSchoberlSecondKind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/gopalakrishnan_lederer_schoberl.html#GopalakrishnanLedererSchoberlSecondKind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.gopalakrishnan_lederer_schoberl.GopalakrishnanLedererSchoberlSecondKind" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.gopalakrishnan_lederer_schoberl.</span></span><span class="sig-name descname"><span class="pre">GopalakrishnanLedererSchoberlSecondKind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/gopalakrishnan_lederer_schoberl.html#GopalakrishnanLedererSchoberlSecondKind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.gopalakrishnan_lederer_schoberl.GopalakrishnanLedererSchoberlSecondKind" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The GLS element used for the Mass-Conserving mixed Stress (MCS)
 formulation for Stokes flow with weakly imposed stress symmetry.</p>
@@ -2691,13 +2719,13 @@ kind = 2 gives C0 Pk(Alfeld)^d + GN bubbles.</p></li>
 <span id="fiat-hct-module"></span><h2>FIAT.hct module<a class="headerlink" href="#module-FIAT.hct" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.hct.HCTDualSet">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hct.</span></span><span class="sig-name descname"><span class="pre">HCTDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hct.html#HCTDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hct.HCTDualSet" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hct.</span></span><span class="sig-name descname"><span class="pre">HCTDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hct.html#HCTDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hct.HCTDualSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.hct.HsiehCloughTocher">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hct.</span></span><span class="sig-name descname"><span class="pre">HsiehCloughTocher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hct.html#HsiehCloughTocher"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hct.HsiehCloughTocher" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hct.</span></span><span class="sig-name descname"><span class="pre">HsiehCloughTocher</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hct.html#HsiehCloughTocher"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hct.HsiehCloughTocher" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The HCT macroelement. For degree higher than 3, we implement the
 super-smooth C^1 space from Groselj and Knez (2022) on a barycentric split,
@@ -2897,7 +2925,7 @@ of dimension (n-1).</p>
 <p>Implementation of the Hellan-Herrmann-Johnson finite elements.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.hellan_herrmann_johnson.HellanHerrmannJohnson">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hellan_herrmann_johnson.</span></span><span class="sig-name descname"><span class="pre">HellanHerrmannJohnson</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hellan_herrmann_johnson.html#HellanHerrmannJohnson"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hellan_herrmann_johnson.HellanHerrmannJohnson" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hellan_herrmann_johnson.</span></span><span class="sig-name descname"><span class="pre">HellanHerrmannJohnson</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hellan_herrmann_johnson.html#HellanHerrmannJohnson"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hellan_herrmann_johnson.HellanHerrmannJohnson" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The definition of Hellan-Herrmann-Johnson element.
 HHJ(k) is the space of symmetric-matrix-valued polynomials of degree k
@@ -2906,7 +2934,7 @@ or less with normal-normal continuity.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.hellan_herrmann_johnson.HellanHerrmannJohnsonDual">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hellan_herrmann_johnson.</span></span><span class="sig-name descname"><span class="pre">HellanHerrmannJohnsonDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qdegree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hellan_herrmann_johnson.html#HellanHerrmannJohnsonDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hellan_herrmann_johnson.HellanHerrmannJohnsonDual" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hellan_herrmann_johnson.</span></span><span class="sig-name descname"><span class="pre">HellanHerrmannJohnsonDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qdegree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hellan_herrmann_johnson.html#HellanHerrmannJohnsonDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hellan_herrmann_johnson.HellanHerrmannJohnsonDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
@@ -2934,14 +2962,14 @@ equispaced points.</p>
 <span id="fiat-hierarchical-module"></span><h2>FIAT.hierarchical module<a class="headerlink" href="#module-FIAT.hierarchical" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.hierarchical.IntegratedLegendre">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">IntegratedLegendre</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#IntegratedLegendre"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.IntegratedLegendre" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">IntegratedLegendre</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#IntegratedLegendre"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.IntegratedLegendre" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>Simplicial continuous element with integrated Legendre polynomials.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.hierarchical.IntegratedLegendreDual">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">IntegratedLegendreDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#IntegratedLegendreDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.IntegratedLegendreDual" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">IntegratedLegendreDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#IntegratedLegendreDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.IntegratedLegendreDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 <p>The dual basis for integrated Legendre elements.</p>
 </dd></dl>
@@ -2955,14 +2983,14 @@ equispaced points.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.hierarchical.LegendreDual">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">LegendreDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#LegendreDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.LegendreDual" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">LegendreDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#LegendreDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.LegendreDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 <p>The dual basis for Legendre elements.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.hierarchical.make_dual_bubbles">
-<span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">make_dual_bubbles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#make_dual_bubbles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.make_dual_bubbles" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.hierarchical.</span></span><span class="sig-name descname"><span class="pre">make_dual_bubbles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/hierarchical.html#make_dual_bubbles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.hierarchical.make_dual_bubbles" title="Link to this definition">¶</a></dt>
 <dd><p>Tabulate the L2-duals of the hierarchical C0 basis.</p>
 </dd></dl>
 
@@ -3053,14 +3081,14 @@ columns correspond to the points.</p>
 <span id="fiat-johnson-mercier-module"></span><h2>FIAT.johnson_mercier module<a class="headerlink" href="#module-FIAT.johnson_mercier" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.johnson_mercier.JohnsonMercier">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.johnson_mercier.</span></span><span class="sig-name descname"><span class="pre">JohnsonMercier</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/johnson_mercier.html#JohnsonMercier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.johnson_mercier.JohnsonMercier" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.johnson_mercier.</span></span><span class="sig-name descname"><span class="pre">JohnsonMercier</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/johnson_mercier.html#JohnsonMercier"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.johnson_mercier.JohnsonMercier" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The Johnson-Mercier finite element.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.johnson_mercier.JohnsonMercierDualSet">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.johnson_mercier.</span></span><span class="sig-name descname"><span class="pre">JohnsonMercierDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/johnson_mercier.html#JohnsonMercierDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.johnson_mercier.JohnsonMercierDualSet" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.johnson_mercier.</span></span><span class="sig-name descname"><span class="pre">JohnsonMercierDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/johnson_mercier.html#JohnsonMercierDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.johnson_mercier.JohnsonMercierDualSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
@@ -3069,7 +3097,7 @@ columns correspond to the points.</p>
 <span id="fiat-kong-mulder-veldhuizen-module"></span><h2>FIAT.kong_mulder_veldhuizen module<a class="headerlink" href="#module-FIAT.kong_mulder_veldhuizen" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.kong_mulder_veldhuizen.KongMulderVeldhuizen">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.kong_mulder_veldhuizen.</span></span><span class="sig-name descname"><span class="pre">KongMulderVeldhuizen</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/kong_mulder_veldhuizen.html#KongMulderVeldhuizen"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.kong_mulder_veldhuizen.KongMulderVeldhuizen" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.kong_mulder_veldhuizen.</span></span><span class="sig-name descname"><span class="pre">KongMulderVeldhuizen</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/kong_mulder_veldhuizen.html#KongMulderVeldhuizen"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.kong_mulder_veldhuizen.KongMulderVeldhuizen" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The “lumped” simplical finite element (NB: requires custom quad. “KMV” points to achieve a diagonal mass matrix).</p>
 <section id="references">
@@ -3095,13 +3123,13 @@ W. A. MULDER</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.kong_mulder_veldhuizen.KongMulderVeldhuizenSpace">
-<span class="sig-prename descclassname"><span class="pre">FIAT.kong_mulder_veldhuizen.</span></span><span class="sig-name descname"><span class="pre">KongMulderVeldhuizenSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/kong_mulder_veldhuizen.html#KongMulderVeldhuizenSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.kong_mulder_veldhuizen.KongMulderVeldhuizenSpace" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.kong_mulder_veldhuizen.</span></span><span class="sig-name descname"><span class="pre">KongMulderVeldhuizenSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/kong_mulder_veldhuizen.html#KongMulderVeldhuizenSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.kong_mulder_veldhuizen.KongMulderVeldhuizenSpace" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.kong_mulder_veldhuizen.bump">
 <span class="sig-prename descclassname"><span class="pre">FIAT.kong_mulder_veldhuizen.</span></span><span class="sig-name descname"><span class="pre">bump</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">T</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/kong_mulder_veldhuizen.html#bump"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.kong_mulder_veldhuizen.bump" title="Link to this definition">¶</a></dt>
-<dd><p>Increase degree of polynomial along face/edges</p>
+<dd><p>Return a tuple with the degree raise for each codimension</p>
 </dd></dl>
 
 </section>
@@ -3641,7 +3669,7 @@ and average of normal derivative on codim=1 entities.</p>
 <span id="fiat-nedelec-module"></span><h2>FIAT.nedelec module<a class="headerlink" href="#module-FIAT.nedelec" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.nedelec.Nedelec">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec.</span></span><span class="sig-name descname"><span class="pre">Nedelec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec.html#Nedelec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec.Nedelec" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec.</span></span><span class="sig-name descname"><span class="pre">Nedelec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec.html#Nedelec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec.Nedelec" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>Nedelec finite element</p>
 <dl class="field-list simple">
@@ -3667,7 +3695,7 @@ interpolation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.nedelec.NedelecDual">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec.</span></span><span class="sig-name descname"><span class="pre">NedelecDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec.html#NedelecDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec.NedelecDual" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec.</span></span><span class="sig-name descname"><span class="pre">NedelecDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec.html#NedelecDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec.NedelecDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 <p>Dual basis for first-kind Nedelec.</p>
 </dd></dl>
@@ -3690,7 +3718,7 @@ which is (P_{degree-1})^2 + P_{degree-1} rot( x )</p>
 <span id="fiat-nedelec-second-kind-module"></span><h2>FIAT.nedelec_second_kind module<a class="headerlink" href="#module-FIAT.nedelec_second_kind" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.nedelec_second_kind.NedelecSecondKind">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec_second_kind.</span></span><span class="sig-name descname"><span class="pre">NedelecSecondKind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec_second_kind.html#NedelecSecondKind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec_second_kind.NedelecSecondKind" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec_second_kind.</span></span><span class="sig-name descname"><span class="pre">NedelecSecondKind</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec_second_kind.html#NedelecSecondKind"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec_second_kind.NedelecSecondKind" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The H(curl) Nedelec elements of the second kind on triangles and
 tetrahedra: the polynomial space described by the full polynomials
@@ -3719,7 +3747,7 @@ interpolation.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.nedelec_second_kind.NedelecSecondKindDual">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec_second_kind.</span></span><span class="sig-name descname"><span class="pre">NedelecSecondKindDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec_second_kind.html#NedelecSecondKindDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec_second_kind.NedelecSecondKindDual" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.nedelec_second_kind.</span></span><span class="sig-name descname"><span class="pre">NedelecSecondKindDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec_second_kind.html#NedelecSecondKindDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec_second_kind.NedelecSecondKindDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 <p>This class represents the dual basis for the Nedelec H(curl)
 elements of the second kind. The degrees of freedom (L) for the
@@ -3741,7 +3769,7 @@ elements of the k’th degree are</p>
 these elements coincide with the CG_k elements.)</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="FIAT.nedelec_second_kind.NedelecSecondKindDual.generate_degrees_of_freedom">
-<span class="sig-name descname"><span class="pre">generate_degrees_of_freedom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec_second_kind.html#NedelecSecondKindDual.generate_degrees_of_freedom"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec_second_kind.NedelecSecondKindDual.generate_degrees_of_freedom" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">generate_degrees_of_freedom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/nedelec_second_kind.html#NedelecSecondKindDual.generate_degrees_of_freedom"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.nedelec_second_kind.NedelecSecondKindDual.generate_degrees_of_freedom" title="Link to this definition">¶</a></dt>
 <dd><p>Generate dofs and geometry-to-dof maps (ids).</p>
 </dd></dl>
 
@@ -4541,7 +4569,7 @@ Mathematics with Applications, vol. 59, no. 2, pp. 663-676, 2010.
 <span id="fiat-raviart-thomas-module"></span><h2>FIAT.raviart_thomas module<a class="headerlink" href="#module-FIAT.raviart_thomas" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.raviart_thomas.RTDualSet">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.raviart_thomas.</span></span><span class="sig-name descname"><span class="pre">RTDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/raviart_thomas.html#RTDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.raviart_thomas.RTDualSet" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.raviart_thomas.</span></span><span class="sig-name descname"><span class="pre">RTDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interpolant_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/raviart_thomas.html#RTDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.raviart_thomas.RTDualSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 <p>Dual basis for Raviart-Thomas elements consisting of point
 evaluation of normals on facets of codimension 1 and internal
@@ -4557,7 +4585,7 @@ moments against polynomials</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.raviart_thomas.RaviartThomas">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.raviart_thomas.</span></span><span class="sig-name descname"><span class="pre">RaviartThomas</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/raviart_thomas.html#RaviartThomas"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.raviart_thomas.RaviartThomas" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.raviart_thomas.</span></span><span class="sig-name descname"><span class="pre">RaviartThomas</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/raviart_thomas.html#RaviartThomas"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.raviart_thomas.RaviartThomas" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The Raviart Thomas element</p>
 <dl class="field-list simple">
@@ -4633,15 +4661,15 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="parameters">
-<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<section id="id6">
+<h3>Parameters<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="returns">
-<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<section id="id7">
+<h3>Returns<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
@@ -4653,8 +4681,8 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id6">
-<h3>Parameters<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<section id="id8">
+<h3>Parameters<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
@@ -4662,8 +4690,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id7">
-<h3>Returns<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<section id="id9">
+<h3>Returns<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
@@ -4675,8 +4703,8 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extrinsic_orientation_permutation_map">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.Cell.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id8">
-<h3>Notes<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<section id="id10">
+<h3>Notes<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -4784,6 +4812,12 @@ contained in the iterable t.</p>
 <dd></dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.Cell.point_entity_ids">
+<span class="sig-name descname"><span class="pre">point_entity_ids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.point_entity_ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.point_entity_ids" title="Link to this definition">¶</a></dt>
+<dd><p>Returns the topological entity association for points on this cell.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.symmetry_group_size">
 <span class="sig-name descname"><span class="pre">symmetry_group_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dim</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.symmetry_group_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.symmetry_group_size" title="Link to this definition">¶</a></dt>
 <dd><p>Returns the size of the symmetry group of an entity of
@@ -4868,8 +4902,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id9">
-<h3>Parameters<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<section id="id11">
+<h3>Parameters<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -4877,8 +4911,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id10">
-<h3>Returns<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<section id="id12">
+<h3>Returns<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -4911,6 +4945,12 @@ spatial dimension.</p>
 </ul>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.Hypercube.point_entity_ids">
+<span class="sig-name descname"><span class="pre">point_entity_ids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Hypercube.point_entity_ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Hypercube.point_entity_ids" title="Link to this definition">¶</a></dt>
+<dd><p>Return the topological entity association for points on this cell.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -5126,8 +5166,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhatten’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id11">
-<h3>Parameters<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<section id="id13">
+<h3>Parameters<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5137,8 +5177,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 </dd>
 </dl>
 </section>
-<section id="id12">
-<h3>Returns<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<section id="id14">
+<h3>Returns<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5148,8 +5188,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <span class="sig-name descname"><span class="pre">distance_to_point_l1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.distance_to_point_l1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.distance_to_point_l1" title="Link to this definition">¶</a></dt>
 <dd><p>Get the L1 distance (aka ‘manhatten’, ‘taxicab’ or rectilinear
 distance) from an entity to a point with 0.0 if the point is inside the entity.</p>
-<section id="id13">
-<h3>Parameters<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
+<section id="id15">
+<h3>Parameters<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>points<span class="classifier">numpy.ndarray or list</span></dt><dd><p>The coordinates of the points.</p>
 </dd>
@@ -5161,8 +5201,8 @@ for points opposite to a single facet.</p>
 </dd>
 </dl>
 </section>
-<section id="id14">
-<h3>Returns<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
+<section id="id16">
+<h3>Returns<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>numpy.float64 or numpy.ndarray</dt><dd><p>The L1 distance, also known as taxicab, manhatten or rectilinear
 distance, of the cell to the point. If 0.0 the point is inside the
@@ -5170,8 +5210,8 @@ cell.</p>
 </dd>
 </dl>
 </section>
-<section id="id15">
-<h3>Notes<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
+<section id="id17">
+<h3>Notes<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
 <p>This is done with the help of barycentric coordinates where the general
 algorithm is to compute the most negative (i.e. minimum) barycentric
 coordinate then return its negative. For implementation reasons we
@@ -5221,7 +5261,7 @@ sphinx):</p>
 </pre></div>
 </div>
 <dl>
-<dt><a href="#id16"><span class="problematic" id="id17">``</span></a><a href="#id18"><span class="problematic" id="id19">`</span></a></dt><dd><blockquote>
+<dt><a href="#id18"><span class="problematic" id="id19">``</span></a><a href="#id20"><span class="problematic" id="id21">`</span></a></dt><dd><blockquote>
 <div><p>y-axis
 |
 |</p>
@@ -5257,7 +5297,7 @@ sphinx):</p>
 <p>(0,0) |         (1,0)</p>
 </dd>
 </dl>
-<p><a href="#id20"><span class="problematic" id="id21">``</span></a><a href="#id22"><span class="problematic" id="id23">`</span></a></p>
+<p><a href="#id22"><span class="problematic" id="id23">``</span></a><a href="#id24"><span class="problematic" id="id25">`</span></a></p>
 <dl class="simple">
 <dt>Barycentric coordinates are defined as</dt><dd><p><cite>X = alpha * P0 + beta * P1 + gamma * P2</cite> where
 <cite>alpha + beta + gamma = 1.0</cite>.</p>
@@ -5307,15 +5347,15 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id24">
-<h3>Parameters<a class="headerlink" href="#id24" title="Link to this heading">¶</a></h3>
+<section id="id26">
+<h3>Parameters<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id25">
-<h3>Returns<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<section id="id27">
+<h3>Returns<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
@@ -5327,8 +5367,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id26">
-<h3>Parameters<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<section id="id28">
+<h3>Parameters<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
@@ -5336,8 +5376,8 @@ actual distance to the tetrahedron.</p>
 </dd>
 </dl>
 </section>
-<section id="id27">
-<h3>Returns<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
+<section id="id29">
+<h3>Returns<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
@@ -5349,8 +5389,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id28">
-<h3>Notes<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
+<section id="id30">
+<h3>Notes<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -5384,6 +5424,12 @@ spatial dimension.</p>
 <dd><p>Constructs a lattice of points on the entity_id:th
 facet of dimension dim.  Order indicates how many points to
 include in each direction.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.point_entity_ids">
+<span class="sig-name descname"><span class="pre">point_entity_ids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.point_entity_ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.point_entity_ids" title="Link to this definition">¶</a></dt>
+<dd><p>Return the topological entity association for points on this cell.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -5473,8 +5519,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id29">
-<h3>Parameters<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
+<section id="id31">
+<h3>Parameters<a class="headerlink" href="#id31" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5482,8 +5528,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id30">
-<h3>Returns<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
+<section id="id32">
+<h3>Returns<a class="headerlink" href="#id32" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5500,22 +5546,22 @@ distance) to a point with 0.0 if the point is inside the cell.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id31">
-<h3>Parameters<a class="headerlink" href="#id31" title="Link to this heading">¶</a></h3>
+<section id="id33">
+<h3>Parameters<a class="headerlink" href="#id33" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id32">
-<h3>Returns<a class="headerlink" href="#id32" title="Link to this heading">¶</a></h3>
+<section id="id34">
+<h3>Returns<a class="headerlink" href="#id34" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id33">
-<h3>Notes<a class="headerlink" href="#id33" title="Link to this heading">¶</a></h3>
+<section id="id35">
+<h3>Notes<a class="headerlink" href="#id35" title="Link to this heading">¶</a></h3>
 <p>The difinition of orientations used here must be consistent with
 that used in make_entity_permutations_tensorproduct.</p>
 </section>
@@ -5525,8 +5571,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id34">
-<h3>Parameters<a class="headerlink" href="#id34" title="Link to this heading">¶</a></h3>
+<section id="id36">
+<h3>Parameters<a class="headerlink" href="#id36" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation. <code class="docutils literal notranslate"><span class="pre">//</span></code> and <code class="docutils literal notranslate"><span class="pre">%</span></code> must be overloaded in type(o).</p>
 </dd>
@@ -5534,15 +5580,15 @@ that used in make_entity_permutations_tensorproduct.</p>
 </dd>
 </dl>
 </section>
-<section id="id35">
-<h3>Returns<a class="headerlink" href="#id35" title="Link to this heading">¶</a></h3>
+<section id="id37">
+<h3>Returns<a class="headerlink" href="#id37" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id36">
-<h3>Notes<a class="headerlink" href="#id36" title="Link to this heading">¶</a></h3>
+<section id="id38">
+<h3>Notes<a class="headerlink" href="#id38" title="Link to this heading">¶</a></h3>
 <p>Must be consistent with make_entity_permutations_tensorproduct.</p>
 </section>
 </dd></dl>
@@ -5551,8 +5597,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id37">
-<h3>Notes<a class="headerlink" href="#id37" title="Link to this heading">¶</a></h3>
+<section id="id39">
+<h3>Notes<a class="headerlink" href="#id39" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -5584,6 +5630,12 @@ dimensions for each cell in the product.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.is_macrocell">
 <span class="sig-name descname"><span class="pre">is_macrocell</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.is_macrocell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.is_macrocell" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.point_entity_ids">
+<span class="sig-name descname"><span class="pre">point_entity_ids</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-10</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.point_entity_ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.point_entity_ids" title="Link to this definition">¶</a></dt>
+<dd><p>Return the topological entity association for points on this cell.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.symmetry_group_size">
@@ -5857,7 +5909,7 @@ the UFC reference simplex of that dimension.</p>
 <p>Implementation of the generalized Regge finite elements.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.regge.Regge">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.regge.</span></span><span class="sig-name descname"><span class="pre">Regge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/regge.html#Regge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.regge.Regge" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.regge.</span></span><span class="sig-name descname"><span class="pre">Regge</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/regge.html#Regge"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.regge.Regge" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The generalized Regge elements for symmetric-matrix-valued functions.
 REG(k) is the space of symmetric-matrix-valued polynomials of degree k
@@ -5866,7 +5918,7 @@ or less with tangential-tangential continuity.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.regge.ReggeDual">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.regge.</span></span><span class="sig-name descname"><span class="pre">ReggeDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qdegree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/regge.html#ReggeDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.regge.ReggeDual" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">FIAT.regge.</span></span><span class="sig-name descname"><span class="pre">ReggeDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variant</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qdegree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/regge.html#ReggeDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.regge.ReggeDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
@@ -6333,6 +6385,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#module-FIAT.check_format_variant">FIAT.check_format_variant module</a><ul>
 <li><a class="reference internal" href="#FIAT.check_format_variant.check_format_variant"><code class="docutils literal notranslate"><span class="pre">check_format_variant()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.check_format_variant.parse_lagrange_variant"><code class="docutils literal notranslate"><span class="pre">parse_lagrange_variant()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.check_format_variant.parse_quadrature_scheme"><code class="docutils literal notranslate"><span class="pre">parse_quadrature_scheme()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.christiansen_hu">FIAT.christiansen_hu module</a><ul>
@@ -6889,6 +6942,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.is_macrocell"><code class="docutils literal notranslate"><span class="pre">Cell.is_macrocell()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.is_parent"><code class="docutils literal notranslate"><span class="pre">Cell.is_parent()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.is_simplex"><code class="docutils literal notranslate"><span class="pre">Cell.is_simplex()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.Cell.point_entity_ids"><code class="docutils literal notranslate"><span class="pre">Cell.point_entity_ids()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Cell.symmetry_group_size"><code class="docutils literal notranslate"><span class="pre">Cell.symmetry_group_size()</span></code></a></li>
 </ul>
 </li>
@@ -6907,6 +6961,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.distance_to_point_l1"><code class="docutils literal notranslate"><span class="pre">Hypercube.distance_to_point_l1()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.get_dimension"><code class="docutils literal notranslate"><span class="pre">Hypercube.get_dimension()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.get_entity_transform"><code class="docutils literal notranslate"><span class="pre">Hypercube.get_entity_transform()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.Hypercube.point_entity_ids"><code class="docutils literal notranslate"><span class="pre">Hypercube.point_entity_ids()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.symmetry_group_size"><code class="docutils literal notranslate"><span class="pre">Hypercube.symmetry_group_size()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.Hypercube.volume"><code class="docutils literal notranslate"><span class="pre">Hypercube.volume()</span></code></a></li>
 </ul>
@@ -6951,6 +7006,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.SimplicialComplex.get_dimension"><code class="docutils literal notranslate"><span class="pre">SimplicialComplex.get_dimension()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.SimplicialComplex.get_entity_transform"><code class="docutils literal notranslate"><span class="pre">SimplicialComplex.get_entity_transform()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.SimplicialComplex.make_points"><code class="docutils literal notranslate"><span class="pre">SimplicialComplex.make_points()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.SimplicialComplex.point_entity_ids"><code class="docutils literal notranslate"><span class="pre">SimplicialComplex.point_entity_ids()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.SimplicialComplex.volume"><code class="docutils literal notranslate"><span class="pre">SimplicialComplex.volume()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.SimplicialComplex.volume_of_subcomplex"><code class="docutils literal notranslate"><span class="pre">SimplicialComplex.volume_of_subcomplex()</span></code></a></li>
 </ul>
@@ -6973,6 +7029,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.TensorProductCell.get_dimension"><code class="docutils literal notranslate"><span class="pre">TensorProductCell.get_dimension()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.TensorProductCell.get_entity_transform"><code class="docutils literal notranslate"><span class="pre">TensorProductCell.get_entity_transform()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.TensorProductCell.is_macrocell"><code class="docutils literal notranslate"><span class="pre">TensorProductCell.is_macrocell()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.reference_element.TensorProductCell.point_entity_ids"><code class="docutils literal notranslate"><span class="pre">TensorProductCell.point_entity_ids()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.TensorProductCell.symmetry_group_size"><code class="docutils literal notranslate"><span class="pre">TensorProductCell.symmetry_group_size()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.TensorProductCell.volume"><code class="docutils literal notranslate"><span class="pre">TensorProductCell.volume()</span></code></a></li>
 </ul>

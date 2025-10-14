@@ -37,9 +37,8 @@
             
   <h1>Source code for FIAT.gopalakrishnan_lederer_schoberl</h1><div class="highlight"><pre>
 <span></span><span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">expansions</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_format_variant</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_format_variant</span><span class="p">,</span> <span class="n">parse_quadrature_scheme</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">TensorBidirectionalIntegralMoment</span> <span class="k">as</span> <span class="n">BidirectionalMoment</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.restricted</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestrictedElement</span>
 
@@ -47,7 +46,7 @@
 <div class="viewcode-block" id="GLSDual">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.gopalakrishnan_lederer_schoberl.GLSDual">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">GLSDual</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
@@ -61,7 +60,7 @@
                 <span class="k">continue</span>
 
             <span class="n">ref_facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span>
-            <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span>
+            <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">parse_quadrature_scheme</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">q</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
             <span class="n">P</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
             <span class="n">phis</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">dim</span><span class="p">]</span>
 
@@ -98,7 +97,7 @@
 <span class="sd">    the weak symmetry constraint.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 
         <span class="n">splitting</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="k">assert</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;integral&quot;</span>
@@ -107,7 +106,7 @@
             <span class="n">ref_el</span> <span class="o">=</span> <span class="n">splitting</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
 
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">TracelessTensorPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
-        <span class="n">dual</span> <span class="o">=</span> <span class="n">GLSDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">GLSDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
         <span class="n">mapping</span> <span class="o">=</span> <span class="s2">&quot;covariant contravariant piola&quot;</span>
@@ -117,7 +116,7 @@
 
 <div class="viewcode-block" id="GopalakrishnanLedererSchoberlFirstKind">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.gopalakrishnan_lederer_schoberl.GopalakrishnanLedererSchoberlFirstKind">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">GopalakrishnanLedererSchoberlFirstKind</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">GopalakrishnanLedererSchoberlFirstKind</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The GLS element used for the Mass-Conserving mixed Stress (MCS)</span>
 <span class="sd">    formulation for Stokes flow.</span>
 
@@ -126,7 +125,7 @@
 
 <span class="sd">    Reference: https://doi.org/10.1093/imanum/drz022</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">fe</span> <span class="o">=</span> <span class="n">GopalakrishnanLedererSchoberlSecondKind</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">)</span>
+    <span class="n">fe</span> <span class="o">=</span> <span class="n">GopalakrishnanLedererSchoberlSecondKind</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
     <span class="n">entity_dofs</span> <span class="o">=</span> <span class="n">fe</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="n">facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>

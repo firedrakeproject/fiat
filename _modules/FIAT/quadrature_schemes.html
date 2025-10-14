@@ -72,7 +72,9 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">QuadratureRule</span><span class="p">,</span> <span class="n">FacetQuadratureRule</span><span class="p">,</span> <span class="n">make_quadrature</span><span class="p">,</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">FacetQuadratureRule</span><span class="p">,</span>
+                             <span class="n">GaussLobattoLegendreQuadratureLineRule</span><span class="p">,</span>
+                             <span class="n">QuadratureRule</span><span class="p">,</span> <span class="n">make_quadrature</span><span class="p">,</span>
                              <span class="n">make_tensor_product_quadrature</span><span class="p">,</span> <span class="n">map_quadrature</span><span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">HEXAHEDRON</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="n">TENSORPRODUCT</span><span class="p">,</span>
                                     <span class="n">TETRAHEDRON</span><span class="p">,</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">symmetric_simplex</span><span class="p">,</span> <span class="n">ufc_simplex</span><span class="p">)</span>
@@ -159,7 +161,10 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Specialized quadrature schemes for P &lt; 6 for KMV simplical elements.&quot;&quot;&quot;</span>
 
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-    <span class="k">if</span> <span class="n">sd</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">}:</span>
+    <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">num_points</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">GaussLobattoLegendreQuadratureLineRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">num_points</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">sd</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Dimension not supported&quot;</span><span class="p">)</span>
 
     <span class="n">T</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span>
