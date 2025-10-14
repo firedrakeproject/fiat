@@ -265,6 +265,10 @@ class Cell:
         """
         raise NotImplementedError("Should be implemented in a subclass.")
 
+    def point_entity_ids(self, points, tol=1E-10):
+        """Returns the topological entity association for points on this cell."""
+        raise NotImplementedError("Should be implemented in a subclass.")
+
     def symmetry_group_size(self, dim):
         """Returns the size of the symmetry group of an entity of
         dimension `dim`."""
@@ -796,6 +800,27 @@ class SimplicialComplex(Cell):
         """
         return self.distance_to_point_l1(point, entity=entity) <= epsilon
 
+    def point_entity_ids(self, points, tol=1e-10):
+        """Return the topological entity association for points on this cell."""
+        sd = self.get_spatial_dimension()
+        top = self.get_topology()
+        invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
+
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        seen = set()
+        for cell in top[sd]:
+            cell_verts = top[sd][cell]
+            bary = self.compute_barycentric_coordinates(points, entity=(sd, cell))
+            for i in numpy.lexsort(bary.T).tolist():
+                if (i in seen) or (bary[i] < -tol).any():
+                    continue
+                entity_verts = numpy.flatnonzero(bary[i] > tol)
+                verts = tuple(cell_verts[v] for v in entity_verts)
+                dim, entity = invtop[verts]
+                entity_ids[dim][entity].append(i)
+                seen.add(i)
+        return entity_ids
+
     def extract_extrinsic_orientation(self, o):
         """Extract extrinsic orientation.
 
@@ -1261,6 +1286,26 @@ class TensorProductCell(Cell):
         return sum(c.distance_to_point_l1(point[..., s], rescale=rescale)
                    for c, s in zip(self.cells, point_slices))
 
+    def point_entity_ids(self, points, tol=1e-10):
+        """Return the topological entity association for points on this cell."""
+        points = numpy.asarray(points)
+        cur = 0
+        factor_ids = []
+        for factor in self.cells:
+            dim = factor.get_spatial_dimension()
+            pts = points[:, cur:cur+dim]
+            factor_ids.append(factor.point_entity_ids(pts, tol=tol))
+            cur += dim
+
+        top = self.get_topology()
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        for dims in product(*factor_ids):
+            pieces = [A[d] for A, d in zip(factor_ids, dims)]
+            for entity, entities in enumerate(product(*pieces)):
+                ids = [set(A[d][e]) for A, d, e in zip(factor_ids, dims, entities)]
+                entity_ids[dims][entity].extend(sorted(set.intersection(*ids)))
+        return entity_ids
+
     def symmetry_group_size(self, dim):
         return tuple(c.symmetry_group_size(d) for d, c in zip(dim, self.cells))
 
@@ -1445,6 +1490,17 @@ class Hypercube(Cell):
 
         For more information see the docstring for the UFCSimplex method."""
         return self.product.distance_to_point_l1(point, rescale=rescale)
+
+    def point_entity_ids(self, points, tol=1E-10):
+        """Return the topological entity association for points on this cell."""
+        entity_ids = {}
+        product_ids = self.product.point_entity_ids(points, tol=tol)
+        for dim in self.topology:
+            entity_ids[dim] = {}
+            for entity in self.topology[dim]:
+                d, e = self.unflattening_map[(dim, entity)]
+                entity_ids[dim][entity] = product_ids[d][e]
+        return entity_ids
 
     def symmetry_group_size(self, dim):
         """Size of hypercube symmetry group is d! * 2**d"""
@@ -1790,49 +1846,3 @@ def max_complex(complexes):
         return max_cell
     else:
         raise ValueError("Cannot find the maximal complex")
-
-
-def point_entity_ids(ref_el, points, tol=1e-10):
-    """Return the topological entity association for points on a cell."""
-    top = ref_el.get_topology()
-    entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-    if isinstance(ref_el, Hypercube):
-        product_ids = point_entity_ids(ref_el.product, points, tol=tol)
-        for dim in entity_ids:
-            for entity in entity_ids[dim]:
-                d, e = ref_el.unflattening_map[(dim, entity)]
-                entity_ids[dim][entity] = product_ids[d][e]
-
-    elif isinstance(ref_el, TensorProductCell):
-        points = numpy.asarray(points)
-        cur = 0
-        flat_ids = []
-        for f in ref_el.cells:
-            dim = f.get_spatial_dimension()
-            pts = points[:, cur:cur+dim]
-            flat_ids.append(point_entity_ids(f, pts, tol=tol))
-            cur += dim
-        for dims in product(*flat_ids):
-            pieces = [A[d] for A, d in zip(flat_ids, dims)]
-            for entity, entities in enumerate(product(*pieces)):
-                ids = [set(A[d][e]) for A, d, e in zip(flat_ids, dims, entities)]
-                entity_ids[dims][entity].extend(sorted(set.intersection(*ids)))
-
-    elif isinstance(ref_el, SimplicialComplex):
-        sd = ref_el.get_spatial_dimension()
-        invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
-        seen = set()
-        for cell in top[sd]:
-            cell_verts = top[sd][cell]
-            bary = ref_el.compute_barycentric_coordinates(points, entity=(sd, cell))
-            for i in numpy.lexsort(bary.T).tolist():
-                if (i in seen) or (bary[i] < -tol).any():
-                    continue
-                entity_verts = numpy.flatnonzero(bary[i] > tol)
-                verts = tuple(cell_verts[v] for v in entity_verts)
-                dim, entity = invtop[verts]
-                entity_ids[dim][entity].append(i)
-                seen.add(i)
-    else:
-        raise NotImplementedError(f"point_entity_ids not implemented for {type(ref_el).__name__}")
-    return entity_ids

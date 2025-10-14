@@ -11,8 +11,7 @@ from FIAT.check_format_variant import parse_lagrange_variant
 from FIAT.expansions import polynomial_entity_ids
 from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import (LINE, TRIANGLE, TETRAHEDRON,
-                                    point_entity_ids)
+from FIAT.reference_element import LINE, TRIANGLE, TETRAHEDRON
 import math
 
 
@@ -62,7 +61,7 @@ class KongMulderVeldhuizenDualSet(dual_set.DualSet):
     def __init__(self, ref_el, degree):
         Q = create_quadrature(ref_el, degree, scheme="KMV")
         points = Q.get_points()
-        entity_ids = point_entity_ids(ref_el, points)
+        entity_ids = ref_el.point_entity_ids(points)
         nodes = [functional.PointEvaluation(ref_el, x) for x in points]
         super().__init__(nodes, ref_el, entity_ids)
 

@@ -3,7 +3,6 @@ from finat.point_set import UnknownPointSet, FacetPointSet
 import numpy
 
 import FIAT
-from FIAT.reference_element import point_entity_ids
 
 import gem
 from gem.interpreter import evaluate
@@ -72,7 +71,7 @@ class QuadratureElement(FiniteElementBase):
         ps = self._rule.point_set
         sd = self.cell.get_spatial_dimension()
         if not isinstance(ps, UnknownPointSet) and ps.dimension == sd:
-            return point_entity_ids(self.cell, ps.points)
+            return self.cell.point_entity_ids(ps.points)
 
         top = self.cell.get_topology()
         entity_dofs = {dim: {entity: [] for entity in entities}
