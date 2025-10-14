@@ -1291,13 +1291,9 @@ class TensorProductCell(Cell):
     def point_entity_ids(self, points, tol=1e-10):
         """Return the topological entity association for points on this cell."""
         points = numpy.asarray(points)
-        cur = 0
-        factor_ids = []
-        for factor in self.cells:
-            dim = factor.get_spatial_dimension()
-            pts = points[:, cur:cur+dim]
-            factor_ids.append(factor.point_entity_ids(pts, tol=tol))
-            cur += dim
+        point_slices = TensorProductCell._split_slices(self.get_dimension())
+        factor_ids = [c.point_entity_ids(points[..., s], tol=tol)
+                      for c, s in zip(self.cells, point_slices)]
 
         top = self.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
