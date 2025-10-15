@@ -34,7 +34,9 @@ Background on the schemes:
 
 import numpy
 
-from FIAT.quadrature import (QuadratureRule, FacetQuadratureRule, make_quadrature,
+from FIAT.quadrature import (FacetQuadratureRule,
+                             GaussLobattoLegendreQuadratureLineRule,
+                             QuadratureRule, make_quadrature,
                              make_tensor_product_quadrature, map_quadrature)
 from FIAT.reference_element import (HEXAHEDRON, QUADRILATERAL, TENSORPRODUCT,
                                     TETRAHEDRON, TRIANGLE, symmetric_simplex, ufc_simplex)
@@ -118,51 +120,28 @@ def _kmv_lump_scheme(ref_el, degree):
     """Specialized quadrature schemes for P < 6 for KMV simplical elements."""
 
     sd = ref_el.get_spatial_dimension()
-    if sd not in {2, 3}:
+    if sd == 1:
+        num_points = degree + 1
+        return GaussLobattoLegendreQuadratureLineRule(ref_el, num_points)
+    elif sd > 3:
         raise ValueError("Dimension not supported")
 
     T = ufc_simplex(sd)
     x = list(T.vertices)
     if degree == 1:
-        w = numpy.arange(sd + 1, dtype=numpy.float64)
-        if sd == 2:
-            w[:] = 1.0 / 6.0
-        elif sd == 3:
-            w[:] = 1.0 / 24.0
-        else:
-            raise ValueError("Dimension not supported")
+        w = numpy.zeros((len(x),), dtype=numpy.float64)
+        w[:] = T.volume() / len(x)
     elif degree == 2:
+        # entity barycenter
+        for dim in range(1, sd+1):
+            for entity in T.topology[dim]:
+                x.extend(T.make_points(dim, entity, dim+1))
+        w = numpy.zeros((len(x),), dtype=numpy.float64)
         if sd == 2:
-            for e in range(3):
-                x.extend(ref_el.make_points(1, e, 2))  # edge midpoints
-            x.extend(ref_el.make_points(2, 0, 3))  # barycenter
-            w = numpy.arange(7, dtype=numpy.float64)
             w[0:3] = 1.0 / 40.0
             w[3:6] = 1.0 / 15.0
             w[6] = 9.0 / 40.0
         elif sd == 3:
-            x.extend(
-                [
-                    (0.0, 0.50, 0.50),
-                    (0.50, 0.0, 0.50),
-                    (0.50, 0.50, 0.0),
-                    (0.0, 0.0, 0.50),
-                    (0.0, 0.50, 0.0),
-                    (0.50, 0.0, 0.0),
-                ]
-            )
-            # in facets
-            x.extend(
-                [
-                    (0.33333333333333337, 0.3333333333333333, 0.3333333333333333),
-                    (0.0, 0.3333333333333333, 0.3333333333333333),
-                    (0.3333333333333333, 0.0, 0.3333333333333333),
-                    (0.3333333333333333, 0.3333333333333333, 0.0),
-                ]
-            )
-            # in the cell
-            x.extend([(1 / 4, 1 / 4, 1 / 4)])
-            w = numpy.arange(15, dtype=numpy.float64)
             w[0:4] = 17.0 / 5040.0
             w[4:10] = 2.0 / 315.0
             w[10:14] = 9.0 / 560.0
@@ -170,111 +149,73 @@ def _kmv_lump_scheme(ref_el, degree):
         else:
             raise ValueError("Dimension not supported")
 
-    elif degree == 3:
-        if sd == 2:
-            alpha = 0.2934695559090401
-            beta = 0.2073451756635909
-            x.extend(
-                [
-                    (1 - alpha, alpha),
-                    (alpha, 1 - alpha),
-                    (0.0, 1 - alpha),
-                    (0.0, alpha),
-                    (alpha, 0.0),
-                    (1 - alpha, 0.0),
-                ]  # edge points
-            )
-            x.extend(
-                [(beta, beta), (1 - 2 * beta, beta), (beta, 1 - 2 * beta)]
-            )  # points in center of cell
-            w = numpy.arange(12, dtype=numpy.float64)
-            w[0:3] = 0.007436456512410291
-            w[3:9] = 0.02442084061702551
-            w[9:12] = 0.1103885289202054
-        elif sd == 3:
-            x.extend(
-                [
-                    (0, 0.685789657581967, 0.314210342418033),
-                    (0, 0.314210342418033, 0.685789657581967),
-                    (0.314210342418033, 0, 0.685789657581967),
-                    (0.685789657581967, 0, 0.314210342418033),
-                    (0.685789657581967, 0.314210342418033, 0.0),
-                    (0.314210342418033, 0.685789657581967, 0.0),
-                    (0, 0, 0.685789657581967),
-                    (0, 0, 0.314210342418033),
-                    (0, 0.314210342418033, 0.0),
-                    (0, 0.685789657581967, 0.0),
-                    (0.314210342418033, 0, 0.0),
-                    (0.685789657581967, 0, 0.0),
-                ]
-            )  # 12 points on edges of facets (0-->1-->2)
+    elif sd == 3:
+        if degree > 3:
+            raise ValueError("Degree not supported")
 
-            x.extend(
-                [
-                    (0.21548220313557542, 0.5690355937288492, 0.21548220313557542),
-                    (0.21548220313557542, 0.21548220313557542, 0.5690355937288492),
-                    (0.5690355937288492, 0.21548220313557542, 0.21548220313557542),
-                    (0.0, 0.5690355937288492, 0.21548220313557542),
-                    (0.0, 0.21548220313557542, 0.5690355937288492),
-                    (0.0, 0.21548220313557542, 0.21548220313557542),
-                    (0.5690355937288492, 0.0, 0.21548220313557542),
-                    (0.21548220313557542, 0.0, 0.5690355937288492),
-                    (0.21548220313557542, 0.0, 0.21548220313557542),
-                    (0.5690355937288492, 0.21548220313557542, 0.0),
-                    (0.21548220313557542, 0.5690355937288492, 0.0),
-                    (0.21548220313557542, 0.21548220313557542, 0.0),
-                ]
-            )  # 12 points (3 points on each facet, 1st two parallel to edge 0)
-            alpha = 1 / 6
-            x.extend(
-                [
-                    (alpha, alpha, 0.5),
-                    (0.5, alpha, alpha),
-                    (alpha, 0.5, alpha),
-                    (alpha, alpha, alpha),
-                ]
-            )  # 4 points inside the cell
-            w = numpy.arange(32, dtype=numpy.float64)
-            w[0:4] = 0.00068688236002531922325120561367839
-            w[4:16] = 0.0015107814913526136472998739890272
-            w[16:28] = 0.0050062894680040258624242888174649
-            w[28:32] = 0.021428571428571428571428571428571
-        else:
-            raise ValueError("Dimension not supported")
-    elif degree == 4:
-        if sd == 2:
-            alpha = 0.2113248654051871  # 0.2113248654051871
+        x.extend(
+            [
+                (0, 0.685789657581967, 0.314210342418033),
+                (0, 0.314210342418033, 0.685789657581967),
+                (0.314210342418033, 0, 0.685789657581967),
+                (0.685789657581967, 0, 0.314210342418033),
+                (0.685789657581967, 0.314210342418033, 0.0),
+                (0.314210342418033, 0.685789657581967, 0.0),
+                (0, 0, 0.685789657581967),
+                (0, 0, 0.314210342418033),
+                (0, 0.314210342418033, 0.0),
+                (0, 0.685789657581967, 0.0),
+                (0.314210342418033, 0, 0.0),
+                (0.685789657581967, 0, 0.0),
+            ]
+        )  # 12 points on edges of facets (0-->1-->2)
+
+        x.extend(
+            [
+                (0.21548220313557542, 0.5690355937288492, 0.21548220313557542),
+                (0.21548220313557542, 0.21548220313557542, 0.5690355937288492),
+                (0.5690355937288492, 0.21548220313557542, 0.21548220313557542),
+                (0.0, 0.5690355937288492, 0.21548220313557542),
+                (0.0, 0.21548220313557542, 0.5690355937288492),
+                (0.0, 0.21548220313557542, 0.21548220313557542),
+                (0.5690355937288492, 0.0, 0.21548220313557542),
+                (0.21548220313557542, 0.0, 0.5690355937288492),
+                (0.21548220313557542, 0.0, 0.21548220313557542),
+                (0.5690355937288492, 0.21548220313557542, 0.0),
+                (0.21548220313557542, 0.5690355937288492, 0.0),
+                (0.21548220313557542, 0.21548220313557542, 0.0),
+            ]
+        )  # 12 points (3 points on each facet, 1st two parallel to edge 0)
+        alpha = 1 / 6
+        x.extend(
+            [
+                (alpha, alpha, 0.5),
+                (0.5, alpha, alpha),
+                (alpha, 0.5, alpha),
+                (alpha, alpha, alpha),
+            ]
+        )  # 4 points inside the cell
+        w = numpy.zeros((len(x),), dtype=numpy.float64)
+        w[0:4] = 0.00068688236002531922325120561367839
+        w[4:16] = 0.0015107814913526136472998739890272
+        w[16:28] = 0.0050062894680040258624242888174649
+        w[28:32] = 0.021428571428571428571428571428571
+
+    elif sd == 2:
+        if degree == 3:
+            alphas = [0.2934695559090401]
+            betas = [0.2073451756635909]
+            gammas = []
+            deltas = []
+        elif degree == 4:
+            alphas = [0.2113248654051871]  # 0.2113248654051871
             betas = [
                 0.4247639617258106,
                 0.130791593829745
             ]
-            for e in range(3):
-                x.extend(ref_el.make_points(1, e, 2))  # edge midpoints
-            x.extend(
-                [
-                    (1 - alpha, alpha),
-                    (alpha, 1 - alpha),
-                    (0.0, 1 - alpha),
-                    (0.0, alpha),
-                    (alpha, 0.0),
-                    (1 - alpha, 0.0),
-                ]  # edge points
-            )
-            for beta in betas:
-                x.extend(
-                    [(beta, beta), (1 - 2 * beta, beta), (beta, 1 - 2 * beta)]
-                )  # points in center of cell
-            w = numpy.arange(18, dtype=numpy.float64)
-            w[0:3] = 0.003174603174603175
-            w[3:6] = 0.0126984126984127
-            w[6:12] = 0.01071428571428571
-            w[12:15] = 0.07878121446939182
-            w[15:18] = 0.05058386489568756
-        else:
-            raise ValueError("Dimension not supported")
-
-    elif degree == 5:
-        if sd == 2:
+            gammas = []
+            deltas = []
+        elif degree == 5:
             alphas = [
                 0.3632980741536860e-00,
                 0.1322645816327140e-00
@@ -284,47 +225,9 @@ def _kmv_lump_scheme(ref_el, degree):
                 0.2568591072619591e-00,
                 0.5752768441141011e-01
             ]
-            gamma = 0.7819258362551702e-01
-            delta = 0.2210012187598900e-00
-            for alpha in alphas:
-                x.extend(
-                    [
-                        (1 - alpha, alpha),
-                        (alpha, 1 - alpha),
-                        (0.0, 1 - alpha),
-                        (0.0, alpha),
-                        (alpha, 0.0),
-                        (1 - alpha, 0.0),
-                    ]  # edge points
-                )
-            for beta in betas:
-                x.extend(
-                    [(beta, beta), (1 - 2 * beta, beta), (beta, 1 - 2 * beta)]
-                )  # points in center of cell
-            x.extend(
-                [
-                    (gamma, delta),
-                    (1 - gamma - delta, delta),
-                    (gamma, 1 - gamma - delta),
-                    (delta, gamma),
-                    (1 - gamma - delta, gamma),
-                    (delta, 1 - gamma - delta),
-                ]  # edge points
-            )
-            w = numpy.arange(30, dtype=numpy.float64)
-            w[0:3] = 0.7094239706792450e-03
-            w[3:9] = 0.6190565003676629e-02
-            w[9:15] = 0.3480578640489211e-02
-            w[15:18] = 0.3453043037728279e-01
-            w[18:21] = 0.4590123763076286e-01
-            w[21:24] = 0.1162613545961757e-01
-            w[24:30] = 0.2727857596999626e-01
-        else:
-            raise ValueError("Dimension not supported")
-
-    elif degree == 6:
-        if sd == 2:
-            episilon = 5.00000000000000e-1
+            gammas = [0.7819258362551702e-01]
+            deltas = [0.2210012187598900e-00]
+        elif degree == 6:
             alphas = [
                 8.29411811106452e-2,
                 2.68649695592714e-1,
@@ -342,71 +245,75 @@ def _kmv_lump_scheme(ref_el, degree):
                 6.99812197147049e-1,
                 2.43089592364562e-1,
             ]
-            weights = [
-                5.35113520281665e-4,
-                4.29435346026293e-3,
-                3.02990950926060e-3,
-                3.16396316646563e-3,
-                2.43035184285235e-2,
-                1.66312091329395e-2,
-                3.42178857644876e-2,
-                1.73480160090330e-2,
-                1.98004044953264e-2,
-            ]
+        else:
+            raise ValueError("Degree not supported")
 
+        if degree % 2 == 0:
+            # edge midpoints for even degree
+            for entity in T.topology[1]:
+                x.extend(T.make_points(1, entity, 2))
+        for alpha in alphas:
             x.extend(
                 [
-                    (episilon, episilon),
-                    (0.0, episilon),
-                    (episilon, 0.0),
-                ]
-            )  # edge midpoints (class 2 points)
-            for alpha in alphas:
-                x.extend(
-                    [
-                        (1 - alpha, alpha),
-                        (alpha, 1 - alpha),
-                        (0.0, 1 - alpha),
-                        (0.0, alpha),
-                        (alpha, 0.0),
-                        (1 - alpha, 0.0),
-                    ]  # edge points (sets of class 3 points)
-                )
-
-            for beta in betas:
-                x.extend(
-                    [
-                        (beta, beta),
-                        (1 - 2 * beta, beta),
-                        (beta, 1 - 2 * beta)
-                    ]  # interior points on bisector (sets of class 5 points)
-                )
-
-            for gamma, delta in zip(gammas, deltas):
-                x.extend(
-                    [
-                        (gamma, delta),
-                        (1 - gamma - delta, delta),
-                        (gamma, 1 - gamma - delta),
-                        (delta, gamma),
-                        (1 - gamma - delta, gamma),
-                        (delta, 1 - gamma - delta),
-                    ]  # interior points (sets of class 6 points)
-                )
-
-            w = numpy.arange(39, dtype=numpy.float64)
-            w[0:3] = weights[0]  # class 1 points (vertices)
-            w[3:6] = weights[1]  # class 2 points
-            w[6:12] = weights[2]  # class 3 points
-            w[12:18] = weights[3]
-            w[18:21] = weights[4]  # class 5 points
-            w[21:24] = weights[5]
-            w[24:27] = weights[6]
-            w[27:33] = weights[7]  # class 6 points
-            w[33:39] = weights[8]
-
+                    (1 - alpha, alpha),
+                    (alpha, 1 - alpha),
+                    (0.0, 1 - alpha),
+                    (0.0, alpha),
+                    (alpha, 0.0),
+                    (1 - alpha, 0.0),
+                ]  # edge points (sets of class 3 points)
+            )
+        for beta in betas:
+            x.extend(
+                [
+                    (beta, beta),
+                    (1 - 2 * beta, beta),
+                    (beta, 1 - 2 * beta)
+                ]  # interior points on bisector (sets of class 5 points)
+            )
+        for gamma, delta in zip(gammas, deltas):
+            x.extend(
+                [
+                    (gamma, delta),
+                    (1 - gamma - delta, delta),
+                    (gamma, 1 - gamma - delta),
+                    (delta, gamma),
+                    (1 - gamma - delta, gamma),
+                    (delta, 1 - gamma - delta),
+                ]  # interior points (sets of class 6 points)
+            )
+        w = numpy.zeros((len(x),), dtype=numpy.float64)
+        if degree == 3:
+            w[0:3] = 0.007436456512410291
+            w[3:9] = 0.02442084061702551
+            w[9:12] = 0.1103885289202054
+        elif degree == 4:
+            w[0:3] = 0.003174603174603175
+            w[3:6] = 0.0126984126984127
+            w[6:12] = 0.01071428571428571
+            w[12:15] = 0.07878121446939182
+            w[15:18] = 0.05058386489568756
+        elif degree == 5:
+            w[0:3] = 0.7094239706792450e-03
+            w[3:9] = 0.6190565003676629e-02
+            w[9:15] = 0.3480578640489211e-02
+            w[15:18] = 0.3453043037728279e-01
+            w[18:21] = 0.4590123763076286e-01
+            w[21:24] = 0.1162613545961757e-01
+            w[24:30] = 0.2727857596999626e-01
         else:
-            raise ValueError("Dimension not supported")
+            w[0:3] = 5.35113520281665e-4  # class 1 points (vertices)
+            w[3:6] = 4.29435346026293e-3  # class 2 points
+            w[6:12] = 3.02990950926060e-3  # class 3 points
+            w[12:18] = 3.16396316646563e-3
+            w[18:21] = 2.43035184285235e-2  # class 5 points
+            w[21:24] = 1.66312091329395e-2
+            w[24:27] = 3.42178857644876e-2
+            w[27:33] = 1.73480160090330e-2  # class 6 points
+            w[33:39] = 1.98004044953264e-2
+    else:
+        raise ValueError("Dimension not supported")
+
     # Return scheme
     x = numpy.asarray(x)
     w = numpy.asarray(w)
