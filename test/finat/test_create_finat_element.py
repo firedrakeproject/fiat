@@ -90,6 +90,23 @@ def test_interval_variant(family, variant, expected_cls):
     assert isinstance(create_element(ufl_element), expected_cls)
 
 
+@pytest.mark.parametrize('cell', [ufl.triangle, ufl.tetrahedron])
+@pytest.mark.parametrize('family,degree,quad_scheme',
+                         [('CR', 1, 'default'),
+                          ('CR', 1, 'KMV(1)'),
+                          ('CR', 1, 'KMV(2)'),
+                          ('CR', 1, 'KMV(2),powell-sabin')])
+def test_quad_scheme(cell, family, degree, quad_scheme):
+    ufl_element = finat.ufl.FiniteElement(family, cell, degree, variant="integral", quad_scheme=quad_scheme)
+    fe = create_element(ufl_element)
+    Q, ps = fe.dual_basis
+    assert fe.space_dimension() == fe.cell.get_spatial_dimension() + 1
+    if quad_scheme in {'KMV(1)', 'default'}:
+        assert len(ps.points) == fe.space_dimension()
+    else:
+        assert len(ps.points) > fe.space_dimension()
+
+
 def test_triangle_variant_spectral():
     ufl_element = finat.ufl.FiniteElement('DP', ufl.triangle, 2, variant='spectral')
     create_element(ufl_element)

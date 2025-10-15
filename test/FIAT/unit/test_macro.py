@@ -4,7 +4,7 @@ import pytest
 from FIAT import (Lagrange, DiscontinuousLagrange, IntegratedLegendre, Legendre, P0,
                   Nedelec, NedelecSecondKind, RaviartThomas, BrezziDouglasMarini,
                   Regge, HellanHerrmannJohnson, GopalakrishnanLedererSchoberlSecondKind,
-                  CrouzeixRaviart)
+                  CrouzeixRaviart, KongMulderVeldhuizen)
 from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet, MacroPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex, UFCSimplex
@@ -94,8 +94,35 @@ def test_macro_quadrature(split, cell):
     Q = create_quadrature(ref_el, 2*degree)
     pts, wts = Q.get_points(), Q.get_weights()
 
+    Qcell = create_quadrature(cell, 2*degree)
+    assert len(pts) == len(ref_el.topology[sd]) * len(Qcell.pts)
+
     # Test that the mass matrix for an orthogonal basis is diagonal
     fe = Legendre(ref_el, degree)
+    phis = fe.tabulate(0, pts)[(0,)*sd]
+    M = numpy.dot(numpy.multiply(phis, wts), phis.T)
+    M = M - numpy.diag(M.diagonal())
+    assert numpy.allclose(M, 0)
+
+
+@pytest.mark.parametrize("split", (AlfeldSplit, PowellSabinSplit))
+def test_macro_lump_quadrature(split, cell):
+    ref_el = split(cell)
+    sd = ref_el.get_spatial_dimension()
+
+    degree = 2
+    Q = create_quadrature(ref_el, degree, "KMV")
+    pts, wts = Q.get_points(), Q.get_weights()
+    assert len(pts) == len(numpy.unique(numpy.round(pts, decimals=10), axis=0))
+
+    fe_ref = KongMulderVeldhuizen(cell, degree)
+    edofs = fe_ref.entity_dofs()
+    top = ref_el.topology
+    assert len(pts) < len(top[sd]) * fe_ref.space_dimension()
+    assert len(pts) == sum(len(top[dim]) * len(edofs[dim][0]) for dim in top)
+
+    # Test that the lumped mass matrix is diagonal
+    fe = KongMulderVeldhuizen(ref_el, degree)
     phis = fe.tabulate(0, pts)[(0,)*sd]
     M = numpy.dot(numpy.multiply(phis, wts), phis.T)
     M = M - numpy.diag(M.diagonal())
