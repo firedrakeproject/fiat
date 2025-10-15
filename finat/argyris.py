@@ -5,8 +5,9 @@ import FIAT
 
 from gem import Literal, ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 def _vertex_transform(V, vorder, fiat_cell, coordinate_mapping):
@@ -100,8 +101,7 @@ def _edge_transform(V, vorder, eorder, fiat_cell, coordinate_mapping, avg=False)
 
 class Argyris(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=5, variant=None, avg=False):
-        if Citations is not None:
-            Citations().register("Argyris1968")
+        cite("Argyris1968")
         if variant is None:
             variant = "integral"
         if variant == "point" and degree != 5:

@@ -9,16 +9,15 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 from FIAT import dual_set, finite_element, polynomial_set
-from FIAT.check_format_variant import check_format_variant
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.functional import (PointwiseInnerProductEvaluation,
                              ComponentPointEvaluation,
                              TensorBidirectionalIntegralMoment as BidirectionalMoment)
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
 
 
 class HellanHerrmannJohnsonDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, qdegree):
+    def __init__(self, ref_el, degree, variant, qdegree, quad_scheme):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
@@ -62,7 +61,7 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
         elif variant == "integral":
             # Face dofs
             ref_facet = ref_el.construct_subelement(sd-1)
-            Q_ref = create_quadrature(ref_facet, qdegree + degree)
+            Q_ref = parse_quadrature_scheme(ref_facet, qdegree + degree, quad_scheme)
             P = polynomial_set.ONPolynomialSet(ref_facet, degree)
             Phis = P.tabulate(Q_ref.get_points())[(0,)*(sd-1)]
 
@@ -75,7 +74,7 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
                 entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
             ref_facet = ref_el.construct_subelement(sd)
-            Q_ref = create_quadrature(ref_facet, qdegree + degree)
+            Q_ref = parse_quadrature_scheme(ref_facet, qdegree + degree, quad_scheme)
             P = polynomial_set.ONPolynomialSet(ref_facet, degree)
             Phis = P.tabulate(Q_ref.get_points())[(0,) * sd]
             dimPkm1 = P.expansion_set.get_num_members(degree-1)
@@ -102,7 +101,7 @@ class HellanHerrmannJohnson(finite_element.CiarletElement):
        HHJ(k) is the space of symmetric-matrix-valued polynomials of degree k
        or less with normal-normal continuity.
     """
-    def __init__(self, ref_el, degree=0, variant=None):
+    def __init__(self, ref_el, degree=0, variant=None, quad_scheme=None):
         if degree < 0:
             raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
 
@@ -111,7 +110,7 @@ class HellanHerrmannJohnson(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
-        dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree)
+        dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree, quad_scheme)
         sd = ref_el.get_spatial_dimension()
         formdegree = (sd-1, sd-1)
         mapping = "double contravariant piola"
