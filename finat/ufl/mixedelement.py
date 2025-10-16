@@ -13,7 +13,8 @@
 
 import numpy as np
 
-from ufl.cell import as_cell
+from ufl.cell import CellSequence, as_cell
+from ufl.domain import MeshSequence
 from finat.ufl.finiteelement import FiniteElement
 from finat.ufl.finiteelementbase import FiniteElementBase
 from ufl.permutation import compute_indices
@@ -26,7 +27,7 @@ class MixedElement(FiniteElementBase):
     """A finite element composed of a nested hierarchy of mixed or simple elements."""
     __slots__ = ("_sub_elements", "_cells")
 
-    def __init__(self, *elements, **kwargs):
+    def __init__(self, *elements, make_cell_sequence=True, **kwargs):
         """Create mixed finite element from given list of elements."""
         if type(self) is MixedElement:
             if kwargs:
@@ -39,18 +40,15 @@ class MixedElement(FiniteElementBase):
         elements = [MixedElement(e) if isinstance(e, (tuple, list)) else e
                     for e in elements]
         self._sub_elements = elements
-
-        # Pick the first cell, for now all should be equal
-        cells = tuple(sorted(set(element.cell for element in elements) - set([None])))
-        self._cells = cells
+        cells = tuple(e.cell for e in elements)
         if cells:
-            cell = cells[0]
-            # Require that all elements are defined on the same cell
-            if not all(c == cell for c in cells[1:]):
-                raise ValueError("Sub elements must live on the same cell.")
+            if make_cell_sequence:
+                cell = CellSequence(cells)
+            else:
+                # VectorElement or TensorElement.
+                cell, = set(cells)
         else:
             cell = None
-
         # Check that all elements use the same quadrature scheme TODO:
         # We can allow the scheme not to be defined.
         if len(elements) == 0:
@@ -94,6 +92,8 @@ class MixedElement(FiniteElementBase):
         :math:`c_1`.
         A component is a tuple of one or more ints.
         """
+        if isinstance(domain, MeshSequence):
+            raise NotImplementedError
         # Build symmetry map from symmetries of subelements
         sm = {}
         # Base index of the current subelement into mixed value
@@ -140,6 +140,8 @@ class MixedElement(FiniteElementBase):
 
         component index for a given component index.
         """
+        if isinstance(domain, MeshSequence):
+            raise NotImplementedError
         if isinstance(i, int):
             i = (i,)
         self._check_component(i)
@@ -245,7 +247,26 @@ class MixedElement(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
-        return MixedElement(*[e.reconstruct(**kwargs) for e in self.sub_elements])
+        cell = kwargs.pop('cell', None)
+        if isinstance(self.cell, CellSequence):
+            if cell is None:
+                cell = self.cell
+            else:
+                if not isinstance(cell, CellSequence):
+                    # Allow for passing a single base cell.
+                    cell = CellSequence([cell] * len(self.sub_elements))
+            cells = cell.cells
+        else:
+            if cell is None:
+                cell = self.cell
+            else:
+                if isinstance(cell, CellSequence):
+                    raise TypeError(f"Input cell(={cell}) must not be CellSequence")
+            cells = [cell] * len(self.sub_elements)
+        return MixedElement(
+            *[e.reconstruct(cell=c, **kwargs) for c, e in zip(cells, self.sub_elements)],
+            make_cell_sequence=isinstance(self.cell, CellSequence),
+        )
 
     def variant(self):
         """Doc."""
@@ -307,8 +328,11 @@ class VectorElement(MixedElement):
         reference_value_shape = (dim,) + sub_element.reference_value_shape
 
         # Initialize element data
-        MixedElement.__init__(self, sub_elements,
-                              reference_value_shape=reference_value_shape)
+        MixedElement.__init__(
+            self, sub_elements,
+            reference_value_shape=reference_value_shape,
+            make_cell_sequence=False,
+        )
 
         FiniteElementBase.__init__(self, sub_element.family(), sub_element.cell, sub_element.degree(),
                                    sub_element.quadrature_scheme(), reference_value_shape)
@@ -435,8 +459,11 @@ class TensorElement(MixedElement):
 
         reference_value_shape = reference_value_shape + sub_element.reference_value_shape
         # Initialize element data
-        MixedElement.__init__(self, sub_elements,
-                              reference_value_shape=reference_value_shape)
+        MixedElement.__init__(
+            self, sub_elements,
+            reference_value_shape=reference_value_shape,
+            make_cell_sequence=False,
+        )
         self._family = sub_element.family()
         self._degree = sub_element.degree()
         self._sub_element = sub_element
