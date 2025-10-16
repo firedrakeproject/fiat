@@ -8,7 +8,7 @@ name = "firedrake-fiat"
 version = "2025.11.0.dev0"
 dependencies = [
   # TODO RELEASE
-  "fenics-ufl @ git+https://github.com/FEniCS/ufl.git@main",
+  "fenics-ufl @ git+https://github.com/firedrakeproject/ufl.git@ksagiyam/introduce_mixed_map",
   "numpy>=1.16",
   "recursivenodes",
   "scipy",
