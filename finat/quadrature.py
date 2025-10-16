@@ -29,7 +29,8 @@ def make_quadrature(ref_el, degree, scheme="default"):
 
     if hasattr(scheme, "dual_basis"):
         Q, point_set = scheme.dual_basis
-        weights = numpy.ones((len(point_set.points),))
+        # point_set does not define an integration rule
+        weights = numpy.full((len(point_set.points),), numpy.nan)
         return QuadratureRule(point_set, weights, ref_el=ref_el)
 
     if ref_el.get_shape() == TENSORPRODUCT:
