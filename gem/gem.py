@@ -126,22 +126,22 @@ class Node(NodeBase, metaclass=NodeMeta):
         return as_gem(other).__matmul__(self)
 
     def __abs__(self):
-        return componentwise(lambda x: MathFunction("abs", x), self)
+        return componentwise(partial(MathFunction, "abs"), self)
 
     def __pow__(self, other):
-        return componentwise(lambda x, y: Power(x, y), self, as_gem(other))
+        return componentwise(Power, self, as_gem(other))
 
     def __lt__(self, other):
-        return componentwise(lambda x, y: Comparison("<", x, y), self, as_gem(other))
+        return componentwise(partial(Comparison, "<"), self, as_gem(other))
 
     def __gt__(self, other):
-        return componentwise(lambda x, y: Comparison(">", x, y), self, as_gem(other))
+        return componentwise(partial(Comparison, ">"), self, as_gem(other))
 
     def __le__(self, other):
-        return componentwise(lambda x, y: Comparison("<=", x, y), self, as_gem(other))
+        return componentwise(partial(Comparison, "<="), self, as_gem(other))
 
     def __ge__(self, other):
-        return componentwise(lambda x, y: Comparison(">=", x, y), self, as_gem(other))
+        return componentwise(partial(Comparison, ">="), self, as_gem(other))
 
     @property
     def T(self):
