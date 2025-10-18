@@ -27,9 +27,7 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     if pts.dtype == object:
         # Do not use barycentric interpolation at unknown points
         phi = numpy.add.outer(-nodes, pts.flatten())
-        n = len(nodes)
-        phis = [wts[i] * numpy.prod(phi[[*range(0, i), *range(i+1, n)]], axis=0)
-                for i in range(n)]
+        phis = [wi * numpy.prod(phi[:i], axis=0) * numpy.prod(phi[i+1:], axis=0) for i, wi in enumerate(wts)]
         phi = numpy.asarray(phis)
     else:
         # Use the second barycentric interpolation formula
