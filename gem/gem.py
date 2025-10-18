@@ -16,7 +16,7 @@ indices.
 
 from abc import ABCMeta
 from itertools import chain, repeat
-from functools import reduce
+from functools import partial, reduce
 from operator import attrgetter
 from numbers import Integral, Number
 
