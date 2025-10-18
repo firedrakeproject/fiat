@@ -44,7 +44,7 @@ class Bell(PhysicallyMappedElement, ScalarFiatElement):
 
             # vertex points
             V[s, v1id] = 1/21 * Bnt
-            V[s, v0id] = -1 * V[s, v1id]
+            V[s, v0id] = -V[s, v1id]
 
             # vertex derivatives
             for i in range(sd):
@@ -55,7 +55,7 @@ class Bell(PhysicallyMappedElement, ScalarFiatElement):
             tau = [Jt[0]*Jt[0], 2*Jt[0]*Jt[1], Jt[1]*Jt[1]]
             for i in range(len(tau)):
                 V[s, v1id+3+i] = 1/252 * Bnt * tau[i]
-                V[s, v0id+3+i] = -1 * V[s, v1id+3+i]
+                V[s, v0id+3+i] = -V[s, v1id+3+i]
 
         # Patch up conditioning
         h = coordinate_mapping.cell_size()
