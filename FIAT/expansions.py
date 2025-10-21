@@ -93,8 +93,8 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
-
     phi[0] = sum((ref_pts[i] * 0 for i in range(dim)), scale)
+
     if dphi is not None:
         dphi[0] = (phi[0] * 0) * dX[0]
     if ddphi is not None:
@@ -150,9 +150,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                                fprev * dphi[iprev] + phi[iprev] * dfprev)
                 if ddphi is None:
                     continue
-                ddfcur = -c * ddfc
+                ddfprev = -c * ddfc
                 ddphi[inext] = (fcur * ddphi[icur] + sym_outer(dphi[icur], dfcur) +
-                                fprev * ddphi[iprev] + sym_outer(dphi[iprev], dfcur) + phi[iprev] * ddfcur)
+                                fprev * ddphi[iprev] + sym_outer(dphi[iprev], dfprev) + phi[iprev] * ddfprev)
 
         # normalize
         d = codim + 1
@@ -162,10 +162,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             if variant is not None:
                 p = index[-1] + shift
                 alpha = 2 * (sum(index[:-1]) + d * shift) - 1
+                norm2 = (0.5 + d) / d
                 if p > 0 and p + alpha > 0:
-                    norm2 = (2*d+1) * (p + alpha) * (2*p + alpha) / (2*d*p)
-                else:
-                    norm2 = 1.0
+                    norm2 *= (p + alpha) * (2*p + alpha) / p
             else:
                 norm2 = (2*sum(index) + d) / d
             scale = math.sqrt(norm2)
