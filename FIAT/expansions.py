@@ -53,7 +53,7 @@ def pad_jacobian(A, embedded_dim):
 def jacobi_factors(x, y, z, dx, dy, dz):
     fb = 0.5 * (y + z)
     fa = x + (fb + 1.0)
-    fc = fb ** 2
+    fc = fb * fb
     dfa = dfb = dfc = None
     if dx is not None:
         dfb = 0.5 * (dy + dz)
@@ -739,11 +739,15 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     :kwarg tol: the absolute tolerance.
     :returns: a list of (weighted) characteristic functions for each subcell.
     """
-    from sympy import Piecewise
+    import gem
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     # assert singleton point
     pt = pt.reshape((sd,))
+    if isinstance(pt[0], gem.Node):
+        import gem as backend
+    else:
+        import sympy as backend
 
     # The distance to the nearest cell is equal to the distance to the parent cell
     best = ref_el.get_parent().distance_to_point_l1(pt, rescale=True)
@@ -755,7 +759,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
         pt_near_cell = ref_el.distance_to_point_l1(pt, entity=(sd, cell), rescale=True) < tol
-        masks.append(Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
+        masks.append(backend.Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
         if unique:
             otherwise.append((0.0, pt_near_cell))
     # If the point is on a facet, divide the characteristic function by the facet multiplicity
