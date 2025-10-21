@@ -70,7 +70,7 @@ def BDFMSpace(ref_el, order):
     # Linear vector valued space. Since the embedding degree of this element
     # is 2, this is implemented by taking the quadratic space and selecting
     # the linear polynomials.
-    vec_poly_set = polynomial_set.ONPolynomialSet(ref_el, order, (sd,))
+    vec_poly_set = polynomial_set.ONPolynomialSet(ref_el, order, (sd,), variant="bubble")
     # Linears are the first three polynomials in each dimension.
     vec_poly_set = vec_poly_set.take([0, 1, 2, 6, 7, 8])
 
