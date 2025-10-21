@@ -89,7 +89,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     phi, dphi, ddphi = results + (None,) * (2-order)
 
     outer = lambda x, y: x[:, None, ...] * y[None, ...]
-    sym_outer = lambda x, y: outer(x, y) + outer(y, x)
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
@@ -131,28 +130,42 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             phi[inext] = fcur * phi[icur]
             if dphi is not None:
                 dfcur = a * dfa - b * dfb
-                dphi[inext] = fcur * dphi[icur] + phi[icur] * dfcur
+                dphi[inext] = fcur * dphi[icur]
+                dphi[inext] += phi[icur] * dfcur
                 if ddphi is not None:
-                    ddphi[inext] = fcur * ddphi[icur] + sym_outer(dphi[icur], dfcur)
+                    ddphi[inext] = fcur * ddphi[icur]
+                    ddphi[inext] += outer(dfcur, dphi[icur])
+                    ddphi[inext] += outer(dphi[icur], dfcur)
 
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
                 iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
                 a, b, c = coefficients(alpha, beta, i)
+
                 fcur = a * fa - b * fb
                 fprev = -c * fc
-                phi[inext] = fcur * phi[icur] + fprev * phi[iprev]
+                phi[inext] = fcur * phi[icur]
+                phi[inext] += fprev * phi[iprev]
                 if dphi is None:
                     continue
+
                 dfcur = a * dfa - b * dfb
                 dfprev = -c * dfc
-                dphi[inext] = (fcur * dphi[icur] + phi[icur] * dfcur +
-                               fprev * dphi[iprev] + phi[iprev] * dfprev)
+                dphi[inext] = fcur * dphi[icur]
+                dphi[inext] += fprev * dphi[iprev]
+                dphi[inext] += phi[icur] * dfcur
+                dphi[inext] += phi[iprev] * dfprev
                 if ddphi is None:
                     continue
+
                 ddfprev = -c * ddfc
-                ddphi[inext] = (fcur * ddphi[icur] + sym_outer(dphi[icur], dfcur) +
-                                fprev * ddphi[iprev] + sym_outer(dphi[iprev], dfprev) + phi[iprev] * ddfprev)
+                ddphi[inext] = fcur * ddphi[icur]
+                ddphi[inext] += fprev * ddphi[iprev]
+                ddphi[inext] += outer(dfcur, dphi[icur])
+                ddphi[inext] += outer(dphi[icur], dfcur)
+                ddphi[inext] += outer(dfprev, dphi[iprev])
+                ddphi[inext] += outer(dphi[iprev], dfprev)
+                ddphi[inext] += phi[iprev] * ddfprev
 
         # normalize
         d = codim + 1
