@@ -1707,7 +1707,7 @@ def ufc_cell(cell):
     if isinstance(cell, str):
         celltype = cell
     else:
-        celltype = cell.cellname()
+        celltype = cell.cellname
 
     if " * " in celltype:
         # Tensor product cell
