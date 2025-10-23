@@ -147,10 +147,12 @@ class FiatElement(FiniteElementBase):
         # Coordinates on the reference entity (GEM)
         Xi = tuple(gem.Indexed(refcoords, i) for i in np.ndindex(refcoords.shape))
         ps = PointSingleton(Xi)
-        result = self.basis_evaluation(order, ps, entity=entity, coordinate_mapping=coordinate_mapping)
+        result = self.basis_evaluation(order, ps, entity=entity,
+                                       coordinate_mapping=coordinate_mapping)
 
         # Apply symbolic simplification
         vals = result.values()
+        vals = map(gem.optimise.ffc_rounding, vals, [1E-15]*len(vals))
         vals = gem.optimise.constant_fold_zero(vals)
         vals = map(gem.optimise.aggressive_unroll, vals)
         vals = gem.optimise.remove_componenttensors(vals)
