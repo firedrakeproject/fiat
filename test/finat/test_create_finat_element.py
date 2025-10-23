@@ -47,7 +47,7 @@ def tensor_name(request):
 
 @pytest.fixture(params=[ufl.interval, ufl.triangle,
                         ufl.quadrilateral],
-                ids=lambda x: x.cellname())
+                ids=lambda x: x.cellname)
 def ufl_A(request, tensor_name):
     return finat.ufl.FiniteElement(tensor_name, request.param, 1)
 
