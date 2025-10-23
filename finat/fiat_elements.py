@@ -119,7 +119,6 @@ class FiatElement(FiniteElementBase):
             expr = gem.ComponentTensor(expr, basis_indices)
             if replace_indices:
                 expr, = gem.optimise.remove_componenttensors((expr,), subst=replace_indices)
-
             result[alpha] = expr
         return result
 
@@ -148,8 +147,15 @@ class FiatElement(FiniteElementBase):
         # Coordinates on the reference entity (GEM)
         Xi = tuple(gem.Indexed(refcoords, i) for i in np.ndindex(refcoords.shape))
         ps = PointSingleton(Xi)
-        return self.basis_evaluation(order, ps, entity=entity,
-                                     coordinate_mapping=coordinate_mapping)
+        result = self.basis_evaluation(order, ps, entity=entity, coordinate_mapping=coordinate_mapping)
+
+        # Apply symbolic simplification
+        vals = result.values()
+        vals = gem.optimise.constant_fold_zero(vals)
+        vals = map(gem.optimise.aggressive_unroll, vals)
+        vals = gem.optimise.remove_componenttensors(vals)
+        result = dict(zip(result.keys(), vals))
+        return result
 
     @cached_property
     def _dual_basis(self):
