@@ -376,7 +376,7 @@
             <span class="k">if</span> <span class="n">cell</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot infer vector dimension without a cell.&quot;</span><span class="p">)</span>
             <span class="c1"># TODO: is this the right default</span>
-            <span class="n">dim</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">topological_dimension</span><span class="p">()</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">topological_dimension</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_mapping</span> <span class="o">=</span> <span class="n">sub_element</span><span class="o">.</span><span class="n">mapping</span><span class="p">()</span>
         <span class="c1"># Create list of sub elements for mixed element constructor</span>
@@ -476,7 +476,7 @@
             <span class="k">if</span> <span class="n">cell</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot infer tensor shape without a cell.&quot;</span><span class="p">)</span>
             <span class="c1"># TODO: is this the right default</span>
-            <span class="n">dim</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">topological_dimension</span><span class="p">()</span>
+            <span class="n">dim</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">topological_dimension</span>
             <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">symmetry</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
