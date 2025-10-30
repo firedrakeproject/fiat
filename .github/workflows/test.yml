@@ -40,3 +40,6 @@ jobs:
         run: DATA_REPO_GIT="" python -m pytest --cov=FIAT/ test/FIAT
       - name: Test FInAT
         run: DATA_REPO_GIT="" python -m pytest --cov=finat/ --cov=gem/ test/finat
+      - name: Test FInAT with FUSE
+        run: |
+          FIREDRAKE_USE_FUSE=1 DATA_REPO_GIT="" python -m pytest test/finat
