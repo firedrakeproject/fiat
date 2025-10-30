@@ -10,14 +10,14 @@ from FIAT.functional import (PointEvaluation, PointDerivative,
                              IntegralMoment,
                              IntegralMomentOfNormalDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
+from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.reference_element import TRIANGLE, ufc_simplex
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi, eval_jacobi_batch, eval_jacobi_deriv_batch
 
 
 class HCTDualSet(dual_set.DualSet):
-    def __init__(self, ref_complex, degree, reduced=False):
+    def __init__(self, ref_complex, degree, reduced=False, quad_scheme=None):
         if reduced and degree != 3:
             raise ValueError("Reduced HCT only defined for degree = 3")
         if degree < 3:
@@ -42,7 +42,7 @@ class HCTDualSet(dual_set.DualSet):
 
         k = 2 if reduced else degree - 3
         facet = ufc_simplex(1)
-        Q = create_quadrature(facet, degree-1+k)
+        Q = parse_quadrature_scheme(facet, degree-1+k, quad_scheme)
         qpts = Q.get_points()
         xref = 2.0 * qpts - 1.0
         if reduced:
@@ -64,7 +64,7 @@ class HCTDualSet(dual_set.DualSet):
 
             q = degree - 4
             if q >= 0:
-                Q = create_quadrature(ref_complex, degree + q)
+                Q = parse_quadrature_scheme(ref_complex, degree + q, quad_scheme)
                 Pq = polynomial_set.ONPolynomialSet(ref_el, q, scale=1)
                 phis = Pq.tabulate(Q.get_points())[(0,) * sd]
                 scale = 1 / ref_el.volume()
@@ -80,9 +80,9 @@ class HsiehCloughTocher(finite_element.CiarletElement):
     super-smooth C^1 space from Groselj and Knez (2022) on a barycentric split,
     although there the basis functions are positive on an incenter split.
     """
-    def __init__(self, ref_el, degree=3, reduced=False):
+    def __init__(self, ref_el, degree=3, reduced=False, quad_scheme=None):
         ref_complex = macro.AlfeldSplit(ref_el)
-        dual = HCTDualSet(ref_complex, degree, reduced=reduced)
+        dual = HCTDualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")
         formdegree = 0
         super().__init__(poly_set, dual, degree, formdegree=formdegree)

@@ -15,12 +15,11 @@ from itertools import chain
 class CodimBubble(RestrictedElement):
     """Bubbles of a certain codimension."""
 
-    def __init__(self, ref_el, degree, codim, variant=None):
+    def __init__(self, ref_el, degree, codim, variant=None, quad_scheme=None):
         if variant and variant.startswith("integral"):
-            CG = IntegratedLegendre
+            element = IntegratedLegendre(ref_el, degree, variant=variant, quad_scheme=quad_scheme)
         else:
-            CG = Lagrange
-        element = CG(ref_el, degree, variant=variant)
+            element = Lagrange(ref_el, degree, variant=variant)
 
         cell_dim = ref_el.get_dimension()
         assert cell_dim == max(element.entity_dofs().keys())
@@ -34,12 +33,12 @@ class CodimBubble(RestrictedElement):
 class Bubble(CodimBubble):
     """The bubble finite element: the dofs of the Lagrange FE in the interior of the cell"""
 
-    def __init__(self, ref_el, degree, variant=None):
-        super().__init__(ref_el, degree, codim=0, variant=variant)
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        super().__init__(ref_el, degree, codim=0, variant=variant, quad_scheme=quad_scheme)
 
 
 class FacetBubble(CodimBubble):
     """The facet bubble finite element: the dofs of the Lagrange FE in the interior of the facets"""
 
-    def __init__(self, ref_el, degree, variant=None):
-        super().__init__(ref_el, degree, codim=1, variant=variant)
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        super().__init__(ref_el, degree, codim=1, variant=variant, quad_scheme=quad_scheme)
