@@ -44,7 +44,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
     if degree < 0:
         raise ValueError("Need positive degree, not %d" % degree)
 
-    if scheme.lower() in {"kmv", "lump"} and not ref_el.is_macrocell():
+    if scheme.lower() in {"kmv", "lump"}:
         fiat_rule = fiat_scheme(ref_el, degree, "KMV")
         if ref_el.get_shape() == LINE:
             point_set = GaussLobattoLegendrePointSet(fiat_rule.get_points())
