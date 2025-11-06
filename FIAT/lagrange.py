@@ -43,11 +43,21 @@ class LagrangeDualSet(dual_set.DualSet):
             support = [top[dim][entity] for dim, entity in entities]
             entities = [entity for verts, entity in sorted(zip(support, entities))]
 
+        if isinstance(point_variant, dict):
+            pt_dict = point_variant
+        else:
+            pt_dict = {}
+            for dim in top:
+                pt_dict[dim] = {}
+                for entity in top[dim]:
+                    pt_dict[dim][entity] = ref_el.make_points(dim, entity, degree, variant=point_variant)
+            
         # make nodes by getting points
         # need to do this entity-by-entity
         for dim, entity in entities:
             cur = len(nodes)
-            pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
+            pts_cur = pt_dict[dim][entity]
+            # pts_cur = ref_el.make_points(dim, entity, degree, variant=point_variant)
             nodes.extend(functional.PointEvaluation(ref_el, x) for x in pts_cur)
             entity_ids[dim][entity] = list(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids, entity_permutations)
@@ -74,6 +84,8 @@ class Lagrange(finite_element.CiarletElement):
     """
     def __init__(self, ref_el, degree, variant="equispaced", sort_entities=False):
         splitting, point_variant = parse_lagrange_variant(variant)
+        if isinstance(point_variant, dict):
+            assert splitting is None
         if splitting is not None:
             ref_el = splitting(ref_el)
         dual = LagrangeDualSet(ref_el, degree, point_variant=point_variant, sort_entities=sort_entities)

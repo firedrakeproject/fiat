@@ -56,6 +56,8 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
     indicating the dof type (integral, equispaced, spectral, etc)
     and the type of splitting to give a macro-element (Alfeld, Powell-Sabin, iso)
     """
+    if isinstance(variant, dict):
+        return None, variant
     if variant is None:
         variant = "integral" if integral else "equispaced"
     options = variant.replace(" ", "").split(",")
