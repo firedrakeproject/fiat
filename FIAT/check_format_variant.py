@@ -1,7 +1,9 @@
+from numpy import ndarray
 import re
 
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.macro import IsoSplit, AlfeldSplit, WorseyFarinSplit, PowellSabinSplit, PowellSabin12Split
+
 
 # dicts mapping Lagrange variant names to recursivenodes family names
 supported_cg_variants = {
@@ -56,7 +58,7 @@ def parse_lagrange_variant(variant, discontinuous=False, integral=False):
     indicating the dof type (integral, equispaced, spectral, etc)
     and the type of splitting to give a macro-element (Alfeld, Powell-Sabin, iso)
     """
-    if isinstance(variant, dict):
+    if isinstance(variant, (list, tuple, ndarray)):
         return None, variant
     if variant is None:
         variant = "integral" if integral else "equispaced"

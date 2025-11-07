@@ -11,6 +11,8 @@ from FIAT.barycentric_interpolation import LagrangePolynomialSet, get_lagrange_p
 from FIAT.reference_element import LINE
 from FIAT.check_format_variant import parse_lagrange_variant
 
+from numpy import ndarray
+
 
 class LagrangeDualSet(dual_set.DualSet):
     """The dual basis for Lagrange elements.  This class works for
@@ -45,13 +47,14 @@ class LagrangeDualSet(dual_set.DualSet):
 
         if isinstance(point_variant, dict):
             pt_dict = point_variant
+        elif isinstance(point_variant, (list, ndarray)):
+            pts = point_variant
+            ptidx_dict = ref_el.point_entity_ids(point_variant)
+            pt_dict = {dim: {entity: [pts[i] for i in ptidx_dict[dim][entity]] for entity in top[dim]} for dim in top}
         else:
-            pt_dict = {}
-            for dim in top:
-                pt_dict[dim] = {}
-                for entity in top[dim]:
-                    pt_dict[dim][entity] = ref_el.make_points(dim, entity, degree, variant=point_variant)
-            
+            pt_dict = {dim: {entity: ref_el.make_points(dim, entity, degree, variant=point_variant)
+                             for entity in top[dim]} for dim in top}
+
         # make nodes by getting points
         # need to do this entity-by-entity
         for dim, entity in entities:
