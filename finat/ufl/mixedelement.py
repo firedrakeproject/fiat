@@ -16,7 +16,7 @@ import numpy as np
 from ufl.cell import CellSequence, as_cell
 from ufl.domain import MeshSequence
 from finat.ufl.finiteelement import FiniteElement
-from finat.ufl.finiteelementbase import FiniteElementBase
+from finat.ufl.finiteelementbase import FiniteElementBase, as_cell
 from ufl.permutation import compute_indices
 from ufl.pullback import MixedPullback, SymmetricPullback
 from ufl.utils.indexflattening import flatten_multiindex, shape_to_strides, unflatten_index

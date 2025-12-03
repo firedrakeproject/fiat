@@ -196,10 +196,12 @@ class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
 class FacetQuadratureRule(QuadratureRule):
     """A quadrature rule on a facet mapped from a reference quadrature rule.
     """
-    def __init__(self, ref_el, entity_dim, entity_id, Q_ref):
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref, facet_orientation=None):
         # Construct the facet of interest
         facet = ref_el.construct_subelement(entity_dim)
         facet_topology = ref_el.get_topology()[entity_dim][entity_id]
+        if facet_orientation:
+            facet_topology = tuple(facet_orientation.permute(list(facet_topology)))
         facet.vertices = ref_el.get_vertices_of_subcomplex(facet_topology)
 
         # Map reference points and weights on the appropriate facet
