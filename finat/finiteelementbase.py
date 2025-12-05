@@ -285,6 +285,28 @@ class FiniteElementBase(metaclass=ABCMeta):
         '''Appropriate mapping from the reference cell to a physical cell for
         all basis functions of the finite element.'''
 
+    def is_lagrange(self):
+        '''Returns whether finat_element.dual_basis consists only of point
+        evaluation dofs.'''
+        try:
+            Q, ps = self.dual_basis
+        except NotImplementedError:
+            return False
+        # Inspect the weight matrix
+        # Lagrange elements have gem.Delta as the only terminal nodes
+        children = [Q]
+        while children:
+            nodes = []
+            for c in children:
+                if isinstance(c, gem.Delta):
+                    pass
+                elif isinstance(c, gem.gem.Terminal):
+                    return False
+                else:
+                    nodes.extend(c.children)
+            children = nodes
+        return True
+
 
 def entity_support_dofs(elem, entity_dim):
     '''Return the map of entity id to the degrees of freedom for which
