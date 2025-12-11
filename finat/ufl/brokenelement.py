@@ -37,8 +37,7 @@ class BrokenElement(FiniteElementBase):
                 shape=element._shape)
 
         elif isinstance(element, MixedElement):
-            return MixedElement(
-                [BrokenElement(elem) for elem in element.sub_elements])
+            return MixedElement(list(map(BrokenElement, element.sub_elements)))
 
         else:  # hopefully no special casing needed
             return super().__new__(cls)
