@@ -25,16 +25,8 @@ class BrokenElement(FiniteElementBase):
 
         and similarly for VectorElement and TensorElement.
         """
-        if isinstance(element, VectorElement):
-            return VectorElement(
-                BrokenElement(element.sub_elements[0]),
-                dim=len(element.sub_elements))
-
-        elif isinstance(element, TensorElement):
-            return TensorElement(
-                BrokenElement(element.sub_elements[0]),
-                symmetry=element._symmetry,
-                shape=element._shape)
+        if isinstance(element, (VectorElement, TensorElement)):
+            return element.reconstruct(sub_element=BrokenElement(element.sub_elements[0]))
 
         elif isinstance(element, MixedElement):
             return MixedElement(list(map(BrokenElement, element.sub_elements)))
