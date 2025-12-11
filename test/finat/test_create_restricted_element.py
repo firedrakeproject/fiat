@@ -1,6 +1,6 @@
 import pytest
 import ufl
-from finat.ufl import FiniteElement, BrokenElement, VectorElement, TensorElement, MixedElement
+from finat.ufl import FiniteElement, RestrictedElement, VectorElement, TensorElement, MixedElement
 
 sub_elements = [
     FiniteElement("CG", ufl.triangle, 1),
@@ -17,8 +17,8 @@ sub_ids = [
 
 @pytest.mark.parametrize("sub_element", sub_elements, ids=sub_ids)
 @pytest.mark.parametrize("shape", (1, 2, (2, 3)), ids=("1", "2", "(2,3)"))
-def test_create_broken_vector_or_tensor_element(shape, sub_element):
-    """Check that BrokenElement returns a nested element
+def test_create_restricted_vector_or_tensor_element(shape, sub_element):
+    """Check that RestridtedElement returns a nested element
     for mixed, vector, and tensor elements.
     """
     if not isinstance(shape, int):
@@ -27,17 +27,17 @@ def test_create_broken_vector_or_tensor_element(shape, sub_element):
         make_element = lambda elem: VectorElement(elem, dim=shape)
 
     tensor = make_element(sub_element)
-    expected = make_element(BrokenElement(sub_element))
+    expected = make_element(RestrictedElement(sub_element, "interior"))
 
-    assert BrokenElement(tensor) == expected
+    assert RestrictedElement(tensor, "interior") == expected
 
 
 @pytest.mark.parametrize("sub_elements", [sub_elements, sub_elements[-1:]],
                          ids=(f"nsubs={len(sub_elements)}", "nsubs=1"))
-def test_create_broken_mixed_element(sub_elements):
-    """Check that BrokenElement returns a nested element
+def test_create_restricted_mixed_element(sub_elements):
+    """Check that RestrictedElement returns a nested element
     for mixed, vector, and tensor elements.
     """
     mixed = MixedElement(sub_elements)
-    expected = MixedElement([BrokenElement(elem) for elem in sub_elements])
-    assert BrokenElement(mixed) == expected
+    expected = MixedElement([RestrictedElement(elem, "facet") for elem in sub_elements])
+    assert RestrictedElement(mixed, "facet") == expected

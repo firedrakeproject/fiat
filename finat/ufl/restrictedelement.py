@@ -12,6 +12,7 @@
 # Modified by Matthew Scroggs, 2023
 
 from finat.ufl.finiteelementbase import FiniteElementBase
+from finat.ufl.mixedelement import MixedElement, VectorElement, TensorElement
 from ufl.sobolevspace import L2
 
 valid_restriction_domains = ("interior", "facet", "ridge", "face", "edge", "vertex", "reduced")
@@ -19,6 +20,23 @@ valid_restriction_domains = ("interior", "facet", "ridge", "face", "edge", "vert
 
 class RestrictedElement(FiniteElementBase):
     """Represents the restriction of a finite element to a type of cell entity."""
+    def __new__(cls, element, restriction_domain):
+        """
+        Restricted qualifier must be below Mixed/Vector/Tensor so we
+        overload __new__ to return:
+
+        RestrictedElement(MixedElement(elem0, elem1), dom) -> MixedElement(RestrictedElement(elem0, dom), RestrictedElement(elem1, dom))
+
+        and similarly for VectorElement and TensorElement.
+        """
+        if isinstance(element, (VectorElement, TensorElement)):
+            return element.reconstruct(sub_element=RestrictedElement(element.sub_elements[0], restriction_domain))
+
+        elif isinstance(element, MixedElement):
+            return MixedElement([RestrictedElement(e, restriction_domain) for e in element.sub_elements])
+
+        else:  # hopefully no special casing needed
+            return super().__new__(cls)
 
     def __init__(self, element, restriction_domain):
         """Doc."""
