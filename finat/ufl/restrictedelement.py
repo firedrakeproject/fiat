@@ -86,9 +86,10 @@ class RestrictedElement(FiniteElementBase):
         """Return the domain onto which the element is restricted."""
         return self._restriction_domain
 
-    def reconstruct(self, **kwargs):
+    def reconstruct(self, element=None, **kwargs):
         """Doc."""
-        element = self._element.reconstruct(**kwargs)
+        if element is None:
+            element = self._element.reconstruct(**kwargs)
         return RestrictedElement(element, self._restriction_domain)
 
     def __str__(self):

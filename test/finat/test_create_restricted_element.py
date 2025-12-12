@@ -18,7 +18,7 @@ sub_ids = [
 @pytest.mark.parametrize("sub_element", sub_elements, ids=sub_ids)
 @pytest.mark.parametrize("shape", (1, 2, (2, 3)), ids=("1", "2", "(2,3)"))
 def test_create_restricted_vector_or_tensor_element(shape, sub_element):
-    """Check that RestridtedElement returns a nested element
+    """Check that RestrictedElement returns a nested element
     for mixed, vector, and tensor elements.
     """
     if not isinstance(shape, int):
@@ -39,5 +39,5 @@ def test_create_restricted_mixed_element(sub_elements):
     for mixed, vector, and tensor elements.
     """
     mixed = MixedElement(sub_elements)
-    expected = MixedElement([RestrictedElement(elem, "facet") for elem in sub_elements])
-    assert RestrictedElement(mixed, "facet") == expected
+    expected = MixedElement([elem["facet"] for elem in sub_elements])
+    assert mixed["facet"] == expected
