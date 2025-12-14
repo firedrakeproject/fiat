@@ -9,10 +9,13 @@
 import numpy
 
 from FIAT import polynomial_set, functional
+from FIAT.reference_element import compute_unflattening_map
 
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
+        if ref_el.get_dimension() != max(entity_ids):
+            entity_ids = unflatten_entity_ids(ref_el, entity_ids)
         nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
         self.nodes = nodes
         self.ref_el = ref_el
@@ -213,6 +216,8 @@ class DualSet(object):
             dim = 2
         elif restriction_domain == "facet":
             dim = self.get_reference_element().get_spatial_dimension() - 1
+        elif restriction_domain == "ridge":
+            dim = self.get_reference_element().get_spatial_dimension() - 2
         else:
             raise RuntimeError("Invalid restriction domain")
 
@@ -256,6 +261,18 @@ def make_entity_closure_ids(ref_el, entity_ids):
             entity_closure_ids[d][e] = ids
 
     return entity_closure_ids
+
+
+def unflatten_entity_ids(ref_el, entity_ids):
+    """Reconstruct entity_ids to match the entities of ref_el."""
+    topology = ref_el.get_topology()
+    unflattening_map = compute_unflattening_map(topology)
+    unflattened_entity_ids = {dim: {} for dim in sorted(topology)}
+    for dim in sorted(entity_ids):
+        for entity in sorted(entity_ids[dim]):
+            unflat_dim, unflat_entity = unflattening_map[(dim, entity)]
+            unflattened_entity_ids[unflat_dim][unflat_entity] = entity_ids[dim][entity]
+    return unflattened_entity_ids
 
 
 def lexsort_nodes(ref_el, nodes, entity=None, offset=0):

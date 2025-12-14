@@ -9,7 +9,7 @@ from FIAT import (polynomial_set, expansions, dual_set,
                   finite_element, functional, macro)
 import numpy
 from itertools import chain
-from FIAT.check_format_variant import check_format_variant
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 
@@ -99,7 +99,7 @@ def NedelecSpace3D(ref_el, degree):
 class NedelecDual(dual_set.DualSet):
     """Dual basis for first-kind Nedelec."""
 
-    def __init__(self, ref_el, degree, variant, interpolant_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg, quad_scheme):
         nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
@@ -122,7 +122,7 @@ class NedelecDual(dual_set.DualSet):
                 phi_deg = degree - dim
                 if phi_deg >= 0:
                     facet = ref_el.construct_subelement(dim)
-                    Q_ref = create_quadrature(facet, interpolant_deg + phi_deg)
+                    Q_ref = parse_quadrature_scheme(facet, interpolant_deg + phi_deg, quad_scheme)
                     Pqmd = polynomial_set.ONPolynomialSet(facet, phi_deg, (dim,))
                     Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * dim]
                     Phis = numpy.transpose(Phis, (0, 2, 1))
@@ -164,7 +164,7 @@ class NedelecDual(dual_set.DualSet):
                 interpolant_deg = degree
 
             cell = ref_el.construct_subelement(sd)
-            Q_ref = create_quadrature(cell, interpolant_deg + phi_deg)
+            Q_ref = parse_quadrature_scheme(cell, interpolant_deg + phi_deg, quad_scheme)
             Pqmd = polynomial_set.ONPolynomialSet(cell, phi_deg)
             Phis = Pqmd.tabulate(Q_ref.get_points())[(0,) * sd]
 
@@ -199,7 +199,7 @@ class Nedelec(finite_element.CiarletElement):
     interpolation.
     """
 
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
@@ -213,6 +213,6 @@ class Nedelec(finite_element.CiarletElement):
             poly_set = NedelecSpace2D(ref_el, degree)
         else:
             raise Exception("Not implemented")
-        dual = NedelecDual(ref_el, degree, variant, interpolant_deg)
+        dual = NedelecDual(ref_el, degree, variant, interpolant_deg, quad_scheme)
         formdegree = 1  # 1-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="covariant piola")

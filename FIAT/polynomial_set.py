@@ -18,7 +18,6 @@
 import numpy
 from itertools import chain
 from FIAT import expansions
-from FIAT.functional import index_iterator
 
 
 def mis(m, n):
@@ -113,25 +112,21 @@ class ONPolynomialSet(PolynomialSet):
     identity matrix of coefficients.  Can be used to specify ON bases
     for vector- and tensor-valued sets as well.
     """
-    def __init__(self, ref_el, degree, shape=tuple(), **kwargs):
+    def __init__(self, ref_el, degree, shape=(), **kwargs):
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
-        if shape == tuple():
-            num_components = 1
-        else:
-            flat_shape = numpy.ravel(shape)
-            num_components = numpy.prod(flat_shape)
+        num_components = numpy.prod(shape, dtype=int)
         num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
 
         # set up coefficients
-        if shape == tuple():
+        if shape == ():
             coeffs = numpy.eye(num_members)
         else:
             coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
             cur = 0
             exp_bf = range(num_exp_functions)
-            for idx in index_iterator(shape):
+            for idx in numpy.ndindex(shape):
                 cur_bf = range(cur, cur+num_exp_functions)
                 coeffs[(cur_bf, *idx, exp_bf)] = 1.0
                 cur += num_exp_functions
@@ -243,7 +238,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
         coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
         cur = 0
         exp_bf = range(num_exp_functions)
-        for i, j in index_iterator(shape):
+        for i, j in numpy.ndindex(shape):
             if i > j:
                 continue
             cur_bf = range(cur, cur+num_exp_functions)
@@ -275,7 +270,7 @@ class TracelessTensorPolynomialSet(PolynomialSet):
         coeffs = numpy.zeros((num_members, *shape, num_exp_functions))
         cur = 0
         exp_bf = range(num_exp_functions)
-        for i, j in index_iterator(shape):
+        for i, j in numpy.ndindex(shape):
             if i == size-1 and j == size-1:
                 continue
             cur_bf = range(cur, cur+num_exp_functions)
@@ -291,21 +286,15 @@ def make_bubbles(ref_el, degree, codim=0, shape=(), scale="L2 piola"):
     """Construct a polynomial set with codim bubbles up to the given degree.
     """
     poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale=scale, variant="bubble")
+    if ref_el.get_spatial_dimension() == 0:
+        return poly_set
+
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
     sd = ref_el.get_spatial_dimension()
     dim = sd - codim
-    if dim == 1:
-        # Apply even / odd reordering on edge bubbles
-        indices = []
-        for entity in entity_ids[dim]:
-            ids = entity_ids[dim][entity]
-            indices.extend(ids[::2])
-            indices.extend(ids[1::2])
-    else:
-        indices = list(chain(*entity_ids[dim].values()))
-
+    indices = list(chain(*entity_ids[dim].values()))
     if shape != ():
-        ncomp = numpy.prod(shape)
+        ncomp = numpy.prod(shape, dtype=int)
         dimPk = poly_set.get_num_members() // ncomp
         indices = list((numpy.array(indices)[:, None] + dimPk * numpy.arange(ncomp)[None, :]).flat)
     poly_set = poly_set.take(indices)

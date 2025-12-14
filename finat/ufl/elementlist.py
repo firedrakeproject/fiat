@@ -152,7 +152,7 @@ register_alias("Lobatto",
 register_alias("Lob",
                lambda family, dim, order, degree: ("Gauss-Lobatto-Legendre", order))
 
-register_element("Bernstein", None, 0, H1, "identity", (1, None), simplices)
+register_element("Bernstein", None, 0, H1, "identity", (1, None), any_cell)
 
 
 # Let Nedelec H(div) elements be aliases to BDMs/RTs
@@ -388,9 +388,9 @@ def canonical_element_description(family, cell, order, form_degree):
     """
     # Get domain dimensions
     if cell is not None:
-        tdim = cell.topological_dimension()
+        tdim = cell.topological_dimension
         if isinstance(cell, Cell):
-            cellname = cell.cellname()
+            cellname = cell.cellname
         else:
             cellname = None
     else:
@@ -424,11 +424,11 @@ def canonical_element_description(family, cell, order, form_degree):
             family = "Q"
         elif family == "Discontinuous Lagrange":
             if order >= 1:
-                warnings.warn("Discontinuous Lagrange element requested on %s, creating DQ element." % cell.cellname())
+                warnings.warn("Discontinuous Lagrange element requested on %s, creating DQ element." % cell.cellname)
             family = "DQ"
         elif family == "Discontinuous Lagrange L2":
             if order >= 1:
-                warnings.warn(f"Discontinuous Lagrange L2 element requested on {cell.cellname()}, "
+                warnings.warn(f"Discontinuous Lagrange L2 element requested on {cell.cellname}, "
                               "creating DQ L2 element.")
             family = "DQ L2"
 

@@ -18,13 +18,6 @@ import numpy
 from FIAT import polynomial_set, jacobi, quadrature_schemes
 
 
-def index_iterator(shp):
-    """Constructs a generator iterating over all indices in
-    shp in generalized column-major order  So if shp = (2,2), then we
-    construct the sequence (0,0),(0,1),(1,0),(1,1)"""
-    return numpy.ndindex(shp)
-
-
 class Functional(object):
     r"""Abstract class representing a linear functional.
     All FIAT functionals are discrete in the sense that
@@ -385,7 +378,7 @@ class FrobeniusIntegralMoment(IntegralMoment):
         self.f_at_qpts = f_at_qpts
         qpts, qwts = Q.get_points(), Q.get_weights()
         weights = numpy.transpose(numpy.multiply(f_at_qpts, qwts), (-1,) + tuple(range(len(shp))))
-        alphas = list(index_iterator(shp))
+        alphas = list(numpy.ndindex(shp))
 
         pt_dict = {tuple(pt): [(wt[alpha], alpha) for alpha in alphas] for pt, wt in zip(qpts, weights)}
         Functional.__init__(self, ref_el, shp, pt_dict, {}, nm or "FrobeniusIntegralMoment")
@@ -495,7 +488,7 @@ class IntegralMomentOfTensorDivergence(Functional):
         weights = numpy.multiply(f_at_qpts, Q.get_weights()).T
 
         alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {tuple(pt): [(wt[i], alphas[j], (i, j)) for i, j in index_iterator(shp)]
+        dpt_dict = {tuple(pt): [(wt[i], alphas[j], (i, j)) for i, j in numpy.ndindex(shp)]
                     for pt, wt in zip(points, weights)}
 
         super().__init__(ref_el, tuple(), {}, dpt_dict, "IntegralMomentOfDivergence")
@@ -656,7 +649,7 @@ class PointwiseInnerProductEvaluation(Functional):
         wvT = numpy.outer(w, v)
         shp = wvT.shape
 
-        pt_dict = {tuple(pt): [(wvT[idx], idx) for idx in index_iterator(shp)]}
+        pt_dict = {tuple(pt): [(wvT[idx], idx) for idx in numpy.ndindex(shp)]}
 
         super().__init__(ref_el, shp, pt_dict, {}, "PointwiseInnerProductEval")
 

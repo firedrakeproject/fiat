@@ -13,7 +13,8 @@
 
 import numpy as np
 
-from ufl.cell import as_cell
+from ufl.cell import CellSequence, as_cell
+from ufl.domain import MeshSequence
 from finat.ufl.finiteelement import FiniteElement
 from finat.ufl.finiteelementbase import FiniteElementBase
 from ufl.permutation import compute_indices
@@ -39,18 +40,6 @@ class MixedElement(FiniteElementBase):
         elements = [MixedElement(e) if isinstance(e, (tuple, list)) else e
                     for e in elements]
         self._sub_elements = elements
-
-        # Pick the first cell, for now all should be equal
-        cells = tuple(sorted(set(element.cell for element in elements) - set([None])))
-        self._cells = cells
-        if cells:
-            cell = cells[0]
-            # Require that all elements are defined on the same cell
-            if not all(c == cell for c in cells[1:]):
-                raise ValueError("Sub elements must live on the same cell.")
-        else:
-            cell = None
-
         # Check that all elements use the same quadrature scheme TODO:
         # We can allow the scheme not to be defined.
         if len(elements) == 0:
@@ -70,8 +59,15 @@ class MixedElement(FiniteElementBase):
         # Initialize element data
         degrees = {e.degree() for e in self._sub_elements} - {None}
         degree = max_degree(degrees) if degrees else None
-        FiniteElementBase.__init__(self, "Mixed", cell, degree, quad_scheme,
+        FiniteElementBase.__init__(self, "Mixed", self._make_cell(), degree, quad_scheme,
                                    reference_value_shape)
+
+    def _make_cell(self):
+        if self.num_sub_elements == 0:
+            return
+        else:
+            cells = tuple(e.cell for e in self.sub_elements)
+            return CellSequence(cells)
 
     def __repr__(self):
         """Doc."""
@@ -94,6 +90,8 @@ class MixedElement(FiniteElementBase):
         :math:`c_1`.
         A component is a tuple of one or more ints.
         """
+        if isinstance(domain, MeshSequence):
+            raise NotImplementedError
         # Build symmetry map from symmetries of subelements
         sm = {}
         # Base index of the current subelement into mixed value
@@ -140,6 +138,8 @@ class MixedElement(FiniteElementBase):
 
         component index for a given component index.
         """
+        if isinstance(domain, MeshSequence):
+            raise NotImplementedError
         if isinstance(i, int):
             i = (i,)
         self._check_component(i)
@@ -245,7 +245,16 @@ class MixedElement(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
-        return MixedElement(*[e.reconstruct(**kwargs) for e in self.sub_elements])
+        cell = kwargs.pop('cell', None)
+        if cell is None:
+            cell = self.cell
+        else:
+            if not isinstance(cell, CellSequence):
+                # Allow for passing a single base cell.
+                cell = CellSequence([cell] * len(self.sub_elements))
+        return type(self)(
+            *[e.reconstruct(cell=c, **kwargs) for c, e in zip(cell.cells, self.sub_elements)],
+        )
 
     def variant(self):
         """Doc."""
@@ -297,7 +306,7 @@ class VectorElement(MixedElement):
             if cell is None:
                 raise ValueError("Cannot infer vector dimension without a cell.")
             # TODO: is this the right default
-            dim = cell.topological_dimension()
+            dim = cell.topological_dimension
 
         self._mapping = sub_element.mapping()
         # Create list of sub elements for mixed element constructor
@@ -307,8 +316,10 @@ class VectorElement(MixedElement):
         reference_value_shape = (dim,) + sub_element.reference_value_shape
 
         # Initialize element data
-        MixedElement.__init__(self, sub_elements,
-                              reference_value_shape=reference_value_shape)
+        MixedElement.__init__(
+            self, sub_elements,
+            reference_value_shape=reference_value_shape,
+        )
 
         FiniteElementBase.__init__(self, sub_element.family(), sub_element.cell, sub_element.degree(),
                                    sub_element.quadrature_scheme(), reference_value_shape)
@@ -323,13 +334,21 @@ class VectorElement(MixedElement):
         # Cache repr string
         self._repr = f"VectorElement({repr(sub_element)}, dim={dim}{var_str})"
 
+    def _make_cell(self):
+        if self.num_sub_elements == 0:
+            return
+        else:
+            cell, = set(e.cell for e in self.sub_elements)
+            return cell
+
     def __repr__(self):
         """Doc."""
         return self._repr
 
-    def reconstruct(self, **kwargs):
+    def reconstruct(self, sub_element=None, **kwargs):
         """Doc."""
-        sub_element = self._sub_element.reconstruct(**kwargs)
+        if sub_element is None:
+            sub_element = self._sub_element.reconstruct(**kwargs)
         return VectorElement(sub_element, dim=len(self.sub_elements))
 
     def variant(self):
@@ -382,7 +401,7 @@ class TensorElement(MixedElement):
             if cell is None:
                 raise ValueError("Cannot infer tensor shape without a cell.")
             # TODO: is this the right default
-            dim = cell.topological_dimension()
+            dim = cell.topological_dimension
             shape = (dim, dim)
 
         if symmetry is None:
@@ -435,8 +454,10 @@ class TensorElement(MixedElement):
 
         reference_value_shape = reference_value_shape + sub_element.reference_value_shape
         # Initialize element data
-        MixedElement.__init__(self, sub_elements,
-                              reference_value_shape=reference_value_shape)
+        MixedElement.__init__(
+            self, sub_elements,
+            reference_value_shape=reference_value_shape,
+        )
         self._family = sub_element.family()
         self._degree = sub_element.degree()
         self._sub_element = sub_element
@@ -453,6 +474,13 @@ class TensorElement(MixedElement):
         # Cache repr string
         self._repr = (f"TensorElement({repr(sub_element)}, shape={shape}, "
                       f"symmetry={symmetry}{var_str})")
+
+    def _make_cell(self):
+        if self.num_sub_elements == 0:
+            return
+        else:
+            cell, = set(e.cell for e in self.sub_elements)
+            return cell
 
     @property
     def pullback(self):
@@ -517,9 +545,10 @@ class TensorElement(MixedElement):
         """
         return self._symmetry
 
-    def reconstruct(self, **kwargs):
+    def reconstruct(self, sub_element=None, **kwargs):
         """Doc."""
-        sub_element = self._sub_element.reconstruct(**kwargs)
+        if sub_element is None:
+            sub_element = self._sub_element.reconstruct(**kwargs)
         return TensorElement(sub_element, shape=self._shape, symmetry=self._symmetry)
 
     def __str__(self):

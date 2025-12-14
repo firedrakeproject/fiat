@@ -4,11 +4,15 @@ from .fiat_elements import (Bernstein, Bubble, BrezziDouglasFortinMarini,       
                             DiscontinuousLagrange, DiscontinuousTaylor, DPC,                 # noqa: F401
                             FacetBubble, GopalakrishnanLedererSchoberlFirstKind,             # noqa: F401
                             GopalakrishnanLedererSchoberlSecondKind, Histopolation,          # noqa: F401
-                            HDivTrace, HellanHerrmannJohnson, KongMulderVeldhuizen,          # noqa: F401
+                            HDivTrace, HellanHerrmannJohnson,                                # noqa: F401
                             Lagrange, Real, Serendipity,                                     # noqa: F401
                             TrimmedSerendipityCurl, TrimmedSerendipityDiv,                   # noqa: F401
                             TrimmedSerendipityEdge, TrimmedSerendipityFace,                  # noqa: F401
                             Nedelec, NedelecSecondKind, RaviartThomas, Regge)                # noqa: F401
+from .spectral import (GaussLobattoLegendre, GaussLegendre, KongMulderVeldhuizen,            # noqa: F401
+                       Legendre, IntegratedLegendre,                                         # noqa: F401
+                       FDMLagrange, FDMQuadrature, FDMDiscontinuousLagrange,                 # noqa: F401
+                       FDMBrokenH1, FDMBrokenL2, FDMHermite)                                 # noqa: F401
 
 from .argyris import Argyris                                       # noqa: F401
 from .aw import ArnoldWinther, ArnoldWintherNC                     # noqa: F401
@@ -27,7 +31,6 @@ from .mtw import MardalTaiWinther                                  # noqa: F401
 from .morley import Morley                                         # noqa: F401
 from .walkington import Walkington                                 # noqa: F401
 from .direct_serendipity import DirectSerendipity                  # noqa: F401
-from .spectral import GaussLobattoLegendre, GaussLegendre, Legendre, IntegratedLegendre, FDMLagrange, FDMQuadrature, FDMDiscontinuousLagrange, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 from .tensorfiniteelement import TensorFiniteElement               # noqa: F401
 from .tensor_product import TensorProductElement                   # noqa: F401
 from .cube import FlattenedDimensions                              # noqa: F401
