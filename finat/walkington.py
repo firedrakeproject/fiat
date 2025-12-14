@@ -4,16 +4,16 @@ from math import comb
 
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.argyris import _vertex_transform, _normal_tangential_transform
 from copy import deepcopy
 
 
 class Walkington(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=5):
-        if Citations is not None:
-            Citations().register("Bell1969")
+        cite("Bell1969")
         super().__init__(FIAT.Walkington(cell, degree=degree))
 
         reduced_dofs = deepcopy(self._element.entity_dofs())
