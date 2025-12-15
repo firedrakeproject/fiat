@@ -285,6 +285,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         '''Appropriate mapping from the reference cell to a physical cell for
         all basis functions of the finite element.'''
 
+    @cached_property
     def is_lagrange(self):
         '''Returns whether finat_element.dual_basis consists only of point
         evaluation dofs.'''
