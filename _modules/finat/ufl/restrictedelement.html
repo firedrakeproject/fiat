@@ -50,6 +50,7 @@
 <span class="c1"># Modified by Matthew Scroggs, 2023</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.ufl.finiteelementbase</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.ufl.mixedelement</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixedElement</span><span class="p">,</span> <span class="n">VectorElement</span><span class="p">,</span> <span class="n">TensorElement</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ufl.sobolevspace</span><span class="w"> </span><span class="kn">import</span> <span class="n">L2</span>
 
 <span class="n">valid_restriction_domains</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;interior&quot;</span><span class="p">,</span> <span class="s2">&quot;facet&quot;</span><span class="p">,</span> <span class="s2">&quot;ridge&quot;</span><span class="p">,</span> <span class="s2">&quot;face&quot;</span><span class="p">,</span> <span class="s2">&quot;edge&quot;</span><span class="p">,</span> <span class="s2">&quot;vertex&quot;</span><span class="p">,</span> <span class="s2">&quot;reduced&quot;</span><span class="p">)</span>
@@ -59,6 +60,23 @@
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.restrictedelement.RestrictedElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">RestrictedElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents the restriction of a finite element to a type of cell entity.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Restricted qualifier must be below Mixed/Vector/Tensor so we</span>
+<span class="sd">        overload __new__ to return:</span>
+
+<span class="sd">        RestrictedElement(MixedElement(elem0, elem1), dom) -&gt; MixedElement(RestrictedElement(elem0, dom), RestrictedElement(elem1, dom))</span>
+
+<span class="sd">        and similarly for VectorElement and TensorElement.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="p">(</span><span class="n">VectorElement</span><span class="p">,</span> <span class="n">TensorElement</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="n">element</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="n">sub_element</span><span class="o">=</span><span class="n">RestrictedElement</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">sub_elements</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">restriction_domain</span><span class="p">))</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">MixedElement</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">MixedElement</span><span class="p">([</span><span class="n">RestrictedElement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">sub_elements</span><span class="p">])</span>
+
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># hopefully no special casing needed</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
@@ -122,9 +140,10 @@
 
 <div class="viewcode-block" id="RestrictedElement.reconstruct">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.restrictedelement.RestrictedElement.reconstruct">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
-        <span class="n">element</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">element</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">element</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">RestrictedElement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_restriction_domain</span><span class="p">)</span></div>
 
 
