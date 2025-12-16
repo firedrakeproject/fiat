@@ -89,11 +89,15 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                 for f in sorted(facets):
                     cur = len(nodes)
                     if i == 0:
+                        scale = -2 if sd == 2 else 2**2.5
+                        wts = numpy.ones(f_at_qpts.shape) * scale
                         udir = numpy.dot(R, *thats[f]) if sd == 2 else numpy.cross(*thats[f])
                     else:
+                        wts = f_at_qpts
                         udir = thats[f][i-1]
+
                     detJ = Qs[f].jacobian_determinant()
-                    phi_at_qpts = udir[:, None] * f_at_qpts[None, :] / detJ
+                    phi_at_qpts = udir[:, None] * wts[None, :] / detJ
                     nodes.append(FrobeniusIntegralMoment(ref_el, Qs[f], phi_at_qpts))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)

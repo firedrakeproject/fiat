@@ -2,8 +2,10 @@ import numpy
 
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
-from gem import Literal, ListTensor
+from gem import Literal, ListTensor, Zero
 from copy import deepcopy
+
+from itertools import chain
 
 
 def determinant(A):
@@ -156,4 +158,41 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
             cur_dofs = dofs[sd-1][f]
             cur_bfs = bfs[sd-1][f][1:]
             V[numpy.ix_(cur_bfs, cur_dofs)] = rows[..., :len(cur_dofs)]
+
+        # Fix discrepancy between normal and tangential moments
+        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof
+        if needs_facet_vertex_coupling:
+
+            foffset = min(min(dofs[sd-1][f]) for f in dofs[sd-1])
+            voffset = min(min(dofs[0][v]) for v in dofs[0])
+            assert voffset == 0
+            num_vdof = sum(len(dofs[0][v]) for v in dofs[0])
+            num_fdof = sum(len(dofs[sd-1][f]) for f in dofs[sd-1])
+
+            T = numpy.full((num_fdof, num_vdof), Zero(), dtype=object)
+
+            for f in sorted(dofs[sd-1]):
+                if sd == 2:
+                    that = self.cell.compute_edge_tangent(f)
+                    nhat = numpy.array([that[1], -that[0]])
+                else:
+                    nhat = numpy.cross(*self.cell.compute_tangents(sd-1, f))
+                Tfv = nhat @ Finv
+                if sd == 3:
+                    Tfv *= (-2**2.5) * self.cell.volume()
+
+                for v in self.cell.topology[sd-1][f]:
+                    cur = 0
+                    while cur < len(dofs[0][v]):
+                        if len(nodes[dofs[0][v][cur]].deriv_dict) > 0:
+                            cur += 1
+                        else:
+                            vdofs = dofs[0][v][cur:cur+sd]
+                            for fdof in dofs[sd-1][f]:
+                                T[fdof-foffset, vdofs] = Tfv
+                            cur += sd
+
+            vdofs = tuple(chain.from_iterable(dofs[0].values()))
+            fdofs = tuple(chain.from_iterable(dofs[sd-1].values()))
+            V[ndof:, vdofs] += V[ndof:, fdofs] @ T
         return ListTensor(V.T)
