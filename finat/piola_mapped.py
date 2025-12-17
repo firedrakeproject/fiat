@@ -4,7 +4,6 @@ from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
 from gem import Literal, ListTensor, Zero
 from copy import deepcopy
-
 from itertools import chain
 
 
@@ -162,37 +161,21 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
         # Fix discrepancy between normal and tangential moments
         needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof
         if needs_facet_vertex_coupling:
+            perp = lambda *t: numpy.array([t[0][1], -t[0][0]]) if len(t) == 1 else numpy.cross(*t)
 
-            foffset = min(min(dofs[sd-1][f]) for f in dofs[sd-1])
-            voffset = min(min(dofs[0][v]) for v in dofs[0])
-            assert voffset == 0
-            num_vdof = sum(len(dofs[0][v]) for v in dofs[0])
-            num_fdof = sum(len(dofs[sd-1][f]) for f in dofs[sd-1])
+            dim = max(d for d in dofs if d < sd-1 and len(dofs[d][0]) > 0)
+            vdofs = chain.from_iterable(dofs[dim].values())
+            vdofs = [i for i in vdofs if not nodes[i].deriv_dict]
+            fdofs = list(chain.from_iterable(dofs[sd-1].values()))
 
-            T = numpy.full((num_fdof, num_vdof), Zero(), dtype=object)
-
+            T = numpy.full((len(fdofs), len(vdofs)), Zero(), dtype=object)
             for f in sorted(dofs[sd-1]):
-                if sd == 2:
-                    that = self.cell.compute_edge_tangent(f)
-                    nhat = numpy.array([that[1], -that[0]])
-                else:
-                    nhat = numpy.cross(*self.cell.compute_tangents(sd-1, f))
-                Tfv = nhat @ Finv
-                if sd == 3:
-                    Tfv *= (-2**2.5) * self.cell.volume()
+                nhat = perp(*self.cell.compute_tangents(sd-1, f))
+                Tfv = ((-1/sd) * nhat) @ Finv
+                for v in self.cell.connectivity[(sd-1, dim)][f]:
+                    curvdofs = [vdofs.index(i) for i in dofs[dim][v] if not nodes[i].deriv_dict]
+                    for fdof in dofs[sd-1][f]:
+                        T[fdofs.index(fdof), curvdofs] = Tfv
 
-                for v in self.cell.topology[sd-1][f]:
-                    cur = 0
-                    while cur < len(dofs[0][v]):
-                        if len(nodes[dofs[0][v][cur]].deriv_dict) > 0:
-                            cur += 1
-                        else:
-                            vdofs = dofs[0][v][cur:cur+sd]
-                            for fdof in dofs[sd-1][f]:
-                                T[fdof-foffset, vdofs] = Tfv
-                            cur += sd
-
-            vdofs = tuple(chain.from_iterable(dofs[0].values()))
-            fdofs = tuple(chain.from_iterable(dofs[sd-1].values()))
             V[ndof:, vdofs] += V[ndof:, fdofs] @ T
         return ListTensor(V.T)

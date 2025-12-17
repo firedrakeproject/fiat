@@ -72,7 +72,13 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             # Face moments of normal/tangential components against dual bubbles
             ref_facet = ref_complex.construct_subcomplex(sd-1)
             codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
-            Q, phis = make_dual_bubbles(ref_facet, degree, codim=codim)
+            # FIXME magic numbers
+            if codim == 0:
+                scale = (-2)**(sd-1)
+            else:
+                scale = (2/3)**0.5 if sd == 2 else 4*(2/15)**0.5
+
+            Q, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=scale)
             f_at_qpts = phis[-1]
             if codim != 0:
                 f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / ref_facet.volume()
@@ -83,15 +89,14 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q) for f in facets}
             thats = {f: ref_el.compute_tangents(sd-1, f) for f in facets}
 
-            R = numpy.array([[0, 1], [-1, 0]])
+            perp = lambda *v: numpy.array([v[0][1], -v[0][0]]) if len(v) == 1 else numpy.cross(*v)
             ndir = 1 if reduced else sd
             for i in range(ndir):
                 for f in sorted(facets):
                     cur = len(nodes)
                     if i == 0:
-                        scale = -2 if sd == 2 else 2**2.5
-                        wts = numpy.ones(f_at_qpts.shape) * scale
-                        udir = numpy.dot(R, *thats[f]) if sd == 2 else numpy.cross(*thats[f])
+                        wts = numpy.ones(f_at_qpts.shape) / ref_facet.volume()
+                        udir = perp(*thats[f])
                     else:
                         wts = f_at_qpts
                         udir = thats[f][i-1]
