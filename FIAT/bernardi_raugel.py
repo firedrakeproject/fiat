@@ -46,7 +46,7 @@ def BernardiRaugelSpace(ref_el, order):
 
 class BernardiRaugelDualSet(dual_set.DualSet):
     """The Bernardi-Raugel dual set."""
-    def __init__(self, ref_el, order=1, degree=None, reduced=False, ref_complex=None):
+    def __init__(self, ref_el, order=1, degree=None, reduced=False, ref_complex=None, hierarchical=False):
         if ref_complex is None:
             ref_complex = ref_el
         sd = ref_el.get_spatial_dimension()
@@ -95,7 +95,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                 for f in sorted(facets):
                     cur = len(nodes)
                     if i == 0:
-                        wts = numpy.ones(f_at_qpts.shape) / ref_facet.volume()
+                        wts = f_at_qpts if hierarchical else numpy.ones(f_at_qpts.shape) / ref_facet.volume()
                         udir = perp(*thats[f])
                     else:
                         wts = f_at_qpts
@@ -114,11 +114,11 @@ class BernardiRaugel(finite_element.CiarletElement):
     This element does not belong to a Stokes complex, but can be paired with
     DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.
     """
-    def __init__(self, ref_el, order=1):
+    def __init__(self, ref_el, order=1, hierarchical=False):
         degree = ref_el.get_spatial_dimension()
         if order >= degree:
             raise ValueError(f"{type(self).__name__} only defined for order < dim")
         poly_set = BernardiRaugelSpace(ref_el, order)
-        dual = BernardiRaugelDualSet(ref_el, order, degree=degree)
+        dual = BernardiRaugelDualSet(ref_el, order, degree=degree, hierarchical=hierarchical)
         formdegree = 0
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
