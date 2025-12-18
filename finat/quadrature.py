@@ -26,11 +26,6 @@ def make_quadrature(ref_el, degree, scheme="default"):
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
     """
-
-    if instance(scheme, QuadratureRule):
-        assert scheme.ref_el is ref_el
-        return scheme
-
     if ref_el.get_shape() == TENSORPRODUCT:
         try:
             degree = tuple(degree)

@@ -31,7 +31,11 @@ def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
     else:
         rule_ref_cell = fiat_ref_cell
 
-    rule = make_quadrature(rule_ref_cell, degree, scheme=scheme)
+    if isinstance(scheme, AbstractQuadratureRule):
+        rule = scheme
+    else:
+        rule = make_quadrature(rule_ref_cell, degree, scheme=scheme)
+
     return QuadratureElement(fiat_ref_cell, rule)
 
 
