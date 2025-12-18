@@ -47,7 +47,8 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">LINE</span><span class="p">,</span> <span class="n">QUADRILATERAL</span><span class="p">,</span> <span class="n">TENSORPRODUCT</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">safe_repr</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">finat.point_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">GaussLegendrePointSet</span><span class="p">,</span> <span class="n">KMVPointSet</span><span class="p">,</span> <span class="n">PointSet</span><span class="p">,</span> <span class="n">TensorPointSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.point_set</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">GaussLegendrePointSet</span><span class="p">,</span> <span class="n">GaussLobattoLegendrePointSet</span><span class="p">,</span>
+                             <span class="n">KMVPointSet</span><span class="p">,</span> <span class="n">PointSet</span><span class="p">,</span> <span class="n">TensorPointSet</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="make_quadrature">
@@ -83,7 +84,13 @@
     <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Need positive degree, not </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">degree</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">LINE</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
+    <span class="k">if</span> <span class="n">scheme</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;kmv&quot;</span><span class="p">,</span> <span class="s2">&quot;lump&quot;</span><span class="p">}:</span>
+        <span class="n">fiat_rule</span> <span class="o">=</span> <span class="n">fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="s2">&quot;KMV&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">LINE</span><span class="p">:</span>
+            <span class="n">point_set</span> <span class="o">=</span> <span class="n">GaussLobattoLegendrePointSet</span><span class="p">(</span><span class="n">fiat_rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">point_set</span> <span class="o">=</span> <span class="n">KMVPointSet</span><span class="p">(</span><span class="n">fiat_rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+    <span class="k">elif</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">LINE</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
         <span class="c1"># FIAT uses Gauss-Legendre line quadature, however, since we</span>
         <span class="c1"># symbolically label it as such, we wish not to risk attaching</span>
         <span class="c1"># the wrong label in case FIAT changes.  So we explicitly ask</span>
@@ -93,10 +100,7 @@
         <span class="n">point_set</span> <span class="o">=</span> <span class="n">GaussLegendrePointSet</span><span class="p">(</span><span class="n">fiat_rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">fiat_rule</span> <span class="o">=</span> <span class="n">fiat_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">scheme</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;kmv&quot;</span><span class="p">:</span>
-            <span class="n">point_set</span> <span class="o">=</span> <span class="n">KMVPointSet</span><span class="p">(</span><span class="n">fiat_rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">point_set</span> <span class="o">=</span> <span class="n">PointSet</span><span class="p">(</span><span class="n">fiat_rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">point_set</span> <span class="o">=</span> <span class="n">PointSet</span><span class="p">(</span><span class="n">fiat_rule</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
 
     <span class="k">return</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">point_set</span><span class="p">,</span> <span class="n">fiat_rule</span><span class="o">.</span><span class="n">get_weights</span><span class="p">(),</span> <span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">io_ornt_map_tuple</span><span class="o">=</span><span class="n">fiat_rule</span><span class="o">.</span><span class="n">_intrinsic_orientation_permutation_map_tuple</span><span class="p">)</span></div>
 
