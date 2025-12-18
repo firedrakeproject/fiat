@@ -463,6 +463,15 @@ def canonical_element_description(family, cell, order, form_degree):
         raise ValueError(f"Invalid value rank {value_rank}.")
 
     embedded_degree = order
-    if any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
+    if family == "Kong-Mulder-Veldhuizen":
+        if order == 1:
+            bump = 0
+        elif tdim == 2 and order < 5:
+            bump = 1
+        else:
+            bump = 2
+        embedded_degree += bump
+    elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
         embedded_degree = tdim
+
     return family, short_name, order, reference_value_shape, sobolev_space, mapping, embedded_degree
