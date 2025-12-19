@@ -58,7 +58,7 @@
 <span class="sd">    Generate quadrature rule for given reference element</span>
 <span class="sd">    that will integrate an polynomial of order &#39;degree&#39; exactly.</span>
 
-<span class="sd">    For low-degree (&lt;=6) polynomials on triangles and tetrahedra, this</span>
+<span class="sd">    For low-degree polynomials on triangles (&lt;=50) and tetrahedra (&lt;=15), this</span>
 <span class="sd">    uses hard-coded rules, otherwise it falls back to a collapsed</span>
 <span class="sd">    Gauss scheme on simplices.  On tensor-product cells, it is a</span>
 <span class="sd">    tensor-product quadrature rule of the subcells.</span>
@@ -66,6 +66,10 @@
 <span class="sd">    :arg ref_el: The FIAT cell to create the quadrature for.</span>
 <span class="sd">    :arg degree: The degree of polynomial that the rule should</span>
 <span class="sd">        integrate exactly.</span>
+<span class="sd">    :kwarg scheme: The quadrature scheme, can be choosen from [&quot;default&quot;, &quot;canonical&quot;, &quot;KMV&quot;]</span>
+<span class="sd">        &quot;default&quot; -&gt; hard-coded scheme for low degree and collapsed Gauss scheme for high degree,</span>
+<span class="sd">        &quot;canonical&quot; -&gt; collapsed Gauss scheme,</span>
+<span class="sd">        &quot;KMV&quot; -&gt; spectral lumped scheme for low degree (&lt;=6 on triangles, &lt;=3 on tetrahedra).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TENSORPRODUCT</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>

@@ -3279,7 +3279,7 @@ as the point set.</p>
 <span class="sig-prename descclassname"><span class="pre">finat.quadrature.</span></span><span class="sig-name descname"><span class="pre">make_quadrature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'default'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/quadrature.html#make_quadrature"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.quadrature.make_quadrature" title="Link to this definition">¶</a></dt>
 <dd><p>Generate quadrature rule for given reference element
 that will integrate an polynomial of order ‘degree’ exactly.</p>
-<p>For low-degree (&lt;=6) polynomials on triangles and tetrahedra, this
+<p>For low-degree polynomials on triangles (&lt;=50) and tetrahedra (&lt;=15), this
 uses hard-coded rules, otherwise it falls back to a collapsed
 Gauss scheme on simplices.  On tensor-product cells, it is a
 tensor-product quadrature rule of the subcells.</p>
@@ -3289,6 +3289,10 @@ tensor-product quadrature rule of the subcells.</p>
 <li><p><strong>ref_el</strong> – The FIAT cell to create the quadrature for.</p></li>
 <li><p><strong>degree</strong> – The degree of polynomial that the rule should
 integrate exactly.</p></li>
+<li><p><strong>scheme</strong> – The quadrature scheme, can be choosen from [“default”, “canonical”, “KMV”]
+“default” -&gt; hard-coded scheme for low degree and collapsed Gauss scheme for high degree,
+“canonical” -&gt; collapsed Gauss scheme,
+“KMV” -&gt; spectral lumped scheme for low degree (&lt;=6 on triangles, &lt;=3 on tetrahedra).</p></li>
 </ul>
 </dd>
 </dl>
