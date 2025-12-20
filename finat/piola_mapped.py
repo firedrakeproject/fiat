@@ -2,8 +2,9 @@ import numpy
 
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
-from gem import Literal, ListTensor
+from gem import Literal, ListTensor, Zero
 from copy import deepcopy
+from itertools import chain
 
 
 def determinant(A):
@@ -156,4 +157,25 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
             cur_dofs = dofs[sd-1][f]
             cur_bfs = bfs[sd-1][f][1:]
             V[numpy.ix_(cur_bfs, cur_dofs)] = rows[..., :len(cur_dofs)]
+
+        # Fix discrepancy between normal and tangential moments
+        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof
+        if needs_facet_vertex_coupling:
+            perp = lambda *t: numpy.array([t[0][1], -t[0][0]]) if len(t) == 1 else numpy.cross(*t)
+
+            dim = max(d for d in dofs if d < sd-1 and len(dofs[d][0]) > 0)
+            vdofs = chain.from_iterable(dofs[dim].values())
+            vdofs = [i for i in vdofs if not nodes[i].deriv_dict]
+            fdofs = list(chain.from_iterable(dofs[sd-1].values()))
+
+            T = numpy.full((len(fdofs), len(vdofs)), Zero(), dtype=object)
+            for f in sorted(dofs[sd-1]):
+                nhat = perp(*self.cell.compute_tangents(sd-1, f))
+                Tfv = ((-1/sd) * nhat) @ Finv
+                for v in self.cell.connectivity[(sd-1, dim)][f]:
+                    curvdofs = [vdofs.index(i) for i in dofs[dim][v] if not nodes[i].deriv_dict]
+                    for fdof in dofs[sd-1][f]:
+                        T[fdofs.index(fdof), curvdofs] = Tfv
+
+            V[ndof:, vdofs] += V[ndof:, fdofs] @ T
         return ListTensor(V.T)
