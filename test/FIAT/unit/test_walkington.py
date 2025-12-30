@@ -78,19 +78,25 @@ def span_greater_equal(A, B):
 
 def test_walkington_space(cell):
     degree = 5
-    P = ONPolynomialSet(cell, degree)
-
     fe = Walkington(cell, degree)
+    space_dim = 45
+
     V = fe.get_nodal_basis()
     ref_complex = V.ref_el
-
     pts = []
     top = ref_complex.topology
     for dim in top:
         for entity in top[dim]:
             pts.extend(ref_complex.make_points(dim, entity, degree))
     V_tab = V.tabulate(pts)
+
+    P = ONPolynomialSet(cell, degree)
     P_tab = P.tabulate(pts)
 
+    # Test that the augmented space includes all quintics
     sd = cell.get_spatial_dimension()
     assert span_greater_equal(V_tab[(0,)*sd], P_tab[(0,)*sd])
+
+    # Test that the reduced space includes all quartics
+    dimP4 = polynomial_dimension(cell, degree-1)
+    assert span_greater_equal(V_tab[(0,)*sd][:space_dim], P_tab[(0,)*sd][:dimP4])

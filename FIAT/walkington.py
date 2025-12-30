@@ -9,13 +9,21 @@
 # bfs, but the extra 20 are used in the transformation theory.
 
 from FIAT import finite_element, polynomial_set, dual_set, macro
-from FIAT.functional import PointEvaluation, PointDerivative, IntegralMomentOfNormalDerivative
+from FIAT.functional import (
+    PointEvaluation, PointDerivative,
+    IntegralMomentOfNormalDerivative,
+    IntegralMomentOfBidirectionalDerivative,
+)
 from FIAT.reference_element import TETRAHEDRON
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi
 from FIAT.hierarchical import make_dual_bubbles
 import numpy
+
+
+def inner(u, v, wts):
+    return numpy.dot(numpy.multiply(u, wts), v.T)
 
 
 class WalkingtonDualSet(dual_set.DualSet):
@@ -36,15 +44,13 @@ class WalkingtonDualSet(dual_set.DualSet):
                          for i in (1, 2) for alpha in polynomial_set.mis(sd, i))
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        # Face dofs: moments against cubic bubble
+        # Face dofs: moments or normal derivative
         ref_face = ref_el.construct_subelement(2)
-        Q_face, phis = make_dual_bubbles(ref_face, degree-1)
-        phis *= ref_face.volume()**0.5
-        phis[0] = 1
-
+        Q_face = create_quadrature(ref_face, degree-1)
+        f_at_qpts = numpy.ones(Q_face.get_weights().shape)
         for face in sorted(top[2]):
             cur = len(nodes)
-            nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, phis[0]))
+            nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, f_at_qpts))
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         # Interior dof: point evaluation at barycenter
@@ -56,17 +62,19 @@ class WalkingtonDualSet(dual_set.DualSet):
 
         # Constraint dofs
         # Face-edge constraint: normal derivative along edge is cubic
-        # Face constraint: normal derivative is cubic
         edges = ref_el.get_connectivity()[(2, 1)]
         ref_edge = ref_el.construct_subelement(1)
         Q_edge = create_quadrature(ref_edge, 2*(degree-1))
         x = ref_edge.compute_barycentric_coordinates(Q_edge.get_points())
         leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
+        # Face constraint: normal derivative is cubic
+        Q_face, phis = make_dual_bubbles(ref_face, degree-2, scale=1)
 
         for face in sorted(top[2]):
             cur = len(nodes)
-            nface = numpy.cross(*ref_el.compute_tangents(sd-1, face))
-            nface /= -numpy.dot(nface, nface)
+            thats = ref_el.compute_tangents(sd-1, face)
+            nface = numpy.cross(*thats)
+            nface *= -1/numpy.dot(nface, nface)
 
             for i, e in enumerate(edges[face]):
                 Q = FacetQuadratureRule(ref_face, 1, i, Q_edge)
@@ -78,7 +86,8 @@ class WalkingtonDualSet(dual_set.DualSet):
 
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q, leg4_at_qpts, n=nfe))
 
-            nodes.extend(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, phi) for phi in phis[1:])
+            Q = FacetQuadratureRule(ref_el, 2, face, Q_face)
+            nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, phis[0], nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)

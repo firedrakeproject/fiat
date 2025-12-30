@@ -39,64 +39,63 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
 
         entity_dofs = self._element.entity_dofs()
         edges = self.cell.get_connectivity()[(2, 1)]
-        for f in sorted(entity_dofs[2]):
+        for f in entity_dofs[2]:
             fdofs = entity_dofs[2][f]
             q = fdofs[0]
             c = fdofs[-2:]
 
-            Rnn, Rnt = morley_transform(self.cell, J, detJ, f)
+            Rnn, Rnt, Jn = morley_transform(self.cell, J, detJ, f)
             V[q, q] = Rnn
 
             for j, e in enumerate(edges[f]):
+                vid0, vid1 = (entity_dofs[0][v][0] for v in top[1][e])
                 s = fdofs[1+j]
-
-                v0id, v1id = (entity_dofs[0][v][0] for v in top[1][e])
                 Bnn, Bnt, Jt = _normal_tangential_transform(self.cell, J, detJ, e, face=f)
 
                 # vertex points
-                V[s, v1id] = 1/21 * Bnt
-                V[s, v0id] = -1 * V[s, v1id]
+                V[s, vid1] = 1/21 * Bnt
+                V[s, vid0] = -1 * V[s, vid1]
 
-                V[q, v1id] += Rnt[j]
-                V[q, v0id] += Rnt[j]
+                V[q, vid1] += Rnt[j]
+                V[q, vid0] += Rnt[j]
 
                 # TODO
-                V[c, v1id] += Rnt[j]
-                V[c, v0id] += Rnt[j]
+                c = fdofs[-2:]
+                Qnt = (Jn @ Jt) / (Jt @ Jt)
+                V[c, vid1] += Qnt
+                V[c, vid0] += Qnt
+                c = []
 
                 # vertex derivatives
                 for i in range(sd):
-                    V[s, v1id+1+i] = -1/42 * Bnt * Jt[i]
-                    V[s, v0id+1+i] = V[s, v1id+1+i]
+                    V[s, vid1+i+1] = -1/42 * Bnt * Jt[i]
+                    V[s, vid0+i+1] = V[s, vid1+1+i]
 
                     R1 = 1/5 * Rnt[j] * Jt[i]
-                    V[q, v1id+1+i] -= R1
-                    V[q, v0id+1+i] += R1
+                    V[q, vid1+i+1] -= R1
+                    V[q, vid0+i+1] += R1
 
                     # TODO
-                    R1 = 1/2 * Rnt[j] * Jt[i]
-                    V[c, v1id+1+i] -= R1
-                    V[c, v0id+1+i] += R1
+                    V[c, vid1+i+1] += Jt[i] * Qnt
+                    V[c, vid0+i+1] -= Jt[i] * Qnt
+                c = []
 
                 # second derivatives
-                for i, alpha in enumerate(mis(sd, 2)):
+                for i, alpha in enumerate(mis(sd, 2), start=sd+1):
                     ids = tuple(k for k, ak in enumerate(alpha) if ak)
                     a, b = ids[0], ids[-1]
                     tau = (1 + (a != b)) * Jt[a] * Jt[b]
-                    V[s, v1id+sd+1+i] = 1/252 * Bnt * tau
-                    V[s, v0id+sd+1+i] = -1 * V[s, v1id+sd+1+i]
+                    V[s, vid1+i] = 1/252 * Bnt * tau
+                    V[s, vid0+i] = -1 * V[s, vid1+i]
 
                     R2 = 1/60 * Rnt[j] * tau
-                    V[q, v1id+sd+1+i] += R2
-                    V[q, v0id+sd+1+i] += R2
+                    V[q, vid1+i] += R2
+                    V[q, vid0+i] += R2
 
                     # TODO
-                    R2 = 1/12 * Rnt[j] * tau
-                    V[c, v1id+sd+1+i] += R2
-                    V[c, v0id+sd+1+i] += R2
+                    V[c, vid1+i] += Qnt * tau
+                    V[c, vid0+i] += Qnt * tau
 
-            V[c[0], :] *= (2/5)*(6/7)**0.5
-            V[c[1], :] *= -(2/5)*(2/7)**0.5
 
         # Patch up conditioning
         h = coordinate_mapping.cell_size()
@@ -138,4 +137,4 @@ def morley_transform(cell, J, detJ, face):
     Bnn *= ahat
     Bnt *= ahat
     Bnt = (-1*(Bnt[0] + Bnt[1]), Bnt[0], Bnt[1])
-    return Bnn, Bnt
+    return Bnn, Bnt, Jn
