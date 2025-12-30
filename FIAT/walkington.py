@@ -39,13 +39,12 @@ class WalkingtonDualSet(dual_set.DualSet):
         # Face dofs: moments against cubic bubble
         ref_face = ref_el.construct_subelement(2)
         Q_face, phis = make_dual_bubbles(ref_face, degree-1)
+        phis *= ref_face.volume()**0.5
+        phis[0] = 1
 
         for face in sorted(top[2]):
             cur = len(nodes)
-            nface = ref_el.compute_scaled_normal(face)
-            nface /= numpy.dot(nface, nface)
-
-            nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, phis[0], n=nface))
+            nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, phis[0]))
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         # Interior dof: point evaluation at barycenter
@@ -66,8 +65,8 @@ class WalkingtonDualSet(dual_set.DualSet):
 
         for face in sorted(top[2]):
             cur = len(nodes)
-            nface = ref_el.compute_scaled_normal(face)
-            nface /= numpy.dot(nface, nface)
+            nface = numpy.cross(*ref_el.compute_tangents(sd-1, face))
+            nface /= -numpy.dot(nface, nface)
 
             for i, e in enumerate(edges[face]):
                 Q = FacetQuadratureRule(ref_face, 1, i, Q_edge)
@@ -79,7 +78,7 @@ class WalkingtonDualSet(dual_set.DualSet):
 
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q, leg4_at_qpts, n=nfe))
 
-            nodes.extend(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, phi, n=nface) for phi in phis[1:])
+            nodes.extend(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, phi) for phi in phis[1:])
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
