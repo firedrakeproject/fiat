@@ -1,4 +1,4 @@
-from FIAT import finite_element, dual_set, polynomial_set, expansions
+from FIAT import finite_element, dual_set, polynomial_set, expansions, macro
 from FIAT.check_format_variant import check_format_variant
 from FIAT.functional import TensorBidirectionalIntegralMoment as BidirectionalMoment
 from FIAT.quadrature_schemes import create_quadrature
@@ -63,7 +63,11 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
         dual = GLSDual(ref_el, degree)
         sd = ref_el.get_spatial_dimension()
         formdegree = (1, sd-1)
