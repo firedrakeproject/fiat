@@ -205,7 +205,7 @@ class Nedelec(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         if ref_el.is_macrocell():
-            base_element = Nedelec(ref_el.get_parent(), degree)
+            base_element = type(self)(ref_el.get_parent(), degree)
             poly_set = macro.MacroPolynomialSet(ref_el, base_element)
         elif ref_el.get_spatial_dimension() == 3:
             poly_set = NedelecSpace3D(ref_el, degree)
