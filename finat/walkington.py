@@ -1,6 +1,7 @@
 import FIAT
 import numpy
 
+from FIAT.walkington import face_constraint
 from FIAT.polynomial_set import mis
 from gem import ListTensor, Zero
 
@@ -42,8 +43,7 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
         entity_dofs = self._element.entity_dofs()
         edges = self.cell.get_connectivity()[(2, 1)]
 
-        Q_face = self._element.dual.Q_face
-        phi = self._element.dual.phi
+        Q_face, phi = face_constraint(self.cell.construct_subelement(2))
         wts = numpy.multiply(Q_face.get_weights(), phi)
         pts = Q_face.get_points()
         pts = pts[abs(wts) > 1E-10]
@@ -53,7 +53,6 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
             Rnn, Rnt = morley_transform(self.cell, J, detJ, f)
             fdofs = entity_dofs[2][f]
             fid = fdofs[0]
-
             V[fid, fid] = Rnn
             for j, e in enumerate(edges[f]):
                 Bnn, Bnt, Jt = _normal_tangential_transform(self.cell, J, detJ, e, face=f)
@@ -86,6 +85,8 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
                     V[eid, vid1+i] = 1/252 * Bnt * tau
                     V[eid, vid0+i] = -1 * V[eid, vid1+i]
 
+            vids = list(chain.from_iterable(entity_dofs[0][v] for v in top[2][f]))
+
             # Evaluate nodal completion of the face constraints
             tab = self._element.tabulate(2, pts, entity=(2, f))
             thats = self.cell.compute_tangents(2, f)
@@ -93,13 +94,14 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
             T = [[a[i, j] + (i != j) * a[j, i] for i in range(sd) for j in range(i, sd)] for a in tt]
             C = numpy.array([tab[alpha] @ wts for alpha in tab if sum(alpha) == 2])
             C = numpy.dot(T, C)
+            C[abs(C) < 1e-10] = 0
+            supp = numpy.unique(numpy.nonzero(C)[1])
             C = C.astype(object)
-            C[abs(C) < 1e-10] = Zero()
+            C[C == 0] = Zero()
+            CV = C[:, supp] @ V[numpy.ix_(supp, vids)]
 
-            # Recombine the physical basis functions to satify the constraints
+            # Add completion basis functions to satisfy the physical constraints
             Gnt = numpy.asarray(Rnt[1:])
-            vids = list(chain.from_iterable(entity_dofs[0][v] for v in top[2][f]))
-            CV = C @ V[:, vids]
             c0, c1 = fdofs[-2:]
             V[c0, vids] = -1 * Gnt @ CV[[0, 1]]
             V[c1, vids] = -1 * Gnt @ CV[[1, 2]]

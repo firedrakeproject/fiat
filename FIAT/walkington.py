@@ -9,6 +9,7 @@
 # bfs, but the extra 20 are used in the transformation theory.
 
 from FIAT import finite_element, polynomial_set, dual_set, macro
+from FIAT.expansions import polynomial_dimension
 from FIAT.functional import (
     PointEvaluation, PointDerivative,
     IntegralMomentOfNormalDerivative,
@@ -19,10 +20,6 @@ from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi
 import numpy
-
-
-def inner(u, v, wts):
-    return numpy.dot(numpy.multiply(u, wts), v.T)
 
 
 class WalkingtonDualSet(dual_set.DualSet):
@@ -67,7 +64,7 @@ class WalkingtonDualSet(dual_set.DualSet):
         x = ref_edge.compute_barycentric_coordinates(Q_edge.get_points())
         leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
         # Face constraint: normal derivative is cubic
-        Q_face, phi = face_constraints(ref_face, degree)
+        Q_face, phi = face_constraint(ref_face)
 
         for face in sorted(top[2]):
             cur = len(nodes)
@@ -89,8 +86,6 @@ class WalkingtonDualSet(dual_set.DualSet):
             nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, phi, nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
-        self.Q_face = Q_face
-        self.phi = phi
         super().__init__(nodes, ref_el, entity_ids)
 
 
@@ -109,17 +104,17 @@ class Walkington(finite_element.CiarletElement):
         super().__init__(poly_set, dual, degree)
 
 
-def face_constraints(ref_face, degree):
-    from FIAT.expansions import polynomial_dimension
+def face_constraint(ref_face):
+    k = 3
     sd = ref_face.get_spatial_dimension()
-    Q_face = create_quadrature(ref_face, 2*(degree-2))
-    dimPkm1 = polynomial_dimension(ref_face, degree-3)
+    Q_face = create_quadrature(ref_face, 2*k)
+    dimPkm1 = polynomial_dimension(ref_face, k-1)
 
     pts = list(Q_face.get_points()[:3])
     pts.append(Q_face.get_points()[-1])
-    P = polynomial_set.ONPolynomialSet(ref_face, degree-2, scale=1)
+    P = polynomial_set.ONPolynomialSet(ref_face, k)
     Pk = P.tabulate(pts)[(0,)*sd][dimPkm1:]
-    c = numpy.linalg.solve(Pk.T, [0, 0, 0, 1/Q_face.get_weights()[-1]])
+    c = numpy.linalg.solve(Pk.T, [0, 0, 0, 1])
     Pk = P.tabulate(Q_face.get_points())[(0,)*sd][dimPkm1:]
     phi = numpy.dot(c, Pk)
     return Q_face, phi
