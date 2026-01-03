@@ -18,7 +18,6 @@ from FIAT.reference_element import TETRAHEDRON
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi
-from FIAT.hierarchical import make_dual_bubbles
 import numpy
 
 
@@ -68,13 +67,13 @@ class WalkingtonDualSet(dual_set.DualSet):
         x = ref_edge.compute_barycentric_coordinates(Q_edge.get_points())
         leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
         # Face constraint: normal derivative is cubic
-        Q_face, phis = make_dual_bubbles(ref_face, degree-2, scale=1)
+        Q_face, phi = face_constraints(ref_face, degree)
 
         for face in sorted(top[2]):
             cur = len(nodes)
             thats = ref_el.compute_tangents(sd-1, face)
-            nface = numpy.cross(*thats)
-            nface *= -1/numpy.dot(nface, nface)
+            nface = -numpy.cross(*thats)
+            nface /= numpy.linalg.norm(nface)
 
             for i, e in enumerate(edges[face]):
                 Q = FacetQuadratureRule(ref_face, 1, i, Q_edge)
@@ -83,13 +82,15 @@ class WalkingtonDualSet(dual_set.DualSet):
                 nfe = numpy.cross(te, nface)
                 nfe /= numpy.linalg.norm(nfe)
                 nfe /= Q.jacobian_determinant()
-
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q, leg4_at_qpts, n=nfe))
 
             Q = FacetQuadratureRule(ref_el, 2, face, Q_face)
-            nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, phis[0], nface, t) for t in thats)
+            nface /= Q.jacobian_determinant()
+            nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, phi, nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
+        self.Q_face = Q_face
+        self.phi = phi
         super().__init__(nodes, ref_el, entity_ids)
 
 
@@ -106,3 +107,19 @@ class Walkington(finite_element.CiarletElement):
         ref_complex = macro.AlfeldSplit(ref_el)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=4, variant="bubble")
         super().__init__(poly_set, dual, degree)
+
+
+def face_constraints(ref_face, degree):
+    from FIAT.expansions import polynomial_dimension
+    sd = ref_face.get_spatial_dimension()
+    Q_face = create_quadrature(ref_face, 2*(degree-2))
+    dimPkm1 = polynomial_dimension(ref_face, degree-3)
+
+    pts = list(Q_face.get_points()[:3])
+    pts.append(Q_face.get_points()[-1])
+    P = polynomial_set.ONPolynomialSet(ref_face, degree-2, scale=1)
+    Pk = P.tabulate(pts)[(0,)*sd][dimPkm1:]
+    c = numpy.linalg.solve(Pk.T, [0, 0, 0, 1/Q_face.get_weights()[-1]])
+    Pk = P.tabulate(Q_face.get_points())[(0,)*sd][dimPkm1:]
+    phi = numpy.dot(c, Pk)
+    return Q_face, phi

@@ -366,7 +366,7 @@ class IntegralMomentOfNormalDerivative(Functional):
 
 
 class IntegralMomentOfBidirectionalDerivative(Functional):
-    """Functional giving normal derivative integrated against some function on a facet."""
+    """Functional giving second derivative integrated against some function on a facet."""
 
     def __init__(self, ref_el, Q, f_at_qpts, s1, s2):
         self.f_at_qpts = f_at_qpts
@@ -393,7 +393,6 @@ class IntegralMomentOfBidirectionalDerivative(Functional):
 
         dpt_dict = {tuple(pt): [(wt*tau[i], alphas[i], tuple()) for i in range(len(alphas))]
                     for pt, wt in zip(points, weights)}
-
 
         super().__init__(ref_el, tuple(),
                          {}, dpt_dict, "IntegralMomentOfBidirectionalDerivative")

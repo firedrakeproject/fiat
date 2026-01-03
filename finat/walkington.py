@@ -1,19 +1,21 @@
 import FIAT
-from FIAT.polynomial_set import mis
+import numpy
 
-from gem import ListTensor, Literal, Power
+from FIAT.polynomial_set import mis
+from gem import ListTensor, Zero
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.argyris import _vertex_transform, _normal_tangential_transform
+from finat.morley import morley_transform
 from copy import deepcopy
-import numpy
+from itertools import chain
 
 
 class Walkington(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=5):
-        cite("Bell1969")
+        cite("Walkington2010")
         super().__init__(FIAT.Walkington(cell, degree=degree))
 
         reduced_dofs = deepcopy(self._element.entity_dofs())
@@ -39,63 +41,68 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
 
         entity_dofs = self._element.entity_dofs()
         edges = self.cell.get_connectivity()[(2, 1)]
+
+        Q_face = self._element.dual.Q_face
+        phi = self._element.dual.phi
+        wts = numpy.multiply(Q_face.get_weights(), phi)
+        pts = Q_face.get_points()
+        pts = pts[abs(wts) > 1E-10]
+        wts = wts[abs(wts) > 1E-10]
+
         for f in entity_dofs[2]:
+            Rnn, Rnt = morley_transform(self.cell, J, detJ, f)
             fdofs = entity_dofs[2][f]
-            q = fdofs[0]
-            c = fdofs[-2:]
+            fid = fdofs[0]
 
-            Rnn, Rnt, Jn = morley_transform(self.cell, J, detJ, f)
-            V[q, q] = Rnn
-
+            V[fid, fid] = Rnn
             for j, e in enumerate(edges[f]):
-                vid0, vid1 = (entity_dofs[0][v][0] for v in top[1][e])
-                s = fdofs[1+j]
                 Bnn, Bnt, Jt = _normal_tangential_transform(self.cell, J, detJ, e, face=f)
+                vid0, vid1 = (entity_dofs[0][v][0] for v in top[1][e])
+                eid = fdofs[1+j]
 
                 # vertex points
-                V[s, vid1] = 1/21 * Bnt
-                V[s, vid0] = -1 * V[s, vid1]
-
-                V[q, vid1] += Rnt[j]
-                V[q, vid0] += Rnt[j]
-
-                # TODO
-                c = fdofs[-2:]
-                Qnt = (Jn @ Jt) / (Jt @ Jt)
-                V[c, vid1] += Qnt
-                V[c, vid0] += Qnt
-                c = []
+                V[fid, vid1] += Rnt[j]
+                V[fid, vid0] += Rnt[j]
+                V[eid, vid1] = 1/21 * Bnt
+                V[eid, vid0] = -1 * V[eid, vid1]
 
                 # vertex derivatives
                 for i in range(sd):
-                    V[s, vid1+i+1] = -1/42 * Bnt * Jt[i]
-                    V[s, vid0+i+1] = V[s, vid1+1+i]
-
                     R1 = 1/5 * Rnt[j] * Jt[i]
-                    V[q, vid1+i+1] -= R1
-                    V[q, vid0+i+1] += R1
-
-                    # TODO
-                    V[c, vid1+i+1] += Jt[i] * Qnt
-                    V[c, vid0+i+1] -= Jt[i] * Qnt
-                c = []
+                    V[fid, vid1+i+1] -= R1
+                    V[fid, vid0+i+1] += R1
+                    V[eid, vid1+i+1] = -1/42 * Bnt * Jt[i]
+                    V[eid, vid0+i+1] = V[eid, vid1+1+i]
 
                 # second derivatives
                 for i, alpha in enumerate(mis(sd, 2), start=sd+1):
                     ids = tuple(k for k, ak in enumerate(alpha) if ak)
                     a, b = ids[0], ids[-1]
                     tau = (1 + (a != b)) * Jt[a] * Jt[b]
-                    V[s, vid1+i] = 1/252 * Bnt * tau
-                    V[s, vid0+i] = -1 * V[s, vid1+i]
 
                     R2 = 1/60 * Rnt[j] * tau
-                    V[q, vid1+i] += R2
-                    V[q, vid0+i] += R2
+                    V[fid, vid1+i] += R2
+                    V[fid, vid0+i] += R2
+                    V[eid, vid1+i] = 1/252 * Bnt * tau
+                    V[eid, vid0+i] = -1 * V[eid, vid1+i]
 
-                    # TODO
-                    V[c, vid1+i] += Qnt * tau
-                    V[c, vid0+i] += Qnt * tau
+            # Evaluate nodal completion of the face constraints
+            tab = self._element.tabulate(2, pts, entity=(2, f))
+            thats = self.cell.compute_tangents(2, f)
+            tt = [numpy.outer(thats[i], thats[j]) for i in range(2) for j in range(i, 2)]
+            T = [[a[i, j] + (i != j) * a[j, i] for i in range(sd) for j in range(i, sd)] for a in tt]
+            C = numpy.array([tab[alpha] @ wts for alpha in tab if sum(alpha) == 2])
+            C = numpy.dot(T, C)
+            C = C.astype(object)
+            C[abs(C) < 1e-10] = Zero()
 
+            # Recombine the physical basis functions to satify the constraints
+            Gnt = numpy.asarray(Rnt[1:])
+            vids = list(chain.from_iterable(entity_dofs[0][v] for v in top[2][f]))
+            CV = C @ V[:, vids]
+            c0, c1 = fdofs[-2:]
+            V[c0, vids] = -1 * Gnt @ CV[[0, 1]]
+            V[c1, vids] = -1 * Gnt @ CV[[1, 2]]
 
         # Patch up conditioning
         h = coordinate_mapping.cell_size()
@@ -114,27 +121,3 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
 
     def space_dimension(self):
         return 45
-
-
-def morley_transform(cell, J, detJ, face):
-    adjugate = lambda A: ListTensor([[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]])
-    sd = cell.get_spatial_dimension()
-    thats = cell.compute_tangents(sd-1, face)
-    nhat = numpy.cross(*thats)
-    ahat = numpy.linalg.norm(nhat)
-    nhat /= numpy.dot(nhat, nhat)
-
-    nhat = Literal(nhat)
-    Jn = J @ nhat
-    Jt = J @ Literal(thats.T)
-    Gnt = Jn.T @ Jt
-    Gtt = Jt.T @ Jt
-    detG = Gtt[0, 0]*Gtt[1, 1] - Gtt[0, 1]*Gtt[1, 0]
-    area = Power(detG, Literal(0.5))
-
-    Bnn = detJ / area
-    Bnt = Gnt @ adjugate(Gtt) / detG
-    Bnn *= ahat
-    Bnt *= ahat
-    Bnt = (-1*(Bnt[0] + Bnt[1]), Bnt[0], Bnt[1])
-    return Bnn, Bnt, Jn
