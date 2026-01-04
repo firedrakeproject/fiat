@@ -85,22 +85,20 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
                     V[eid, vid1+i] = 1/252 * Bnt * tau
                     V[eid, vid0+i] = -1 * V[eid, vid1+i]
 
-            vids = list(chain.from_iterable(entity_dofs[0][v] for v in top[2][f]))
-
             # Evaluate nodal completion of the face constraints
             tab = self._element.tabulate(2, pts, entity=(2, f))
             thats = self.cell.compute_tangents(2, f)
             tt = [numpy.outer(thats[i], thats[j]) for i in range(2) for j in range(i, 2)]
             T = [[a[i, j] + (i != j) * a[j, i] for i in range(sd) for j in range(i, sd)] for a in tt]
-            C = numpy.array([tab[alpha] @ wts for alpha in tab if sum(alpha) == 2])
-            C = numpy.dot(T, C)
+            C = numpy.dot(T, [tab[alpha] @ wts for alpha in tab if sum(alpha) == 2])
             C[abs(C) < 1e-10] = 0
             supp = numpy.unique(numpy.nonzero(C)[1])
             C = C.astype(object)
             C[C == 0] = Zero()
-            CV = C[:, supp] @ V[numpy.ix_(supp, vids)]
 
-            # Add completion basis functions to satisfy the physical constraints
+            # Recombine with nodal completion to satisfy the physical constraints
+            vids = list(chain.from_iterable(entity_dofs[0][v] for v in top[2][f]))
+            CV = C[:, supp] @ V[numpy.ix_(supp, vids)]
             Gnt = numpy.asarray(Rnt[1:])
             c0, c1 = fdofs[-2:]
             V[c0, vids] = -1 * Gnt @ CV[[0, 1]]
