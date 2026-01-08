@@ -8,7 +8,8 @@
 # functionals.  The first 45 basis functions are the reference element
 # bfs, but the extra 20 are used in the transformation theory.
 
-from FIAT import finite_element, polynomial_set, dual_set, macro
+from FIAT import finite_element, polynomial_set, macro
+from FIAT.dual_set import DualSet
 from FIAT.expansions import polynomial_dimension
 from FIAT.functional import (
     PointEvaluation, PointDerivative,
@@ -16,13 +17,13 @@ from FIAT.functional import (
     IntegralMomentOfBidirectionalDerivative,
 )
 from FIAT.reference_element import TETRAHEDRON
-from FIAT.quadrature import FacetQuadratureRule
+from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.jacobi import eval_jacobi
 import numpy
 
 
-class WalkingtonDualSet(dual_set.DualSet):
+class WalkingtonDualSet(DualSet):
     def __init__(self, ref_el, degree):
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
@@ -66,6 +67,9 @@ class WalkingtonDualSet(dual_set.DualSet):
         # Face constraint: normal derivative is cubic
         Q_face, phi = face_constraint(ref_face)
 
+        extra_entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        extra_nodes = []
+
         for face in sorted(top[2]):
             cur = len(nodes)
             thats = ref_el.compute_tangents(sd-1, face)
@@ -82,10 +86,16 @@ class WalkingtonDualSet(dual_set.DualSet):
                 nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q, leg4_at_qpts, n=nfe))
 
             Q = FacetQuadratureRule(ref_el, 2, face, Q_face)
-            nface /= Q.jacobian_determinant()
-            nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, phi, nface, t) for t in thats)
+            f = phi / Q.jacobian_determinant()
+            nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
+            cur = len(extra_nodes)
+            extra_nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, thats[i], thats[j])
+                               for i in range(2) for j in range(i, 2))
+            extra_entity_ids[2][face].extend(range(cur, len(extra_nodes)))
+
+        self.nodal_completion = DualSet(extra_nodes, ref_el, extra_entity_ids)
         super().__init__(nodes, ref_el, entity_ids)
 
 
@@ -107,14 +117,20 @@ class Walkington(finite_element.CiarletElement):
 def face_constraint(ref_face):
     k = 3
     sd = ref_face.get_spatial_dimension()
-    Q_face = create_quadrature(ref_face, 2*k)
+    Q = create_quadrature(ref_face, 2*k)
     dimPkm1 = polynomial_dimension(ref_face, k-1)
 
-    pts = list(Q_face.get_points()[:3])
-    pts.append(Q_face.get_points()[-1])
+    pts = list(Q.get_points()[:3])
+    pts.append(Q.get_points()[-1])
     P = polynomial_set.ONPolynomialSet(ref_face, k)
     Pk = P.tabulate(pts)[(0,)*sd][dimPkm1:]
     c = numpy.linalg.solve(Pk.T, [0, 0, 0, 1])
-    Pk = P.tabulate(Q_face.get_points())[(0,)*sd][dimPkm1:]
+    Pk = P.tabulate(Q.get_points())[(0,)*sd][dimPkm1:]
     phi = numpy.dot(c, Pk)
-    return Q_face, phi
+
+    supp = abs(phi) > 1E-12
+    pts = Q.get_points()[supp]
+    wts = Q.get_weights()[supp]
+    Q = QuadratureRule(ref_face, pts, wts)
+    phi = phi[supp]
+    return Q, phi
