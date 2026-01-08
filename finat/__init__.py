@@ -29,6 +29,7 @@ from .hermite import Hermite                                       # noqa: F401
 from .johnson_mercier import JohnsonMercier                        # noqa: F401
 from .mtw import MardalTaiWinther                                  # noqa: F401
 from .morley import Morley                                         # noqa: F401
+from .walkington import Walkington                                 # noqa: F401
 from .direct_serendipity import DirectSerendipity                  # noqa: F401
 from .tensorfiniteelement import TensorFiniteElement               # noqa: F401
 from .tensor_product import TensorProductElement                   # noqa: F401

@@ -12,7 +12,7 @@ from copy import deepcopy
 class Bell(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=5):
         cite("Bell1969")
-        super().__init__(FIAT.Bell(cell))
+        super().__init__(FIAT.Bell(cell, degree=degree))
 
         reduced_dofs = deepcopy(self._element.entity_dofs())
         sd = cell.get_spatial_dimension()

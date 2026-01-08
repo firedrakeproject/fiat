@@ -342,8 +342,9 @@ class IntegralMomentOfDerivative(Functional):
 class IntegralMomentOfNormalDerivative(Functional):
     """Functional giving normal derivative integrated against some function on a facet."""
 
-    def __init__(self, ref_el, facet_no, Q, f_at_qpts):
-        n = ref_el.compute_normal(facet_no)
+    def __init__(self, ref_el, facet_no, Q, f_at_qpts, n=None):
+        if n is None:
+            n = ref_el.compute_normal(facet_no)
         self.n = n
         self.f_at_qpts = f_at_qpts
         self.Q = Q
@@ -362,6 +363,39 @@ class IntegralMomentOfNormalDerivative(Functional):
 
         super().__init__(ref_el, tuple(),
                          {}, dpt_dict, "IntegralMomentOfNormalDerivative")
+
+
+class IntegralMomentOfBidirectionalDerivative(Functional):
+    """Functional giving second derivative integrated against some function on a facet."""
+
+    def __init__(self, ref_el, Q, f_at_qpts, s1, s2):
+        self.f_at_qpts = f_at_qpts
+        self.Q = Q
+
+        sd = ref_el.get_spatial_dimension()
+
+        # map points onto facet
+        points = Q.get_points()
+        self.dpts = points
+        weights = numpy.multiply(f_at_qpts, Q.get_weights())
+
+        tau = numpy.zeros((sd*(sd+1)//2,))
+        alphas = []
+        cur = 0
+        for i in range(sd):
+            for j in range(i, sd):
+                alpha = [0] * sd
+                alpha[i] += 1
+                alpha[j] += 1
+                alphas.append(tuple(alpha))
+                tau[cur] = s1[i] * s2[j] + (i != j) * s2[i] * s1[j]
+                cur += 1
+
+        dpt_dict = {tuple(pt): [(wt*tau[i], alphas[i], tuple()) for i in range(len(alphas))]
+                    for pt, wt in zip(points, weights)}
+
+        super().__init__(ref_el, tuple(),
+                         {}, dpt_dict, "IntegralMomentOfBidirectionalDerivative")
 
 
 class FrobeniusIntegralMoment(IntegralMoment):
