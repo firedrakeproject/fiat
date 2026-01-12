@@ -71,7 +71,12 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="n">rule_ref_cell</span> <span class="o">=</span> <span class="n">fiat_ref_cell</span>
 
-    <span class="n">rule</span> <span class="o">=</span> <span class="n">make_quadrature</span><span class="p">(</span><span class="n">rule_ref_cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="n">scheme</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scheme</span><span class="p">,</span> <span class="n">AbstractQuadratureRule</span><span class="p">):</span>
+        <span class="n">rule</span> <span class="o">=</span> <span class="n">scheme</span>
+        <span class="k">assert</span> <span class="n">rule</span><span class="o">.</span><span class="n">ref_el</span> <span class="o">==</span> <span class="n">rule_ref_cell</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">rule</span> <span class="o">=</span> <span class="n">make_quadrature</span><span class="p">(</span><span class="n">rule_ref_cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="o">=</span><span class="n">scheme</span><span class="p">)</span>
+
     <span class="k">return</span> <span class="n">QuadratureElement</span><span class="p">(</span><span class="n">fiat_ref_cell</span><span class="p">,</span> <span class="n">rule</span><span class="p">)</span></div>
 
 
@@ -262,8 +267,8 @@
       </ul>
     </div>
     <div class="footer" role="contentinfo">
-    &#169; Copyright 2025, Firedrake Project.
-      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.0.4.
+    &#169; Copyright 2026, Firedrake Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
     </div>
   </body>
 </html>
