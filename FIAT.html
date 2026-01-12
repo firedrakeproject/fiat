@@ -631,14 +631,14 @@ associated with x[j].</p>
 <span id="fiat-bell-module"></span><h2>FIAT.bell module<a class="headerlink" href="#module-FIAT.bell" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.bell.Bell">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bell.</span></span><span class="sig-name descname"><span class="pre">Bell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bell.html#Bell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bell.Bell" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bell.</span></span><span class="sig-name descname"><span class="pre">Bell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bell.html#Bell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bell.Bell" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The Bell finite element.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.bell.BellDualSet">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bell.</span></span><span class="sig-name descname"><span class="pre">BellDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bell.html#BellDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bell.BellDualSet" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.bell.</span></span><span class="sig-name descname"><span class="pre">BellDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/bell.html#BellDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.bell.BellDualSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 </dd></dl>
 
@@ -2295,6 +2295,13 @@ component of the input function should be integrated against f</p></li>
 </dd></dl>
 
 <dl class="py class">
+<dt class="sig sig-object py" id="FIAT.functional.IntegralMomentOfBidirectionalDerivative">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfBidirectionalDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfBidirectionalDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfBidirectionalDerivative" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.functional.Functional" title="FIAT.functional.Functional"><code class="xref py py-class docutils literal notranslate"><span class="pre">Functional</span></code></a></p>
+<p>Functional giving second derivative integrated against some function on a facet.</p>
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="FIAT.functional.IntegralMomentOfDerivative">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfDerivative" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.functional.Functional" title="FIAT.functional.Functional"><code class="xref py py-class docutils literal notranslate"><span class="pre">Functional</span></code></a></p>
@@ -2347,7 +2354,7 @@ against some tabulated function f.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.functional.IntegralMomentOfNormalDerivative">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfNormalDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">facet_no</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfNormalDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfNormalDerivative" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfNormalDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">facet_no</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfNormalDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfNormalDerivative" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.functional.Functional" title="FIAT.functional.Functional"><code class="xref py py-class docutils literal notranslate"><span class="pre">Functional</span></code></a></p>
 <p>Functional giving normal derivative integrated against some function on a facet.</p>
 </dd></dl>
@@ -6171,6 +6178,27 @@ basis functions at given points.</p>
 </dd></dl>
 
 </section>
+<section id="module-FIAT.walkington">
+<span id="fiat-walkington-module"></span><h2>FIAT.walkington module<a class="headerlink" href="#module-FIAT.walkington" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.walkington.Walkington">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.walkington.</span></span><span class="sig-name descname"><span class="pre">Walkington</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/walkington.html#Walkington"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.walkington.Walkington" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
+<p>The Walkington C1 macroelement.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.walkington.WalkingtonDualSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.walkington.</span></span><span class="sig-name descname"><span class="pre">WalkingtonDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/walkington.html#WalkingtonDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.walkington.WalkingtonDualSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.walkington.face_constraint">
+<span class="sig-prename descclassname"><span class="pre">FIAT.walkington.</span></span><span class="sig-name descname"><span class="pre">face_constraint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_face</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/walkington.html#face_constraint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.walkington.face_constraint" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</section>
 <section id="module-FIAT.xg_quad_data">
 <span id="fiat-xg-quad-data-module"></span><h2>FIAT.xg_quad_data module<a class="headerlink" href="#module-FIAT.xg_quad_data" title="Link to this heading">¶</a></h2>
 </section>
@@ -6574,6 +6602,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.functional.IntegralLegendreTangentialMoment"><code class="docutils literal notranslate"><span class="pre">IntegralLegendreTangentialMoment</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralLegendreTangentialTangentialMoment"><code class="docutils literal notranslate"><span class="pre">IntegralLegendreTangentialTangentialMoment</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMoment"><code class="docutils literal notranslate"><span class="pre">IntegralMoment</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfBidirectionalDerivative"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfBidirectionalDerivative</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfDerivative"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfDerivative</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfDivergence"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfDivergence</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfEdgeTangentEvaluation"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfEdgeTangentEvaluation</span></code></a></li>
@@ -7128,6 +7157,12 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.tensor_product.TensorProductElement.value_shape"><code class="docutils literal notranslate"><span class="pre">TensorProductElement.value_shape()</span></code></a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-FIAT.walkington">FIAT.walkington module</a><ul>
+<li><a class="reference internal" href="#FIAT.walkington.Walkington"><code class="docutils literal notranslate"><span class="pre">Walkington</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.walkington.WalkingtonDualSet"><code class="docutils literal notranslate"><span class="pre">WalkingtonDualSet</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.walkington.face_constraint"><code class="docutils literal notranslate"><span class="pre">face_constraint()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.xg_quad_data">FIAT.xg_quad_data module</a></li>

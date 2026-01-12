@@ -316,6 +316,14 @@ finat.tensorfiniteelement module
    :show-inheritance:
    :undoc-members:
 
+finat.walkington module
+-----------------------
+
+.. automodule:: finat.walkington
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Module contents
 ---------------
 

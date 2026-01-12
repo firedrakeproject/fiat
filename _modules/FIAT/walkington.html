@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.walkington &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.walkington</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.walkington</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2025 Pablo D. Brubeck</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+
+<span class="c1"># This is not quite Walkington, but is 65-dofs and includes 20 extra constraint</span>
+<span class="c1"># functionals.  The first 45 basis functions are the reference element</span>
+<span class="c1"># bfs, but the extra 20 are used in the transformation theory.</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">macro</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.expansions</span><span class="w"> </span><span class="kn">import</span> <span class="n">polynomial_dimension</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PointEvaluation</span><span class="p">,</span> <span class="n">PointDerivative</span><span class="p">,</span>
+    <span class="n">IntegralMomentOfNormalDerivative</span><span class="p">,</span>
+    <span class="n">IntegralMomentOfBidirectionalDerivative</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TETRAHEDRON</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span><span class="p">,</span> <span class="n">QuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.jacobi</span><span class="w"> </span><span class="kn">import</span> <span class="n">eval_jacobi</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+
+
+<div class="viewcode-block" id="WalkingtonDualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.walkington.WalkingtonDualSet">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WalkingtonDualSet</span><span class="p">(</span><span class="n">DualSet</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Vertex dofs: second order jet</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">x</span><span class="p">,</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+
+            <span class="c1"># first and second derivatives</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">PointDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)</span>
+                         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="c1"># Face dofs: moments or normal derivative</span>
+        <span class="n">ref_face</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">Q_face</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">Q_face</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">face</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">face</span><span class="p">,</span> <span class="n">Q_face</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">face</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="c1"># Interior dof: point evaluation at barycenter</span>
+        <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="p">]:</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">x</span><span class="p">,</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span> <span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="c1"># Constraint dofs</span>
+        <span class="c1"># Face-edge constraint: normal derivative along edge is cubic</span>
+        <span class="n">edges</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_connectivity</span><span class="p">()[(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="n">ref_edge</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">Q_edge</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_edge</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">ref_edge</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">Q_edge</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">leg4_at_qpts</span> <span class="o">=</span> <span class="n">eval_jacobi</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
+        <span class="c1"># Face constraint: normal derivative is cubic</span>
+        <span class="n">Q_face</span><span class="p">,</span> <span class="n">phi</span> <span class="o">=</span> <span class="n">face_constraint</span><span class="p">(</span><span class="n">ref_face</span><span class="p">)</span>
+
+        <span class="n">extra_entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="n">extra_nodes</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">face</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">thats</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">face</span><span class="p">)</span>
+            <span class="n">nface</span> <span class="o">=</span> <span class="o">-</span><span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="o">*</span><span class="n">thats</span><span class="p">)</span>
+            <span class="n">nface</span> <span class="o">/=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">nface</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">edges</span><span class="p">[</span><span class="n">face</span><span class="p">]):</span>
+                <span class="n">Q</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">Q_edge</span><span class="p">)</span>
+
+                <span class="n">te</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                <span class="n">nfe</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">te</span><span class="p">,</span> <span class="n">nface</span><span class="p">)</span>
+                <span class="n">nfe</span> <span class="o">/=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">nfe</span><span class="p">)</span>
+                <span class="n">nfe</span> <span class="o">/=</span> <span class="n">Q</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">()</span>
+                <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">face</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">leg4_at_qpts</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">nfe</span><span class="p">))</span>
+
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">face</span><span class="p">,</span> <span class="n">Q_face</span><span class="p">)</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">phi</span> <span class="o">/</span> <span class="n">Q</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">()</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMomentOfBidirectionalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">nface</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">thats</span><span class="p">)</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">face</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">extra_nodes</span><span class="p">)</span>
+            <span class="n">extra_nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMomentOfBidirectionalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">thats</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">thats</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+                               <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+            <span class="n">extra_entity_ids</span><span class="p">[</span><span class="mi">2</span><span class="p">][</span><span class="n">face</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">extra_nodes</span><span class="p">)))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">nodal_completion</span> <span class="o">=</span> <span class="n">DualSet</span><span class="p">(</span><span class="n">extra_nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">extra_entity_ids</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="Walkington">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.walkington.Walkington">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Walkington</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Walkington C1 macroelement.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TETRAHEDRON</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on tetrahedron&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree=5.&quot;</span><span class="p">)</span>
+
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">WalkingtonDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">vorder</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="face_constraint">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.walkington.face_constraint">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">face_constraint</span><span class="p">(</span><span class="n">ref_face</span><span class="p">):</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_face</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">k</span><span class="p">)</span>
+    <span class="n">dimPkm1</span> <span class="o">=</span> <span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">pts</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()[:</span><span class="mi">3</span><span class="p">])</span>
+    <span class="n">pts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+    <span class="n">P</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+    <span class="n">Pk</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">pts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">][</span><span class="n">dimPkm1</span><span class="p">:]</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">Pk</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+    <span class="n">Pk</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">][</span><span class="n">dimPkm1</span><span class="p">:]</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">Pk</span><span class="p">)</span>
+
+    <span class="n">supp</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1E-12</span>
+    <span class="n">pts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()[</span><span class="n">supp</span><span class="p">]</span>
+    <span class="n">wts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()[</span><span class="n">supp</span><span class="p">]</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">QuadratureRule</span><span class="p">(</span><span class="n">ref_face</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="n">supp</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.walkington</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Firedrake Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

@@ -80,10 +80,16 @@
     <span class="k">return</span> <span class="n">V</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_normal_tangential_transform</span><span class="p">(</span><span class="n">fiat_cell</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
-    <span class="n">R</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
-    <span class="n">that</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-    <span class="n">nhat</span> <span class="o">=</span> <span class="n">R</span> <span class="o">@</span> <span class="n">that</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_normal_tangential_transform</span><span class="p">(</span><span class="n">fiat_cell</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">edge</span><span class="p">,</span> <span class="n">face</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">that</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
+        <span class="n">nhat</span> <span class="o">=</span> <span class="n">R</span> <span class="o">@</span> <span class="n">that</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">nface</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">face</span><span class="p">)</span>
+        <span class="n">nface</span> <span class="o">/=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">nface</span><span class="p">)</span>
+        <span class="n">nhat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">that</span><span class="p">,</span> <span class="n">nface</span><span class="p">)</span>
+
     <span class="n">Jn</span> <span class="o">=</span> <span class="n">J</span> <span class="o">@</span> <span class="n">Literal</span><span class="p">(</span><span class="n">nhat</span><span class="p">)</span>
     <span class="n">Jt</span> <span class="o">=</span> <span class="n">J</span> <span class="o">@</span> <span class="n">Literal</span><span class="p">(</span><span class="n">that</span><span class="p">)</span>
     <span class="n">alpha</span> <span class="o">=</span> <span class="n">Jn</span> <span class="o">@</span> <span class="n">Jt</span>

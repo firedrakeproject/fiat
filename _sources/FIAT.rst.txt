@@ -548,6 +548,14 @@ FIAT.tensor\_product module
    :show-inheritance:
    :undoc-members:
 
+FIAT.walkington module
+----------------------
+
+.. automodule:: FIAT.walkington
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 FIAT.xg\_quad\_data module
 --------------------------
 

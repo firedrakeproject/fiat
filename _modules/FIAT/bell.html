@@ -47,62 +47,41 @@
 <span class="c1"># bfs, but the extra three are used in the transformation theory.</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">functional</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">ufc_simplex</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRIANGLE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.jacobi</span><span class="w"> </span><span class="kn">import</span> <span class="n">eval_jacobi</span>
 
 
 <div class="viewcode-block" id="BellDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.bell.BellDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">BellDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
-        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
-
-        <span class="c1"># make nodes by getting points</span>
-        <span class="c1"># need to do this dimension-by-dimension, facet-by-facet</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
-        <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Bell only defined on triangles&quot;</span><span class="p">)</span>
-
-        <span class="n">pd</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointDerivative</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="c1"># get jet at each vertex</span>
-
-        <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">]))</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">x</span><span class="p">,</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
 
-            <span class="c1"># first derivatives</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
-                <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
-                <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
-                <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pd</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">],</span> <span class="n">alpha</span><span class="p">))</span>
-
-            <span class="c1"># second derivatives</span>
-            <span class="n">alphas</span> <span class="o">=</span> <span class="p">[[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">]]</span>
-            <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
-                <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pd</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">],</span> <span class="n">alpha</span><span class="p">))</span>
-
-            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="mi">6</span><span class="p">))</span>
-            <span class="n">cur</span> <span class="o">+=</span> <span class="mi">6</span>
+            <span class="c1"># first and second derivatives</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">PointDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)</span>
+                         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
         <span class="c1"># we need an edge quadrature rule for the moment</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.jacobi</span><span class="w"> </span><span class="kn">import</span> <span class="n">eval_jacobi</span>
-        <span class="n">rline</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">q1d</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">rline</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
-        <span class="n">q1dpts</span> <span class="o">=</span> <span class="n">q1d</span><span class="o">.</span><span class="n">get_points</span><span class="p">()[:,</span> <span class="mi">0</span><span class="p">]</span>
-        <span class="n">leg4_at_qpts</span> <span class="o">=</span> <span class="n">eval_jacobi</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mf">2.0</span><span class="o">*</span><span class="n">q1dpts</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">facet</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="p">(</span><span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">facet</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">leg4_at_qpts</span> <span class="o">=</span> <span class="n">eval_jacobi</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">x</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>
 
-        <span class="n">imond</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">IntegralMomentOfNormalDerivative</span>
-        <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
-            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">e</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">18</span><span class="o">+</span><span class="n">e</span><span class="p">]</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">imond</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">q1d</span><span class="p">,</span> <span class="n">leg4_at_qpts</span><span class="p">))</span>
-
-        <span class="n">entity_ids</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[]}</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">functional</span><span class="o">.</span><span class="n">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">,</span> <span class="n">leg4_at_qpts</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">e</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
 
@@ -113,10 +92,14 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">Bell</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The Bell finite element.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
-        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
-        <span class="n">dual</span> <span class="o">=</span> <span class="n">BellDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span></div>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on triangles&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree = 5.&quot;</span><span class="p">)</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">BellDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
 
 </pre></div>
 
