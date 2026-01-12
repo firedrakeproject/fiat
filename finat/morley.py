@@ -16,8 +16,7 @@ def morley_transform(cell, J, detJ, face):
     ahat = numpy.linalg.norm(nhat)
     nhat /= numpy.dot(nhat, nhat)
 
-    nhat = Literal(nhat)
-    Jn = J @ nhat
+    Jn = J @ Literal(nhat)
     Jt = J @ Literal(thats.T)
     Gnt = Jn.T @ Jt
     Gtt = Jt.T @ Jt
