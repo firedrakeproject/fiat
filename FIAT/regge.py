@@ -8,7 +8,7 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-from FIAT import dual_set, finite_element, polynomial_set
+from FIAT import dual_set, finite_element, polynomial_set, macro
 from FIAT.check_format_variant import check_format_variant
 from FIAT.functional import (PointwiseInnerProductEvaluation,
                              TensorBidirectionalIntegralMoment as BidirectionalMoment)
@@ -69,7 +69,12 @@ class Regge(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+
         dual = ReggeDual(ref_el, degree, variant, qdegree)
         formdegree = (1, 1)
         mapping = "double covariant piola"
