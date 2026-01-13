@@ -21,6 +21,7 @@ from FIAT.argyris import Argyris
 from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
+from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC
 from FIAT.hct import HsiehCloughTocher
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
@@ -88,6 +89,8 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
+                      "WuXuH3NC": WuXuH3NC,
+                      "WuXuRobustH3NC": WuXuRobustH3NC,
                       "Hsieh-Clough-Tocher": HsiehCloughTocher,
                       "QuadraticPowellSabin6": QuadraticPowellSabin6,
                       "QuadraticPowellSabin12": QuadraticPowellSabin12,

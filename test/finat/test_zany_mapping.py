@@ -107,6 +107,8 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
                          finat.Morley,
                          finat.Hermite,
                          finat.Bell,
+                         finat.WuXuH3NC,
+                         finat.WuXuRobustH3NC,
                          ])
 def test_C1_triangle(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[2])
