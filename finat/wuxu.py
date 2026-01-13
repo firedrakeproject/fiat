@@ -22,9 +22,9 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
         [[dxdxhat, dxdyhat], [dydxhat, dydyhat]] = J
 
         Thetainv = numpy.array(
-            [[dxdxhat*dxdxhat, Literal(2) * dxdxhat * dydxhat, dydxhat*dydxhat],
+            [[dxdxhat*dxdxhat, 2 * dxdxhat * dydxhat, dydxhat*dydxhat],
              [dxdyhat * dxdxhat, dxdyhat * dydxhat + dxdxhat * dydyhat, dydxhat * dydyhat],
-             [dxdyhat*dxdyhat, Literal(2) * dxdyhat * dydyhat, dydyhat*dydyhat]])
+             [dxdyhat*dxdyhat, 2 * dxdyhat * dydyhat, dydyhat*dydyhat]])
         nhats = coordinate_mapping.reference_normals()
         ns = coordinate_mapping.physical_normals()
 
@@ -40,13 +40,13 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
 
         V = numpy.full((15, 15), Zero(), dtype=object)
 
-        Gs = numpy.zeros((3, 2, 2), dtype='O')
-        Ghats = numpy.zeros((3, 2, 2), dtype='O')
-        Gammas = numpy.zeros((3, 3, 3), dtype='O')
-        Gammainvhats = numpy.zeros((3, 3, 3), dtype='O')
-        B1s = numpy.zeros((3, 2, 2), dtype='O')
-        B2s = numpy.zeros((3, 3, 3), dtype='O')
-        betas = numpy.zeros((3, 2), dtype='O')
+        Gs = numpy.zeros((3, 2, 2), dtype=object)
+        Ghats = numpy.zeros((3, 2, 2), dtype=object)
+        Gammas = numpy.zeros((3, 3, 3), dtype=object)
+        Gammainvhats = numpy.zeros((3, 3, 3), dtype=object)
+        B1s = numpy.zeros((3, 2, 2), dtype=object)
+        B2s = numpy.zeros((3, 3, 3), dtype=object)
+        betas = numpy.zeros((3, 2), dtype=object)
 
         for e in range(3):
             nx = ns[e, 0]
@@ -63,22 +63,22 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
                                             [thatx, thaty]])
 
             Gammas[e, :, :] = numpy.asarray(
-                [[nx*nx, Literal(2)*nx*tx, tx*tx],
+                [[nx*nx, 2*nx*tx, tx*tx],
                  [nx*ny, nx*ty+ny*tx, tx*ty],
-                 [ny*ny, Literal(2)*ny*ty, ty*ty]])
+                 [ny*ny, 2*ny*ty, ty*ty]])
 
             Gammainvhats[e, :, :] = numpy.asarray(
-                [[nhatx*nhatx, Literal(2)*nhatx*nhaty, nhaty*nhaty],
+                [[nhatx*nhatx, 2*nhatx*nhaty, nhaty*nhaty],
                  [nhatx*thatx, nhatx*thaty+nhaty*thatx, nhaty*thaty],
-                 [thatx*thatx, Literal(2)*thatx*thaty, thaty*thaty]])
+                 [thatx*thatx, 2*thatx*thaty, thaty*thaty]])
 
             B1s[e, :, :] = numpy.dot(Ghats[e],
                                      numpy.dot(J.T, Gs[e].T)) / lens[e]
             B2s[e, :, :] = numpy.dot(Gammainvhats[e],
-                                     numpy.dot(Thetainv, Gammas[e])) / lens[e]
+                                     numpy.dot(Thetainv, Gammas[e]))
 
-            betas[e, 0] = nx * B2s[e, 0, 1] + tx * B2s[e, 0, 2]
-            betas[e, 1] = ny * B2s[e, 0, 1] + ty * B2s[e, 0, 2]
+            betas[e, 0] = (nx * B2s[e, 0, 1] + tx * B2s[e, 0, 2])/lens[e]
+            betas[e, 1] = (ny * B2s[e, 0, 1] + ty * B2s[e, 0, 2])/lens[e]
 
         for e in range(3):
             V[3*e, 3*e] = Literal(1)
@@ -86,31 +86,31 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
                 for j in range(2):
                     V[3*e+1+i, 3*e+1+j] = J[j, i]
 
-        V[10, 0] = Literal(-1)*B1s[1, 0, 1]
-        V[11, 0] = Literal(-1)*B1s[2, 0, 1]
-        V[9, 3] = Literal(-1)*B1s[0, 0, 1]
-        V[11, 3] = B1s[2, 0, 1]
+        V[9, 3] = -1*B1s[0, 0, 1]
+        V[10, 0] = -1*B1s[1, 0, 1]
+        V[11, 0] = -1*B1s[2, 0, 1]
         V[9, 6] = B1s[0, 0, 1]
         V[10, 6] = B1s[1, 0, 1]
+        V[11, 3] = B1s[2, 0, 1]
 
         for e in range(9, 12):
-            V[e, e] = B1s[e-9, 0, 0]
+            V[e, e] = B1s[e-9, 0, 0] * lens[e-9]
 
         for e in range(12, 15):
             V[e, e] = B2s[e-12, 0, 0]
 
-        V[13, 1] = Literal(-1)*betas[1, 0]
-        V[13, 2] = Literal(-1)*betas[1, 1]
-        V[14, 1] = Literal(-1)*betas[2, 0]
-        V[14, 2] = Literal(-1)*betas[2, 1]
-        V[12, 4] = Literal(-1)*betas[0, 0]
-        V[12, 5] = Literal(-1)*betas[0, 1]
-        V[14, 4] = betas[2, 0]
-        V[14, 5] = betas[2, 1]
+        V[12, 4] = -1*betas[0, 0]
+        V[12, 5] = -1*betas[0, 1]
+        V[13, 1] = -1*betas[1, 0]
+        V[13, 2] = -1*betas[1, 1]
+        V[14, 1] = -1*betas[2, 0]
+        V[14, 2] = -1*betas[2, 1]
         V[12, 7] = betas[0, 0]
         V[12, 8] = betas[0, 1]
         V[13, 7] = betas[1, 0]
         V[13, 8] = betas[1, 1]
+        V[14, 4] = betas[2, 0]
+        V[14, 5] = betas[2, 1]
 
         # Now let's fix the scaling.
         h = coordinate_mapping.cell_size()
@@ -144,9 +144,9 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
         [[dxdxhat, dxdyhat], [dydxhat, dydyhat]] = J
 
         Thetainv = numpy.array(
-            [[dxdxhat*dxdxhat, Literal(2) * dxdxhat * dydxhat, dydxhat*dydxhat],
+            [[dxdxhat*dxdxhat, 2 * dxdxhat * dydxhat, dydxhat*dydxhat],
              [dxdyhat * dxdxhat, dxdyhat * dydxhat + dxdxhat * dydyhat, dydxhat * dydyhat],
-             [dxdyhat*dxdyhat, Literal(2) * dxdyhat * dydyhat, dydyhat*dydyhat]])
+             [dxdyhat*dxdyhat, 2 * dxdyhat * dydyhat, dydyhat*dydyhat]])
         nhats = coordinate_mapping.reference_normals()
         ns = coordinate_mapping.physical_normals()
 
@@ -160,14 +160,14 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
 
         lens = coordinate_mapping.physical_edge_lengths()
 
-        V = numpy.full((12, 12), gem.Zero(), dtype=object)
+        V = numpy.full((12, 12), Zero(), dtype=object)
 
-        Gs = numpy.zeros((3, 2, 2), dtype='O')
-        Ghats = numpy.zeros((3, 2, 2), dtype='O')
-        Gammas = numpy.zeros((3, 3, 3), dtype='O')
-        Gammainvhats = numpy.zeros((3, 3, 3), dtype='O')
-        B2s = numpy.zeros((3, 3, 3), dtype='O')
-        betas = numpy.zeros((3, 2), dtype='O')
+        Gs = numpy.zeros((3, 2, 2), dtype=object)
+        Ghats = numpy.zeros((3, 2, 2), dtype=object)
+        Gammas = numpy.zeros((3, 3, 3), dtype=object)
+        Gammainvhats = numpy.zeros((3, 3, 3), dtype=object)
+        B2s = numpy.zeros((3, 3, 3), dtype=object)
+        betas = numpy.zeros((3, 2), dtype=object)
 
         for e in range(3):
             nx = ns[e, 0]
@@ -184,17 +184,17 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
                                             [thatx, thaty]])
 
             Gammas[e, :, :] = numpy.asarray(
-                [[nx*nx, Literal(2)*nx*tx, tx*tx],
+                [[nx*nx, 2*nx*tx, tx*tx],
                  [nx*ny, nx*ty+ny*tx, tx*ty],
-                 [ny*ny, Literal(2)*ny*ty, ty*ty]])
+                 [ny*ny, 2*ny*ty, ty*ty]])
 
             Gammainvhats[e, :, :] = numpy.asarray(
-                [[nhatx*nhatx, Literal(2)*nhatx*nhaty, nhaty*nhaty],
+                [[nhatx*nhatx, 2*nhatx*nhaty, nhaty*nhaty],
                  [nhatx*thatx, nhatx*thaty+nhaty*thatx, nhaty*thaty],
-                 [thatx*thatx, Literal(2)*thatx*thaty, thaty*thaty]])
+                 [thatx*thatx, 2*thatx*thaty, thaty*thaty]])
 
             B2s[e, :, :] = numpy.dot(Gammainvhats[e],
-                                     numpy.dot(Thetainv, Gammas[e]))  # / lens[e]
+                                     numpy.dot(Thetainv, Gammas[e]))
 
             betas[e, 0] = (nx * B2s[e, 0, 1] + tx * B2s[e, 0, 2])/lens[e]
             betas[e, 1] = (ny * B2s[e, 0, 1] + ty * B2s[e, 0, 2])/lens[e]
@@ -208,16 +208,16 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
         for e in range(9, 12):
             V[e, e] = B2s[e-9, 0, 0]
 
-        V[9, 4] = Literal(-1) * betas[0, 0]
-        V[9, 5] = Literal(-1) * betas[0, 1]
+        V[9, 4] = -1*betas[0, 0]
+        V[9, 5] = -1*betas[0, 1]
+        V[10, 1] = -1*betas[1, 0]
+        V[10, 2] = -1*betas[1, 1]
+        V[11, 1] = -1*betas[2, 0]
+        V[11, 2] = -1*betas[2, 1]
         V[9, 7] = betas[0, 0]
         V[9, 8] = betas[0, 1]
-        V[10, 1] = Literal(-1) * betas[1, 0]
-        V[10, 2] = Literal(-1) * betas[1, 1]
         V[10, 7] = betas[1, 0]
         V[10, 8] = betas[1, 1]
-        V[11, 1] = Literal(-1) * betas[2, 0]
-        V[11, 2] = Literal(-1) * betas[2, 1]
         V[11, 4] = betas[2, 0]
         V[11, 5] = betas[2, 1]
 

@@ -21,7 +21,6 @@ from FIAT.argyris import Argyris
 from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
-from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC
 from FIAT.hct import HsiehCloughTocher
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
@@ -63,6 +62,7 @@ from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
+from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC
 from FIAT.walkington import Walkington
 from FIAT.histopolation import Histopolation
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401

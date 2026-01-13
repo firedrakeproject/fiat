@@ -15,15 +15,15 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with FIAT. If not, see <http://www.gnu.org/licenses/>.
 
-from FIAT import (expansions, polynomial_set, dual_set,
-                  finite_element, reference_element)
+from FIAT import expansions, polynomial_set, dual_set, finite_element
 from FIAT.functional import (IntegralMomentOfDerivative,
                              IntegralMomentOfBidirectionalDerivative,
                              PointDerivative, PointEvaluation)
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.polynomial_set import mis
-import FIAT
+from FIAT.bubble import Bubble
+from FIAT.lagrange import Lagrange
 import numpy
 
 polydim = expansions.polynomial_dimension
@@ -53,8 +53,8 @@ def WuXuRobustH3NCSpace(ref_el):
 
     # Rather than creating the barycentric coordinates ourself, let's
     # reuse the existing bubble functionality
-    bT = FIAT.Bubble(ref_el, 3)
-    p1 = FIAT.Lagrange(ref_el, 1)
+    bT = Bubble(ref_el, 3)
+    p1 = Lagrange(ref_el, 1)
 
     # next, we'll have to project b_T P1 and b_T^2 P1 onto P^7
     Q = create_quadrature(ref_el, 14)
@@ -103,7 +103,7 @@ def WuXuH3NCSpace(ref_el):
 
     # Rather than creating the barycentric coordinates ourself, let's
     # reuse the existing bubble functionality
-    bT = FIAT.Bubble(ref_el, 4)
+    bT = Bubble(ref_el, 4)
 
     return polynomial_set.polynomial_set_union_normalized(p3fromp4, bT.get_nodal_basis())
 
