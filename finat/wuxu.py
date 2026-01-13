@@ -1,9 +1,10 @@
 import numpy
 
-from gem import Literal, ListTensor, Zero
+from gem import Literal, ListTensor
 
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
+from finat.argyris import _vertex_transform
 from finat.citations import cite
 import FIAT
 
@@ -16,7 +17,12 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
         super().__init__(FIAT.WuXuRobustH3NC(cell))
 
     def basis_transformation(self, coordinate_mapping):
-        J = coordinate_mapping.jacobian_at([1/3, 1/3])
+        top = self.cell.topology
+        entity_ids = self._element.entity_dofs()
+        V = identity(self.space_dimension())
+        _vertex_transform(V, 1, self.cell, coordinate_mapping)
+
+        J = coordinate_mapping.jacobian_at(self.cell.make_points(2, 0, 3)[0])
         J = numpy.array([[J[0, 0], J[0, 1]],
                          [J[1, 0], J[1, 1]]])
         [[dxdxhat, dxdyhat], [dydxhat, dydyhat]] = J
@@ -25,25 +31,18 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
             [[dxdxhat*dxdxhat, 2 * dxdxhat * dydxhat, dydxhat*dydxhat],
              [dxdyhat * dxdxhat, dxdyhat * dydxhat + dxdxhat * dydyhat, dydxhat * dydyhat],
              [dxdyhat*dxdyhat, 2 * dxdyhat * dydyhat, dydyhat*dydyhat]])
-        nhats = coordinate_mapping.reference_normals()
+
         ns = coordinate_mapping.physical_normals()
-
         ts = coordinate_mapping.physical_tangents()
+        lens = coordinate_mapping.physical_edge_lengths()
 
+        nhats = coordinate_mapping.reference_normals()
         thats = numpy.zeros((3, 2), dtype=object)
         for e in range(3):
             tancur = self.cell.compute_normalized_edge_tangent(e)
             for i in range(2):
                 thats[e, i] = Literal(tancur[i])
 
-        lens = coordinate_mapping.physical_edge_lengths()
-
-        V = numpy.full((15, 15), Zero(), dtype=object)
-
-        Gs = numpy.zeros((3, 2, 2), dtype=object)
-        Ghats = numpy.zeros((3, 2, 2), dtype=object)
-        Gammas = numpy.zeros((3, 3, 3), dtype=object)
-        Gammainvhats = numpy.zeros((3, 3, 3), dtype=object)
         B1s = numpy.zeros((3, 2, 2), dtype=object)
         B2s = numpy.zeros((3, 3, 3), dtype=object)
         betas = numpy.zeros((3, 2), dtype=object)
@@ -58,59 +57,42 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
             thatx = thats[e, 0]
             thaty = thats[e, 1]
 
-            Gs[e, :, :] = numpy.asarray([[nx, ny], [tx, ty]])
-            Ghats[e, :, :] = numpy.asarray([[nhatx, nhaty],
-                                            [thatx, thaty]])
+            Gs = numpy.asarray([[nx, ny], [tx, ty]])
+            Ghats = numpy.asarray([[nhatx, nhaty], [thatx, thaty]])
 
-            Gammas[e, :, :] = numpy.asarray(
+            B1s[e, :, :] = (Ghats @ (J.T @ Gs.T)) / lens[e]
+
+            Gammas = numpy.asarray(
                 [[nx*nx, 2*nx*tx, tx*tx],
                  [nx*ny, nx*ty+ny*tx, tx*ty],
                  [ny*ny, 2*ny*ty, ty*ty]])
 
-            Gammainvhats[e, :, :] = numpy.asarray(
+            Gammainvhats = numpy.asarray(
                 [[nhatx*nhatx, 2*nhatx*nhaty, nhaty*nhaty],
                  [nhatx*thatx, nhatx*thaty+nhaty*thatx, nhaty*thaty],
                  [thatx*thatx, 2*thatx*thaty, thaty*thaty]])
 
-            B1s[e, :, :] = numpy.dot(Ghats[e],
-                                     numpy.dot(J.T, Gs[e].T)) / lens[e]
-            B2s[e, :, :] = numpy.dot(Gammainvhats[e],
-                                     numpy.dot(Thetainv, Gammas[e]))
+            B2s[e, :, :] = Gammainvhats @ (Thetainv @ Gammas)
 
             betas[e, 0] = (nx * B2s[e, 0, 1] + tx * B2s[e, 0, 2])/lens[e]
             betas[e, 1] = (ny * B2s[e, 0, 1] + ty * B2s[e, 0, 2])/lens[e]
 
-        for e in range(3):
-            V[3*e, 3*e] = Literal(1)
-            for i in range(2):
-                for j in range(2):
-                    V[3*e+1+i, 3*e+1+j] = J[j, i]
+        for e in top[1]:
+            v0, v1 = top[1][e]
+            vid0 = entity_ids[0][v0]
+            vid1 = entity_ids[0][v1]
 
-        V[9, 3] = -1*B1s[0, 0, 1]
-        V[10, 0] = -1*B1s[1, 0, 1]
-        V[11, 0] = -1*B1s[2, 0, 1]
-        V[9, 6] = B1s[0, 0, 1]
-        V[10, 6] = B1s[1, 0, 1]
-        V[11, 3] = B1s[2, 0, 1]
+            eid = entity_ids[1][e][0]
+            V[eid, eid] = B1s[e, 0, 0] * lens[e]
+            V[eid, vid0[0]] = -1*B1s[e, 0, 1]
+            V[eid, vid1[0]] = B1s[e, 0, 1]
 
-        for e in range(9, 12):
-            V[e, e] = B1s[e-9, 0, 0] * lens[e-9]
-
-        for e in range(12, 15):
-            V[e, e] = B2s[e-12, 0, 0]
-
-        V[12, 4] = -1*betas[0, 0]
-        V[12, 5] = -1*betas[0, 1]
-        V[13, 1] = -1*betas[1, 0]
-        V[13, 2] = -1*betas[1, 1]
-        V[14, 1] = -1*betas[2, 0]
-        V[14, 2] = -1*betas[2, 1]
-        V[12, 7] = betas[0, 0]
-        V[12, 8] = betas[0, 1]
-        V[13, 7] = betas[1, 0]
-        V[13, 8] = betas[1, 1]
-        V[14, 4] = betas[2, 0]
-        V[14, 5] = betas[2, 1]
+            eid = entity_ids[1][e][1]
+            V[eid, eid] = B2s[e, 0, 0]
+            V[eid, vid0[1]] = -1*betas[e, 0]
+            V[eid, vid0[2]] = -1*betas[e, 1]
+            V[eid, vid1[1]] = betas[e, 0]
+            V[eid, vid1[2]] = betas[e, 1]
 
         # Now let's fix the scaling.
         h = coordinate_mapping.cell_size()
@@ -118,8 +100,7 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
         # This gets the vertex gradients
         for v in range(3):
             for k in range(2):
-                for i in range(15):
-                    V[i, 3*v+1+k] = V[i, 3*v+1+k] / h[v]
+                V[:, 3*v+1+k] *= 1 / h[v]
 
         # this scales second derivative moments.  First should be ok.
         for e in range(3):
@@ -138,7 +119,12 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
         super().__init__(FIAT.WuXuH3NC(cell))
 
     def basis_transformation(self, coordinate_mapping):
-        J = coordinate_mapping.jacobian_at([1/3, 1/3])
+        top = self.cell.topology
+        entity_ids = self._element.entity_dofs()
+        V = identity(self.space_dimension())
+        _vertex_transform(V, 1, self.cell, coordinate_mapping)
+
+        J = coordinate_mapping.jacobian_at(self.cell.make_points(2, 0, 3)[0])
         J = numpy.array([[J[0, 0], J[0, 1]],
                          [J[1, 0], J[1, 1]]])
         [[dxdxhat, dxdyhat], [dydxhat, dydyhat]] = J
@@ -147,25 +133,18 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
             [[dxdxhat*dxdxhat, 2 * dxdxhat * dydxhat, dydxhat*dydxhat],
              [dxdyhat * dxdxhat, dxdyhat * dydxhat + dxdxhat * dydyhat, dydxhat * dydyhat],
              [dxdyhat*dxdyhat, 2 * dxdyhat * dydyhat, dydyhat*dydyhat]])
-        nhats = coordinate_mapping.reference_normals()
+
         ns = coordinate_mapping.physical_normals()
-
         ts = coordinate_mapping.physical_tangents()
+        lens = coordinate_mapping.physical_edge_lengths()
 
+        nhats = coordinate_mapping.reference_normals()
         thats = numpy.zeros((3, 2), dtype=object)
         for e in range(3):
             tancur = self.cell.compute_normalized_edge_tangent(e)
             for i in range(2):
                 thats[e, i] = Literal(tancur[i])
 
-        lens = coordinate_mapping.physical_edge_lengths()
-
-        V = numpy.full((12, 12), Zero(), dtype=object)
-
-        Gs = numpy.zeros((3, 2, 2), dtype=object)
-        Ghats = numpy.zeros((3, 2, 2), dtype=object)
-        Gammas = numpy.zeros((3, 3, 3), dtype=object)
-        Gammainvhats = numpy.zeros((3, 3, 3), dtype=object)
         B2s = numpy.zeros((3, 3, 3), dtype=object)
         betas = numpy.zeros((3, 2), dtype=object)
 
@@ -179,47 +158,32 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
             thatx = thats[e, 0]
             thaty = thats[e, 1]
 
-            Gs[e, :, :] = numpy.asarray([[nx, ny], [tx, ty]])
-            Ghats[e, :, :] = numpy.asarray([[nhatx, nhaty],
-                                            [thatx, thaty]])
-
-            Gammas[e, :, :] = numpy.asarray(
+            Gammas = numpy.asarray(
                 [[nx*nx, 2*nx*tx, tx*tx],
                  [nx*ny, nx*ty+ny*tx, tx*ty],
                  [ny*ny, 2*ny*ty, ty*ty]])
 
-            Gammainvhats[e, :, :] = numpy.asarray(
+            Gammainvhats = numpy.asarray(
                 [[nhatx*nhatx, 2*nhatx*nhaty, nhaty*nhaty],
                  [nhatx*thatx, nhatx*thaty+nhaty*thatx, nhaty*thaty],
                  [thatx*thatx, 2*thatx*thaty, thaty*thaty]])
 
-            B2s[e, :, :] = numpy.dot(Gammainvhats[e],
-                                     numpy.dot(Thetainv, Gammas[e]))
+            B2s[e, :, :] = Gammainvhats @ (Thetainv @ Gammas)
 
             betas[e, 0] = (nx * B2s[e, 0, 1] + tx * B2s[e, 0, 2])/lens[e]
             betas[e, 1] = (ny * B2s[e, 0, 1] + ty * B2s[e, 0, 2])/lens[e]
 
-        for e in range(3):
-            V[3*e, 3*e] = Literal(1)
-            for i in range(2):
-                for j in range(2):
-                    V[3*e+1+i, 3*e+1+j] = J[j, i]
+        for e in top[1]:
+            v0, v1 = top[1][e]
+            vid0 = entity_ids[0][v0]
+            vid1 = entity_ids[0][v1]
 
-        for e in range(9, 12):
-            V[e, e] = B2s[e-9, 0, 0]
-
-        V[9, 4] = -1*betas[0, 0]
-        V[9, 5] = -1*betas[0, 1]
-        V[10, 1] = -1*betas[1, 0]
-        V[10, 2] = -1*betas[1, 1]
-        V[11, 1] = -1*betas[2, 0]
-        V[11, 2] = -1*betas[2, 1]
-        V[9, 7] = betas[0, 0]
-        V[9, 8] = betas[0, 1]
-        V[10, 7] = betas[1, 0]
-        V[10, 8] = betas[1, 1]
-        V[11, 4] = betas[2, 0]
-        V[11, 5] = betas[2, 1]
+            eid = entity_ids[1][e][0]
+            V[eid, eid] = B2s[e, 0, 0]
+            V[eid, vid0[1]] = -1*betas[e, 0]
+            V[eid, vid0[2]] = -1*betas[e, 1]
+            V[eid, vid1[1]] = betas[e, 0]
+            V[eid, vid1[2]] = betas[e, 1]
 
         # Now let's fix the scaling.
         h = coordinate_mapping.cell_size()
@@ -227,8 +191,7 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
         # This gets the vertex gradients
         for v in range(3):
             for k in range(2):
-                for i in range(12):
-                    V[i, 3*v+1+k] = V[i, 3*v+1+k] / h[v]
+                V[:, 3*v+1+k] *= 1 / h[v]
 
         # this scales second derivative moments.  First should be ok.
         for e in range(3):
