@@ -89,12 +89,13 @@ def wuxu_transformation(self, coordinate_mapping):
 
     # This gets the vertex gradients
     for v in top[0]:
-        vids = entity_ids[0][v]
-        V[:, vids[1]:vids[1]+sd] *= 1 / h[v]
+        vids = entity_ids[0][v][1:]
+        V[:, vids] *= 1 / h[v]
 
     # this scales second derivative moments.  First should be ok.
     for e in top[1]:
         eid = entity_ids[1][e][-1]
-        V[:, eid] *= 2 / sum(h[v] for v in top[1][e])
+        he = (1/len(top[1][e])) * sum(h[v] for v in top[1][e])
+        V[:, eid] *= 1 / (he * he)
 
     return ListTensor(V.T)
