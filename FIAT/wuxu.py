@@ -99,7 +99,8 @@ def WuXuH3NCSpace(ref_el):
 
     # Here's the first bit we'll work with.  It's already expressed in terms
     # of the ON basis for P4, so we're golden.
-    p3fromp4 = p4.take(list(range(10)))
+    dimp3 = polydim(ref_el, 3)
+    p3fromp4 = p4.take(list(range(dimp3)))
 
     # Rather than creating the barycentric coordinates ourself, let's
     # reuse the existing bubble functionality
@@ -112,7 +113,7 @@ class WuXuRobustH3NCDualSet(dual_set.DualSet):
     """Dual basis for WuXu H3 nonconforming element consisting of
     vertex values and gradients and first and second normals at edge midpoints."""
 
-    def __init__(self, ref_el, degree, avg=True):
+    def __init__(self, ref_el, degree):
         sd = ref_el.get_spatial_dimension()
         assert sd == 2
         top = ref_el.get_topology()
@@ -127,26 +128,14 @@ class WuXuRobustH3NCDualSet(dual_set.DualSet):
             nodes.extend(PointDerivative(ref_el, verts[v], alpha) for alpha in mis(sd, 1))
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        # quadrature rule for edge integrals
-        Q_ref = create_quadrature(ref_el.construct_subelement(1), 4)
-        Q_edge = {e: FacetQuadratureRule(ref_el, 1, e, Q_ref) for e in top[1]}
+        # average of first and second normal derivative along each edge
+        Q_ref = create_quadrature(ref_el.construct_subelement(1), degree-1)
         for e in sorted(top[1]):
             n = ref_el.compute_normal(e)
-            Q = Q_edge[e]
-            f = numpy.ones(Q.get_weights().shape)
-            if avg:
-                f *= 1/Q.jacobian_determinant()
+            Q = FacetQuadratureRule(ref_el, 1, e, Q_ref)
+            f = numpy.full(Q.get_weights().shape, 1/Q.jacobian_determinant())
             cur = len(nodes)
             nodes.append(IntegralMomentOfDerivative(ref_el, n, Q, f))
-            entity_ids[1][e].extend(range(cur, len(nodes)))
-
-        for e in sorted(top[1]):
-            n = ref_el.compute_normal(e)
-            Q = Q_edge[e]
-            f = numpy.ones(Q.get_weights().shape)
-            if avg:
-                f *= 1/Q.jacobian_determinant()
-            cur = len(nodes)
             nodes.append(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, n, n))
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
@@ -157,7 +146,7 @@ class WuXuH3NCDualSet(dual_set.DualSet):
     """Dual basis for WuXu H3 nonconforming element consisting of
     vertex values and gradients and second normals at edge midpoints."""
 
-    def __init__(self, ref_el, degree, avg=True):
+    def __init__(self, ref_el, degree):
         sd = ref_el.get_spatial_dimension()
         assert sd == 2
         top = ref_el.get_topology()
@@ -172,14 +161,12 @@ class WuXuH3NCDualSet(dual_set.DualSet):
             nodes.extend(PointDerivative(ref_el, verts[v], alpha) for alpha in mis(sd, 1))
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        # quadrature rule for edge integrals
-        Q_ref = create_quadrature(ref_el.construct_subelement(1), 4)
+        # average of second normal derivative along each edge
+        Q_ref = create_quadrature(ref_el.construct_subelement(1), degree-2)
         for e in sorted(top[1]):
-            Q = FacetQuadratureRule(ref_el, 1, e, Q_ref)
             n = ref_el.compute_normal(e)
-            f = numpy.ones(Q.get_weights().shape)
-            if avg:
-                f *= 1/Q.jacobian_determinant()
+            Q = FacetQuadratureRule(ref_el, 1, e, Q_ref)
+            f = numpy.full(Q.get_weights().shape, 1/Q.jacobian_determinant())
             cur = len(nodes)
             nodes.append(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, n, n))
             entity_ids[1][e].extend(range(cur, len(nodes)))
@@ -189,17 +176,17 @@ class WuXuH3NCDualSet(dual_set.DualSet):
 
 class WuXuRobustH3NC(finite_element.CiarletElement):
     """The Wu-Xu robust H3 nonconforming finite element"""
-    def __init__(self, ref_el, avg=True):
+    def __init__(self, ref_el, degree=7):
         poly_set = WuXuRobustH3NCSpace(ref_el)
-        degree = poly_set.degree
-        dual = WuXuRobustH3NCDualSet(ref_el, degree, avg)
+        assert degree == poly_set.degree
+        dual = WuXuRobustH3NCDualSet(ref_el, degree)
         super().__init__(poly_set, dual, degree)
 
 
 class WuXuH3NC(finite_element.CiarletElement):
     """The Wu-Xu H3 nonconforming finite element"""
-    def __init__(self, ref_el, avg=True):
+    def __init__(self, ref_el, degree=4):
         poly_set = WuXuH3NCSpace(ref_el)
-        degree = poly_set.degree
-        dual = WuXuH3NCDualSet(ref_el, degree, avg)
+        assert degree == poly_set.degree
+        dual = WuXuH3NCDualSet(ref_el, degree)
         super().__init__(poly_set, dual, degree)
