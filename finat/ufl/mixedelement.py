@@ -345,9 +345,10 @@ class VectorElement(MixedElement):
         """Doc."""
         return self._repr
 
-    def reconstruct(self, **kwargs):
+    def reconstruct(self, sub_element=None, **kwargs):
         """Doc."""
-        sub_element = self._sub_element.reconstruct(**kwargs)
+        if sub_element is None:
+            sub_element = self._sub_element.reconstruct(**kwargs)
         return VectorElement(sub_element, dim=len(self.sub_elements))
 
     def variant(self):
@@ -544,9 +545,10 @@ class TensorElement(MixedElement):
         """
         return self._symmetry
 
-    def reconstruct(self, **kwargs):
+    def reconstruct(self, sub_element=None, **kwargs):
         """Doc."""
-        sub_element = self._sub_element.reconstruct(**kwargs)
+        if sub_element is None:
+            sub_element = self._sub_element.reconstruct(**kwargs)
         return TensorElement(sub_element, shape=self._shape, symmetry=self._symmetry)
 
     def __str__(self):
