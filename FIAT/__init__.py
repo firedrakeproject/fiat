@@ -22,6 +22,7 @@ from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.hct import HsiehCloughTocher
+from FIAT.double_alfeld import DoubleAlfeld
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
@@ -94,6 +95,7 @@ supported_elements = {"Argyris": Argyris,
                       "Hsieh-Clough-Tocher": HsiehCloughTocher,
                       "QuadraticPowellSabin6": QuadraticPowellSabin6,
                       "QuadraticPowellSabin12": QuadraticPowellSabin12,
+                      "Double Alfeld": DoubleAlfeld,
                       "Alfeld-Sorokina": AlfeldSorokina,
                       "Arnold-Qin": ArnoldQin,
                       "Christiansen-Hu": ChristiansenHu,

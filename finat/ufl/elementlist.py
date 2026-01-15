@@ -126,6 +126,7 @@ register_element("Hsieh-Clough-Tocher", "HCT", 0, H2, "custom", (3, None), ("tri
 register_element("Reduced-Hsieh-Clough-Tocher", "HCT-red", 0, H2, "custom", (3, 3), ("triangle",))
 register_element("Johnson-Mercier", "JM", 2, HDiv, "double contravariant Piola", (1, 1), simplices[1:])
 register_element("Walkington", "WALK", 0, H2, "custom", (5, 5), ("tetrahedron",))
+register_element("Double Alfeld", "DALF", 0, H3, "custom", (5, None), ("triangle",))
 
 register_element("Arnold-Qin", "AQ", 1, H1, "identity", (2, 2), ("triangle",))
 register_element("Reduced-Arnold-Qin", "AQ-red", 1, H1, "contravariant Piola", (2, 2), ("triangle",))
