@@ -129,10 +129,9 @@ class NedelecDual(dual_set.DualSet):
 
                     for entity in top[dim]:
                         cur = len(nodes)
-                        Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                        Jdet = Q.jacobian_determinant()
+                        Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
                         R = numpy.array(ref_el.compute_tangents(dim, entity))
-                        phis = numpy.dot(Phis, R / Jdet)
+                        phis = numpy.dot(Phis, R)
                         phis = numpy.transpose(phis, (0, 2, 1))
                         nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                                      for phi in phis)

@@ -47,13 +47,10 @@ class LegendreDual(dual_set.DualSet):
         ref_facet = ref_el.construct_subelement(dim)
         poly_set = ONPolynomialSet(ref_facet, degree, scale="L2 piola")
         Q_ref = parse_quadrature_scheme(ref_facet, degree + interpolant_deg, quad_scheme)
-        Phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
+        phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
         for entity in sorted(top[dim]):
             cur = len(nodes)
-            Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-            # phis must transform like a d-form to undo the measure transformation
-            scale = 1 / Q_facet.jacobian_determinant()
-            phis = scale * Phis
+            Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
             nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
             entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
@@ -93,13 +90,10 @@ class IntegratedLegendreDual(dual_set.DualSet):
             if degree <= dim:
                 continue
             ref_facet = symmetric_simplex(dim)
-            Q_ref, Phis = make_dual_bubbles(ref_facet, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
+            Q_ref, phis = make_dual_bubbles(ref_facet, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
-                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                # phis must transform like a d-form to undo the measure transformation
-                scale = 1 / Q_facet.jacobian_determinant()
-                phis = scale * Phis
+                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
                 nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 

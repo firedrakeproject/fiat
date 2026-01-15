@@ -46,9 +46,8 @@ class ReggeDual(dual_set.DualSet):
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
                     tangents = ref_el.compute_face_edge_tangents(dim, entity)
-                    Q_mapped = FacetQuadratureRule(ref_el, dim, entity, Q)
-                    detJ = Q_mapped.jacobian_determinant()
-                    nodes.extend(BidirectionalMoment(ref_el, t, t/detJ, Q_mapped, phi)
+                    Q_mapped = FacetQuadratureRule(ref_el, dim, entity, Q, avg=True)
+                    nodes.extend(BidirectionalMoment(ref_el, t, t, Q_mapped, phi)
                                  for phi in phis for t in tangents)
                     entity_ids[dim][entity].extend(range(cur, len(nodes)))
 

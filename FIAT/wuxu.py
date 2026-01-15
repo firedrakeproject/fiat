@@ -17,7 +17,6 @@
 
 from FIAT import expansions, polynomial_set, dual_set, finite_element
 from FIAT.functional import (IntegralMomentOfDerivative,
-                             IntegralMomentOfBidirectionalDerivative,
                              PointDerivative, PointEvaluation)
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
@@ -130,13 +129,13 @@ class WuXuRobustH3NCDualSet(dual_set.DualSet):
 
         # average of first and second normal derivative along each edge
         Q_ref = create_quadrature(ref_el.construct_subelement(1), degree-1)
+        f = numpy.ones(Q_ref.get_weights().shape)
         for e in sorted(top[1]):
             n = ref_el.compute_normal(e)
-            Q = FacetQuadratureRule(ref_el, 1, e, Q_ref)
-            f = numpy.full(Q.get_weights().shape, 1/Q.jacobian_determinant())
+            Q = FacetQuadratureRule(ref_el, 1, e, Q_ref, avg=True)
             cur = len(nodes)
-            nodes.append(IntegralMomentOfDerivative(ref_el, n, Q, f))
-            nodes.append(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, n, n))
+            nodes.append(IntegralMomentOfDerivative(ref_el, Q, f, n))
+            nodes.append(IntegralMomentOfDerivative(ref_el, Q, f, n, n))
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
@@ -163,12 +162,12 @@ class WuXuH3NCDualSet(dual_set.DualSet):
 
         # average of second normal derivative along each edge
         Q_ref = create_quadrature(ref_el.construct_subelement(1), degree-2)
+        f = numpy.ones(Q_ref.get_weights().shape)
         for e in sorted(top[1]):
             n = ref_el.compute_normal(e)
-            Q = FacetQuadratureRule(ref_el, 1, e, Q_ref)
-            f = numpy.full(Q.get_weights().shape, 1/Q.jacobian_determinant())
+            Q = FacetQuadratureRule(ref_el, 1, e, Q_ref, avg=True)
             cur = len(nodes)
-            nodes.append(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, n, n))
+            nodes.append(IntegralMomentOfDerivative(ref_el, Q, f, n, n))
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)

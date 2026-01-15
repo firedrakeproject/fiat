@@ -26,13 +26,11 @@ class GLSDual(dual_set.DualSet):
 
             for entity in sorted(top[dim]):
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                Jdet = Q.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
                 for f in ref_el.get_connectivity()[(dim, sd-1)][entity]:
                     normal = ref_el.compute_scaled_normal(f)
                     tangents = ref_el.compute_tangents(sd-1, f)
-                    n = normal / Jdet
-                    nodes.extend(BidirectionalMoment(ref_el, t, n, Q, phi)
+                    nodes.extend(BidirectionalMoment(ref_el, t, normal, Q, phi)
                                  for phi in phis for t in tangents)
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 

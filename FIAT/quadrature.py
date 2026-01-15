@@ -20,7 +20,7 @@ def pseudo_determinant(A):
     return numpy.sqrt(abs(numpy.linalg.det(numpy.dot(A.T, A))))
 
 
-def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
+def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False, avg=False):
     """Map quadrature points and weights defined on source_cell to target_cell.
     """
     while source_cell.get_parent():
@@ -29,10 +29,12 @@ def map_quadrature(pts_ref, wts_ref, source_cell, target_cell, jacobian=False):
                                                  target_cell.get_vertices())
     if len(pts_ref.shape) != 2:
         pts_ref = pts_ref.reshape(-1, A.shape[1])
-    scale = pseudo_determinant(A)
     pts = numpy.dot(pts_ref, A.T)
     pts = numpy.add(pts, b, out=pts)
-    wts = scale * wts_ref
+    if avg:
+        wts = wts_ref
+    else:
+        wts = wts_ref * pseudo_determinant(A)
 
     # return immutable types
     pts = tuple(map(tuple, pts))
@@ -196,7 +198,7 @@ class CollapsedQuadratureTetrahedronRule(CollapsedQuadratureSimplexRule):
 class FacetQuadratureRule(QuadratureRule):
     """A quadrature rule on a facet mapped from a reference quadrature rule.
     """
-    def __init__(self, ref_el, entity_dim, entity_id, Q_ref):
+    def __init__(self, ref_el, entity_dim, entity_id, Q_ref, avg=False):
         # Construct the facet of interest
         facet = ref_el.construct_subelement(entity_dim)
         facet_topology = ref_el.get_topology()[entity_dim][entity_id]
@@ -205,7 +207,7 @@ class FacetQuadratureRule(QuadratureRule):
         # Map reference points and weights on the appropriate facet
         pts_ref = Q_ref.get_points()
         wts_ref = Q_ref.get_weights()
-        pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, facet, jacobian=True)
+        pts, wts, J = map_quadrature(pts_ref, wts_ref, Q_ref.ref_el, facet, jacobian=True, avg=avg)
 
         # Initialize super class with new points and weights
         QuadratureRule.__init__(self, facet, pts, wts)
