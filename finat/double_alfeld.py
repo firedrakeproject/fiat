@@ -11,7 +11,7 @@ from math import comb
 
 
 class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
-    def __init__(self, cell, degree=5, avg=False):
+    def __init__(self, cell, degree=5, avg=True):
         cite("Alfeld1984")
         self.avg = avg
         super().__init__(FIAT.DoubleAlfeld(cell, degree))
@@ -57,7 +57,6 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
             beta = B2[0, 1:] @ G / lens[e]
 
             Bnn, Bnt, Jt = _normal_tangential_transform(self.cell, J, detJ, e)
-            Tnn = alpha
             if self.avg:
                 Bnn = Bnn * lens[e]
 
@@ -71,7 +70,7 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
                 V[eid, vid0[0]] = P0*alpha
                 V[eid, vid1[0]] = P1*alpha
                 if k > 0:
-                    V[eid, eids[k-1]] = -1 * Tnn
+                    V[eid, eids[k-1]] = -1 * alpha
 
             # second derivative moments
             for k, eid in enumerate(eids[(n0+n1):]):
@@ -89,7 +88,7 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
                     V[eid, vid0[0]] = -P0*alpha*Bnt
                     V[eid, vid1[0]] = -P1*alpha*Bnt
                 if k > 1:
-                    V[eid, eids[k-2]] = alpha * Tnn
+                    V[eid, eids[k-2]] = alpha * alpha
 
         # Now let's fix the scaling.
         h = coordinate_mapping.cell_size()
