@@ -347,6 +347,8 @@ class IntegralMomentOfDerivative(Functional):
 
         points = Q.get_points()
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
+        self.weights = {alpha: weights*tau[alpha] for alpha in tau}
+
         dpt_dict = {tuple(pt): [(wt*tau[alpha], alpha, comp) for alpha in tau]
                     for pt, wt in zip(points, weights)}
 
