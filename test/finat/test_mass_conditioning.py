@@ -15,6 +15,8 @@ from gem.interpreter import evaluate
     (2, finat.Argyris, 5, "point"),
     (2, finat.Argyris, 5, None),
     (2, finat.Argyris, 6, None),
+    (2, finat.WuXuH3NC, 4, None),
+    (2, finat.WuXuRobustH3NC, 7, None),
     (3, finat.Walkington, 5, None),
 ])
 def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):

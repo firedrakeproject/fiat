@@ -91,6 +91,8 @@ supported_elements = {"Argyris": finat.Argyris,
                       "Hu-Zhang": finat.HuZhang,
                       "Mardal-Tai-Winther": finat.MardalTaiWinther,
                       "Walkington": finat.Walkington,
+                      "Nonconforming Wu-Xu": finat.WuXuH3NC,
+                      "Nonconforming Robust Wu-Xu": finat.WuXuRobustH3NC,
                       # These require special treatment
                       "Q": None,
                       "DQ": None,

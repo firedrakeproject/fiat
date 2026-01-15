@@ -260,6 +260,7 @@ if petsctools is not None:
 }
 """)
     petsctools.add_citation("Walkington2010", """
+@article{Walkington2010,
 author = {Walkington, Noel J.},
 title = {{A \\$C^1\\$ Tetrahedral Finite Element without Edge Degrees of Freedom}},
 journal = {SIAM Journal on Numerical Analysis},
@@ -268,4 +269,14 @@ number = {1},
 pages = {330-342},
 year = {2014},
 doi = {10.1137/130912013},
+}""")
+    petsctools.add_citation("WuXu2019", """
+@article{WuXu2019,
+title={Nonconforming finite element spaces for $2m^{\\mathrm{th}}$ order partial differential equations on $\\mathbb{R}^n$ simplicial grids when $\\mathbb{m} = \\mathbb{n} + 1$},
+author={Wu, Shuonan and Xu, Jinchao},
+journal={Mathematics of Computation},
+volume={88},
+number={316},
+pages={531--551},
+year={2019}
 }""")

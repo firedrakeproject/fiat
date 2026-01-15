@@ -18,6 +18,7 @@ from .argyris import Argyris                                       # noqa: F401
 from .aw import ArnoldWinther, ArnoldWintherNC                     # noqa: F401
 from .hz import HuZhang                                            # noqa: F401
 from .bell import Bell                                             # noqa: F401
+from .wuxu import WuXuH3NC, WuXuRobustH3NC                         # noqa: F401
 from .bernardi_raugel import BernardiRaugel, BernardiRaugelBubble  # noqa: F401
 from .hct import HsiehCloughTocher, ReducedHsiehCloughTocher       # noqa: F401
 from .arnold_qin import ArnoldQin, ReducedArnoldQin                # noqa: F401
