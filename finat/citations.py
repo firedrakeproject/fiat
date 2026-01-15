@@ -280,3 +280,14 @@ number={316},
 pages={531--551},
 year={2019}
 }""")
+    petsctools.add_citation("Alfeld1984", """
+@article{Alfeld1984,
+  title={{A bivariate C2 Clough-Tocher scheme}},
+  author={Alfeld, Peter},
+  journal={Computer Aided Geometric Design},
+  volume={1},
+  number={3},
+  pages={257--267},
+  year={1984},
+  publisher={Elsevier}
+}""")

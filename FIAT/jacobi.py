@@ -82,17 +82,21 @@ def eval_jacobi_deriv(a, b, n, x):
         return 0.5 * (a + b + n + 1) * eval_jacobi(a + 1, b + 1, n - 1, x)
 
 
-def eval_jacobi_deriv_batch(a, b, n, xs):
+def eval_jacobi_deriv_batch(a, b, n, xs, order=1):
     """Evaluates the first derivatives of all jacobi polynomials with
     weights a,b up to degree n.  xs is a numpy.array of points.
     Returns a two-dimensional array of points, where the
     rows correspond to the Jacobi polynomials and the
     columns correspond to the points."""
     results = numpy.zeros((n + 1, len(xs)), xs.dtype)
-    if n == 0:
+    if n-order+1 == 0:
         return results
     else:
-        results[1:, :] = eval_jacobi_batch(a + 1, b + 1, n - 1, xs)
-    for j in range(1, n + 1):
-        results[j, :] *= 0.5 * (a + b + j + 1)
+        results[order:, :] = eval_jacobi_batch(a + order, b + order, n - order, xs)
+    for j in range(order, n + 1):
+        z = 1
+        f = a + b + j + 1
+        for l in range(order):
+            z *= 0.5 * (f + l)
+        results[j, :] *= z
     return results
