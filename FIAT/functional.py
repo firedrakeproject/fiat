@@ -322,20 +322,20 @@ class IntegralMomentOfDerivative(Functional):
     :arg Q: a :class:`QuadratureRule`.
     :arg f_at_qpts: an array tabulating the function f at the quadrature
          points.
-    :arg s: a list of vectors of directions of differentiation.
+    :arg *directions: a list of vectors of directions of differentiation.
     :arg comp: Optional argument indicating that only a particular
          component of the input function should be integrated against f
     :arg shp: Optional argument giving the value shape of input functions.
     """
 
-    def __init__(self, ref_el, Q, f_at_qpts, *s, comp=(), shp=(), nm=""):
+    def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
         self.Q = Q
         self.f_at_qpts = f_at_qpts
         self.comp = comp
 
-        S = s[0]
-        for sj in s[1:]:
-            S = numpy.outer(S, sj)
+        S = directions[0]
+        for dj in directions[1:]:
+            S = numpy.outer(S, dj)
 
         sd = ref_el.get_spatial_dimension()
         tau = defaultdict(float)
@@ -347,6 +347,8 @@ class IntegralMomentOfDerivative(Functional):
 
         points = Q.get_points()
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
+        self.weights = {alpha: weights*tau[alpha] for alpha in tau}
+
         dpt_dict = {tuple(pt): [(wt*tau[alpha], alpha, comp) for alpha in tau]
                     for pt, wt in zip(points, weights)}
 
