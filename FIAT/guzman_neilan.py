@@ -46,7 +46,7 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     K = ref_complex if kind == 2 else ref_el
     num_bubbles = sd + 1
     if reduced:
-        BR = BernardiRaugel(K, order).get_nodal_basis()
+        BR = BernardiRaugel(K, order, hierarchical=True).get_nodal_basis()
         reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
         BR = BR.take(list(range(reduced_dim)))
     else:
