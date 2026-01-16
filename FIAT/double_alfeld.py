@@ -17,7 +17,7 @@ from FIAT.jacobi import eval_jacobi_batch, eval_jacobi_deriv_batch
 
 
 class DoubleAlfeldDualSet(dual_set.DualSet):
-    def __init__(self, ref_complex, degree, quad_scheme=None):
+    def __init__(self, ref_complex, degree, reduced=False, quad_scheme=None):
         if degree < 5:
             raise ValueError("Double Alfeld only defined for degree >= 5")
         ref_el = ref_complex.get_parent()
@@ -38,7 +38,6 @@ class DoubleAlfeldDualSet(dual_set.DualSet):
             nodes.extend(PointDerivative(ref_el, pt, alpha) for i in range(1, order+1) for alpha in mis(sd, i))
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
-        reduced = False
         k = degree-1 if reduced else degree-4
         facet = ufc_simplex(1)
         Q_ref = parse_quadrature_scheme(facet, degree-2+k, quad_scheme)
@@ -74,14 +73,13 @@ class DoubleAlfeldDualSet(dual_set.DualSet):
 
 
 class DoubleAlfeld(finite_element.CiarletElement):
-    """The double Alfeld macroelement. For degree higher than 5, we implement the
-    super-smooth C^2 on a double barycentric split
-    See Section 7.5 of Lai & Schumacher
+    """The double Alfeld C^2 macroelement on a double barycentric split.
+    See Section 7.5 of Lai & Schumacher for the quintic C2 spline.
     """
-    def __init__(self, ref_el, degree=5, quad_scheme=None):
+    def __init__(self, ref_el, degree=5, reduced=False, quad_scheme=None):
         # Construct the quintic C2 spline on the double Alfeld split
         ref_complex = macro.AlfeldSplit(macro.AlfeldSplit(ref_el))
-        dual = DoubleAlfeldDualSet(ref_complex, degree, quad_scheme=quad_scheme)
+        dual = DoubleAlfeldDualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)
 
         # C3 on major split facets, C2 elsewhere
         order = {}
