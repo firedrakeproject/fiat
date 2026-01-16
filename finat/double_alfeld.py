@@ -29,7 +29,6 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
         J = coordinate_mapping.jacobian_at(bary)
         detJ = coordinate_mapping.detJ_at(bary)
         Thetainv = _jet_transform(J, 2)
-        JT = _jet_transform(J, 1)
 
         ns = coordinate_mapping.physical_normals()
         ts = coordinate_mapping.physical_tangents()
@@ -48,10 +47,6 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
 
             G = numpy.array([[u[e, j] for j in range(sd)] for u in (ns, ts)])
             Ghat = numpy.array([[u[e, j] for j in range(sd)] for u in (nhats, thats)])
-
-            B1 = (Ghat @ JT) @ G.T
-            alpha = B1[0, 1] / lens[e]
-
             Gamma = _jet_transform(G, 2)
             Gammainvhat = _jet_transform(Ghat.T, 2)
 
@@ -63,53 +58,51 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
                 Bnn = Bnn * lens[e]
 
             # first derivative moments
-            for k, eid in enumerate(emoments[1], start=1):
+            for k, s1 in enumerate(emoments[1], start=1):
                 # Derivative of Jacobi polynomial at the endpoints
                 dP1 = comb(k + vorder, k-1) * (2*vorder+k+1)
                 dP0 = (-1)**k * dP1
 
-                V[eid, eid] = B1[0, 0]
-                V[eid, vid0[0]] = dP0*alpha
-                V[eid, vid1[0]] = dP1*alpha
+                V[s1, s1] = Bnn
+                V[s1, vid0[0]] = dP0 * Bnt
+                V[s1, vid1[0]] = dP1 * Bnt
                 if k > 1:
-                    V[eid, emoments[0][k-2]] = -1 * alpha
+                    s0 = emoments[0][k-2]
+                    V[s1, s0] = -1 * Bnt
 
             # second derivative moments
-            for k, eid in enumerate(emoments[2]):
+            for k, s2 in enumerate(emoments[2]):
                 # Jacobi polynomial at the endpoints
                 P1 = comb(k + vorder, k)
                 P0 = -(-1)**k * P1
 
-                V[eid, eid] = B2[0, 0]
-                V[eid, vid0[1:sd+1]] = P0*beta
-                V[eid, vid1[1:sd+1]] = P1*beta
+                V[s2, s2] = B2[0, 0]
+                V[s2, vid0[1:sd+1]] = P0 * beta
+                V[s2, vid1[1:sd+1]] = P1 * beta
                 if k > 0:
-                    dP1 = comb(k + vorder, k-1) * (2*vorder+k+1)
-                    dP0 = (-1)**k * dP1
-
-                    V[eid, emoments[1][k-1]] = -2*alpha*Bnn
-                    V[eid, vid0[0]] = -dP0*alpha*Bnt
-                    V[eid, vid1[0]] = -dP1*alpha*Bnt
+                    s1 = emoments[1][k-1]
+                    V[s2, s1] = -2 * Bnt * V[s1, s1]
+                    V[s2, vid0[0]] = -1 * Bnt * V[s1, vid0[0]]
+                    V[s2, vid1[0]] = -1 * Bnt * V[s1, vid1[0]]
                 if k > 1:
-                    V[eid, emoments[0][k-2]] = alpha * alpha
+                    s0 = emoments[0][k-2]
+                    V[s2, s0] = -1 * Bnt * V[s1, s0]
 
         # Now let's fix the scaling.
         h = coordinate_mapping.cell_size()
         for v in top[0]:
-            # This gets the vertex gradients
-            vids = entity_ids[0][v][1:sd+1]
-            V[:, vids] *= 1 / h[v]
-            # this gets the vertex hessians
-            vids = entity_ids[0][v][sd+1:]
-            V[:, vids] *= 1 / (h[v] * h[v])
+            vids = entity_ids[0][v]
+            vjet = (vids[:1], vids[1:sd+1], vids[sd+1:])
+            # scale the gradients and hessians
+            V[:, vjet[1]] *= 1 / h[v]
+            V[:, vjet[2]] *= 1 / (h[v] * h[v])
 
         for e in top[1]:
+            eids = entity_ids[1][e]
+            emoments = (eids[:n0], eids[n0:n0+n1], eids[n0+n1:])
             he = (1/len(top[1][e])) * sum(h[v] for v in top[1][e])
-            # scale first derivative moments
-            eid = entity_ids[1][e][n0:(n0+n1)]
-            V[:, eid] *= 1 / he
-            # scale second derivative moments
-            eid = entity_ids[1][e][(n0+n1):]
-            V[:, eid] *= 1 / (he * he)
+            # scale first and second derivative moments
+            V[:, emoments[1]] *= 1 / he
+            V[:, emoments[2]] *= 1 / (he * he)
 
         return ListTensor(V.T)
