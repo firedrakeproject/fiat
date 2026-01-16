@@ -63,16 +63,16 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
                 Bnn = Bnn * lens[e]
 
             # first derivative moments
-            for k, eid in enumerate(emoments[1]):
+            for k, eid in enumerate(emoments[1], start=1):
                 # Derivative of Jacobi polynomial at the endpoints
-                P1 = comb(k+1 + vorder, k+1-1) * (2*vorder+k+1+1)
-                P0 = -(-1)**k * P1
+                dP1 = comb(k + vorder, k-1) * (2*vorder+k+1)
+                dP0 = (-1)**k * dP1
 
                 V[eid, eid] = B1[0, 0]
-                V[eid, vid0[0]] = P0*alpha
-                V[eid, vid1[0]] = P1*alpha
-                if k > 0:
-                    V[eid, emoments[0][k-1]] = -1 * alpha
+                V[eid, vid0[0]] = dP0*alpha
+                V[eid, vid1[0]] = dP1*alpha
+                if k > 1:
+                    V[eid, emoments[0][k-2]] = -1 * alpha
 
             # second derivative moments
             for k, eid in enumerate(emoments[2]):
@@ -84,12 +84,12 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
                 V[eid, vid0[1:sd+1]] = P0*beta
                 V[eid, vid1[1:sd+1]] = P1*beta
                 if k > 0:
-                    P1 = comb(k + vorder, k-1) * (2*vorder+k+1)
-                    P0 = -(-1)**(k+1) * P1
+                    dP1 = comb(k + vorder, k-1) * (2*vorder+k+1)
+                    dP0 = (-1)**k * dP1
 
                     V[eid, emoments[1][k-1]] = -2*alpha*Bnn
-                    V[eid, vid0[0]] = -P0*alpha*Bnt
-                    V[eid, vid1[0]] = -P1*alpha*Bnt
+                    V[eid, vid0[0]] = -dP0*alpha*Bnt
+                    V[eid, vid1[0]] = -dP1*alpha*Bnt
                 if k > 1:
                     V[eid, emoments[0][k-2]] = alpha * alpha
 
