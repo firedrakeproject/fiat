@@ -21,7 +21,12 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
         sd = self.cell.get_spatial_dimension()
         entity_ids = self._element.entity_dofs()
 
-        vorder = 2
+        # Detect the maximum derivative order of the vertex dofs
+        pt = self.cell.vertices[0]
+        nodes = self._element.dual_basis()
+        vorder = max(sum(node.deriv_dict[pt][0][1])
+                     for node in nodes if pt in node.deriv_dict)
+
         V = identity(self.space_dimension())
         _vertex_transform(V, vorder, self.cell, coordinate_mapping)
 
@@ -36,7 +41,7 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
         nhats = coordinate_mapping.reference_normals()
         thats = coordinate_mapping.normalized_reference_edge_tangents()
 
-        n0 = self.degree - 5
+        n0 = self.degree - 2*vorder - 1
         n1 = n0 + 1
         for e in top[1]:
             v0, v1 = top[1][e]
