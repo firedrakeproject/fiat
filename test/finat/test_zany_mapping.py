@@ -137,9 +137,10 @@ def test_C1_macroelements(ref_to_phys, element):
 @pytest.mark.parametrize("element, degree", [
     *((finat.Argyris, k) for k in range(5, 8)),
     *((finat.HsiehCloughTocher, k) for k in range(3, 6)),
-    *((finat.DoubleAlfeld, k) for k in range(5, 7)),
+    *((finat.AlfeldC2, k) for k in range(5, 7)),
+    *((finat.BrambleZlamalC2, k) for k in range(9, 11)),
 ])
-def test_high_order_C1_elements(ref_to_phys, element, degree):
+def test_high_order_Ck_elements(ref_to_phys, element, degree):
     check_zany_mapping(element, ref_to_phys[2], degree, avg=True)
 
 

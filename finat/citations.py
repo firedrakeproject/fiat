@@ -261,24 +261,24 @@ if petsctools is not None:
 """)
     petsctools.add_citation("Walkington2010", """
 @article{Walkington2010,
-author = {Walkington, Noel J.},
-title = {{A \\$C^1\\$ Tetrahedral Finite Element without Edge Degrees of Freedom}},
-journal = {SIAM Journal on Numerical Analysis},
-volume = {52},
-number = {1},
-pages = {330-342},
-year = {2014},
-doi = {10.1137/130912013},
+  author = {Walkington, Noel J.},
+  title = {{A \\$C^1\\$ Tetrahedral Finite Element without Edge Degrees of Freedom}},
+  journal = {SIAM Journal on Numerical Analysis},
+  volume = {52},
+  number = {1},
+  pages = {330-342},
+  year = {2014},
+  doi = {10.1137/130912013},
 }""")
     petsctools.add_citation("WuXu2019", """
 @article{WuXu2019,
-title={Nonconforming finite element spaces for $2m^{\\mathrm{th}}$ order partial differential equations on $\\mathbb{R}^n$ simplicial grids when $\\mathbb{m} = \\mathbb{n} + 1$},
-author={Wu, Shuonan and Xu, Jinchao},
-journal={Mathematics of Computation},
-volume={88},
-number={316},
-pages={531--551},
-year={2019}
+  title={Nonconforming finite element spaces for $2m^{\\mathrm{th}}$ order partial differential equations on $\\mathbb{R}^n$ simplicial grids when $\\mathbb{m} = \\mathbb{n} + 1$},
+  author={Wu, Shuonan and Xu, Jinchao},
+  journal={Mathematics of Computation},
+  volume={88},
+  number={316},
+  pages={531--551},
+  year={2019}
 }""")
     petsctools.add_citation("Alfeld1984", """
 @article{Alfeld1984,
@@ -290,4 +290,14 @@ year={2019}
   pages={257--267},
   year={1984},
   publisher={Elsevier}
+}""")
+    petsctools.add_citation("BrambleZlamal1970", """
+@article{BrambleZlamal1970,
+  title={Triangular elements in the finite element method},
+  author={Bramble, James H and Zl{\'a}mal, Milo{\v{s}}},
+  journal={Mathematics of Computation},
+  volume={24},
+  number={112},
+  pages={809--820},
+  year={1970}
 }""")

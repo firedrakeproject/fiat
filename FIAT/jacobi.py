@@ -89,7 +89,7 @@ def eval_jacobi_deriv_batch(a, b, n, xs, order=1):
     rows correspond to the Jacobi polynomials and the
     columns correspond to the points."""
     results = numpy.zeros((n + 1, len(xs)), xs.dtype)
-    if n-order+1 == 0:
+    if n+1 <= order:
         return results
     else:
         results[order:, :] = eval_jacobi_batch(a + order, b + order, n - order, xs)

@@ -17,6 +17,11 @@ from FIAT.jacobi import eval_jacobi_batch, eval_jacobi_deriv_batch
 
 
 class C2DualSet(dual_set.DualSet):
+    """A DualSet for triangular C2 elements.
+
+    By default, this imposes C4 continuity at vertices for non-macroelements,
+    and the minimal C2 continuity for macroelements.
+    """
     def __init__(self, ref_complex, degree, vorder=None, reduced=False, quad_scheme=None):
         if vorder is None:
             vorder = 2 if ref_complex.is_macrocell() else 4
@@ -78,21 +83,34 @@ class C2DualSet(dual_set.DualSet):
         super().__init__(nodes, ref_el, entity_ids)
 
 
-class DoubleAlfeld(finite_element.CiarletElement):
-    """The double Alfeld C^2 macroelement on a double barycentric split.
+class BrambleZlamalC2(finite_element.CiarletElement):
+    """The Bramble-Zlamal C2 element."""
+    def __init__(self, ref_el, degree=9, reduced=False, quad_scheme=None):
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        dual = C2DualSet(ref_el, degree, reduced=reduced, quad_scheme=quad_scheme)
+        super().__init__(poly_set, dual, degree, formdegree=0)
+
+
+def AlfeldC2Space(ref_el, degree):
+    """Construct the generalization of the quintic C2 spline on the double Alfeld split."""
+    # Construct the double Alfeld split by splitting twice
+    ref_complex = macro.AlfeldSplit(macro.AlfeldSplit(ref_el))
+    # C3 on major split facets, C2 elsewhere
+    order = {}
+    order[1] = dict.fromkeys(ref_complex.get_interior_facets(1), 2)
+    order[1].update(dict.fromkeys(range(3, 6), degree-2))
+    # C4 at minor split barycenters, C3 at major split barycenter
+    order[0] = dict.fromkeys(ref_complex.get_interior_facets(0), degree-1)
+    order[0][3] = degree-2
+    return macro.CkPolynomialSet(ref_complex, degree, order=order, variant="bubble")
+
+
+class AlfeldC2(finite_element.CiarletElement):
+    """The Alfeld C^2 macroelement on a double barycentric split.
     See Section 7.5 of Lai & Schumacher for the quintic C^2 spline.
     """
     def __init__(self, ref_el, degree=5, reduced=False, quad_scheme=None):
-        # Construct the quintic C2 spline on the double Alfeld split
-        ref_complex = macro.AlfeldSplit(macro.AlfeldSplit(ref_el))
-        # C3 on major split facets, C2 elsewhere
-        order = {}
-        order[1] = dict.fromkeys(ref_complex.get_interior_facets(1), 2)
-        order[1].update(dict.fromkeys(range(3, 6), degree-2))
-        # C4 at minor split barycenters, C3 at major split barycenter
-        order[0] = dict.fromkeys(ref_complex.get_interior_facets(0), degree-1)
-        order[0][3] = degree-2
-        poly_set = macro.CkPolynomialSet(ref_complex, degree, order=order, variant="bubble")
-
+        poly_set = AlfeldC2Space(ref_el, degree)
+        ref_complex = poly_set.get_reference_element()
         dual = C2DualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)
         super().__init__(poly_set, dual, degree, formdegree=0)

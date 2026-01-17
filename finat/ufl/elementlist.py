@@ -118,6 +118,7 @@ register_element("Bell", "BELL", 0, H2, "custom", (5, 5), ("triangle",))
 register_element("Morley", "MOR", 0, H2, "custom", (2, 2), simplices[1:])
 register_element("Nonconforming Wu-Xu", "WXnc", 0, H3, "custom", (4, 4), ("triangle",))
 register_element("Nonconforming Robust Wu-Xu", "WXncr", 0, H3, "custom", (7, 7), ("triangle",))
+register_element("Bramble-Zlamal C2", "BZ2", 0, H3, "custom", (9, None), ("triangle",))
 
 # Macro elements
 register_element("QuadraticPowellSabin6", "PS6", 0, H2, "custom", (2, 2), ("triangle",))
@@ -126,7 +127,7 @@ register_element("Hsieh-Clough-Tocher", "HCT", 0, H2, "custom", (3, None), ("tri
 register_element("Reduced-Hsieh-Clough-Tocher", "HCT-red", 0, H2, "custom", (3, 3), ("triangle",))
 register_element("Johnson-Mercier", "JM", 2, HDiv, "double contravariant Piola", (1, 1), simplices[1:])
 register_element("Walkington", "WALK", 0, H2, "custom", (5, 5), ("tetrahedron",))
-register_element("Double Alfeld", "DALF", 0, H3, "custom", (5, None), ("triangle",))
+register_element("Alfeld C2", "ALF2", 0, H3, "custom", (5, None), ("triangle",))
 
 register_element("Arnold-Qin", "AQ", 1, H1, "identity", (2, 2), ("triangle",))
 register_element("Reduced-Arnold-Qin", "AQ-red", 1, H1, "contravariant Piola", (2, 2), ("triangle",))

@@ -10,11 +10,7 @@ import numpy
 from math import comb
 
 
-class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
-    def __init__(self, cell, degree=5, avg=True):
-        cite("Alfeld1984")
-        self.avg = avg
-        super().__init__(FIAT.DoubleAlfeld(cell, degree))
+class C2Element(PhysicallyMappedElement):
 
     def basis_transformation(self, coordinate_mapping):
         top = self.cell.topology
@@ -22,10 +18,8 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
         entity_ids = self._element.entity_dofs()
 
         # Detect the maximum derivative order of the vertex dofs
-        pt = self.cell.vertices[0]
         nodes = self._element.dual_basis()
-        vorder = max(sum(node.deriv_dict[pt][0][1])
-                     for node in nodes if pt in node.deriv_dict)
+        vorder = max(nodes[i].max_deriv_order for i in entity_ids[0][0])
 
         V = identity(self.space_dimension())
         _vertex_transform(V, vorder, self.cell, coordinate_mapping)
@@ -97,10 +91,15 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
         h = coordinate_mapping.cell_size()
         for v in top[0]:
             vids = entity_ids[0][v]
-            vjet = (vids[:1], vids[1:sd+1], vids[sd+1:])
-            # scale the gradients and hessians
-            V[:, vjet[1]] *= 1 / h[v]
-            V[:, vjet[2]] *= 1 / (h[v] * h[v])
+            scale = 1 / h[v]
+            F = scale
+            iend = 1
+            # scale the jet at vertices
+            for k in range(1, vorder+1):
+                istart = iend
+                iend = istart + comb(k+sd-1, sd-1)
+                V[:, vids[istart:iend]] *= F
+                F *= scale
 
         for e in top[1]:
             eids = entity_ids[1][e]
@@ -111,3 +110,17 @@ class DoubleAlfeld(PhysicallyMappedElement, ScalarFiatElement):
             V[:, emoments[2]] *= 1 / (he * he)
 
         return ListTensor(V.T)
+
+
+class BrambleZlamalC2(C2Element, ScalarFiatElement):
+    def __init__(self, cell, degree=9, avg=True):
+        cite("BrambleZlamal1970")
+        self.avg = avg
+        super().__init__(FIAT.BrambleZlamalC2(cell, degree))
+
+
+class AlfeldC2(C2Element, ScalarFiatElement):
+    def __init__(self, cell, degree=5, avg=True):
+        cite("Alfeld1984")
+        self.avg = avg
+        super().__init__(FIAT.AlfeldC2(cell, degree))
