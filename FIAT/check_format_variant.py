@@ -1,7 +1,7 @@
 import re
 
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.macro import IsoSplit, AlfeldSplit, WorseyFarinSplit, PowellSabinSplit, PowellSabin12Split
+from FIAT.macro import IsoSplit, AlfeldSplit, WorseyFarinSplit, PowellSabinSplit, PowellSabin12Split, WangSplit
 
 # dicts mapping Lagrange variant names to recursivenodes family names
 supported_cg_variants = {
@@ -24,6 +24,7 @@ supported_splits = {
     "worsey-farin": WorseyFarinSplit,
     "powell-sabin": PowellSabinSplit,
     "powell-sabin(12)": PowellSabin12Split,
+    "wang": WangSplit,
 }
 
 

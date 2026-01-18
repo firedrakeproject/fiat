@@ -71,6 +71,9 @@ class C2DualSet(dual_set.DualSet):
 
             # Interior moments against a basis for Pq
             q = degree - 3 * (vorder // 2 + 1)
+            if isinstance(ref_complex, macro.WangSplit):
+                # Wang needs extra DOFs on the interior
+                q += 3
             if q >= 0:
                 Q = parse_quadrature_scheme(ref_complex, degree + q, quad_scheme)
                 Pq = polynomial_set.ONPolynomialSet(ref_el, q, scale=1)
@@ -111,6 +114,27 @@ class AlfeldC2(finite_element.CiarletElement):
     """
     def __init__(self, ref_el, degree=5, reduced=False, quad_scheme=None):
         poly_set = AlfeldC2Space(ref_el, degree)
+        ref_complex = poly_set.get_reference_element()
+        dual = C2DualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)
+        super().__init__(poly_set, dual, degree, formdegree=0)
+
+
+def WangC2Space(ref_el, degree):
+    """Construct the generalization of the quintic C2 spline on the double Alfeld split."""
+    # Construct the Wang split
+    ref_complex = macro.WangSplit(ref_el)
+    order = {}
+    order[1] = dict.fromkeys(ref_complex.get_interior_facets(1), 2)
+    order[0] = dict.fromkeys(ref_complex.get_interior_facets(0), degree-2)
+    return macro.CkPolynomialSet(ref_complex, degree, order=order, variant="bubble")
+
+
+class WangC2(finite_element.CiarletElement):
+    """The Wang C^2 macroelement.
+    See Section 7.6 of Lai & Schumacher for the quintic C^2 spline.
+    """
+    def __init__(self, ref_el, degree=5, reduced=False, quad_scheme=None):
+        poly_set = WangC2Space(ref_el, degree)
         ref_complex = poly_set.get_reference_element()
         dual = C2DualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)
         super().__init__(poly_set, dual, degree, formdegree=0)

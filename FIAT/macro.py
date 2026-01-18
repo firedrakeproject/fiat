@@ -336,6 +336,44 @@ class WorseyFarinSplit(PowellSabinSplit):
         super().__init__(ref_el, dimension=sd-1)
 
 
+class WangSplit(SplitSimplicialComplex):
+    """Splits a simplicial complex by introducing a simplex inside each simplex and
+    replacing each vertex of an original simplex with those of its inner simplex.
+    """
+    def __init__(self, ref_el):
+        sd = ref_el.get_spatial_dimension()
+        top = ref_el.get_topology()
+
+        alpha = 1/((sd+1)**2)
+        beta = (1-alpha) / sd
+        bary = numpy.full((sd+1, sd+1), beta)
+        numpy.fill_diagonal(bary, alpha)
+
+        bary[0] = (1/7, 4/7, 2/7)
+        bary[1] = (2/7, 1/7, 4/7)
+        bary[2] = (4/7, 2/7, 1/7)
+
+        cells = []
+        new_verts = list(ref_el.get_vertices())
+        for cell in top[sd]:
+            cur = len(new_verts)
+            verts = ref_el.get_vertices_of_subcomplex(top[sd][cell])
+            new_verts.extend(map(tuple, bary_to_xy(verts, bary)))
+            for i in range(1, 2**(sd+1)):
+                subcell = list(top[sd][cell])
+                for k in range(sd+1):
+                    if i & 2**k:
+                        subcell[k] = cur + k
+                cells.append(tuple(sorted(subcell)))
+
+        topology = {}
+        topology[sd] = dict(enumerate(sorted(cells)))
+        for dim in reversed(range(sd)):
+            entities = set(chain.from_iterable(combinations(cell, dim+1) for cell in cells))
+            topology[dim] = dict(enumerate(sorted(entities)))
+        super().__init__(ref_el, new_verts, topology)
+
+
 class PowellSabin12Split(SplitSimplicialComplex):
     """Splits a triangle (only!) by connecting each vertex to the opposite
     edge midpoint and edge midpoints to each other.
