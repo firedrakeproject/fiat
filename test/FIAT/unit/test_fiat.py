@@ -53,6 +53,7 @@ from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.hct import HsiehCloughTocher                          # noqa: F401
+from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2          # noqa: F401
 from FIAT.alfeld_sorokina import AlfeldSorokina                 # noqa: F401
 from FIAT.arnold_qin import ArnoldQin                           # noqa: F401
 from FIAT.christiansen_hu import ChristiansenHu                 # noqa: F401
@@ -369,6 +370,8 @@ elements = [
     "KongMulderVeldhuizen(T,4)",
     "KongMulderVeldhuizen(T,5)",
     "KongMulderVeldhuizen(T,6)",
+    "BrambleZlamalC2(T, 9)",
+    "BrambleZlamalC2(T, 10)",
 
     # Macroelements
     "Lagrange(T, 1, 'iso')",
@@ -376,6 +379,8 @@ elements = [
     "Lagrange(T, 2, 'alfeld')",
     "DiscontinuousLagrange(T, 1, 'alfeld')",
     "HsiehCloughTocher(T)",
+    "AlfeldC2(T, 5)",
+    "AlfeldC2(T, 6)",
     "JohnsonMercier(T)",
     "JohnsonMercier(S)",
     "AlfeldSorokina(T)",
