@@ -110,7 +110,6 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
             cur += 1
         self._entity_dofs = reduced_dofs
         self._space_dimension = fiat_element.space_dimension() - reduced_dim
-        self._coordinate_mapping = None
 
     def entity_dofs(self):
         return self._entity_dofs
@@ -174,7 +173,7 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                 nhat = perp(*self.cell.compute_tangents(sd-1, f))
                 Tfv = ((-1/sd) * nhat) @ Finv
                 for v in self.cell.connectivity[(sd-1, dim)][f]:
-                    curvdofs = [vdofs.index(i) for i in dofs[dim][v] if not nodes[i].deriv_dict]
+                    curvdofs = [vdofs.index(i) for i in dofs[dim][v] if i in vdofs]
                     for fdof in dofs[sd-1][f]:
                         T[fdofs.index(fdof), curvdofs] = Tfv
 
