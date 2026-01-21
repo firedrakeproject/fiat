@@ -10,7 +10,9 @@ from finat.citations import cite
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
     """Abstract class for elements that require physical information
     either to map or construct their basis functions."""
-    pass
+
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        raise NotImplementedError(f"Dual evaluation for {type(self).__name__} is not implemented.")
 
 
 class MappedTabulation(Mapping):
@@ -68,9 +70,6 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
         :arg coordinate_mapping: Object providing physical geometry."""
         pass
-
-    def dual_transformation(self, Q, coordinate_mapping=None):
-        raise NotImplementedError(f"Dual evaluation for {type(self).__name__} is not implemented.")
 
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
