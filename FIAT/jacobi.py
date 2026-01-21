@@ -83,7 +83,7 @@ def eval_jacobi_deriv(a, b, n, x):
 
 
 def eval_jacobi_deriv_batch(a, b, n, xs, order=1):
-    """Evaluates the first derivatives of all jacobi polynomials with
+    """Evaluates the derivative of the given order of all jacobi polynomials with
     weights a,b up to degree n.  xs is a numpy.array of points.
     Returns a two-dimensional array of points, where the
     rows correspond to the Jacobi polynomials and the
