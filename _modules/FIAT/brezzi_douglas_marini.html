@@ -44,7 +44,7 @@
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">finite_element</span><span class="p">,</span> <span class="n">functional</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span>
-                  <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">nedelec</span><span class="p">)</span>
+                  <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">nedelec</span><span class="p">,</span> <span class="n">macro</span><span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">check_format_variant</span><span class="p">,</span> <span class="n">parse_quadrature_scheme</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
@@ -144,7 +144,12 @@
             <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;BDM_k elements only valid for k &gt;= 1&quot;</span><span class="p">)</span>
 
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">))</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
+            <span class="n">base_element</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent</span><span class="p">(),</span> <span class="n">degree</span><span class="p">)</span>
+            <span class="n">poly_set</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">MacroPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">base_element</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="p">))</span>
+
         <span class="n">dual</span> <span class="o">=</span> <span class="n">BDMDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># (n-1)-form</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
