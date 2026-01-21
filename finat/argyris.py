@@ -31,14 +31,15 @@ def _jet_transform(J, order):
         mapping[indices] = alphas.index(alpha)
     # Inverse mapping
     imapping = {v: k for k, v in mapping.items()}
-   # Get the transformation for a covariant tensor.
-   # We take the outer product, as each index maps with the Jacobian.
+
+    # Get the transformation for a covariant tensor.
+    # We take the outer product, as each index maps with the Jacobian.
     Jnp = numpy.asarray([[J[i, j] for j in range(sd)] for i in range(sd)])
     Jprod = Jnp
     for i in range(1, order):
         Jprod = Jprod[..., None, None] * Jnp
 
-   # Deal with symmetries by contracting along linearly-dependent components.
+    # Deal with symmetries by contracting along linearly-dependent components.
     B = numpy.full((len(alphas), len(alphas)), Zero(), dtype=object)
     for i, ii in imapping.items():
         for jj, j in mapping.items():
