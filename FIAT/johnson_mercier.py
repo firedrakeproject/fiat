@@ -26,11 +26,10 @@ class JohnsonMercierDualSet(dual_set.DualSet):
         phis = P.tabulate(Qref.get_points())[(0,) * dim]
         for f in sorted(top[dim]):
             cur = len(nodes)
-            Q = FacetQuadratureRule(ref_el, dim, f, Qref)
+            Q = FacetQuadratureRule(ref_el, dim, f, Qref, avg=True)
             thats = ref_el.compute_tangents(dim, f)
             nhat = numpy.dot(R, *thats) if sd == 2 else numpy.cross(*thats)
-            normal = nhat / Q.jacobian_determinant()
-            nodes.extend(TensorBidirectionalIntegralMoment(ref_el, normal, comp, Q, phi)
+            nodes.extend(TensorBidirectionalIntegralMoment(ref_el, nhat, comp, Q, phi)
                          for phi in phis for comp in (nhat, *thats))
             entity_ids[dim][f].extend(range(cur, len(nodes)))
 
