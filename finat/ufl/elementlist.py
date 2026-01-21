@@ -120,6 +120,7 @@ register_element("Nonconforming Wu-Xu", "WXnc", 0, H3, "custom", (4, 4), ("trian
 register_element("Nonconforming Robust Wu-Xu", "WXncr", 0, H3, "custom", (7, 7), ("triangle",))
 register_element("Bramble-Zlamal C2", "BZ-C2", 0, H3, "custom", (9, None), ("triangle",))
 
+
 # Macro elements
 register_element("QuadraticPowellSabin6", "PS6", 0, H2, "custom", (2, 2), ("triangle",))
 register_element("QuadraticPowellSabin12", "PS12", 0, H2, "custom", (2, 2), ("triangle",))
