@@ -171,8 +171,10 @@ class TensorFiniteElement(FiniteElementBase):
         tQ = gem.ComponentTensor(Qi*deltas, index_ordering)
         return tQ, points
 
-    def dual_evaluation(self, fn):
+    def dual_evaluation(self, fn, coordinate_mapping=None):
         tQ, x = self.dual_basis
+        tQ = self._base_element.dual_transformation(tQ, coordinate_mapping)
+
         expr = fn(x)
         # Apply targeted sum factorisation and delta elimination to
         # the expression
