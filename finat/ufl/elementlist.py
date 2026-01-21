@@ -22,7 +22,7 @@ import warnings
 from numpy import asarray
 
 from ufl.cell import Cell, TensorProductCell
-from ufl.sobolevspace import H1, H2, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
+from ufl.sobolevspace import H1, H2, H3, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
 from ufl.utils.formatting import istr
 
 # List of valid elements
@@ -116,6 +116,8 @@ register_element("Hermite", "HER", 0, H1, "custom", (3, 3), simplices)
 register_element("Argyris", "ARG", 0, H2, "custom", (5, None), ("triangle",))
 register_element("Bell", "BELL", 0, H2, "custom", (5, 5), ("triangle",))
 register_element("Morley", "MOR", 0, H2, "custom", (2, 2), simplices[1:])
+register_element("Nonconforming Wu-Xu", "WXnc", 0, H3, "custom", (4, 4), ("triangle",))
+register_element("Nonconforming Robust Wu-Xu", "WXncr", 0, H3, "custom", (7, 7), ("triangle",))
 
 # Macro elements
 register_element("QuadraticPowellSabin6", "PS6", 0, H2, "custom", (2, 2), ("triangle",))

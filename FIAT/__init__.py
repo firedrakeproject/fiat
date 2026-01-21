@@ -62,6 +62,7 @@ from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
+from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC
 from FIAT.walkington import Walkington
 from FIAT.histopolation import Histopolation
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
@@ -88,6 +89,8 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
+                      "Nonconforming Wu-Xu": WuXuH3NC,
+                      "Nonconforming Robust Wu-Xu": WuXuRobustH3NC,
                       "Hsieh-Clough-Tocher": HsiehCloughTocher,
                       "QuadraticPowellSabin6": QuadraticPowellSabin6,
                       "QuadraticPowellSabin12": QuadraticPowellSabin12,
