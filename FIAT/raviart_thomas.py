@@ -148,7 +148,7 @@ class RaviartThomas(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         if ref_el.is_macrocell():
-            base_element = RaviartThomas(ref_el.get_parent(), degree)
+            base_element = type(self)(ref_el.get_parent(), degree)
             poly_set = macro.MacroPolynomialSet(ref_el, base_element)
         else:
             poly_set = RTSpace(ref_el, degree)

@@ -10,7 +10,7 @@
 # Last changed: 2010-01-28
 
 import numpy
-from FIAT import finite_element, polynomial_set, dual_set, functional
+from FIAT import finite_element, polynomial_set, dual_set, functional, macro
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.quadrature import FacetQuadratureRule
 
@@ -85,6 +85,11 @@ class CrouzeixRaviart(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+
         dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg, quad_scheme)
         super().__init__(poly_set, dual, degree)
