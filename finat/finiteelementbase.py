@@ -242,7 +242,7 @@ class FiniteElementBase(metaclass=ABCMeta):
             f"Dual basis not defined for element {type(self).__name__}"
         )
 
-    def dual_evaluation(self, fn):
+    def dual_evaluation(self, fn, coordinate_mapping=None):
         '''Get a GEM expression for performing the dual basis evaluation at
         the nodes of the reference element. Currently only works for flat
         elements: tensor elements are implemented in
@@ -252,6 +252,9 @@ class FiniteElementBase(metaclass=ABCMeta):
                    Callable should take in an :class:`AbstractPointSet` and
                    return a GEM expression for evaluation of the function at
                    those points.
+        :param coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
         :returns: A tuple ``(dual_evaluation_gem_expression, basis_indices)``
                   where the given ``basis_indices`` are those needed to form a
                   return expression for the code which is compiled from
@@ -259,6 +262,7 @@ class FiniteElementBase(metaclass=ABCMeta):
                   multiindices already encoded within ``fn``)
         '''
         Q, x = self.dual_basis
+        Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
 
         expr = fn(x)
         # Apply targeted sum factorisation and delta elimination to
@@ -279,6 +283,21 @@ class FiniteElementBase(metaclass=ABCMeta):
         # Really need to do a more targeted job here.
         evaluation = gem.optimise.contraction(evaluation, shape_indices)
         return evaluation, basis_indices
+
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        """Recombination of degrees of freedom in the physical cell.
+
+        Usually only required for elements with mixed mappings, e.g.
+        vertex DoFs are affine-invariant and face DoFs are contravariant.
+
+        :param Q: The quadratures weight matrix in dual_basis
+            that maps quadrature points to degrees of freedom.
+        :param coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
+        :returns: The transformed quadrature weight matrix.
+        """
+        return Q
 
     @abstractproperty
     def mapping(self):

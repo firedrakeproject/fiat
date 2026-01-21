@@ -227,6 +227,9 @@ class FiatElement(FiniteElementBase):
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
                 Qdense[idx] = value
+
+            if Qdense.shape[0] != self.space_dimension():
+                Qdense = Qdense[:self.space_dimension()]
             Q = gem.Literal(Qdense)
         return Q, np.asarray(allpts)
 

@@ -110,6 +110,7 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
             cur += 1
         self._entity_dofs = reduced_dofs
         self._space_dimension = fiat_element.space_dimension() - reduced_dim
+        self._coordinate_mapping = None
 
     def entity_dofs(self):
         return self._entity_dofs
@@ -178,4 +179,23 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                         T[fdofs.index(fdof), curvdofs] = Tfv
 
             V[ndof:, vdofs] += V[ndof:, fdofs] @ T
+        self._coordinate_mapping = coordinate_mapping
         return ListTensor(V.T)
+
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        sd = self.cell.get_spatial_dimension()
+        bary, = self.cell.make_points(sd, 0, sd+1)
+        J = coordinate_mapping.jacobian_at(bary)
+        detJ = coordinate_mapping.detJ_at(bary)
+
+        # undo the Piola mapping at vertices
+        F = J / detJ
+        F = numpy.array([[F[i, j] for j in range(sd)] for i in range(sd)])
+
+        M = identity(self.space_dimension())
+        entity_ids = self.entity_dofs()
+        for v in entity_ids[0]:
+            vids = entity_ids[0][v]
+            M[numpy.ix_(vids, vids)] = F
+        M = ListTensor(M)
+        return M @ Q
