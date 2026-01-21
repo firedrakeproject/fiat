@@ -168,7 +168,6 @@ class WuXuH3NCDualSet(dual_set.DualSet):
             Q = FacetQuadratureRule(ref_el, 1, e, Q_ref, avg=True)
             cur = len(nodes)
             nodes.append(IntegralMomentOfDerivative(ref_el, Q, f, n, n))
-
             entity_ids[1][e].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
