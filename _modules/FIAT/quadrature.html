@@ -63,7 +63,7 @@
 
 <div class="viewcode-block" id="map_quadrature">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature.map_quadrature">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">source_cell</span><span class="p">,</span> <span class="n">target_cell</span><span class="p">,</span> <span class="n">jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">source_cell</span><span class="p">,</span> <span class="n">target_cell</span><span class="p">,</span> <span class="n">jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Map quadrature points and weights defined on source_cell to target_cell.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">while</span> <span class="n">source_cell</span><span class="o">.</span><span class="n">get_parent</span><span class="p">():</span>
@@ -72,10 +72,12 @@
                                                  <span class="n">target_cell</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">())</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts_ref</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
         <span class="n">pts_ref</span> <span class="o">=</span> <span class="n">pts_ref</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-    <span class="n">scale</span> <span class="o">=</span> <span class="n">pseudo_determinant</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
     <span class="n">pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">A</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
     <span class="n">pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">pts</span><span class="p">)</span>
-    <span class="n">wts</span> <span class="o">=</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">wts_ref</span>
+    <span class="k">if</span> <span class="n">avg</span><span class="p">:</span>
+        <span class="n">wts</span> <span class="o">=</span> <span class="n">wts_ref</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">wts</span> <span class="o">=</span> <span class="n">wts_ref</span> <span class="o">*</span> <span class="n">pseudo_determinant</span><span class="p">(</span><span class="n">A</span><span class="p">)</span>
 
     <span class="c1"># return immutable types</span>
     <span class="n">pts</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">pts</span><span class="p">))</span>
@@ -275,7 +277,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">FacetQuadratureRule</span><span class="p">(</span><span class="n">QuadratureRule</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A quadrature rule on a facet mapped from a reference quadrature rule.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">,</span> <span class="n">entity_id</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="c1"># Construct the facet of interest</span>
         <span class="n">facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">entity_dim</span><span class="p">)</span>
         <span class="n">facet_topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()[</span><span class="n">entity_dim</span><span class="p">][</span><span class="n">entity_id</span><span class="p">]</span>
@@ -284,7 +286,7 @@
         <span class="c1"># Map reference points and weights on the appropriate facet</span>
         <span class="n">pts_ref</span> <span class="o">=</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
         <span class="n">wts_ref</span> <span class="o">=</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
-        <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="n">J</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">jacobian</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="n">J</span> <span class="o">=</span> <span class="n">map_quadrature</span><span class="p">(</span><span class="n">pts_ref</span><span class="p">,</span> <span class="n">wts_ref</span><span class="p">,</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">jacobian</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="n">avg</span><span class="p">)</span>
 
         <span class="c1"># Initialize super class with new points and weights</span>
         <span class="n">QuadratureRule</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">facet</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">wts</span><span class="p">)</span>

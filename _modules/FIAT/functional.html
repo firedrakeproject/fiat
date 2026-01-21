@@ -51,9 +51,10 @@
 <span class="c1"># - type information</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">jacobi</span><span class="p">,</span> <span class="n">quadrature_schemes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">jacobi</span><span class="p">,</span> <span class="n">quadrature</span><span class="p">,</span> <span class="n">quadrature_schemes</span>
 
 
 <div class="viewcode-block" id="Functional">
@@ -327,21 +328,16 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">PointSecondDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents d/ds1 d/ds2 at a point.&quot;&quot;&quot;</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">,</span> <span class="n">pt</span><span class="p">,</span> <span class="n">comp</span><span class="o">=</span><span class="p">(),</span> <span class="n">shp</span><span class="o">=</span><span class="p">(),</span> <span class="n">nm</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">S</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">)</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">tau</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">sd</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span><span class="p">,))</span>
-
-        <span class="n">alphas</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">sd</span><span class="p">):</span>
-                <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
+        <span class="n">tau</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">index</span><span class="p">:</span>
                 <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-                <span class="n">alpha</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-                <span class="n">alphas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">))</span>
-                <span class="n">tau</span><span class="p">[</span><span class="n">cur</span><span class="p">]</span> <span class="o">=</span> <span class="n">s1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">s2</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">!=</span> <span class="n">j</span><span class="p">)</span> <span class="o">*</span> <span class="n">s2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">s1</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
-                <span class="n">cur</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">tau</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">)]</span> <span class="o">+=</span> <span class="n">S</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
 
-        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">tau</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">comp</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">))]}</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">tau</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">comp</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">tau</span><span class="p">]}</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="n">nm</span> <span class="ow">or</span> <span class="s2">&quot;PointSecondDeriv&quot;</span><span class="p">)</span></div>
 
@@ -420,88 +416,55 @@
 <div class="viewcode-block" id="IntegralMomentOfDerivative">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfDerivative">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Functional giving directional derivative integrated against some function on a facet.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Functional giving multi-directional derivative integrated against some function.</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">comp</span><span class="o">=</span><span class="p">(),</span> <span class="n">shp</span><span class="o">=</span><span class="p">()):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
+<span class="sd">    :arg ref_el: a :class:`Cell`.</span>
+<span class="sd">    :arg Q: a :class:`QuadratureRule`.</span>
+<span class="sd">    :arg f_at_qpts: an array tabulating the function f at the quadrature</span>
+<span class="sd">         points.</span>
+<span class="sd">    :arg *directions: a list of vectors of directions of differentiation.</span>
+<span class="sd">    :arg comp: Optional argument indicating that only a particular</span>
+<span class="sd">         component of the input function should be integrated against f</span>
+<span class="sd">    :arg shp: Optional argument giving the value shape of input functions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="o">*</span><span class="n">directions</span><span class="p">,</span> <span class="n">comp</span><span class="o">=</span><span class="p">(),</span> <span class="n">shp</span><span class="o">=</span><span class="p">(),</span> <span class="n">nm</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comp</span> <span class="o">=</span> <span class="n">comp</span>
+
+        <span class="n">S</span> <span class="o">=</span> <span class="n">directions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">dj</span> <span class="ow">in</span> <span class="n">directions</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="n">S</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">dj</span><span class="p">)</span>
 
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">tau</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">S</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">index</span><span class="p">:</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">tau</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">)]</span> <span class="o">+=</span> <span class="n">S</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
 
         <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
         <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-
-        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
-        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">s</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">comp</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">tau</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">comp</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">tau</span><span class="p">]</span>
                     <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
 
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span>
-                         <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;IntegralMomentOfDerivative&quot;</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">shp</span><span class="p">,</span> <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="n">nm</span> <span class="ow">or</span> <span class="s2">&quot;IntegralMomentOfDerivative&quot;</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="IntegralMomentOfNormalDerivative">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfNormalDerivative">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfNormalDerivative</span><span class="p">(</span><span class="n">IntegralMomentOfDerivative</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Functional giving normal derivative integrated against some function on a facet.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">n</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet_no</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">n</span> <span class="o">=</span> <span class="n">n</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
-
-        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">Q_face</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">):</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">facet_no</span><span class="p">)</span>
         <span class="c1"># map points onto facet</span>
-        <span class="n">transform</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">)</span>
-        <span class="n">points</span> <span class="o">=</span> <span class="n">transform</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dpts</span> <span class="o">=</span> <span class="n">points</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-
-        <span class="n">alphas</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)))</span>
-        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">n</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
-                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span>
-                         <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;IntegralMomentOfNormalDerivative&quot;</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="IntegralMomentOfBidirectionalDerivative">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.functional.IntegralMomentOfBidirectionalDerivative">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">IntegralMomentOfBidirectionalDerivative</span><span class="p">(</span><span class="n">Functional</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Functional giving second derivative integrated against some function on a facet.&quot;&quot;&quot;</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="n">s2</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">f_at_qpts</span> <span class="o">=</span> <span class="n">f_at_qpts</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">Q</span> <span class="o">=</span> <span class="n">Q</span>
-
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-
-        <span class="c1"># map points onto facet</span>
-        <span class="n">points</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dpts</span> <span class="o">=</span> <span class="n">points</span>
-        <span class="n">weights</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
-
-        <span class="n">tau</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">sd</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span><span class="p">,))</span>
-        <span class="n">alphas</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">sd</span><span class="p">):</span>
-                <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
-                <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-                <span class="n">alpha</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-                <span class="n">alphas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">))</span>
-                <span class="n">tau</span><span class="p">[</span><span class="n">cur</span><span class="p">]</span> <span class="o">=</span> <span class="n">s1</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">s2</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">!=</span> <span class="n">j</span><span class="p">)</span> <span class="o">*</span> <span class="n">s2</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">s1</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
-                <span class="n">cur</span> <span class="o">+=</span> <span class="mi">1</span>
-
-        <span class="n">dpt_dict</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">):</span> <span class="p">[(</span><span class="n">wt</span><span class="o">*</span><span class="n">tau</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">alphas</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">())</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">))]</span>
-                    <span class="k">for</span> <span class="n">pt</span><span class="p">,</span> <span class="n">wt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="p">)}</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(),</span>
-                         <span class="p">{},</span> <span class="n">dpt_dict</span><span class="p">,</span> <span class="s2">&quot;IntegralMomentOfBidirectionalDerivative&quot;</span><span class="p">)</span></div>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">quadrature</span><span class="o">.</span><span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">facet_no</span><span class="p">,</span> <span class="n">Q_face</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f_at_qpts</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">nm</span><span class="o">=</span><span class="s2">&quot;IntegralMomentOfNormalDerivative&quot;</span><span class="p">)</span></div>
 
 
 

@@ -2295,17 +2295,25 @@ component of the input function should be integrated against f</p></li>
 </dd></dl>
 
 <dl class="py class">
-<dt class="sig sig-object py" id="FIAT.functional.IntegralMomentOfBidirectionalDerivative">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfBidirectionalDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfBidirectionalDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfBidirectionalDerivative" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#FIAT.functional.Functional" title="FIAT.functional.Functional"><code class="xref py py-class docutils literal notranslate"><span class="pre">Functional</span></code></a></p>
-<p>Functional giving second derivative integrated against some function on a facet.</p>
-</dd></dl>
-
-<dl class="py class">
 <dt class="sig sig-object py" id="FIAT.functional.IntegralMomentOfDerivative">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfDerivative" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">directions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfDerivative" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.functional.Functional" title="FIAT.functional.Functional"><code class="xref py py-class docutils literal notranslate"><span class="pre">Functional</span></code></a></p>
-<p>Functional giving directional derivative integrated against some function on a facet.</p>
+<p>Functional giving multi-directional derivative integrated against some function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ref_el</strong> – a <code class="xref py py-class docutils literal notranslate"><span class="pre">Cell</span></code>.</p></li>
+<li><p><strong>Q</strong> – a <code class="xref py py-class docutils literal notranslate"><span class="pre">QuadratureRule</span></code>.</p></li>
+<li><p><strong>f_at_qpts</strong> – an array tabulating the function f at the quadrature
+points.</p></li>
+<li><p><strong>*directions</strong> – <p>a list of vectors of directions of differentiation.</p>
+</p></li>
+<li><p><strong>comp</strong> – Optional argument indicating that only a particular
+component of the input function should be integrated against f</p></li>
+<li><p><strong>shp</strong> – Optional argument giving the value shape of input functions.</p></li>
+</ul>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py class">
@@ -2354,8 +2362,8 @@ against some tabulated function f.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.functional.IntegralMomentOfNormalDerivative">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfNormalDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">facet_no</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfNormalDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfNormalDerivative" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#FIAT.functional.Functional" title="FIAT.functional.Functional"><code class="xref py py-class docutils literal notranslate"><span class="pre">Functional</span></code></a></p>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.functional.</span></span><span class="sig-name descname"><span class="pre">IntegralMomentOfNormalDerivative</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">facet_no</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q_face</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f_at_qpts</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/functional.html#IntegralMomentOfNormalDerivative"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.functional.IntegralMomentOfNormalDerivative" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.functional.IntegralMomentOfDerivative" title="FIAT.functional.IntegralMomentOfDerivative"><code class="xref py py-class docutils literal notranslate"><span class="pre">IntegralMomentOfDerivative</span></code></a></p>
 <p>Functional giving normal derivative integrated against some function on a facet.</p>
 </dd></dl>
 
@@ -4016,7 +4024,7 @@ by Gene Golub, SIAM Review Vol 15, No. 2, April 1973, pp.318–334</p>
 logarithmic weight function w(t)=t^a log(1/t) on [0,1] relative to
 shifted Legendre polynomials.</p>
 <dl class="simple">
-<dt>REFERENCE:  Walter Gautschi,``On the preceding paper <a href="#id1"><span class="problematic" id="id2">`</span></a>A Legendre</dt><dd><p>polynomial integral’ by James L. Blue’’,
+<dt>REFERENCE:  Walter Gautschi,``On the preceding paper <a href="#id3"><span class="problematic" id="id4">`</span></a>A Legendre</dt><dd><p>polynomial integral’ by James L. Blue’’,
 Math. Comp. 33 (1979), 742-743.</p>
 </dd>
 </dl>
@@ -4031,8 +4039,8 @@ Math. Comp. 33 (1979), 742-743.</p>
 which are are orthogonal with respect to a weight function which is
 represented in terms of its modifed moments which are obtained by
 integrating the monic polynomials against the weight function.</p>
-<section id="id3">
-<h3>References<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<section id="id5">
+<h3>References<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
 <p>John C. Wheeler, “Modified moments and Gaussian quadratures”
 Rocky Mountain Journal of Mathematics, Vol. 4, Num. 2 (1974), 287–296</p>
 <p>Walter Gautschi, “Orthogonal Polynomials (in Matlab)
@@ -4353,7 +4361,7 @@ from the square to the triangle.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.quadrature.FacetQuadratureRule">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.quadrature.</span></span><span class="sig-name descname"><span class="pre">FacetQuadratureRule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q_ref</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/quadrature.html#FacetQuadratureRule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.quadrature.FacetQuadratureRule" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.quadrature.</span></span><span class="sig-name descname"><span class="pre">FacetQuadratureRule</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Q_ref</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/quadrature.html#FacetQuadratureRule"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.quadrature.FacetQuadratureRule" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.quadrature.QuadratureRule" title="FIAT.quadrature.QuadratureRule"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuadratureRule</span></code></a></p>
 <p>A quadrature rule on a facet mapped from a reference quadrature rule.</p>
 <dl class="py method">
@@ -4407,8 +4415,8 @@ as the weighted sum of a function evaluated at a set of points.</p>
 <dt class="sig sig-object py" id="FIAT.quadrature.QuadratureRule.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.quadrature.QuadratureRule.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id4">
-<h3>Notes<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<section id="id6">
+<h3>Notes<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -4433,8 +4441,8 @@ eo (extrinsic orientation).</p>
 <dt class="sig sig-object py" id="FIAT.quadrature.QuadratureRule.intrinsic_orientation_permutation_map_tuple">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">intrinsic_orientation_permutation_map_tuple</span></span><a class="headerlink" href="#FIAT.quadrature.QuadratureRule.intrinsic_orientation_permutation_map_tuple" title="Link to this definition">¶</a></dt>
 <dd><p>A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.</p>
-<section id="id5">
-<h3>Notes<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<section id="id7">
+<h3>Notes<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
 <p>result[axis][io] gives the physical point-reference point permutation array corresponding to
 io (intrinsic orientation) on <code class="docutils literal notranslate"><span class="pre">axis</span></code>.</p>
 </section>
@@ -4467,7 +4475,7 @@ the quadrature rules of the components.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.quadrature.map_quadrature">
-<span class="sig-prename descclassname"><span class="pre">FIAT.quadrature.</span></span><span class="sig-name descname"><span class="pre">map_quadrature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pts_ref</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wts_ref</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jacobian</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/quadrature.html#map_quadrature"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.quadrature.map_quadrature" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.quadrature.</span></span><span class="sig-name descname"><span class="pre">map_quadrature</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pts_ref</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">wts_ref</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source_cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jacobian</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">avg</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/quadrature.html#map_quadrature"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.quadrature.map_quadrature" title="Link to this definition">¶</a></dt>
 <dd><p>Map quadrature points and weights defined on source_cell to target_cell.</p>
 </dd></dl>
 
@@ -4668,15 +4676,15 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id6">
-<h3>Parameters<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<section id="id8">
+<h3>Parameters<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id7">
-<h3>Returns<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<section id="id9">
+<h3>Returns<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
@@ -4688,8 +4696,8 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#Cell.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.Cell.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id8">
-<h3>Parameters<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<section id="id10">
+<h3>Parameters<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
@@ -4697,8 +4705,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id9">
-<h3>Returns<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
+<section id="id11">
+<h3>Returns<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
@@ -4710,8 +4718,8 @@ specified by subelement dimension.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.Cell.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.Cell.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id10">
-<h3>Notes<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
+<section id="id12">
+<h3>Notes<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -4909,8 +4917,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id11">
-<h3>Parameters<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
+<section id="id13">
+<h3>Parameters<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -4918,8 +4926,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id12">
-<h3>Returns<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
+<section id="id14">
+<h3>Returns<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5173,8 +5181,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhatten’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id13">
-<h3>Parameters<a class="headerlink" href="#id13" title="Link to this heading">¶</a></h3>
+<section id="id15">
+<h3>Parameters<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5184,8 +5192,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 </dd>
 </dl>
 </section>
-<section id="id14">
-<h3>Returns<a class="headerlink" href="#id14" title="Link to this heading">¶</a></h3>
+<section id="id16">
+<h3>Returns<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5195,8 +5203,8 @@ These tangents are <em>NOT</em> normalized to have unit length.</p>
 <span class="sig-name descname"><span class="pre">distance_to_point_l1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rescale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.distance_to_point_l1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.distance_to_point_l1" title="Link to this definition">¶</a></dt>
 <dd><p>Get the L1 distance (aka ‘manhatten’, ‘taxicab’ or rectilinear
 distance) from an entity to a point with 0.0 if the point is inside the entity.</p>
-<section id="id15">
-<h3>Parameters<a class="headerlink" href="#id15" title="Link to this heading">¶</a></h3>
+<section id="id17">
+<h3>Parameters<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>points<span class="classifier">numpy.ndarray or list</span></dt><dd><p>The coordinates of the points.</p>
 </dd>
@@ -5208,8 +5216,8 @@ for points opposite to a single facet.</p>
 </dd>
 </dl>
 </section>
-<section id="id16">
-<h3>Returns<a class="headerlink" href="#id16" title="Link to this heading">¶</a></h3>
+<section id="id18">
+<h3>Returns<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>numpy.float64 or numpy.ndarray</dt><dd><p>The L1 distance, also known as taxicab, manhatten or rectilinear
 distance, of the cell to the point. If 0.0 the point is inside the
@@ -5217,8 +5225,8 @@ cell.</p>
 </dd>
 </dl>
 </section>
-<section id="id17">
-<h3>Notes<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
+<section id="id19">
+<h3>Notes<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
 <p>This is done with the help of barycentric coordinates where the general
 algorithm is to compute the most negative (i.e. minimum) barycentric
 coordinate then return its negative. For implementation reasons we
@@ -5268,7 +5276,7 @@ sphinx):</p>
 </pre></div>
 </div>
 <dl>
-<dt><a href="#id18"><span class="problematic" id="id19">``</span></a><a href="#id20"><span class="problematic" id="id21">`</span></a></dt><dd><blockquote>
+<dt><a href="#id20"><span class="problematic" id="id21">``</span></a><a href="#id22"><span class="problematic" id="id23">`</span></a></dt><dd><blockquote>
 <div><p>y-axis
 |
 |</p>
@@ -5304,7 +5312,7 @@ sphinx):</p>
 <p>(0,0) |         (1,0)</p>
 </dd>
 </dl>
-<p><a href="#id22"><span class="problematic" id="id23">``</span></a><a href="#id24"><span class="problematic" id="id25">`</span></a></p>
+<p><a href="#id24"><span class="problematic" id="id25">``</span></a><a href="#id26"><span class="problematic" id="id27">`</span></a></p>
 <dl class="simple">
 <dt>Barycentric coordinates are defined as</dt><dd><p><cite>X = alpha * P0 + beta * P1 + gamma * P2</cite> where
 <cite>alpha + beta + gamma = 1.0</cite>.</p>
@@ -5354,15 +5362,15 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id26">
-<h3>Parameters<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<section id="id28">
+<h3>Parameters<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id27">
-<h3>Returns<a class="headerlink" href="#id27" title="Link to this heading">¶</a></h3>
+<section id="id29">
+<h3>Returns<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
@@ -5374,8 +5382,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#SimplicialComplex.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id28">
-<h3>Parameters<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
+<section id="id30">
+<h3>Parameters<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
@@ -5383,8 +5391,8 @@ actual distance to the tetrahedron.</p>
 </dd>
 </dl>
 </section>
-<section id="id29">
-<h3>Returns<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
+<section id="id31">
+<h3>Returns<a class="headerlink" href="#id31" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
@@ -5396,8 +5404,8 @@ actual distance to the tetrahedron.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.SimplicialComplex.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id30">
-<h3>Notes<a class="headerlink" href="#id30" title="Link to this heading">¶</a></h3>
+<section id="id32">
+<h3>Notes<a class="headerlink" href="#id32" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -5526,8 +5534,8 @@ specified by subelement dimension.</p>
 <dd><p>Checks if reference cell contains given point
 (with numerical tolerance as given by the L1 distance (aka ‘manhattan’,
 ‘taxicab’ or rectilinear distance) to the cell.</p>
-<section id="id31">
-<h3>Parameters<a class="headerlink" href="#id31" title="Link to this heading">¶</a></h3>
+<section id="id33">
+<h3>Parameters<a class="headerlink" href="#id33" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>point<span class="classifier">numpy.ndarray, list or symbolic expression</span></dt><dd><p>The coordinates of the point.</p>
 </dd>
@@ -5535,8 +5543,8 @@ specified by subelement dimension.</p>
 </dd>
 </dl>
 </section>
-<section id="id32">
-<h3>Returns<a class="headerlink" href="#id32" title="Link to this heading">¶</a></h3>
+<section id="id34">
+<h3>Returns<a class="headerlink" href="#id34" title="Link to this heading">¶</a></h3>
 <p>bool : True if the point is inside the cell, False otherwise.</p>
 </section>
 </dd></dl>
@@ -5553,22 +5561,22 @@ distance) to a point with 0.0 if the point is inside the cell.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_extrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_extrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_extrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract extrinsic orientation.</p>
-<section id="id33">
-<h3>Parameters<a class="headerlink" href="#id33" title="Link to this heading">¶</a></h3>
+<section id="id35">
+<h3>Parameters<a class="headerlink" href="#id35" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id34">
-<h3>Returns<a class="headerlink" href="#id34" title="Link to this heading">¶</a></h3>
+<section id="id36">
+<h3>Returns<a class="headerlink" href="#id36" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Extrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id35">
-<h3>Notes<a class="headerlink" href="#id35" title="Link to this heading">¶</a></h3>
+<section id="id37">
+<h3>Notes<a class="headerlink" href="#id37" title="Link to this heading">¶</a></h3>
 <p>The difinition of orientations used here must be consistent with
 that used in make_entity_permutations_tensorproduct.</p>
 </section>
@@ -5578,8 +5586,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation">
 <span class="sig-name descname"><span class="pre">extract_intrinsic_orientation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#TensorProductCell.extract_intrinsic_orientation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extract_intrinsic_orientation" title="Link to this definition">¶</a></dt>
 <dd><p>Extract intrinsic orientation.</p>
-<section id="id36">
-<h3>Parameters<a class="headerlink" href="#id36" title="Link to this heading">¶</a></h3>
+<section id="id38">
+<h3>Parameters<a class="headerlink" href="#id38" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>o<span class="classifier">Orientation</span></dt><dd><p>Total orientation. <code class="docutils literal notranslate"><span class="pre">//</span></code> and <code class="docutils literal notranslate"><span class="pre">%</span></code> must be overloaded in type(o).</p>
 </dd>
@@ -5587,15 +5595,15 @@ that used in make_entity_permutations_tensorproduct.</p>
 </dd>
 </dl>
 </section>
-<section id="id37">
-<h3>Returns<a class="headerlink" href="#id37" title="Link to this heading">¶</a></h3>
+<section id="id39">
+<h3>Returns<a class="headerlink" href="#id39" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Orientation</dt><dd><p>Intrinsic orientation.</p>
 </dd>
 </dl>
 </section>
-<section id="id38">
-<h3>Notes<a class="headerlink" href="#id38" title="Link to this heading">¶</a></h3>
+<section id="id40">
+<h3>Notes<a class="headerlink" href="#id40" title="Link to this heading">¶</a></h3>
 <p>Must be consistent with make_entity_permutations_tensorproduct.</p>
 </section>
 </dd></dl>
@@ -5604,8 +5612,8 @@ that used in make_entity_permutations_tensorproduct.</p>
 <dt class="sig sig-object py" id="FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">extrinsic_orientation_permutation_map</span></span><a class="headerlink" href="#FIAT.reference_element.TensorProductCell.extrinsic_orientation_permutation_map" title="Link to this definition">¶</a></dt>
 <dd><p>A map from extrinsic orientations to corresponding axis permutation matrices.</p>
-<section id="id39">
-<h3>Notes<a class="headerlink" href="#id39" title="Link to this heading">¶</a></h3>
+<section id="id41">
+<h3>Notes<a class="headerlink" href="#id41" title="Link to this heading">¶</a></h3>
 <p>result[eo] gives the physical axis-reference axis permutation matrix corresponding to
 eo (extrinsic orientation).</p>
 </section>
@@ -6651,7 +6659,6 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.functional.IntegralLegendreTangentialMoment"><code class="docutils literal notranslate"><span class="pre">IntegralLegendreTangentialMoment</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralLegendreTangentialTangentialMoment"><code class="docutils literal notranslate"><span class="pre">IntegralLegendreTangentialTangentialMoment</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMoment"><code class="docutils literal notranslate"><span class="pre">IntegralMoment</span></code></a></li>
-<li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfBidirectionalDerivative"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfBidirectionalDerivative</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfDerivative"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfDerivative</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfDivergence"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfDivergence</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.functional.IntegralMomentOfEdgeTangentEvaluation"><code class="docutils literal notranslate"><span class="pre">IntegralMomentOfEdgeTangentEvaluation</span></code></a></li>
