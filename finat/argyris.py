@@ -42,10 +42,16 @@ def _vertex_transform(V, vorder, fiat_cell, coordinate_mapping):
     return V
 
 
-def _normal_tangential_transform(fiat_cell, J, detJ, f):
-    R = numpy.array([[0, 1], [-1, 0]])
-    that = fiat_cell.compute_edge_tangent(f)
-    nhat = R @ that
+def _normal_tangential_transform(fiat_cell, J, detJ, edge, face=None):
+    that = fiat_cell.compute_edge_tangent(edge)
+    if fiat_cell.get_spatial_dimension() == 2:
+        R = numpy.array([[0, 1], [-1, 0]])
+        nhat = R @ that
+    else:
+        nface = fiat_cell.compute_scaled_normal(face)
+        nface /= numpy.linalg.norm(nface)
+        nhat = numpy.cross(that, nface)
+
     Jn = J @ Literal(nhat)
     Jt = J @ Literal(that)
     alpha = Jn @ Jt

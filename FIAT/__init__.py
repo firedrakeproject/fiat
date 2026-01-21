@@ -62,6 +62,7 @@ from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
+from FIAT.walkington import Walkington
 from FIAT.histopolation import Histopolation
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 
@@ -117,7 +118,8 @@ supported_elements = {"Argyris": Argyris,
                       "Conforming Arnold-Winther": ArnoldWinther,
                       "Nonconforming Arnold-Winther": ArnoldWintherNC,
                       "Hu-Zhang": HuZhang,
-                      "Mardal-Tai-Winther": MardalTaiWinther}
+                      "Mardal-Tai-Winther": MardalTaiWinther,
+                      "Walkington": Walkington}
 
 # List of extra elements
 extra_elements = {"P0": P0}

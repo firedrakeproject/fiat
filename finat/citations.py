@@ -259,3 +259,13 @@ if petsctools is not None:
  doi={https://doi.org/10.1023/A:1004420829610},
 }
 """)
+    petsctools.add_citation("Walkington2010", """
+author = {Walkington, Noel J.},
+title = {{A \\$C^1\\$ Tetrahedral Finite Element without Edge Degrees of Freedom}},
+journal = {SIAM Journal on Numerical Analysis},
+volume = {52},
+number = {1},
+pages = {330-342},
+year = {2014},
+doi = {10.1137/130912013},
+}""")
