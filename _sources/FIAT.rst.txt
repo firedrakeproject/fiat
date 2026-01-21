@@ -556,6 +556,14 @@ FIAT.walkington module
    :show-inheritance:
    :undoc-members:
 
+FIAT.wuxu module
+----------------
+
+.. automodule:: FIAT.wuxu
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 FIAT.xg\_quad\_data module
 --------------------------
 

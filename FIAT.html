@@ -6199,6 +6199,55 @@ basis functions at given points.</p>
 <dd></dd></dl>
 
 </section>
+<section id="module-FIAT.wuxu">
+<span id="fiat-wuxu-module"></span><h2>FIAT.wuxu module<a class="headerlink" href="#module-FIAT.wuxu" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.wuxu.WuXuH3NC">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuH3NC</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuH3NC"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuH3NC" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
+<p>The Wu-Xu H3 nonconforming finite element</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.wuxu.WuXuH3NCDualSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuH3NCDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuH3NCDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuH3NCDualSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
+<p>Dual basis for WuXu H3 nonconforming element consisting of
+vertex values and gradients and second normals at edge midpoints.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.wuxu.WuXuH3NCSpace">
+<span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuH3NCSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuH3NCSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuH3NCSpace" title="Link to this definition">¶</a></dt>
+<dd><p>Constructs a basis for the the Wu Xu H^3 nonconforming space
+P(T) = P_3(T) + b_T P_1(T),
+where b_T is the standard cubic bubble.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.wuxu.WuXuRobustH3NC">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuRobustH3NC</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">7</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuRobustH3NC"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuRobustH3NC" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
+<p>The Wu-Xu robust H3 nonconforming finite element</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.wuxu.WuXuRobustH3NCDualSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuRobustH3NCDualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuRobustH3NCDualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuRobustH3NCDualSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
+<p>Dual basis for WuXu H3 nonconforming element consisting of
+vertex values and gradients and first and second normals at edge midpoints.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.wuxu.WuXuRobustH3NCSpace">
+<span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuRobustH3NCSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuRobustH3NCSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuRobustH3NCSpace" title="Link to this definition">¶</a></dt>
+<dd><p>Constructs a basis for the the Wu Xu H^3 nonconforming space
+P^{(3,2)}(T) = P_3(T) + b_T P_1(T) + b_T^2 P_1(T),
+where b_T is the standard cubic bubble.</p>
+</dd></dl>
+
+</section>
 <section id="module-FIAT.xg_quad_data">
 <span id="fiat-xg-quad-data-module"></span><h2>FIAT.xg_quad_data module<a class="headerlink" href="#module-FIAT.xg_quad_data" title="Link to this heading">¶</a></h2>
 </section>
@@ -7163,6 +7212,15 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.walkington.Walkington"><code class="docutils literal notranslate"><span class="pre">Walkington</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.walkington.WalkingtonDualSet"><code class="docutils literal notranslate"><span class="pre">WalkingtonDualSet</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.walkington.face_constraint"><code class="docutils literal notranslate"><span class="pre">face_constraint()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-FIAT.wuxu">FIAT.wuxu module</a><ul>
+<li><a class="reference internal" href="#FIAT.wuxu.WuXuH3NC"><code class="docutils literal notranslate"><span class="pre">WuXuH3NC</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.wuxu.WuXuH3NCDualSet"><code class="docutils literal notranslate"><span class="pre">WuXuH3NCDualSet</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.wuxu.WuXuH3NCSpace"><code class="docutils literal notranslate"><span class="pre">WuXuH3NCSpace()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.wuxu.WuXuRobustH3NC"><code class="docutils literal notranslate"><span class="pre">WuXuRobustH3NC</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.wuxu.WuXuRobustH3NCDualSet"><code class="docutils literal notranslate"><span class="pre">WuXuRobustH3NCDualSet</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.wuxu.WuXuRobustH3NCSpace"><code class="docutils literal notranslate"><span class="pre">WuXuRobustH3NCSpace()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.xg_quad_data">FIAT.xg_quad_data module</a></li>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.wuxu &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.wuxu</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.wuxu</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2022 Robert C. Kirby (Baylor University)</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT.</span>
+<span class="c1">#</span>
+<span class="c1"># FIAT is free software: you can redistribute it and/or modify</span>
+<span class="c1"># it under the terms of the GNU Lesser General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># FIAT is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU Lesser General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU Lesser General Public License</span>
+<span class="c1"># along with FIAT. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">finite_element</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">IntegralMomentOfDerivative</span><span class="p">,</span>
+                             <span class="n">IntegralMomentOfBidirectionalDerivative</span><span class="p">,</span>
+                             <span class="n">PointDerivative</span><span class="p">,</span> <span class="n">PointEvaluation</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.bubble</span><span class="w"> </span><span class="kn">import</span> <span class="n">Bubble</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.lagrange</span><span class="w"> </span><span class="kn">import</span> <span class="n">Lagrange</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
+
+<span class="n">polydim</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span>
+
+
+<div class="viewcode-block" id="WuXuRobustH3NCSpace">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuRobustH3NCSpace">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">WuXuRobustH3NCSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a basis for the the Wu Xu H^3 nonconforming space</span>
+<span class="sd">    P^{(3,2)}(T) = P_3(T) + b_T P_1(T) + b_T^2 P_1(T),</span>
+<span class="sd">    where b_T is the standard cubic bubble.&quot;&quot;&quot;</span>
+
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span>
+
+    <span class="n">em_deg</span> <span class="o">=</span> <span class="mi">7</span>
+
+    <span class="c1"># Unfortunately,  b_T^2 P_1 has degree 7 (cubic squared times a linear)</span>
+    <span class="c1"># so we need a high embedded degree!</span>
+    <span class="n">p7</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span>
+
+    <span class="n">dimp1</span> <span class="o">=</span> <span class="n">polydim</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">dimp3</span> <span class="o">=</span> <span class="n">polydim</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">dimp7</span> <span class="o">=</span> <span class="n">polydim</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">7</span><span class="p">)</span>
+
+    <span class="c1"># Here&#39;s the first bit we&#39;ll work with.  It&#39;s already expressed in terms</span>
+    <span class="c1"># of the ON basis for P7, so we&#39;re golden.</span>
+    <span class="n">p3fromp7</span> <span class="o">=</span> <span class="n">p7</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">dimp3</span><span class="p">)))</span>
+
+    <span class="c1"># Rather than creating the barycentric coordinates ourself, let&#39;s</span>
+    <span class="c1"># reuse the existing bubble functionality</span>
+    <span class="n">bT</span> <span class="o">=</span> <span class="n">Bubble</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">p1</span> <span class="o">=</span> <span class="n">Lagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># next, we&#39;ll have to project b_T P1 and b_T^2 P1 onto P^7</span>
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">14</span><span class="p">)</span>
+    <span class="n">Qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+    <span class="n">Qwts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+
+    <span class="n">zero_index</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">([</span><span class="mi">0</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)])</span>
+
+    <span class="c1"># it&#39;s just one bubble function: let&#39;s get a 1d array!</span>
+    <span class="n">bT_at_qpts</span> <span class="o">=</span> <span class="n">bT</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Qpts</span><span class="p">)[</span><span class="n">zero_index</span><span class="p">][</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="n">p1_at_qpts</span> <span class="o">=</span> <span class="n">p1</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Qpts</span><span class="p">)[</span><span class="n">zero_index</span><span class="p">]</span>
+
+    <span class="c1"># Note: difference in signature because bT, p1 are FE and p7 is a</span>
+    <span class="c1"># polynomial set</span>
+    <span class="n">p7_at_qpts</span> <span class="o">=</span> <span class="n">p7</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Qpts</span><span class="p">)[</span><span class="n">zero_index</span><span class="p">]</span>
+
+    <span class="n">bubble_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="n">dimp7</span><span class="p">),</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+
+    <span class="c1"># first three: bT P1, last three will be bT^2 P1</span>
+    <span class="n">foo</span> <span class="o">=</span> <span class="n">bT_at_qpts</span> <span class="o">*</span> <span class="n">p1_at_qpts</span> <span class="o">*</span> <span class="n">Qwts</span>
+    <span class="n">bubble_coeffs</span><span class="p">[:</span><span class="n">dimp1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">foo</span><span class="p">,</span> <span class="n">p7_at_qpts</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+
+    <span class="n">foo</span> <span class="o">=</span> <span class="n">bT_at_qpts</span> <span class="o">*</span> <span class="n">foo</span>
+    <span class="n">bubble_coeffs</span><span class="p">[</span><span class="n">dimp1</span><span class="p">:</span><span class="mi">2</span><span class="o">*</span><span class="n">dimp1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">foo</span><span class="p">,</span> <span class="n">p7_at_qpts</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
+
+    <span class="n">bubbles</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">em_deg</span><span class="p">,</span>
+                                           <span class="n">p7</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span>
+                                           <span class="n">bubble_coeffs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">polynomial_set_union_normalized</span><span class="p">(</span><span class="n">p3fromp7</span><span class="p">,</span> <span class="n">bubbles</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="WuXuH3NCSpace">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuH3NCSpace">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">WuXuH3NCSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a basis for the the Wu Xu H^3 nonconforming space</span>
+<span class="sd">    P(T) = P_3(T) + b_T P_1(T),</span>
+<span class="sd">    where b_T is the standard cubic bubble.&quot;&quot;&quot;</span>
+
+    <span class="k">assert</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span>
+
+    <span class="n">em_deg</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">p4</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">em_deg</span><span class="p">)</span>
+
+    <span class="c1"># Here&#39;s the first bit we&#39;ll work with.  It&#39;s already expressed in terms</span>
+    <span class="c1"># of the ON basis for P4, so we&#39;re golden.</span>
+    <span class="n">dimp3</span> <span class="o">=</span> <span class="n">polydim</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">p3fromp4</span> <span class="o">=</span> <span class="n">p4</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">dimp3</span><span class="p">)))</span>
+
+    <span class="c1"># Rather than creating the barycentric coordinates ourself, let&#39;s</span>
+    <span class="c1"># reuse the existing bubble functionality</span>
+    <span class="n">bT</span> <span class="o">=</span> <span class="n">Bubble</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">polynomial_set_union_normalized</span><span class="p">(</span><span class="n">p3fromp4</span><span class="p">,</span> <span class="n">bT</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">())</span></div>
+
+
+
+<div class="viewcode-block" id="WuXuRobustH3NCDualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuRobustH3NCDualSet">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WuXuRobustH3NCDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dual basis for WuXu H3 nonconforming element consisting of</span>
+<span class="sd">    vertex values and gradients and first and second normals at edge midpoints.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># jet at each vertex</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">]))</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">PointDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">],</span> <span class="n">alpha</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="c1"># average of first and second normal derivative along each edge</span>
+        <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">1</span><span class="o">/</span><span class="n">Q</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">())</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f</span><span class="p">))</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfBidirectionalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">e</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="WuXuH3NCDualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuH3NCDualSet">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WuXuH3NCDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dual basis for WuXu H3 nonconforming element consisting of</span>
+<span class="sd">    vertex values and gradients and second normals at edge midpoints.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span>
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># jet at each vertex</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">]))</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">PointDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">],</span> <span class="n">alpha</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="c1"># average of second normal derivative along each edge</span>
+        <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">degree</span><span class="o">-</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">)</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="mi">1</span><span class="o">/</span><span class="n">Q</span><span class="o">.</span><span class="n">jacobian_determinant</span><span class="p">())</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfBidirectionalDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">e</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="WuXuRobustH3NC">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuRobustH3NC">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WuXuRobustH3NC</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Wu-Xu robust H3 nonconforming finite element&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">7</span><span class="p">):</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">WuXuRobustH3NCSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">degree</span> <span class="o">==</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">degree</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">WuXuRobustH3NCDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="WuXuH3NC">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuH3NC">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">WuXuH3NC</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Wu-Xu H3 nonconforming finite element&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">WuXuH3NCSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">degree</span> <span class="o">==</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">degree</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">WuXuH3NCDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.wuxu</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Firedrake Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

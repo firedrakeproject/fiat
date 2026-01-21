@@ -324,6 +324,14 @@ finat.walkington module
    :show-inheritance:
    :undoc-members:
 
+finat.wuxu module
+-----------------
+
+.. automodule:: finat.wuxu
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 Module contents
 ---------------
 
