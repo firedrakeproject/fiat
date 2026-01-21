@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FIAT.c2_elements &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
+    
+    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.c2_elements</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for FIAT.c2_elements</h1><div class="highlight"><pre>
+<span></span><span class="c1"># Copyright (C) 2026 Pablo D. Brubeck</span>
+<span class="c1">#</span>
+<span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
+<span class="c1">#</span>
+<span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
+<span class="c1">#</span>
+<span class="c1"># Written by Pablo D. Brubeck (brubeck@protonmail.com), 2026</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">PointEvaluation</span><span class="p">,</span> <span class="n">PointDerivative</span><span class="p">,</span>
+                             <span class="n">IntegralMoment</span><span class="p">,</span> <span class="n">IntegralMomentOfDerivative</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">macro</span><span class="p">,</span> <span class="n">polynomial_set</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_quadrature_scheme</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">ufc_simplex</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.jacobi</span><span class="w"> </span><span class="kn">import</span> <span class="n">eval_jacobi_batch</span><span class="p">,</span> <span class="n">eval_jacobi_deriv_batch</span>
+
+
+<div class="viewcode-block" id="C2DualSet">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.C2DualSet">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">C2DualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A DualSet for triangular C2 elements.</span>
+
+<span class="sd">    By default, this imposes C4 continuity at vertices for non-macroelements,</span>
+<span class="sd">    and the minimal C2 continuity for macroelements.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">vorder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">vorder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">vorder</span> <span class="o">=</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">()</span> <span class="k">else</span> <span class="mi">4</span>
+
+        <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="o">*</span><span class="n">vorder</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree &gt;= </span><span class="si">{</span><span class="mi">2</span><span class="o">*</span><span class="n">vorder</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span> <span class="ow">or</span> <span class="n">ref_complex</span>
+        <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on triangles&quot;</span><span class="p">)</span>
+
+        <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
+        <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">])}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">)}</span>
+
+        <span class="c1"># vorder jet at vertices</span>
+        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">pt</span> <span class="o">=</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">]</span>
+            <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pt</span><span class="p">))</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">PointDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pt</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">vorder</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="n">k</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">vorder</span>
+        <span class="n">facet</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">parse_quadrature_scheme</span><span class="p">(</span><span class="n">facet</span><span class="p">,</span> <span class="n">degree</span><span class="o">-</span><span class="mi">2</span><span class="o">+</span><span class="n">k</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">facet</span><span class="o">.</span><span class="n">compute_barycentric_coordinates</span><span class="p">(</span><span class="n">Q_ref</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
+        <span class="n">xref</span> <span class="o">=</span> <span class="n">x</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">-</span> <span class="n">x</span><span class="p">[:,</span> <span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+
+        <span class="k">if</span> <span class="n">reduced</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Integral moments of normal derivatives against Jacobi polynomials along edges</span>
+            <span class="n">phis</span> <span class="o">=</span> <span class="n">eval_jacobi_batch</span><span class="p">(</span><span class="n">vorder</span><span class="p">,</span> <span class="n">vorder</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">xref</span><span class="p">)</span>
+            <span class="n">dphis</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">eval_jacobi_deriv_batch</span><span class="p">(</span><span class="n">vorder</span><span class="p">,</span> <span class="n">vorder</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">xref</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">ddphis</span> <span class="o">=</span> <span class="mi">4</span><span class="o">*</span><span class="n">eval_jacobi_deriv_batch</span><span class="p">(</span><span class="n">vorder</span><span class="p">,</span> <span class="n">vorder</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">xref</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="n">Q</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_normal</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+                <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">ddphi</span><span class="p">)</span> <span class="k">for</span> <span class="n">ddphi</span> <span class="ow">in</span> <span class="n">ddphis</span><span class="p">[</span><span class="mi">2</span><span class="p">:])</span>
+                <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMomentOfDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">dphi</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">dphi</span> <span class="ow">in</span> <span class="n">dphis</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+                <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMomentOfDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">)</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">e</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+            <span class="c1"># Interior moments against a basis for Pq</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">-</span> <span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="n">vorder</span> <span class="o">//</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">q</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">Q</span> <span class="o">=</span> <span class="n">parse_quadrature_scheme</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">q</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
+                <span class="n">Pq</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">phis</span> <span class="o">=</span> <span class="n">Pq</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
+                <span class="n">phis</span> <span class="o">*=</span> <span class="mi">1</span><span class="o">/</span><span class="n">ref_el</span><span class="o">.</span><span class="n">volume</span><span class="p">()</span>
+                <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
+                <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">)</span>
+                <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="BrambleZlamalC2">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.BrambleZlamalC2">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">BrambleZlamalC2</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Bramble-Zlamal C2 element.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">C2DualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="n">reduced</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="AlfeldC2Space">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.AlfeldC2Space">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">AlfeldC2Space</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct the generalization of the quintic C2 spline on the double Alfeld split.&quot;&quot;&quot;</span>
+    <span class="c1"># Construct the double Alfeld split by splitting twice</span>
+    <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">macro</span><span class="o">.</span><span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">ref_el</span><span class="p">))</span>
+    <span class="c1"># C3 on major split facets, C2 elsewhere</span>
+    <span class="n">order</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">ref_complex</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">order</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">),</span> <span class="n">degree</span><span class="o">-</span><span class="mi">2</span><span class="p">))</span>
+    <span class="c1"># C4 at minor split barycenters, C3 at major split barycenter</span>
+    <span class="n">order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">ref_complex</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">order</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">degree</span><span class="o">-</span><span class="mi">2</span>
+    <span class="k">return</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="AlfeldC2">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.AlfeldC2">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AlfeldC2</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Alfeld C^2 macroelement on a double barycentric split.</span>
+<span class="sd">    See Section 7.5 of Lai &amp; Schumacher for the quintic C^2 spline.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">AlfeldC2Space</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">C2DualSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="n">reduced</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span></div>
+
+</pre></div>
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">FIAT.c2_elements</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2026, Firedrake Project.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 9.1.0.
+    </div>
+  </body>
+</html>

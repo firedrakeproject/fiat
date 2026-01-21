@@ -60,6 +60,14 @@ finat.bernardi\_raugel module
    :show-inheritance:
    :undoc-members:
 
+finat.c2\_elements module
+-------------------------
+
+.. automodule:: finat.c2_elements
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 finat.cell\_tools module
 ------------------------
 

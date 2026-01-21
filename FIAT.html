@@ -1054,6 +1054,39 @@ an array of 1s with the same shape as x. This function does that.</p>
 </dd></dl>
 
 </section>
+<section id="module-FIAT.c2_elements">
+<span id="fiat-c2-elements-module"></span><h2>FIAT.c2_elements module<a class="headerlink" href="#module-FIAT.c2_elements" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.c2_elements.AlfeldC2">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.c2_elements.</span></span><span class="sig-name descname"><span class="pre">AlfeldC2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/c2_elements.html#AlfeldC2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.c2_elements.AlfeldC2" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
+<p>The Alfeld C^2 macroelement on a double barycentric split.
+See Section 7.5 of Lai &amp; Schumacher for the quintic C^2 spline.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.c2_elements.AlfeldC2Space">
+<span class="sig-prename descclassname"><span class="pre">FIAT.c2_elements.</span></span><span class="sig-name descname"><span class="pre">AlfeldC2Space</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/c2_elements.html#AlfeldC2Space"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.c2_elements.AlfeldC2Space" title="Link to this definition">¶</a></dt>
+<dd><p>Construct the generalization of the quintic C2 spline on the double Alfeld split.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.c2_elements.BrambleZlamalC2">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.c2_elements.</span></span><span class="sig-name descname"><span class="pre">BrambleZlamalC2</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/c2_elements.html#BrambleZlamalC2"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.c2_elements.BrambleZlamalC2" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
+<p>The Bramble-Zlamal C2 element.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="FIAT.c2_elements.C2DualSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.c2_elements.</span></span><span class="sig-name descname"><span class="pre">C2DualSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_complex</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vorder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reduced</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/c2_elements.html#C2DualSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.c2_elements.C2DualSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
+<p>A DualSet for triangular C2 elements.</p>
+<p>By default, this imposes C4 continuity at vertices for non-macroelements,
+and the minimal C2 continuity for macroelements.</p>
+</dd></dl>
+
+</section>
 <section id="module-FIAT.check_format_variant">
 <span id="fiat-check-format-variant-module"></span><h2>FIAT.check_format_variant module<a class="headerlink" href="#module-FIAT.check_format_variant" title="Link to this heading">¶</a></h2>
 <dl class="py function">
@@ -3083,8 +3116,8 @@ columns correspond to the points.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.jacobi.eval_jacobi_deriv_batch">
-<span class="sig-prename descclassname"><span class="pre">FIAT.jacobi.</span></span><span class="sig-name descname"><span class="pre">eval_jacobi_deriv_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/jacobi.html#eval_jacobi_deriv_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.jacobi.eval_jacobi_deriv_batch" title="Link to this definition">¶</a></dt>
-<dd><p>Evaluates the first derivatives of all jacobi polynomials with
+<span class="sig-prename descclassname"><span class="pre">FIAT.jacobi.</span></span><span class="sig-name descname"><span class="pre">eval_jacobi_deriv_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/jacobi.html#eval_jacobi_deriv_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.jacobi.eval_jacobi_deriv_batch" title="Link to this definition">¶</a></dt>
+<dd><p>Evaluates the derivative of the given order of all jacobi polynomials with
 weights a,b up to degree n.  xs is a numpy.array of points.
 Returns a two-dimensional array of points, where the
 rows correspond to the Jacobi polynomials and the
@@ -6465,6 +6498,13 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.bubble.Bubble"><code class="docutils literal notranslate"><span class="pre">Bubble</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.bubble.CodimBubble"><code class="docutils literal notranslate"><span class="pre">CodimBubble</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.bubble.FacetBubble"><code class="docutils literal notranslate"><span class="pre">FacetBubble</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-FIAT.c2_elements">FIAT.c2_elements module</a><ul>
+<li><a class="reference internal" href="#FIAT.c2_elements.AlfeldC2"><code class="docutils literal notranslate"><span class="pre">AlfeldC2</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.c2_elements.AlfeldC2Space"><code class="docutils literal notranslate"><span class="pre">AlfeldC2Space()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.c2_elements.BrambleZlamalC2"><code class="docutils literal notranslate"><span class="pre">BrambleZlamalC2</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.c2_elements.C2DualSet"><code class="docutils literal notranslate"><span class="pre">C2DualSet</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.check_format_variant">FIAT.check_format_variant module</a><ul>

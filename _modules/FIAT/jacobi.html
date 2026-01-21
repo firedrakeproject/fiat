@@ -131,19 +131,23 @@
 
 <div class="viewcode-block" id="eval_jacobi_deriv_batch">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi_deriv_batch">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_deriv_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the first derivatives of all jacobi polynomials with</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_deriv_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the derivative of the given order of all jacobi polynomials with</span>
 <span class="sd">    weights a,b up to degree n.  xs is a numpy.array of points.</span>
 <span class="sd">    Returns a two-dimensional array of points, where the</span>
 <span class="sd">    rows correspond to the Jacobi polynomials and the</span>
 <span class="sd">    columns correspond to the points.&quot;&quot;&quot;</span>
     <span class="n">results</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xs</span><span class="p">)),</span> <span class="n">xs</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">order</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">results</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">results</span><span class="p">[</span><span class="mi">1</span><span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">eval_jacobi_batch</span><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">b</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">xs</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
-        <span class="n">results</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">*=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="n">b</span> <span class="o">+</span> <span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">results</span><span class="p">[</span><span class="n">order</span><span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">eval_jacobi_batch</span><span class="p">(</span><span class="n">a</span> <span class="o">+</span> <span class="n">order</span><span class="p">,</span> <span class="n">b</span> <span class="o">+</span> <span class="n">order</span><span class="p">,</span> <span class="n">n</span> <span class="o">-</span> <span class="n">order</span><span class="p">,</span> <span class="n">xs</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="n">a</span> <span class="o">+</span> <span class="n">b</span> <span class="o">+</span> <span class="n">j</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="p">):</span>
+            <span class="n">z</span> <span class="o">*=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">f</span> <span class="o">+</span> <span class="n">l</span><span class="p">)</span>
+        <span class="n">results</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">*=</span> <span class="n">z</span>
     <span class="k">return</span> <span class="n">results</span></div>
 
 </pre></div>

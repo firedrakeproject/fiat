@@ -132,6 +132,14 @@ FIAT.bubble module
    :show-inheritance:
    :undoc-members:
 
+FIAT.c2\_elements module
+------------------------
+
+.. automodule:: FIAT.c2_elements
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 FIAT.check\_format\_variant module
 ----------------------------------
 

@@ -38,45 +38,67 @@
   <h1>Source code for finat.argyris</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">math</span><span class="w"> </span><span class="kn">import</span> <span class="n">comb</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">ListTensor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">ListTensor</span><span class="p">,</span> <span class="n">Zero</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.citations</span><span class="w"> </span><span class="kn">import</span> <span class="n">cite</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.fiat_elements</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScalarFiatElement</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.physically_mapped</span><span class="w"> </span><span class="kn">import</span> <span class="n">identity</span><span class="p">,</span> <span class="n">PhysicallyMappedElement</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_jet_transform</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Basis transformation for derivative evaluation.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">order</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">identity</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">J</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="p">,)</span><span class="o">*</span><span class="n">order</span>
+
+    <span class="c1"># Mapping from multiindices to linearly-independent (flattened) components</span>
+    <span class="n">mapping</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">alphas</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">indices</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
+        <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">sd</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">:</span>
+            <span class="n">alpha</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">alpha</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">alpha</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">:</span>
+            <span class="n">alphas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+        <span class="n">mapping</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span> <span class="o">=</span> <span class="n">alphas</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+    <span class="c1"># Inverse mapping</span>
+    <span class="n">imapping</span> <span class="o">=</span> <span class="p">{</span><span class="n">v</span><span class="p">:</span> <span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">mapping</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+    <span class="c1"># Get the transformation for a covariant tensor.</span>
+    <span class="c1"># We take the outer product, as each index maps with the Jacobian.</span>
+    <span class="n">Jnp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">([[</span><span class="n">J</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)])</span>
+    <span class="n">Jprod</span> <span class="o">=</span> <span class="n">Jnp</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
+        <span class="n">Jprod</span> <span class="o">=</span> <span class="n">Jprod</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="n">Jnp</span>
+
+    <span class="c1"># Deal with symmetries by contracting along linearly-dependent components.</span>
+    <span class="n">B</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">)),</span> <span class="n">Zero</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ii</span> <span class="ow">in</span> <span class="n">imapping</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">jj</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">mapping</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">B</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="n">Jprod</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">jj</span><span class="p">,</span> <span class="n">ii</span><span class="p">)))]</span>
+    <span class="k">return</span> <span class="n">B</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_vertex_transform</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="n">vorder</span><span class="p">,</span> <span class="n">fiat_cell</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Basis transformation for evaluation, gradient, and hessian at vertices.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Basis transformation for jet at vertices.&quot;&quot;&quot;</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="n">top</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
     <span class="n">bary</span><span class="p">,</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
     <span class="n">J</span> <span class="o">=</span> <span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">jacobian_at</span><span class="p">(</span><span class="n">bary</span><span class="p">)</span>
 
-    <span class="n">gdofs</span> <span class="o">=</span> <span class="n">sd</span>
-    <span class="n">G</span> <span class="o">=</span> <span class="p">[[</span><span class="n">J</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
-
-    <span class="k">if</span> <span class="n">vorder</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="n">hdofs</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="n">H</span> <span class="o">=</span> <span class="p">[[]]</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">hdofs</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span><span class="o">//</span><span class="mi">2</span>
-        <span class="n">indices</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">sd</span><span class="p">)]</span>
-        <span class="n">H</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">hdofs</span><span class="p">,</span> <span class="n">hdofs</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">p</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">indices</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">q</span><span class="p">,</span> <span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">indices</span><span class="p">):</span>
-                <span class="n">H</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">]</span> <span class="o">=</span> <span class="n">J</span><span class="p">[</span><span class="n">m</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">J</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="n">J</span><span class="p">[</span><span class="n">m</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">J</span><span class="p">[</span><span class="n">n</span><span class="p">,</span> <span class="n">i</span><span class="p">]</span>
-        <span class="n">H</span><span class="p">[:,</span> <span class="p">[</span><span class="n">i</span> <span class="o">==</span> <span class="n">j</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]]</span> <span class="o">*=</span> <span class="mf">0.5</span>
-
+    <span class="n">jet</span> <span class="o">=</span> <span class="p">[</span><span class="n">_jet_transform</span><span class="p">(</span><span class="n">J</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">vorder</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
     <span class="n">s</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
-        <span class="n">s</span> <span class="o">+=</span> <span class="mi">1</span>
-        <span class="n">V</span><span class="p">[</span><span class="n">s</span><span class="p">:</span><span class="n">s</span><span class="o">+</span><span class="n">gdofs</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span><span class="n">s</span><span class="o">+</span><span class="n">gdofs</span><span class="p">]</span> <span class="o">=</span> <span class="n">G</span>
-        <span class="n">s</span> <span class="o">+=</span> <span class="n">gdofs</span>
-        <span class="n">V</span><span class="p">[</span><span class="n">s</span><span class="p">:</span><span class="n">s</span><span class="o">+</span><span class="n">hdofs</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span><span class="n">s</span><span class="o">+</span><span class="n">hdofs</span><span class="p">]</span> <span class="o">=</span> <span class="n">H</span>
-        <span class="n">s</span> <span class="o">+=</span> <span class="n">hdofs</span>
+        <span class="k">for</span> <span class="n">B</span> <span class="ow">in</span> <span class="n">jet</span><span class="p">:</span>
+            <span class="n">ndofs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">B</span><span class="p">)</span>
+            <span class="n">V</span><span class="p">[</span><span class="n">s</span><span class="p">:</span><span class="n">s</span><span class="o">+</span><span class="n">ndofs</span><span class="p">,</span> <span class="n">s</span><span class="p">:</span><span class="n">s</span><span class="o">+</span><span class="n">ndofs</span><span class="p">]</span> <span class="o">=</span> <span class="n">B</span>
+            <span class="n">s</span> <span class="o">+=</span> <span class="n">ndofs</span>
     <span class="k">return</span> <span class="n">V</span>
 
 
