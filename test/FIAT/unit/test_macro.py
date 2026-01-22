@@ -444,10 +444,11 @@ def test_macro_sympy(cell, element):
     variant = "spectral,alfeld"
     K = IsoSplit(cell)
     ebig = element(K, 3, variant=variant)
-    pts = get_lagrange_points(ebig.dual_basis())
+    pts = numpy.asarray(get_lagrange_points(ebig.dual_basis()))
+
+    X = tuple(sympy.Symbol(f"X[{i}]") for i in range(pts.shape[1]))
 
     dim = cell.get_spatial_dimension()
-    X = tuple(sympy.Symbol(f"X[{i}]") for i in range(dim))
     degrees = range(1, 3) if element is Lagrange else range(3)
     for degree in degrees:
         fe = element(cell, degree, variant=variant)
@@ -455,6 +456,34 @@ def test_macro_sympy(cell, element):
 
         phis = sympy.lambdify(X, tab_sympy)
         results = phis(*numpy.transpose(pts))
+        tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
+        assert numpy.allclose(results, tab_numpy)
+
+
+@pytest.mark.parametrize("element", (DiscontinuousLagrange, Lagrange))
+def test_macro_gem(cell, element):
+    import gem
+    from gem.interpreter import evaluate
+
+    variant = "spectral,alfeld"
+    K = IsoSplit(cell)
+    ebig = element(K, 3, variant=variant)
+    pts = numpy.asarray(get_lagrange_points(ebig.dual_basis()))
+
+    coords = gem.Variable('X', pts.shape)
+    bindings = {coords: pts}
+    index = gem.Index()
+    point = gem.partial_indexed(coords, (index,))
+    X = tuple(gem.Indexed(point, i) for i in numpy.ndindex(point.shape))
+
+    dim = cell.get_spatial_dimension()
+    degrees = range(1, 3) if element is Lagrange else range(3)
+    for degree in degrees:
+        fe = element(cell, degree, variant=variant)
+        tab_gem = fe.tabulate(0, X)[(0,) * dim]
+
+        results, = evaluate((gem.as_gem(tab_gem),), bindings=bindings)
+        results = results.arr.T
         tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
         assert numpy.allclose(results, tab_numpy)
 
