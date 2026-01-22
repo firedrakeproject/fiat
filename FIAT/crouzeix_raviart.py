@@ -10,7 +10,7 @@
 # Last changed: 2010-01-28
 
 import numpy
-from FIAT import finite_element, polynomial_set, dual_set, functional
+from FIAT import finite_element, polynomial_set, dual_set, functional, macro
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.quadrature import FacetQuadratureRule
 
@@ -38,20 +38,18 @@ class CrouzeixRaviartDualSet(dual_set.DualSet):
                 facet = ref_el.construct_subelement(dim)
                 if dim == 0:
                     Q_facet = parse_quadrature_scheme(facet, degree + interpolant_deg-1, quad_scheme)
-                    Phis = numpy.ones((1, len(Q_facet.pts)))
+                    phis = numpy.ones((1, len(Q_facet.pts)))
                 else:
                     k = degree - 1 if dim == sd-1 else degree - (1+dim)
                     if k < 0:
                         continue
                     Q_facet = parse_quadrature_scheme(facet, k + interpolant_deg, quad_scheme)
                     poly_set = polynomial_set.ONPolynomialSet(facet, k)
-                    Phis = poly_set.tabulate(Q_facet.get_points())[(0,) * dim]
+                    phis = poly_set.tabulate(Q_facet.get_points())[(0,) * dim]
 
                 for i in sorted(top[dim]):
                     cur = len(nodes)
-                    Q = FacetQuadratureRule(ref_el, dim, i, Q_facet)
-                    scale = 1 / Q.jacobian_determinant()
-                    phis = scale * Phis
+                    Q = FacetQuadratureRule(ref_el, dim, i, Q_facet, avg=True)
                     nodes.extend(functional.IntegralMoment(ref_el, Q, phi) for phi in phis)
                     entity_ids[dim][i].extend(range(cur, len(nodes)))
         else:
@@ -87,6 +85,11 @@ class CrouzeixRaviart(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+
         dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg, quad_scheme)
         super().__init__(poly_set, dual, degree)

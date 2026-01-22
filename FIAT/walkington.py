@@ -13,8 +13,7 @@ from FIAT.dual_set import DualSet
 from FIAT.expansions import polynomial_dimension
 from FIAT.functional import (
     PointEvaluation, PointDerivative,
-    IntegralMomentOfNormalDerivative,
-    IntegralMomentOfBidirectionalDerivative,
+    IntegralMomentOfDerivative,
 )
 from FIAT.reference_element import TETRAHEDRON
 from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
@@ -47,7 +46,9 @@ class WalkingtonDualSet(DualSet):
         f_at_qpts = numpy.ones(Q_face.get_weights().shape)
         for face in sorted(top[2]):
             cur = len(nodes)
-            nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q_face, f_at_qpts))
+            Q = FacetQuadratureRule(ref_el, 2, face, Q_face, avg=True)
+            n = ref_el.compute_normal(face)
+            nodes.append(IntegralMomentOfDerivative(ref_el, Q, f_at_qpts, n))
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
         # Interior dof: point evaluation at barycenter
@@ -76,22 +77,19 @@ class WalkingtonDualSet(DualSet):
             nface = -numpy.cross(*thats)
             nface /= numpy.linalg.norm(nface)
 
-            for i, e in enumerate(edges[face]):
-                Q = FacetQuadratureRule(ref_face, 1, i, Q_edge)
-
+            for e in sorted(edges[face]):
+                Q = FacetQuadratureRule(ref_el, 1, e, Q_edge, avg=True)
                 te = ref_el.compute_edge_tangent(e)
                 nfe = numpy.cross(te, nface)
                 nfe /= numpy.linalg.norm(nfe)
-                nfe /= Q.jacobian_determinant()
-                nodes.append(IntegralMomentOfNormalDerivative(ref_el, face, Q, leg4_at_qpts, n=nfe))
+                nodes.append(IntegralMomentOfDerivative(ref_el, Q, leg4_at_qpts, nfe))
 
-            Q = FacetQuadratureRule(ref_el, 2, face, Q_face)
-            f = phi / Q.jacobian_determinant()
-            nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, nface, t) for t in thats)
+            Q = FacetQuadratureRule(ref_el, 2, face, Q_face, avg=True)
+            nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, nface, t) for t in thats)
             entity_ids[2][face].extend(range(cur, len(nodes)))
 
             cur = len(extra_nodes)
-            extra_nodes.extend(IntegralMomentOfBidirectionalDerivative(ref_el, Q, f, thats[i], thats[j])
+            extra_nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, thats[i], thats[j])
                                for i in range(2) for j in range(i, 2))
             extra_entity_ids[2][face].extend(range(cur, len(extra_nodes)))
 
