@@ -156,6 +156,11 @@ class FiatElement(FiniteElementBase):
         # point set over and over in case it is used multiple times
         # (in for example a tensorproductelement).
         fiat_dual_basis = self._element.dual_basis()
+
+        if len(fiat_dual_basis) > self.space_dimension():
+            # Throw away constrained degrees of freedom
+            fiat_dual_basis = tuple(fiat_dual_basis)[:self.space_dimension()]
+
         seen = dict()
         allpts = []
         # Find the unique points to evaluate at.
@@ -227,10 +232,6 @@ class FiatElement(FiniteElementBase):
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
                 Qdense[idx] = value
-
-            # Remove the constrained degrees of freedom
-            if Qdense.shape[0] != self.space_dimension():
-                Qdense = Qdense[:self.space_dimension()]
             Q = gem.Literal(Qdense)
         return Q, np.asarray(allpts)
 

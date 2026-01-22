@@ -10,6 +10,7 @@
 # transformation theory.
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
+from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
 from FIAT.hierarchical import make_dual_bubbles
 from FIAT.quadrature import FacetQuadratureRule
@@ -46,7 +47,7 @@ def BernardiRaugelSpace(ref_el, order):
 
 class BernardiRaugelDualSet(dual_set.DualSet):
     """The Bernardi-Raugel dual set."""
-    def __init__(self, ref_el, order=1, degree=None, reduced=False, ref_complex=None, hierarchical=False):
+    def __init__(self, ref_el, order=1, degree=None, reduced=False, ref_complex=None, hierarchical=False, quad_scheme=None):
         if ref_complex is None:
             ref_complex = ref_el
         sd = ref_el.get_spatial_dimension()
@@ -72,38 +73,40 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             # Face moments of normal/tangential components against dual bubbles
             ref_facet = ref_complex.construct_subcomplex(sd-1)
             codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
-            # FIXME magic numbers
             if codim == 0:
-                scale = (-2)**(sd-1)
+                scale = (-1)**(sd-1) * 0.5 * ref_facet.volume()
             else:
-                scale = (2/3)**0.5 if sd == 2 else 4*(2/15)**0.5
+                scale = (3/2)**0.5 if sd == 2 else (15/32)**0.5
 
-            Q, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=scale)
+            # We set up two quadrature rules, one for the normal DoFs and another for the tangential constraints
+            Q_low = parse_quadrature_scheme(ref_facet, degree, quad_scheme=quad_scheme)
+            Q_face, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
             f_at_qpts = phis[-1]
+            f_at_qpts *= scale
             if codim != 0:
-                f_at_qpts -= numpy.dot(f_at_qpts, Q.get_weights()) / ref_facet.volume()
+                f_at_qpts -= numpy.dot(f_at_qpts, Q_face.get_weights()) / ref_facet.volume()
 
             interior_facets = ref_el.get_interior_facets(sd-1) or ()
             facets = list(set(top[sd-1]) - set(interior_facets))
 
-            Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q) for f in facets}
+            Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q_face, avg=True) for f in facets}
             thats = {f: ref_el.compute_tangents(sd-1, f) for f in facets}
 
             perp = lambda *v: numpy.array([v[0][1], -v[0][0]]) if len(v) == 1 else numpy.cross(*v)
             ndir = 1 if reduced else sd
             for i in range(ndir):
                 for f in sorted(facets):
-                    cur = len(nodes)
-                    if i == 0:
-                        wts = f_at_qpts if hierarchical else numpy.ones(f_at_qpts.shape) / ref_facet.volume()
-                        udir = perp(*thats[f])
-                    else:
+                    udir = thats[f][i-1] if i > 0 else perp(*thats[f])
+                    if i > 0 or hierarchical:
+                        Q = Qs[f]
                         wts = f_at_qpts
-                        udir = thats[f][i-1]
+                    else:
+                        Q = FacetQuadratureRule(ref_el, sd-1, f, Q_low, avg=True)
+                        wts = numpy.full(Q_low.get_weights().shape, 1/ref_facet.volume())
+                    phi_at_qpts = numpy.outer(udir, wts)
 
-                    detJ = Qs[f].jacobian_determinant()
-                    phi_at_qpts = udir[:, None] * wts[None, :] / detJ
-                    nodes.append(FrobeniusIntegralMoment(ref_el, Qs[f], phi_at_qpts))
+                    cur = len(nodes)
+                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, phi_at_qpts))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -114,11 +117,11 @@ class BernardiRaugel(finite_element.CiarletElement):
     This element does not belong to a Stokes complex, but can be paired with
     DG_{k-1}. This pair is inf-sup stable, but only weakly divergence-free.
     """
-    def __init__(self, ref_el, order=1, hierarchical=False):
+    def __init__(self, ref_el, order=1, hierarchical=False, quad_scheme=None):
         degree = ref_el.get_spatial_dimension()
         if order >= degree:
             raise ValueError(f"{type(self).__name__} only defined for order < dim")
         poly_set = BernardiRaugelSpace(ref_el, order)
-        dual = BernardiRaugelDualSet(ref_el, order, degree=degree, hierarchical=hierarchical)
+        dual = BernardiRaugelDualSet(ref_el, order, degree=degree, hierarchical=hierarchical, quad_scheme=quad_scheme)
         formdegree = 0
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
