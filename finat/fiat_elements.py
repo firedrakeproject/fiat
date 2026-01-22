@@ -228,6 +228,7 @@ class FiatElement(FiniteElementBase):
             for idx, value in Q.items():
                 Qdense[idx] = value
 
+            # Remove the constrained degrees of freedom
             if Qdense.shape[0] != self.space_dimension():
                 Qdense = Qdense[:self.space_dimension()]
             Q = gem.Literal(Qdense)

@@ -285,17 +285,14 @@ class FiniteElementBase(metaclass=ABCMeta):
         return evaluation, basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):
-        """Recombination of degrees of freedom in the physical cell.
+        """Transforms reference dual evaluation into physical dual evaluation.
 
-        Usually only required for elements with mixed mappings, e.g.
-        vertex DoFs are affine-invariant and face DoFs are contravariant.
-
-        :param Q: The quadratures weight matrix in dual_basis
-            that maps quadrature points to degrees of freedom.
+        :param Q: The reference dual evaluation gem weight tensor
+            mapping quadrature points to reference degrees of freedom.
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
-        :returns: The transformed quadrature weight matrix.
+        :returns: The physcial dual evaluation gem weight tensor.
         """
         return Q
 
