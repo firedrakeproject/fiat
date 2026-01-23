@@ -163,9 +163,9 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
         if needs_facet_vertex_coupling:
             perp = lambda *t: numpy.array([t[0][1], -t[0][0]]) if len(t) == 1 else numpy.cross(*t)
 
-            dim = max(d for d in dofs if d < sd-1 and len(dofs[d][0]) > 0)
+            dim = max(d for d in range(sd-1) if len(dofs[d][0]) > 0)
             vdofs = chain.from_iterable(dofs[dim].values())
-            vdofs = [i for i in vdofs if not nodes[i].deriv_dict]
+            vdofs = [i for i in vdofs if nodes[i].max_deriv_order == 0]
             fdofs = list(chain.from_iterable(dofs[sd-1].values()))
 
             T = numpy.full((len(fdofs), len(vdofs)), Zero(), dtype=object)
@@ -178,7 +178,6 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                         T[fdofs.index(fdof), curvdofs] = Tfv
 
             V[ndof:, vdofs] += V[ndof:, fdofs] @ T
-        self._coordinate_mapping = coordinate_mapping
         return ListTensor(V.T)
 
     def dual_transformation(self, Q, coordinate_mapping=None):
@@ -194,7 +193,7 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
         M = identity(self.space_dimension())
         entity_ids = self.entity_dofs()
         for v in entity_ids[0]:
-            vids = entity_ids[0][v]
+            vids = entity_ids[0][v][:sd]
             M[numpy.ix_(vids, vids)] = F
         M = ListTensor(M)
         return M @ Q

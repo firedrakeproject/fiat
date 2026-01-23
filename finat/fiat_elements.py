@@ -159,7 +159,7 @@ class FiatElement(FiniteElementBase):
 
         if len(fiat_dual_basis) > self.space_dimension():
             # Throw away constrained degrees of freedom
-            fiat_dual_basis = tuple(fiat_dual_basis)[:self.space_dimension()]
+            fiat_dual_basis = fiat_dual_basis[:self.space_dimension()]
 
         seen = dict()
         allpts = []

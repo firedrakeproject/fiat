@@ -70,43 +70,53 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                     entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         if order < sd:
-            # Face moments of normal/tangential components against dual bubbles
+            # Face moments of normal component against constant
+            # Face moments of tangential components against dual bubbles
             ref_facet = ref_complex.construct_subcomplex(sd-1)
-            codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
-            if codim == 0:
-                scale = (-1)**(sd-1) * 0.5 * ref_facet.volume()
-            else:
-                scale = (3/2)**0.5 if sd == 2 else (15/32)**0.5
+            ref_area = ref_facet.volume()
 
-            # We set up two quadrature rules, one for the normal DoFs and another for the tangential constraints
-            Q_low = parse_quadrature_scheme(ref_facet, degree, quad_scheme=quad_scheme)
-            Q_face, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
-            f_at_qpts = phis[-1]
-            f_at_qpts *= scale
+            # Quadrature and weight function for tangential constraints
+            codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
+            Qt_ref, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
+            ft_at_qpts = phis[-1]
+            if codim == 0:
+                scale = (-1)**(sd-1) * 0.5 * ref_area
+            else:
+                scale = ref_area / numpy.dot(ft_at_qpts, Qt_ref.get_weights())
+            ft_at_qpts *= scale
             if codim != 0:
-                f_at_qpts -= numpy.dot(f_at_qpts, Q_face.get_weights()) / ref_facet.volume()
+                ft_at_qpts -= numpy.dot(ft_at_qpts, Qt_ref.get_weights()) / ref_area
 
             interior_facets = ref_el.get_interior_facets(sd-1) or ()
             facets = list(set(top[sd-1]) - set(interior_facets))
+            Qt = {f: FacetQuadratureRule(ref_el, sd-1, f, Qt_ref, avg=True) for f in facets}
 
-            Qs = {f: FacetQuadratureRule(ref_el, sd-1, f, Q_face, avg=True) for f in facets}
+            # Quadrature and weight function for normal degrees of freedom
+            if hierarchical:
+                Qn = Qt
+                fn_at_qpts = ft_at_qpts
+            else:
+                Qn_ref = parse_quadrature_scheme(ref_facet, degree, quad_scheme=quad_scheme)
+                Qn = {f: FacetQuadratureRule(ref_el, sd-1, f, Qn_ref, avg=True) for f in facets}
+                fn_at_qpts = numpy.full(Qn_ref.get_weights().shape, 1 / ref_area)
+
             thats = {f: ref_el.compute_tangents(sd-1, f) for f in facets}
-
             perp = lambda *v: numpy.array([v[0][1], -v[0][0]]) if len(v) == 1 else numpy.cross(*v)
             ndir = 1 if reduced else sd
             for i in range(ndir):
                 for f in sorted(facets):
-                    udir = thats[f][i-1] if i > 0 else perp(*thats[f])
-                    if i > 0 or hierarchical:
-                        Q = Qs[f]
-                        wts = f_at_qpts
-                    else:
-                        Q = FacetQuadratureRule(ref_el, sd-1, f, Q_low, avg=True)
-                        wts = numpy.full(Q_low.get_weights().shape, 1/ref_facet.volume())
-                    phi_at_qpts = numpy.outer(udir, wts)
-
                     cur = len(nodes)
-                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, phi_at_qpts))
+                    if i == 0:
+                        # normal DoF
+                        Q = Qn[f]
+                        phi = fn_at_qpts
+                        udir = perp(*thats[f])
+                    else:
+                        # tangential constraint
+                        Q = Qt[f]
+                        phi = ft_at_qpts
+                        udir = thats[f][i-1]
+                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(udir, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 

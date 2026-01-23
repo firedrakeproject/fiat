@@ -292,7 +292,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
-        :returns: The physcial dual evaluation gem weight tensor.
+        :returns: The physical dual evaluation gem weight tensor.
         """
         return Q
 
