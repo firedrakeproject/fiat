@@ -285,15 +285,16 @@ class FiniteElementBase(metaclass=ABCMeta):
         '''Appropriate mapping from the reference cell to a physical cell for
         all basis functions of the finite element.'''
 
-    def is_lagrange(self):
-        '''Returns whether finat_element.dual_basis consists only of point
-        evaluation dofs.'''
+    @cached_property
+    def has_pointwise_dual_basis(self):
+        '''Whether this element's dual basis consist only of point
+        evaluation functionals.'''
         try:
             Q, ps = self.dual_basis
         except NotImplementedError:
             return False
-        # Inspect the weight matrix
-        # Lagrange elements have gem.Delta as the only terminal nodes
+        # Check whether the weight matrix is a product of identity matrices
+        # A pointwise dual basis has gem.Delta as the only terminal node
         children = [Q]
         while children:
             nodes = []
