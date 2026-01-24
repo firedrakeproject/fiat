@@ -287,7 +287,7 @@ class FiniteElementBase(metaclass=ABCMeta):
 
     @cached_property
     def has_pointwise_dual_basis(self):
-        '''Whether this element's dual basis consist only of point
+        '''Whether this element's dual basis consists only of point
         evaluation functionals.'''
         try:
             Q, ps = self.dual_basis
