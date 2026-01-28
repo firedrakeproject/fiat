@@ -50,7 +50,12 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">NeedsCoordinateMappingElement</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for elements that require physical information</span>
 <span class="sd">    either to map or construct their basis functions.&quot;&quot;&quot;</span>
-    <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="NeedsCoordinateMappingElement.dual_transformation">
+<a class="viewcode-back" href="../../finat.html#finat.physically_mapped.NeedsCoordinateMappingElement.dual_transformation">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">dual_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Dual evaluation for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> is not implemented.&quot;</span><span class="p">)</span></div>
+</div>
 
 
 

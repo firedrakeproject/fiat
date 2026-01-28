@@ -211,6 +211,11 @@
         <span class="c1"># point set over and over in case it is used multiple times</span>
         <span class="c1"># (in for example a tensorproductelement).</span>
         <span class="n">fiat_dual_basis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">dual_basis</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">fiat_dual_basis</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">():</span>
+            <span class="c1"># Throw away constrained degrees of freedom</span>
+            <span class="n">fiat_dual_basis</span> <span class="o">=</span> <span class="n">fiat_dual_basis</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()]</span>
+
         <span class="n">seen</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
         <span class="n">allpts</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="c1"># Find the unique points to evaluate at.</span>

@@ -408,13 +408,13 @@ freedom for the finite element.</p>
 <span id="finat-bernardi-raugel-module"></span><h2>finat.bernardi_raugel module<a class="headerlink" href="#module-finat.bernardi_raugel" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.bernardi_raugel.BernardiRaugel">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.bernardi_raugel.</span></span><span class="sig-name descname"><span class="pre">BernardiRaugel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/bernardi_raugel.html#BernardiRaugel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.bernardi_raugel.BernardiRaugel" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.bernardi_raugel.</span></span><span class="sig-name descname"><span class="pre">BernardiRaugel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/bernardi_raugel.html#BernardiRaugel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.bernardi_raugel.BernardiRaugel" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement" title="finat.piola_mapped.PiolaBubbleElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">PiolaBubbleElement</span></code></a></p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.bernardi_raugel.BernardiRaugelBubble">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.bernardi_raugel.</span></span><span class="sig-name descname"><span class="pre">BernardiRaugelBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/bernardi_raugel.html#BernardiRaugelBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.bernardi_raugel.BernardiRaugelBubble" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.bernardi_raugel.</span></span><span class="sig-name descname"><span class="pre">BernardiRaugelBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/bernardi_raugel.html#BernardiRaugelBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.bernardi_raugel.BernardiRaugelBubble" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.bernardi_raugel.BernardiRaugel" title="finat.bernardi_raugel.BernardiRaugel"><code class="xref py py-class docutils literal notranslate"><span class="pre">BernardiRaugel</span></code></a></p>
 </dd></dl>
 
@@ -1889,17 +1889,22 @@ currently have a FInAT dual basis.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.finiteelementbase.FiniteElementBase.dual_evaluation">
-<span class="sig-name descname"><span class="pre">dual_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#FiniteElementBase.dual_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.FiniteElementBase.dual_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">dual_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#FiniteElementBase.dual_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.FiniteElementBase.dual_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Get a GEM expression for performing the dual basis evaluation at
 the nodes of the reference element. Currently only works for flat
 elements: tensor elements are implemented in
 <code class="xref py py-class docutils literal notranslate"><span class="pre">TensorFiniteElement</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>fn</strong> – Callable representing the function to dual evaluate.
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fn</strong> – Callable representing the function to dual evaluate.
 Callable should take in an <code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractPointSet</span></code> and
 return a GEM expression for evaluation of the function at
-those points.</p>
+those points.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
+</ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(dual_evaluation_gem_expression,</span> <span class="pre">basis_indices)</span></code>
@@ -1907,6 +1912,26 @@ where the given <code class="docutils literal notranslate"><span class="pre">bas
 return expression for the code which is compiled from
 <code class="docutils literal notranslate"><span class="pre">dual_evaluation_gem_expression</span></code> (alongside any argument
 multiindices already encoded within <code class="docutils literal notranslate"><span class="pre">fn</span></code>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.finiteelementbase.FiniteElementBase.dual_transformation">
+<span class="sig-name descname"><span class="pre">dual_transformation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#FiniteElementBase.dual_transformation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.FiniteElementBase.dual_transformation" title="Link to this definition">¶</a></dt>
+<dd><p>Transforms reference dual evaluation into physical dual evaluation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>Q</strong> – The reference dual evaluation gem weight tensor
+mapping quadrature points to reference degrees of freedom.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The physical dual evaluation gem weight tensor.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -2059,28 +2084,28 @@ the corresponding basis functions take non-zero values.</p>
 <span id="finat-guzman-neilan-module"></span><h2>finat.guzman_neilan module<a class="headerlink" href="#module-finat.guzman_neilan" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.guzman_neilan.GuzmanNeilanBubble">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanBubble" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanBubble</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanBubble"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanBubble" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.guzman_neilan.GuzmanNeilanFirstKindH1" title="finat.guzman_neilan.GuzmanNeilanFirstKindH1"><code class="xref py py-class docutils literal notranslate"><span class="pre">GuzmanNeilanFirstKindH1</span></code></a></p>
 <p>Modified Bernardi-Raugel bubbles that are C^0 P_dim(Alfeld) with constant divergence.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.guzman_neilan.GuzmanNeilanFirstKindH1">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanFirstKindH1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanFirstKindH1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanFirstKindH1" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanFirstKindH1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanFirstKindH1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanFirstKindH1" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement" title="finat.piola_mapped.PiolaBubbleElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">PiolaBubbleElement</span></code></a></p>
 <p>Pk^d enriched with Guzman-Neilan bubbles.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.guzman_neilan.GuzmanNeilanH1div">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanH1div</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanH1div"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanH1div" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanH1div</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanH1div"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanH1div" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement" title="finat.piola_mapped.PiolaBubbleElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">PiolaBubbleElement</span></code></a></p>
 <p>Alfeld-Sorokina nodally enriched with Guzman-Neilan bubbles.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.guzman_neilan.GuzmanNeilanSecondKindH1">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanSecondKindH1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanSecondKindH1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanSecondKindH1" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.guzman_neilan.</span></span><span class="sig-name descname"><span class="pre">GuzmanNeilanSecondKindH1</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/guzman_neilan.html#GuzmanNeilanSecondKindH1"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.guzman_neilan.GuzmanNeilanSecondKindH1" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement" title="finat.piola_mapped.PiolaBubbleElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">PiolaBubbleElement</span></code></a></p>
 <p>C0 Pk^d(Alfeld) enriched with Guzman-Neilan bubbles.</p>
 </dd></dl>
@@ -2696,6 +2721,11 @@ on the requested derivatives.</p>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Abstract class for elements that require physical information
 either to map or construct their basis functions.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.physically_mapped.NeedsCoordinateMappingElement.dual_transformation">
+<span class="sig-name descname"><span class="pre">dual_transformation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#NeedsCoordinateMappingElement.dual_transformation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.NeedsCoordinateMappingElement.dual_transformation" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
@@ -2883,6 +2913,26 @@ basis functions.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>coordinate_mapping</strong> – Object providing physical geometry.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.piola_mapped.PiolaBubbleElement.dual_transformation">
+<span class="sig-name descname"><span class="pre">dual_transformation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/piola_mapped.html#PiolaBubbleElement.dual_transformation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.piola_mapped.PiolaBubbleElement.dual_transformation" title="Link to this definition">¶</a></dt>
+<dd><p>Transforms reference dual evaluation into physical dual evaluation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>Q</strong> – The reference dual evaluation gem weight tensor
+mapping quadrature points to reference degrees of freedom.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The physical dual evaluation gem weight tensor.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -4490,17 +4540,22 @@ currently have a FInAT dual basis.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation">
-<span class="sig-name descname"><span class="pre">dual_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensorfiniteelement.html#TensorFiniteElement.dual_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">dual_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensorfiniteelement.html#TensorFiniteElement.dual_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation" title="Link to this definition">¶</a></dt>
 <dd><p>Get a GEM expression for performing the dual basis evaluation at
 the nodes of the reference element. Currently only works for flat
 elements: tensor elements are implemented in
 <a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement" title="finat.tensorfiniteelement.TensorFiniteElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">TensorFiniteElement</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>fn</strong> – Callable representing the function to dual evaluate.
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fn</strong> – Callable representing the function to dual evaluate.
 Callable should take in an <code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractPointSet</span></code> and
 return a GEM expression for evaluation of the function at
-those points.</p>
+those points.</p></li>
+<li><p><strong>coordinate_mapping</strong> – a
+<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
+provides physical geometry callbacks (may be None).</p></li>
+</ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(dual_evaluation_gem_expression,</span> <span class="pre">basis_indices)</span></code>
@@ -4919,6 +4974,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.degree"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.degree</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.dual_basis"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.dual_basis</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.dual_evaluation"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.dual_evaluation()</span></code></a></li>
+<li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.dual_transformation"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.dual_transformation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.entity_closure_dofs"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.entity_closure_dofs()</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.entity_dofs"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.entity_dofs()</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.entity_permutations"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.entity_permutations</span></code></a></li>
@@ -5061,7 +5117,10 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.physically_mapped.MappedTabulation.matvec"><code class="docutils literal notranslate"><span class="pre">MappedTabulation.matvec()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#finat.physically_mapped.NeedsCoordinateMappingElement"><code class="docutils literal notranslate"><span class="pre">NeedsCoordinateMappingElement</span></code></a></li>
+<li><a class="reference internal" href="#finat.physically_mapped.NeedsCoordinateMappingElement"><code class="docutils literal notranslate"><span class="pre">NeedsCoordinateMappingElement</span></code></a><ul>
+<li><a class="reference internal" href="#finat.physically_mapped.NeedsCoordinateMappingElement.dual_transformation"><code class="docutils literal notranslate"><span class="pre">NeedsCoordinateMappingElement.dual_transformation()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry"><code class="docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a><ul>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry.cell_size"><code class="docutils literal notranslate"><span class="pre">PhysicalGeometry.cell_size()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry.detJ_at"><code class="docutils literal notranslate"><span class="pre">PhysicalGeometry.detJ_at()</span></code></a></li>
@@ -5087,6 +5146,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#module-finat.piola_mapped">finat.piola_mapped module</a><ul>
 <li><a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement"><code class="docutils literal notranslate"><span class="pre">PiolaBubbleElement</span></code></a><ul>
 <li><a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement.basis_transformation"><code class="docutils literal notranslate"><span class="pre">PiolaBubbleElement.basis_transformation()</span></code></a></li>
+<li><a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement.dual_transformation"><code class="docutils literal notranslate"><span class="pre">PiolaBubbleElement.dual_transformation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement.entity_dofs"><code class="docutils literal notranslate"><span class="pre">PiolaBubbleElement.entity_dofs()</span></code></a></li>
 <li><a class="reference internal" href="#finat.piola_mapped.PiolaBubbleElement.space_dimension"><code class="docutils literal notranslate"><span class="pre">PiolaBubbleElement.space_dimension()</span></code></a></li>
 </ul>
