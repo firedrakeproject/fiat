@@ -156,6 +156,11 @@ class FiatElement(FiniteElementBase):
         # point set over and over in case it is used multiple times
         # (in for example a tensorproductelement).
         fiat_dual_basis = self._element.dual_basis()
+
+        if len(fiat_dual_basis) > self.space_dimension():
+            # Throw away constrained degrees of freedom
+            fiat_dual_basis = fiat_dual_basis[:self.space_dimension()]
+
         seen = dict()
         allpts = []
         # Find the unique points to evaluate at.

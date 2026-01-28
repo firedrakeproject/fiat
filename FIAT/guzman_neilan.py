@@ -46,7 +46,7 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     K = ref_complex if kind == 2 else ref_el
     num_bubbles = sd + 1
     if reduced:
-        BR = BernardiRaugel(K, order).get_nodal_basis()
+        BR = BernardiRaugel(K, order, hierarchical=True).get_nodal_basis()
         reduced_dim = BR.get_num_members() - (sd-1) * (sd+1)
         BR = BR.take(list(range(reduced_dim)))
     else:
@@ -59,14 +59,14 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
 
 class GuzmanNeilanH1(finite_element.CiarletElement):
     """The Guzman-Neilan H1-conforming (extended) macroelement."""
-    def __init__(self, ref_el, order=1, kind=1):
+    def __init__(self, ref_el, order=1, kind=1, quad_scheme=None):
         sd = ref_el.get_spatial_dimension()
         if order >= sd:
             raise ValueError(f"{type(self).__name__} is only defined for order < dim")
         degree = sd
         poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
         ref_complex = poly_set.get_reference_element() if kind == 2 else ref_el
-        dual = BernardiRaugelDualSet(ref_complex, order, degree=degree)
+        dual = BernardiRaugelDualSet(ref_complex, order, degree=degree, quad_scheme=quad_scheme)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")
 
@@ -80,8 +80,8 @@ class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):
 
     This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.
     """
-    def __init__(self, ref_el, order=1):
-        super().__init__(ref_el, order=order, kind=1)
+    def __init__(self, ref_el, order=1, quad_scheme=None):
+        super().__init__(ref_el, order=order, kind=1, quad_scheme=quad_scheme)
 
 
 class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
@@ -93,11 +93,11 @@ class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
 
     This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).
     """
-    def __init__(self, ref_el, order=1):
-        super().__init__(ref_el, order=order, kind=2)
+    def __init__(self, ref_el, order=1, quad_scheme=None):
+        super().__init__(ref_el, order=order, kind=2, quad_scheme=quad_scheme)
 
 
-def GuzmanNeilanH1div(ref_el, degree=2, reduced=False):
+def GuzmanNeilanH1div(ref_el, degree=2, reduced=False, quad_scheme=None):
     """The Guzman-Neilan H1(div)-conforming (extended) macroelement.
 
     Reference element: a simplex of any dimension.
@@ -115,7 +115,7 @@ def GuzmanNeilanH1div(ref_el, degree=2, reduced=False):
         div_nodes = [i for i, node in enumerate(AS.dual_basis())
                      if len(node.deriv_dict) > 0]
         AS = RestrictedElement(AS, indices=div_nodes)
-    GN = GuzmanNeilanH1(ref_el, order=order)
+    GN = GuzmanNeilanH1(ref_el, order=order, quad_scheme=quad_scheme)
     return NodalEnrichedElement(AS, GN)
 
 
