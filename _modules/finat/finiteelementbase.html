@@ -372,7 +372,30 @@
     <span class="nd">@abstractproperty</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&#39;&#39;&#39;Appropriate mapping from the reference cell to a physical cell for</span>
-<span class="sd">        all basis functions of the finite element.&#39;&#39;&#39;</span></div>
+<span class="sd">        all basis functions of the finite element.&#39;&#39;&#39;</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_pointwise_dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Whether this element&#39;s dual basis consists only of point</span>
+<span class="sd">        evaluation functionals.&#39;&#39;&#39;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">Q</span><span class="p">,</span> <span class="n">ps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
+        <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="c1"># Check whether the weight matrix is a product of identity matrices</span>
+        <span class="c1"># A pointwise dual basis has gem.Delta as the only terminal node</span>
+        <span class="n">children</span> <span class="o">=</span> <span class="p">[</span><span class="n">Q</span><span class="p">]</span>
+        <span class="k">while</span> <span class="n">children</span><span class="p">:</span>
+            <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">children</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">):</span>
+                    <span class="k">pass</span>
+                <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">gem</span><span class="o">.</span><span class="n">Terminal</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">children</span><span class="p">)</span>
+            <span class="n">children</span> <span class="o">=</span> <span class="n">nodes</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
 
 
 
