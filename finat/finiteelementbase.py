@@ -285,6 +285,29 @@ class FiniteElementBase(metaclass=ABCMeta):
         '''Appropriate mapping from the reference cell to a physical cell for
         all basis functions of the finite element.'''
 
+    @cached_property
+    def has_pointwise_dual_basis(self):
+        '''Whether this element's dual basis consists only of point
+        evaluation functionals.'''
+        try:
+            Q, ps = self.dual_basis
+        except NotImplementedError:
+            return False
+        # Check whether the weight matrix is a product of identity matrices
+        # A pointwise dual basis has gem.Delta as the only terminal node
+        children = [Q]
+        while children:
+            nodes = []
+            for c in children:
+                if isinstance(c, gem.Delta):
+                    pass
+                elif isinstance(c, gem.gem.Terminal):
+                    return False
+                else:
+                    nodes.extend(c.children)
+            children = nodes
+        return True
+
 
 def entity_support_dofs(elem, entity_dim):
     '''Return the map of entity id to the degrees of freedom for which
