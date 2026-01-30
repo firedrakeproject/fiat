@@ -134,10 +134,13 @@ class QuadratureElement(FiniteElementBase):
         :param ps: the point set object.
         :param entity: the cell entity on which to tabulate.
         '''
-        rule_dim = self._rule.point_set.dimension
         if entity is None:
-            entity = (rule_dim, 0)
+            entity = (self.cell.get_dimension(), 0)
         entity_dim, entity_id = entity
+        if isinstance(entity_dim, tuple):
+            entity_dim = sum(entity_dim)
+
+        rule_dim = self._rule.point_set.dimension
         if entity_dim != rule_dim:
             raise ValueError(f"Cannot tabulate QuadratureElement of dimension {rule_dim}"
                              f" on subentities of dimension {entity_dim}.")
