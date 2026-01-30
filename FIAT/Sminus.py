@@ -52,7 +52,7 @@ class TrimmedSerendipity(FiniteElement):
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         self.fdim = dim
-        if dim != 2 or dim != 3:
+        if dim not in (2, 3):
             raise Exception("Trimmed serendipity elements only valid for dimensions 2 and 3")
 
         flat_topology = flat_el.get_topology()
