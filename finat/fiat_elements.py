@@ -119,7 +119,6 @@ class FiatElement(FiniteElementBase):
             expr = gem.ComponentTensor(expr, basis_indices)
             if replace_indices:
                 expr, = gem.optimise.remove_componenttensors((expr,), subst=replace_indices)
-
             result[alpha] = expr
         return result
 
@@ -148,8 +147,17 @@ class FiatElement(FiniteElementBase):
         # Coordinates on the reference entity (GEM)
         Xi = tuple(gem.Indexed(refcoords, i) for i in np.ndindex(refcoords.shape))
         ps = PointSingleton(Xi)
-        return self.basis_evaluation(order, ps, entity=entity,
-                                     coordinate_mapping=coordinate_mapping)
+        result = self.basis_evaluation(order, ps, entity=entity,
+                                       coordinate_mapping=coordinate_mapping)
+
+        # Apply symbolic simplification
+        vals = result.values()
+        vals = map(gem.optimise.ffc_rounding, vals, [1E-15]*len(vals))
+        vals = gem.optimise.constant_fold_zero(vals)
+        vals = map(gem.optimise.aggressive_unroll, vals)
+        vals = gem.optimise.remove_componenttensors(vals)
+        result = dict(zip(result.keys(), vals))
+        return result
 
     @cached_property
     def _dual_basis(self):
@@ -158,6 +166,11 @@ class FiatElement(FiniteElementBase):
         # point set over and over in case it is used multiple times
         # (in for example a tensorproductelement).
         fiat_dual_basis = self._element.dual_basis()
+
+        if len(fiat_dual_basis) > self.space_dimension():
+            # Throw away constrained degrees of freedom
+            fiat_dual_basis = fiat_dual_basis[:self.space_dimension()]
+
         seen = dict()
         allpts = []
         # Find the unique points to evaluate at.

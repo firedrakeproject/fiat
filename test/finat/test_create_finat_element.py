@@ -47,7 +47,7 @@ def tensor_name(request):
 
 @pytest.fixture(params=[ufl.interval, ufl.triangle,
                         ufl.quadrilateral],
-                ids=lambda x: x.cellname())
+                ids=lambda x: x.cellname)
 def ufl_A(request, tensor_name):
     return finat.ufl.FiniteElement(tensor_name, request.param, 1)
 
@@ -139,6 +139,17 @@ def test_quadrilateral_variant_spectral_dq_l2():
     element = create_element(finat.ufl.FiniteElement('DQ L2', ufl.quadrilateral, 1, variant='spectral'))
     assert isinstance(element.product.factors[0], finat.GaussLegendre)
     assert isinstance(element.product.factors[1], finat.GaussLegendre)
+
+
+@pytest.mark.parametrize("cell, degree",
+                         [(ufl.triangle, p) for p in range(1, 7)]
+                         + [(ufl.tetrahedron, p) for p in range(1, 4)])
+def test_kmv(cell, degree):
+    ufl_element = finat.ufl.FiniteElement('KMV', cell, degree)
+    finat_element = create_element(ufl_element)
+    assert ufl_element.degree() == degree
+    assert ufl_element.embedded_superdegree == finat_element.degree
+    assert (finat_element.degree > degree) or (degree == 1)
 
 
 def test_cache_hit(ufl_element):

@@ -242,7 +242,7 @@ class FiniteElementBase(metaclass=ABCMeta):
             f"Dual basis not defined for element {type(self).__name__}"
         )
 
-    def dual_evaluation(self, fn):
+    def dual_evaluation(self, fn, coordinate_mapping=None):
         '''Get a GEM expression for performing the dual basis evaluation at
         the nodes of the reference element. Currently only works for flat
         elements: tensor elements are implemented in
@@ -252,6 +252,9 @@ class FiniteElementBase(metaclass=ABCMeta):
                    Callable should take in an :class:`AbstractPointSet` and
                    return a GEM expression for evaluation of the function at
                    those points.
+        :param coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
         :returns: A tuple ``(dual_evaluation_gem_expression, basis_indices)``
                   where the given ``basis_indices`` are those needed to form a
                   return expression for the code which is compiled from
@@ -259,6 +262,7 @@ class FiniteElementBase(metaclass=ABCMeta):
                   multiindices already encoded within ``fn``)
         '''
         Q, x = self.dual_basis
+        Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
 
         expr = fn(x)
         # Apply targeted sum factorisation and delta elimination to
@@ -280,10 +284,45 @@ class FiniteElementBase(metaclass=ABCMeta):
         evaluation = gem.optimise.contraction(evaluation, shape_indices)
         return evaluation, basis_indices
 
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        """Transforms reference dual evaluation into physical dual evaluation.
+
+        :param Q: The reference dual evaluation gem weight tensor
+            mapping quadrature points to reference degrees of freedom.
+        :param coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
+        :returns: The physical dual evaluation gem weight tensor.
+        """
+        return Q
+
     @abstractproperty
     def mapping(self):
         '''Appropriate mapping from the reference cell to a physical cell for
         all basis functions of the finite element.'''
+
+    @cached_property
+    def has_pointwise_dual_basis(self):
+        '''Whether this element's dual basis consists only of point
+        evaluation functionals.'''
+        try:
+            Q, ps = self.dual_basis
+        except NotImplementedError:
+            return False
+        # Check whether the weight matrix is a product of identity matrices
+        # A pointwise dual basis has gem.Delta as the only terminal node
+        children = [Q]
+        while children:
+            nodes = []
+            for c in children:
+                if isinstance(c, gem.Delta):
+                    pass
+                elif isinstance(c, gem.gem.Terminal):
+                    return False
+                else:
+                    nodes.extend(c.children)
+            children = nodes
+        return True
 
 
 def entity_support_dofs(elem, entity_dim):

@@ -2,8 +2,9 @@ import numpy
 
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
-from gem import Literal, ListTensor
+from gem import Literal, ListTensor, Zero
 from copy import deepcopy
+from itertools import chain
 
 
 def determinant(A):
@@ -156,4 +157,43 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
             cur_dofs = dofs[sd-1][f]
             cur_bfs = bfs[sd-1][f][1:]
             V[numpy.ix_(cur_bfs, cur_dofs)] = rows[..., :len(cur_dofs)]
+
+        # Fix discrepancy between normal and tangential moments
+        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof
+        if needs_facet_vertex_coupling:
+            perp = lambda *t: numpy.array([t[0][1], -t[0][0]]) if len(t) == 1 else numpy.cross(*t)
+
+            dim = max(d for d in range(sd-1) if len(dofs[d][0]) > 0)
+            vdofs = chain.from_iterable(dofs[dim].values())
+            vdofs = [i for i in vdofs if nodes[i].max_deriv_order == 0]
+            fdofs = list(chain.from_iterable(dofs[sd-1].values()))
+
+            T = numpy.full((len(fdofs), len(vdofs)), Zero(), dtype=object)
+            for f in sorted(dofs[sd-1]):
+                nhat = perp(*self.cell.compute_tangents(sd-1, f))
+                Tfv = ((-1/sd) * nhat) @ Finv
+                for v in self.cell.connectivity[(sd-1, dim)][f]:
+                    curvdofs = [vdofs.index(i) for i in dofs[dim][v] if i in vdofs]
+                    for fdof in dofs[sd-1][f]:
+                        T[fdofs.index(fdof), curvdofs] = Tfv
+
+            V[ndof:, vdofs] += V[ndof:, fdofs] @ T
         return ListTensor(V.T)
+
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        sd = self.cell.get_spatial_dimension()
+        bary, = self.cell.make_points(sd, 0, sd+1)
+        J = coordinate_mapping.jacobian_at(bary)
+        detJ = coordinate_mapping.detJ_at(bary)
+
+        # undo the Piola mapping at vertices
+        F = J / detJ
+        F = numpy.array([[F[i, j] for j in range(sd)] for i in range(sd)])
+
+        M = identity(self.space_dimension())
+        entity_ids = self.entity_dofs()
+        for v in entity_ids[0]:
+            vids = entity_ids[0][v][:sd]
+            M[numpy.ix_(vids, vids)] = F
+        M = ListTensor(M)
+        return M @ Q

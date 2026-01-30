@@ -22,6 +22,7 @@ from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.bernstein import Bernstein
 from FIAT.bell import Bell
 from FIAT.hct import HsiehCloughTocher
+from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2
 from FIAT.alfeld_sorokina import AlfeldSorokina
 from FIAT.arnold_qin import ArnoldQin
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1, GuzmanNeilanSecondKindH1, GuzmanNeilanH1div
@@ -62,6 +63,8 @@ from FIAT.mardal_tai_winther import MardalTaiWinther
 from FIAT.bubble import Bubble, FacetBubble
 from FIAT.hdiv_trace import HDivTrace
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen
+from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC
+from FIAT.walkington import Walkington
 from FIAT.histopolation import Histopolation
 from FIAT.fdm_element import FDMLagrange, FDMDiscontinuousLagrange, FDMQuadrature, FDMBrokenH1, FDMBrokenL2, FDMHermite  # noqa: F401
 
@@ -87,9 +90,13 @@ supported_elements = {"Argyris": Argyris,
                       "Discontinuous Taylor": DiscontinuousTaylor,
                       "Discontinuous Raviart-Thomas": DiscontinuousRaviartThomas,
                       "Hermite": CubicHermite,
+                      "Nonconforming Wu-Xu": WuXuH3NC,
+                      "Nonconforming Robust Wu-Xu": WuXuRobustH3NC,
                       "Hsieh-Clough-Tocher": HsiehCloughTocher,
                       "QuadraticPowellSabin6": QuadraticPowellSabin6,
                       "QuadraticPowellSabin12": QuadraticPowellSabin12,
+                      "Alfeld C2": AlfeldC2,
+                      "Bramble-Zlamal C2": BrambleZlamalC2,
                       "Alfeld-Sorokina": AlfeldSorokina,
                       "Arnold-Qin": ArnoldQin,
                       "Christiansen-Hu": ChristiansenHu,
@@ -117,7 +124,8 @@ supported_elements = {"Argyris": Argyris,
                       "Conforming Arnold-Winther": ArnoldWinther,
                       "Nonconforming Arnold-Winther": ArnoldWintherNC,
                       "Hu-Zhang": HuZhang,
-                      "Mardal-Tai-Winther": MardalTaiWinther}
+                      "Mardal-Tai-Winther": MardalTaiWinther,
+                      "Walkington": Walkington}
 
 # List of extra elements
 extra_elements = {"P0": P0}
