@@ -24,12 +24,21 @@ from functools import singledispatch, cache
 
 import finat
 import finat.ufl
+import gem
+
+from finat.fiat_elements import ScalarFiatElement
+from finat.point_set import UnknownPointSet
+from finat.quadrature import QuadratureRule
+from finat.quadrature_element import QuadratureElement
+from finat.tensorfiniteelement import TensorFiniteElement
+
 import ufl
 
-from FIAT import ufc_cell
+from FIAT.reference_element import ufc_cell, Point
 
 __all__ = ("as_fiat_cell", "create_base_element",
-           "create_element", "supported_elements")
+           "create_element", "supported_elements",
+           "create_runtime_quadrature_element")
 
 
 # List of supported elements and mapping to element classes
@@ -387,3 +396,57 @@ def create_base_element(ufl_element, **kwargs):
     if isinstance(finat_element, finat.TensorFiniteElement):
         finat_element = finat_element.base_element
     return finat_element
+
+
+@singledispatch
+def create_runtime_quadrature_element(element, ufl_cell, rt_var_name):
+    """Construct a FInAT QuadratureElement for interpolation onto a
+    VertexOnlyMesh. The quadrature point is an UnknownPointSet of shape
+    (1, tdim) where tdim is the topological dimension of ufl_cell. The
+    weight is [1.0], since the single local dof in the VertexOnlyMesh function
+    space corresponds to a point evaluation at the vertex.
+
+    Parameters
+    ----------
+    element : finat.FiniteElementBase
+        The FInAT element to construct a QuadratureElement for.
+    ufl_cell : ufl.Cell
+        The UFL cell of the source domain.
+    rt_var_name : str
+        String beginning with 'rt_' which is used as the name of the
+        gem.Variable used to represent the UnknownPointSet. The `rt_` prefix
+        forces TSFC to do runtime tabulation.
+
+    Raises
+    ------
+    ValueError
+        If the element does not define a physical Quadrature space
+    """
+    raise NotImplementedError(f"Point evaluation not implemented for a {element} element.")
+
+
+@create_runtime_quadrature_element.register(ScalarFiatElement)
+@create_runtime_quadrature_element.register(QuadratureElement)
+def scalar_runtime_quadrature_element(element, ufl_cell, rt_var_name):
+    # QuadratureElements have a dual basis which is point evaluation at the
+    # quadrature points. By using an UnknownPointSet with one point, TSFC
+    # will generate a kernel with an argument to which we can pass the reference
+    # coordinates of a point and evaluate the expression at that point at runtime.
+    if isinstance(element, QuadratureElement) or (element.degree == 0 and isinstance(element.cell, Point)):
+        pass
+    else:
+        raise ValueError("Runtime Quadrature element needs a physical Quadrature element.")
+
+    # gem.Variable name starting with rt_ forces TSFC runtime tabulation
+    assert rt_var_name.startswith("rt_")
+    runtime_points_expr = gem.Variable(rt_var_name, (1, ufl_cell.topological_dimension))
+    rule_pointset = UnknownPointSet(runtime_points_expr)
+    # What we use for the weight doesn't matter since we are not integrating
+    rule = QuadratureRule(rule_pointset, weights=[1.0])
+    return QuadratureElement(as_fiat_cell(ufl_cell), rule)
+
+
+@create_runtime_quadrature_element.register(TensorFiniteElement)
+def tensor_runtime_quadrature_element(element, ufl_cell, rt_var_name):
+    base_element = create_runtime_quadrature_element(element.base_element, ufl_cell, rt_var_name)
+    return TensorFiniteElement(base_element, element._shape, transpose=element._transpose)
