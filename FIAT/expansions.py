@@ -94,9 +94,9 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
-    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
+    phi[0] = numpy.full(numpy.shape(ref_pts[0]), scale)
     if dphi is not None:
-        dphi[0] = (phi[0] - phi[0]) * dX[0]
+        dphi[0] = numpy.zeros(numpy.shape(phi[0])) * dX[0]
     if ddphi is not None:
         ddphi[0] = outer(dphi[0], dX[0])
     if dim == 0 or n == 0:
