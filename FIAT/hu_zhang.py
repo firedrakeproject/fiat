@@ -59,7 +59,7 @@ class HuZhangDual(dual_set.DualSet):
             cell = ref_el.construct_subelement(sd)
             Q_ref = create_quadrature(cell, 2*degree-2)
             P = polynomial_set.ONPolynomialSet(cell, degree-2, scale=1)
-            Phis = P.tabulate(Q_ref.get_points())[(0,)*sd]
+            phis = P.tabulate(Q_ref.get_points())[(0,)*sd]
 
         for entity in sorted(top[sd]):
             cur = len(nodes)
@@ -73,8 +73,7 @@ class HuZhangDual(dual_set.DualSet):
                 # Moments of unique components against a basis for P_{k-2}
                 faces = ref_el.get_connectivity()[(sd, sd-1)][entity]
                 n = list(map(ref_el.compute_scaled_normal, faces))
-                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                phis = Phis / Q.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref, avg=True)
                 nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n[i+1], n[j+1], Q, phi)
                              for phi in phis for i in range(sd) for j in range(i, sd))
 

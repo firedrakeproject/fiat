@@ -7,8 +7,7 @@
 from FIAT import finite_element, polynomial_set, dual_set
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.functional import (PointEvaluation, PointDerivative, PointNormalDerivative,
-                             IntegralMoment,
-                             IntegralMomentOfNormalDerivative)
+                             IntegralMoment, IntegralMomentOfDerivative)
 from FIAT.jacobi import eval_jacobi_batch, eval_jacobi_deriv_batch
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.reference_element import TRIANGLE, ufc_simplex
@@ -37,16 +36,17 @@ class ArgyrisDualSet(dual_set.DualSet):
             # edge dofs
             k = degree - 5
             rline = ufc_simplex(1)
-            Q = parse_quadrature_scheme(rline, interpolant_deg+k-1, quad_scheme)
-            x = 2.0 * Q.get_points() - 1.0
-            phis = eval_jacobi_batch(2, 2, k, x)
-            dphis = eval_jacobi_deriv_batch(2, 2, k, x)
+            Q_ref = parse_quadrature_scheme(rline, interpolant_deg+k-1, quad_scheme)
+            x = rline.compute_barycentric_coordinates(Q_ref.get_points())
+            xref = x[:, [1]] - x[:, [0]]
+            phis = eval_jacobi_batch(2, 2, k, xref)
+            dphis = 2*eval_jacobi_deriv_batch(2, 2, k, xref)
             for e in sorted(top[1]):
-                Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
-                scale = 2 / Q_mapped.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, 1, e, Q_ref, avg=True)
+                n = ref_el.compute_normal(e)
                 cur = len(nodes)
-                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, dphi * scale) for dphi in dphis[1:])
+                nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, n) for phi in phis)
+                nodes.extend(IntegralMoment(ref_el, Q, dphi) for dphi in dphis[1:])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
             # interior dofs
@@ -55,11 +55,9 @@ class ArgyrisDualSet(dual_set.DualSet):
                 cell = ref_el.construct_subelement(sd)
                 Q_ref = parse_quadrature_scheme(cell, interpolant_deg + q, quad_scheme)
                 Pq = polynomial_set.ONPolynomialSet(cell, q, scale=1)
-                Phis = Pq.tabulate(Q_ref.get_points())[(0,) * sd]
+                phis = Pq.tabulate(Q_ref.get_points())[(0,) * sd]
                 for entity in sorted(top[sd]):
-                    Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                    scale = 1 / Q.jacobian_determinant()
-                    phis = scale * Phis
+                    Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref, avg=True)
                     cur = len(nodes)
                     nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis)
                     entity_ids[sd][entity] = list(range(cur, len(nodes)))
