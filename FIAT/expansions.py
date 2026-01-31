@@ -86,8 +86,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
         scale = -scale
 
     num_members = math.comb(n + dim, dim)
-    results = tuple([None] * num_members for i in range(order+1))
-    phi, dphi, ddphi = results + (None,) * (2-order)
 
     outer = lambda x, y: x[:, None, ...] * y[None, ...]
     sym_outer = lambda x, y: outer(x, y) + outer(y, x)
@@ -95,12 +93,12 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
 
-    scale = scale + 0.0
-    phi0 = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
-    for order, result in enumerate(results):
-        result[0] = numpy.zeros((dim,)*order + phi0.shape, dtype=phi0.dtype)
-    phi[0] += scale
+    phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
+    results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
+               for k in range(order+1)]
 
+    phi, dphi, ddphi = results + [None] * (2-order)
+    phi[0] += scale
     if dim == 0 or n == 0:
         return results
     if dim > 3 or dim < 0:
