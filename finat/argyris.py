@@ -1,44 +1,66 @@
 import numpy
 from math import comb
+from itertools import chain
 
 import FIAT
 
-from gem import Literal, ListTensor
+from gem import Literal, ListTensor, Zero
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
+def _jet_transform(J, order):
+    """Basis transformation for derivative evaluation."""
+    if order == 0:
+        return identity(1)
+    sd = J.shape[0]
+    shape = (sd,)*order
+
+    # Mapping from multiindices to linearly-independent (flattened) components
+    mapping = {}
+    alphas = []
+    for indices in numpy.ndindex(shape):
+        alpha = [0] * sd
+        for i in indices:
+            alpha[i] += 1
+        alpha = tuple(alpha)
+        if alpha not in alphas:
+            alphas.append(alpha)
+        mapping[indices] = alphas.index(alpha)
+    # Inverse mapping
+    imapping = {v: k for k, v in mapping.items()}
+
+    # Get the transformation for a covariant tensor.
+    # We take the outer product, as each index maps with the Jacobian.
+    Jnp = numpy.asarray([[J[i, j] for j in range(sd)] for i in range(sd)])
+    Jprod = Jnp
+    for i in range(1, order):
+        Jprod = Jprod[..., None, None] * Jnp
+
+    # Deal with symmetries by contracting along linearly-dependent components.
+    B = numpy.full((len(alphas), len(alphas)), Zero(), dtype=object)
+    for i, ii in imapping.items():
+        for jj, j in mapping.items():
+            B[i, j] += Jprod[tuple(chain.from_iterable(zip(jj, ii)))]
+    return B
+
+
 def _vertex_transform(V, vorder, fiat_cell, coordinate_mapping):
-    """Basis transformation for evaluation, gradient, and hessian at vertices."""
+    """Basis transformation for jet at vertices."""
     sd = fiat_cell.get_spatial_dimension()
     top = fiat_cell.get_topology()
     bary, = fiat_cell.make_points(sd, 0, sd+1)
     J = coordinate_mapping.jacobian_at(bary)
 
-    gdofs = sd
-    G = [[J[j, i] for j in range(sd)] for i in range(sd)]
-
-    if vorder < 2:
-        hdofs = 0
-        H = [[]]
-    else:
-        hdofs = (sd*(sd+1))//2
-        indices = [(i, j) for i in range(sd) for j in range(i, sd)]
-        H = numpy.zeros((hdofs, hdofs), dtype=object)
-        for p, (i, j) in enumerate(indices):
-            for q, (m, n) in enumerate(indices):
-                H[p, q] = J[m, i] * J[n, j] + J[m, j] * J[n, i]
-        H[:, [i == j for i, j in indices]] *= 0.5
-
+    jet = [_jet_transform(J, k) for k in range(vorder+1)]
     s = 0
     for v in sorted(top[0]):
-        s += 1
-        V[s:s+gdofs, s:s+gdofs] = G
-        s += gdofs
-        V[s:s+hdofs, s:s+hdofs] = H
-        s += hdofs
+        for B in jet:
+            ndofs = len(B)
+            V[s:s+ndofs, s:s+ndofs] = B
+            s += ndofs
     return V
 
 

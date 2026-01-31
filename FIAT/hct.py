@@ -7,7 +7,7 @@
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
 from FIAT.functional import (PointEvaluation, PointDerivative,
-                             IntegralMoment,
+                             IntegralMoment, IntegralMomentOfDerivative,
                              IntegralMomentOfNormalDerivative)
 from FIAT import finite_element, dual_set, macro, polynomial_set
 from FIAT.check_format_variant import parse_quadrature_scheme
@@ -42,24 +42,24 @@ class HCTDualSet(dual_set.DualSet):
 
         k = 2 if reduced else degree - 3
         facet = ufc_simplex(1)
-        Q = parse_quadrature_scheme(facet, degree-1+k, quad_scheme)
-        qpts = Q.get_points()
-        xref = 2.0 * qpts - 1.0
+        Q_ref = parse_quadrature_scheme(facet, degree-1+k, quad_scheme)
+        x = facet.compute_barycentric_coordinates(Q_ref.get_points())
+        xref = x[:, [1]] - x[:, [0]]
         if reduced:
             f_at_qpts = eval_jacobi(0, 0, k, xref[:, 0])
             for e in sorted(top[1]):
                 cur = len(nodes)
-                nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q, f_at_qpts))
+                nodes.append(IntegralMomentOfNormalDerivative(ref_el, e, Q_ref, f_at_qpts))
                 entity_ids[1][e].extend(range(cur, len(nodes)))
         else:
             phis = eval_jacobi_batch(1, 1, k, xref)
-            dphis = eval_jacobi_deriv_batch(1, 1, k, xref)
+            dphis = 2*eval_jacobi_deriv_batch(1, 1, k, xref)
             for e in sorted(top[1]):
-                Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
-                scale = 2 / Q_mapped.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, 1, e, Q_ref, avg=True)
+                n = ref_el.compute_normal(e)
                 cur = len(nodes)
-                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, dphi * scale) for dphi in dphis[1:])
+                nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, n) for phi in phis)
+                nodes.extend(IntegralMoment(ref_el, Q, dphi) for dphi in dphis[1:])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
             q = degree - 4
@@ -67,9 +67,9 @@ class HCTDualSet(dual_set.DualSet):
                 Q = parse_quadrature_scheme(ref_complex, degree + q, quad_scheme)
                 Pq = polynomial_set.ONPolynomialSet(ref_el, q, scale=1)
                 phis = Pq.tabulate(Q.get_points())[(0,) * sd]
-                scale = 1 / ref_el.volume()
+                phis *= 1/ref_el.volume()
                 cur = len(nodes)
-                nodes.extend(IntegralMoment(ref_el, Q, phi * scale) for phi in phis)
+                nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis)
                 entity_ids[sd][0] = list(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
