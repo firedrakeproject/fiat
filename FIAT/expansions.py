@@ -85,22 +85,18 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
         scale = -scale
 
     num_members = math.comb(n + dim, dim)
-    results = tuple([None] * num_members for i in range(order+1))
-    phi, dphi, ddphi = results + (None,) * (2-order)
 
     outer = lambda x, y: x[:, None, ...] * y[None, ...]
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
 
-    shape = () if dim == 0 else numpy.shape(ref_pts[0])
-    dtype = None if dim == 0 else numpy.result_type(*ref_pts)
+    phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
+    results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
+               for k in range(order+1)]
 
-    phi[0] = numpy.full(shape, scale, dtype=dtype)
-    if dphi is not None:
-        dphi[0] = numpy.zeros(shape, dtype=dtype) * dX[0]
-    if ddphi is not None:
-        ddphi[0] = outer(dphi[0], dX[0])
+    phi, dphi, ddphi = results + [None] * (2-order)
+    phi[0] += scale
     if dim == 0 or n == 0:
         return results
     if dim > 3 or dim < 0:
@@ -202,9 +198,9 @@ def C0_basis(dim, n, tabulations):
     # Recover facet bubbles
     for phi in tabulations:
         icur = 0
+        phi[icur] *= -1.0
         for inext in range(1, dim+1):
             phi[icur] += phi[inext]
-        phi[icur] *= -1
         if dim == 2:
             for i in range(2, n+1):
                 phi[idx(0, i)] -= phi[idx(1, i-1)]
