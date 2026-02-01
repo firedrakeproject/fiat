@@ -192,11 +192,8 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
 
         M = identity(self.space_dimension())
         entity_ids = self.entity_dofs()
-        for dim in range(sd-1):
-            for entity in entity_ids[dim]:
-                eids = entity_ids[dim][entity]
-                for k in range(0, len(eids), sd):
-                    vids = eids[k:k+sd]
-                    M[numpy.ix_(vids, vids)] = F
+        for v in entity_ids[0]:
+            vids = entity_ids[0][v][:sd]
+            M[numpy.ix_(vids, vids)] = F
         M = ListTensor(M)
         return M @ Q
