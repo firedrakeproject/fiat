@@ -246,7 +246,7 @@ def inverse(A):
         # Extract a connected component
         seed = {min(candidates)}
         while True:
-            ids = set()
+            ids = set(seed)
             for i in seed:
                 ids.update(j for j in candidates if not isinstance(M[j, i], gem.Zero))
                 ids.update(j for j in candidates if not isinstance(M[i, j], gem.Zero))
