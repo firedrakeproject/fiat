@@ -6,9 +6,10 @@ from FIAT import (HsiehCloughTocher as HCT,
                   ArnoldQin as AQ,
                   Lagrange as CG,
                   DiscontinuousLagrange as DG)
-from FIAT.reference_element import ufc_simplex
+from FIAT.reference_element import ufc_simplex, symmetric_simplex
 
 from FIAT.polynomial_set import ONPolynomialSet
+from FIAT.quadrature_schemes import create_quadrature
 from FIAT.macro import CkPolynomialSet
 from FIAT.alfeld_sorokina import AlfeldSorokinaSpace
 from FIAT.arnold_qin import ArnoldQinSpace
@@ -178,6 +179,31 @@ def test_gn_stokes_pairs(cell, kind):
     else:
         raise ValueError(f"Unexpected kind {kind}")
     check_stokes_complex(spaces, degree)
+
+
+@pytest.mark.parametrize("quad_scheme", (None, "KMV(2),powell-sabin"))
+@pytest.mark.parametrize("sd", (2, 3))
+def test_gn_dofs(sd, quad_scheme):
+    cell = symmetric_simplex(sd)
+
+    gn = GuzmanNeilanFirstKindH1(cell, 1, quad_scheme=quad_scheme)
+    degree = gn.degree()
+    assert degree == sd
+    ref_complex = gn.get_reference_complex()
+    Q = create_quadrature(ref_complex, degree-1)
+    wts = Q.get_weights()
+    tab = gn.tabulate(1, Q.get_points())
+
+    div_moments = numpy.dot(div(tab), wts)
+    expected = numpy.zeros(div_moments.shape)
+
+    entity_ids = gn.entity_dofs()
+    for f in entity_ids[sd-1]:
+        fdof = entity_ids[sd-1][f][0]
+        farea = cell.volume_of_subcomplex(sd-1, f)
+        expected[fdof] = farea
+
+    assert numpy.allclose(div_moments, expected)
 
 
 @pytest.mark.parametrize("cell", (T, S))

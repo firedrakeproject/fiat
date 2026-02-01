@@ -1,45 +1,10 @@
 import numpy
 
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
+from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
 from gem import Literal, ListTensor, Zero
 from copy import deepcopy
 from itertools import chain
-
-
-def determinant(A):
-    """Return the determinant of A"""
-    n = A.shape[0]
-    if n == 0:
-        return 1
-    elif n == 1:
-        return A[0, 0]
-    elif n == 2:
-        return A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
-    else:
-        detA = A[0, 0] * determinant(A[1:, 1:])
-        cols = numpy.ones(A.shape[1], dtype=bool)
-        for j in range(1, n):
-            cols[j] = False
-            detA += (-1)**j * A[0, j] * determinant(A[1:][:, cols])
-            cols[j] = True
-        return detA
-
-
-def adjugate(A):
-    """Return the adjugate matrix of A"""
-    A = numpy.asarray(A)
-    C = numpy.zeros_like(A)
-    rows = numpy.ones(A.shape[0], dtype=bool)
-    cols = numpy.ones(A.shape[1], dtype=bool)
-    for i in range(A.shape[0]):
-        rows[i] = False
-        for j in range(A.shape[1]):
-            cols[j] = False
-            C[j, i] = (-1)**(i+j)*determinant(A[rows, :][:, cols])
-            cols[j] = True
-        rows[i] = True
-    return C
 
 
 def piola_inverse(fiat_cell, J, detJ):
@@ -179,21 +144,3 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
 
             V[ndof:, vdofs] += V[ndof:, fdofs] @ T
         return ListTensor(V.T)
-
-    def dual_transformation(self, Q, coordinate_mapping=None):
-        sd = self.cell.get_spatial_dimension()
-        bary, = self.cell.make_points(sd, 0, sd+1)
-        J = coordinate_mapping.jacobian_at(bary)
-        detJ = coordinate_mapping.detJ_at(bary)
-
-        # undo the Piola mapping at vertices
-        F = J / detJ
-        F = numpy.array([[F[i, j] for j in range(sd)] for i in range(sd)])
-
-        M = identity(self.space_dimension())
-        entity_ids = self.entity_dofs()
-        for v in entity_ids[0]:
-            vids = entity_ids[0][v][:sd]
-            M[numpy.ix_(vids, vids)] = F
-        M = ListTensor(M)
-        return M @ Q

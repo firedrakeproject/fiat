@@ -84,6 +84,17 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         result = super().point_evaluation(order, refcoords, entity=entity)
         return self.map_tabulation(result, coordinate_mapping)
 
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        M = self.basis_transformation(coordinate_mapping)
+
+        M = M.array
+        if M.shape[0] != M.shape[1]:
+            M = M[:, :self.space_dimension()]
+        M_dual = gem.ListTensor(inverse(M.T))
+
+        key = None
+        return MappedTabulation(M_dual, {key: Q})[key]
+
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
     """Base class for directly defined elements such as direct
@@ -183,3 +194,65 @@ def identity(*shape):
     for multiindex in numpy.ndindex(V.shape):
         V[multiindex] = zero if V[multiindex] == 0 else one
     return V
+
+
+def determinant(A):
+    """Return the determinant of A"""
+    n = A.shape[0]
+    if n == 0:
+        return 1
+    elif n == 1:
+        return A[0, 0]
+    elif n == 2:
+        return A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
+    else:
+        detA = A[0, 0] * determinant(A[1:, 1:])
+        cols = numpy.ones(A.shape[1], dtype=bool)
+        for j in range(1, n):
+            cols[j] = False
+            detA += (-1)**j * A[0, j] * determinant(A[1:][:, cols])
+            cols[j] = True
+        return detA
+
+
+def adjugate(A):
+    """Return the adjugate matrix of A"""
+    A = numpy.asarray(A)
+    C = numpy.zeros_like(A)
+    rows = numpy.ones(A.shape[0], dtype=bool)
+    cols = numpy.ones(A.shape[1], dtype=bool)
+    for i in range(A.shape[0]):
+        rows[i] = False
+        for j in range(A.shape[1]):
+            cols[j] = False
+            C[j, i] = (-1)**(i+j)*determinant(A[rows, :][:, cols])
+            cols[j] = True
+        rows[i] = True
+    return C
+
+
+def inverse(A):
+    """Return the inverse of A"""
+    m, n = A.shape
+    if m != n:
+        raise ValueError("A must be square.")
+    M = A.copy()
+    seen = numpy.zeros((m,), dtype=bool)
+    while not seen.all():
+        # Extract a connected component
+        i = next(i for i, b in enumerate(seen) if not b)
+        seed = {i}
+        while True:
+            ids = set()
+            for i in seed:
+                ids.update(j for j in range(m) if not isinstance(M[j, i], gem.Zero))
+                ids.update(j for j in range(m) if not isinstance(M[i, j], gem.Zero))
+            if len(ids) == len(seed):
+                break
+            seed = ids
+
+        ids = list(ids)
+        Mii = M[numpy.ix_(ids, ids)]
+        M[numpy.ix_(ids, ids)] = adjugate(Mii) / determinant(Mii)
+        seen[ids] = True
+    return M
