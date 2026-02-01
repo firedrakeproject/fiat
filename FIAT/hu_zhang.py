@@ -9,19 +9,17 @@
 
 
 from FIAT import finite_element, polynomial_set, dual_set
-from FIAT.check_format_variant import check_format_variant
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.functional import (ComponentPointEvaluation,
                              PointwiseInnerProductEvaluation,
-                             TensorBidirectionalIntegralMoment,
-                             IntegralLegendreNormalNormalMoment,
-                             IntegralLegendreNormalTangentialMoment)
+                             TensorBidirectionalIntegralMoment)
 
 
 class HuZhangDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, qdegree):
+    def __init__(self, ref_el, degree, variant, qdegree, quad_scheme):
         top = ref_el.get_topology()
         sd = ref_el.get_spatial_dimension()
         shp = (sd, sd)
@@ -37,27 +35,32 @@ class HuZhangDual(dual_set.DualSet):
             entity_ids[0][v].extend(range(cur, len(nodes)))
 
         # edge dofs
+        dim = sd - 1
+        ref_facet = ref_el.construct_subelement(dim)
+        Qref = parse_quadrature_scheme(ref_facet, 2*degree-2, quad_scheme)
+        P = polynomial_set.ONPolynomialSet(ref_facet, degree-2)
+        phis = P.tabulate(Qref.get_points())[(0,) * dim]
         for entity in sorted(top[1]):
             cur = len(nodes)
+            n = ref_el.compute_scaled_normal(entity)
+            t = ref_el.compute_edge_tangent(entity)
             if variant == "point":
                 # nn and nt components evaluated at edge points
-                n = ref_el.compute_scaled_normal(entity)
-                t = ref_el.compute_edge_tangent(entity)
                 pts = ref_el.make_points(1, entity, degree)
                 nodes.extend(PointwiseInnerProductEvaluation(ref_el, n, s, pt)
                              for pt in pts for s in (n, t))
 
             elif variant == "integral":
                 # bidirectional nn and nt moments against P_{k-2}
-                moments = (IntegralLegendreNormalNormalMoment, IntegralLegendreNormalTangentialMoment)
-                nodes.extend(mu(ref_el, entity, order, qdegree + degree-2)
-                             for order in range(degree-1) for mu in moments)
+                Q = FacetQuadratureRule(ref_el, dim, entity, Qref, avg=True)
+                nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n, comp, Q, phi)
+                             for phi in phis for comp in (n, t))
             entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # interior dofs
         if variant == "integral":
             cell = ref_el.construct_subelement(sd)
-            Q_ref = create_quadrature(cell, 2*degree-2)
+            Q_ref = parse_quadrature_scheme(cell, 2*degree-2, quad_scheme)
             P = polynomial_set.ONPolynomialSet(cell, degree-2, scale=1)
             phis = P.tabulate(Q_ref.get_points())[(0,)*sd]
 
@@ -83,7 +86,7 @@ class HuZhangDual(dual_set.DualSet):
 
 class HuZhang(finite_element.CiarletElement):
     """The definition of the Hu-Zhang element."""
-    def __init__(self, ref_el, degree=3, variant=None):
+    def __init__(self, ref_el, degree=3, variant=None, quad_scheme=None):
         if degree < 3:
             raise ValueError(f"{type(self).__name__} only defined for degree >= 3")
         if ref_el.shape != TRIANGLE:
@@ -93,7 +96,7 @@ class HuZhang(finite_element.CiarletElement):
             raise NotImplementedError(f"{type(self).__name__} is not implemented as a macroelement.")
 
         poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
-        dual = HuZhangDual(ref_el, degree, variant, qdegree)
+        dual = HuZhangDual(ref_el, degree, variant, qdegree, quad_scheme)
         formdegree = ref_el.get_spatial_dimension() - 1
         mapping = "double contravariant piola"
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)

@@ -197,7 +197,7 @@ def identity(*shape):
 
 
 def determinant(A):
-    """Return the determinant of A"""
+    """Returns the determinant of A"""
     n = A.shape[0]
     if n == 0:
         return 1
@@ -216,7 +216,7 @@ def determinant(A):
 
 
 def adjugate(A):
-    """Return the adjugate matrix of A"""
+    """Returns the adjugate matrix of A"""
     A = numpy.asarray(A)
     C = numpy.zeros_like(A)
     rows = numpy.ones(A.shape[0], dtype=bool)
@@ -232,27 +232,38 @@ def adjugate(A):
 
 
 def inverse(A):
-    """Return the inverse of A"""
+    """Returns the inverse of A.
+
+    Exploits block-diagonal structure with repeated blocks.
+    """
     m, n = A.shape
     if m != n:
         raise ValueError("A must be square.")
     M = A.copy()
-    seen = numpy.zeros((m,), dtype=bool)
-    while not seen.all():
+    cache = {}
+    candidates = set(range(m))
+    while len(candidates) > 0:
         # Extract a connected component
-        i = next(i for i, b in enumerate(seen) if not b)
-        seed = {i}
+        seed = {min(candidates)}
         while True:
             ids = set()
             for i in seed:
-                ids.update(j for j in range(m) if not isinstance(M[j, i], gem.Zero))
-                ids.update(j for j in range(m) if not isinstance(M[i, j], gem.Zero))
+                ids.update(j for j in candidates if not isinstance(M[j, i], gem.Zero))
+                ids.update(j for j in candidates if not isinstance(M[i, j], gem.Zero))
             if len(ids) == len(seed):
                 break
             seed = ids
-
+        candidates -= ids
         ids = list(ids)
         Mii = M[numpy.ix_(ids, ids)]
-        M[numpy.ix_(ids, ids)] = adjugate(Mii) / determinant(Mii)
-        seen[ids] = True
+
+        # Have we already done this?
+        key = gem.ListTensor(Mii)
+        try:
+            Minv = cache[key]
+        except KeyError:
+            Minv = adjugate(Mii) / determinant(Mii)
+            cache[key] = Minv
+
+        M[numpy.ix_(ids, ids)] = Minv
     return M
