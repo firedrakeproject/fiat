@@ -20,10 +20,10 @@
 
 from sympy import symbols, legendre, Array, diff, binomial, lambdify
 import numpy as np
-from FIAT.dual_set import make_entity_closure_ids
+from FIAT.dual_set import DualSet
 from FIAT.finite_element import FiniteElement
 from FIAT.polynomial_set import mis
-from FIAT.reference_element import compute_unflattening_map, flatten_reference_cube
+from FIAT.reference_element import flatten_reference_cube
 
 x, y = symbols('x y')
 variables = (x, y)
@@ -31,7 +31,7 @@ leg = legendre
 
 
 def triangular_number(n):
-    return int((n+1)*n/2)
+    return ((n+1)*n)//2
 
 
 class BrezziDouglasMariniCube(FiniteElement):
@@ -73,44 +73,12 @@ class BrezziDouglasMariniCube(FiniteElement):
         entity_ids[2][0] = list(range(counter, counter + 2*triangular_number(degree - 1)))
         counter += 2*triangular_number(degree - 1)
 
-        entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
-
+        nodes = [None] * counter
+        dual = DualSet(nodes, ref_el, entity_ids)
         # Set up FiniteElement
-        super().__init__(ref_el=ref_el, dual=None,
+        super().__init__(ref_el=ref_el, dual=dual,
                          order=degree, formdegree=1,
                          mapping=mapping)
-
-        # Store unflattened entity ID dictionaries
-        topology = ref_el.get_topology()
-        unflattening_map = compute_unflattening_map(topology)
-        unflattened_entity_ids = {}
-        unflattened_entity_closure_ids = {}
-
-        for dim, entities in sorted(topology.items()):
-            unflattened_entity_ids[dim] = {}
-            unflattened_entity_closure_ids[dim] = {}
-        for dim, entities in sorted(flat_topology.items()):
-            for entity in entities:
-                unflat_dim, unflat_entity = unflattening_map[(dim, entity)]
-                unflattened_entity_ids[unflat_dim][unflat_entity] = entity_ids[dim][entity]
-                unflattened_entity_closure_ids[unflat_dim][unflat_entity] = entity_closure_ids[dim][entity]
-        self.entity_ids = unflattened_entity_ids
-        self.entity_closure_ids = unflattened_entity_closure_ids
-        self._degree = degree
-        self.flat_el = flat_el
-
-    def degree(self):
-        """Return the degree of the polynomial space."""
-        return self._degree
-
-    def get_nodal_basis(self):
-        raise NotImplementedError("get_nodal_basis not implemented for BDMCE/F elements")
-
-    def get_dual_set(self):
-        raise NotImplementedError("get_dual_set is not implemented for BDMCE/F elements")
-
-    def get_coeffs(self):
-        raise NotImplementedError("get_coeffs not implemented for BDMCE/F elements")
 
     def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to a given order of
@@ -157,30 +125,6 @@ class BrezziDouglasMariniCube(FiniteElement):
                 phivals[alpha] = T
 
         return phivals
-
-    def entity_dofs(self):
-        """Return the map of topological entities to degrees of
-        freedom for the finite element."""
-        return self.entity_ids
-
-    def entity_closure_dofs(self):
-        """Return the map of topological entities to degrees of
-        freedom on the closure of those entities for the finite element."""
-        return self.entity_closure_ids
-
-    def value_shape(self):
-        """Return the value shape of the finite element functions."""
-        return np.shape(self.basis[(0, 0)][0])
-
-    def dmats(self):
-        raise NotImplementedError
-
-    def get_num_members(self, arg):
-        raise NotImplementedError
-
-    def space_dimension(self):
-        """Return the dimension of the finite element space."""
-        return int(len(self.basis[(0, 0)])/2)
 
 
 def bdmce_edge_basis(deg, dx, dy, x_mid, y_mid):
