@@ -81,47 +81,6 @@ def replace_division(expressions):
 
 
 @singledispatch
-def _expand_fixedindices(node, self):
-    """Simplify Indexed(ListTensor(A), FixedIndex) -> A[FixedIndex]
-
-    :param node: root of expression
-    :param self: function for recursive calls
-    """
-    raise AssertionError("cannot handle type %s" % type(node))
-
-
-_expand_fixedindices.register(Node)(reuse_if_untouched)
-
-
-@_expand_fixedindices.register(Indexed)
-def expand_fixedindices_indexed(node, self):
-    aggregate, = node.children
-    multiindex = node.multiindex
-
-    # Simplify Literal and ListTensor
-    if isinstance(aggregate, (Constant, ListTensor)):
-        if all(isinstance(i, int) for i in multiindex):
-            # All indices fixed
-            sub = aggregate.array[multiindex]
-            return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
-
-        elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
-            # Some indices fixed
-            slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
-            sub = aggregate.array[slices]
-            sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
-            return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
-
-    return reuse_if_untouched(node, self)
-
-
-def expand_fixedindices(expressions):
-    """Expands indices in multi-root expression DAG."""
-    mapper = Memoizer(_expand_fixedindices)
-    return list(map(mapper, expressions))
-
-
-@singledispatch
 def replace_indices(node, self, subst):
     """Replace free indices in a GEM expression.
 
@@ -160,6 +119,22 @@ def replace_indices_delta(node, self, subst):
 def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
     child, = node.children
+
+    # Remove fixed indices
+    if isinstance(child, (Constant, ListTensor)):
+        if all(isinstance(i, int) for i in multiindex):
+            # All indices fixed
+            sub = child.array[multiindex]
+            child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else sub
+            multiindex = ()
+
+        elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
+            # Some indices fixed
+            slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
+            sub = child.array[slices]
+            child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else ListTensor(sub)
+            multiindex = tuple(i for i in multiindex if not isinstance(i, int))
+
     if isinstance(child, ComponentTensor):
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
@@ -204,7 +179,6 @@ def filtered_replace_indices(node, self, subst):
 
 def remove_componenttensors(expressions):
     """Removes all ComponentTensors in multi-root expression DAG."""
-    expressions = expand_fixedindices(expressions)
     mapper = MemoizerArg(filtered_replace_indices)
     return [mapper(expression, ()) for expression in expressions]
 
