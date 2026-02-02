@@ -120,21 +120,6 @@ def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
     child, = node.children
 
-    # Remove fixed indices
-    if isinstance(child, (Constant, ListTensor)):
-        if all(isinstance(i, int) for i in multiindex):
-            # All indices fixed
-            sub = child.array[multiindex]
-            child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else sub
-            multiindex = ()
-
-        elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
-            # Some indices fixed
-            slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
-            sub = child.array[slices]
-            child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else ListTensor(sub)
-            multiindex = tuple(i for i in multiindex if not isinstance(i, int))
-
     if isinstance(child, ComponentTensor):
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
@@ -143,11 +128,27 @@ def replace_indices_indexed(node, self, subst):
         return self(child.children[0], tuple(sorted(substitute.items())))
     else:
         # Replace indices
-        new_child = self(child, subst)
-        if multiindex == node.multiindex and new_child == child:
+        child = self(child, subst)
+
+        # Remove fixed indices
+        if isinstance(child, (Constant, ListTensor)):
+            if all(isinstance(i, Integral) for i in multiindex):
+                # All indices fixed
+                sub = child.array[multiindex]
+                child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else sub
+                multiindex = tuple()
+
+            elif any(isinstance(i, Integral) for i in multiindex):
+                # Some indices fixed
+                slices = tuple(i if isinstance(i, Integral) else slice(None) for i in multiindex)
+                sub = child.array[slices]
+                child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else ListTensor(sub)
+                multiindex = tuple(i for i in multiindex if not isinstance(i, Integral))
+
+        if multiindex == node.multiindex and child == node.children[0]:
             return node
         else:
-            return Indexed(new_child, multiindex)
+            return Indexed(child, multiindex)
 
 
 @replace_indices.register(FlexiblyIndexed)
