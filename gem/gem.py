@@ -691,13 +691,6 @@ class Indexed(Scalar):
                 sub = aggregate.array[multiindex]
                 return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
 
-            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
-                # Some indices fixed
-                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
-                sub = aggregate.array[slices]
-                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
-                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
-
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         if isinstance(aggregate, ComponentTensor):
             B, = aggregate.children
@@ -715,15 +708,6 @@ class Indexed(Scalar):
                     ii = tuple(rep[j] for j in jj)
                     if not ii:
                         return B
-
-            if isinstance(B, Indexed):
-                C, = B.children
-                kk = B.multiindex
-                ff = C.free_indices
-                if all((j in kk) and (j not in ff) for j in jj):
-                    rep = dict(zip(jj, ii))
-                    ll = tuple(rep.get(k, k) for k in kk)
-                    return Indexed(C, ll)
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
