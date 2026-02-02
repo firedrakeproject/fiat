@@ -12,7 +12,6 @@ from FIAT import finite_element, polynomial_set, dual_set
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.reference_element import TRIANGLE
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
 from FIAT.functional import (ComponentPointEvaluation,
                              PointwiseInnerProductEvaluation,
                              TensorBidirectionalIntegralMoment)

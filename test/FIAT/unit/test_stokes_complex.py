@@ -1,5 +1,6 @@
 import pytest
 import numpy
+from math import factorial
 
 from FIAT import (HsiehCloughTocher as HCT,
                   AlfeldSorokina as AS,
@@ -186,22 +187,21 @@ def test_gn_stokes_pairs(cell, kind):
 def test_gn_dofs(sd, quad_scheme):
     cell = symmetric_simplex(sd)
 
-    gn = GuzmanNeilanFirstKindH1(cell, 1, quad_scheme=quad_scheme)
-    degree = gn.degree()
+    fe = GuzmanNeilanFirstKindH1(cell, 1, quad_scheme=quad_scheme)
+    degree = fe.degree()
     assert degree == sd
-    ref_complex = gn.get_reference_complex()
+    ref_complex = fe.get_reference_complex()
     Q = create_quadrature(ref_complex, degree-1)
     wts = Q.get_weights()
-    tab = gn.tabulate(1, Q.get_points())
+    tab = fe.tabulate(1, Q.get_points())
 
     div_moments = numpy.dot(div(tab), wts)
     expected = numpy.zeros(div_moments.shape)
 
-    entity_ids = gn.entity_dofs()
+    entity_ids = fe.entity_dofs()
     for f in entity_ids[sd-1]:
         fdof = entity_ids[sd-1][f][0]
-        farea = cell.volume_of_subcomplex(sd-1, f)
-        expected[fdof] = farea
+        expected[fdof] = (-1.0)**f / factorial(sd-1)
 
     assert numpy.allclose(div_moments, expected)
 
