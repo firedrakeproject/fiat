@@ -129,10 +129,9 @@ class NedelecDual(dual_set.DualSet):
 
                     for entity in top[dim]:
                         cur = len(nodes)
-                        Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                        Jdet = Q.jacobian_determinant()
+                        Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
                         R = numpy.array(ref_el.compute_tangents(dim, entity))
-                        phis = numpy.dot(Phis, R / Jdet)
+                        phis = numpy.dot(Phis, R)
                         phis = numpy.transpose(phis, (0, 2, 1))
                         nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                                      for phi in phis)
@@ -205,7 +204,7 @@ class Nedelec(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         if ref_el.is_macrocell():
-            base_element = Nedelec(ref_el.get_parent(), degree)
+            base_element = type(self)(ref_el.get_parent(), degree)
             poly_set = macro.MacroPolynomialSet(ref_el, base_element)
         elif ref_el.get_spatial_dimension() == 3:
             poly_set = NedelecSpace3D(ref_el, degree)

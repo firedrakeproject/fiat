@@ -13,9 +13,10 @@
 # - type information
 
 from itertools import chain
+from collections import defaultdict
 import numpy
 
-from FIAT import polynomial_set, jacobi, quadrature_schemes
+from FIAT import polynomial_set, jacobi, quadrature, quadrature_schemes
 
 
 class Functional(object):
@@ -242,21 +243,16 @@ class PointTangentialDerivative(PointDirectionalDerivative):
 class PointSecondDerivative(Functional):
     """Represents d/ds1 d/ds2 at a point."""
     def __init__(self, ref_el, s1, s2, pt, comp=(), shp=(), nm=None):
+        S = numpy.outer(s1, s2)
         sd = ref_el.get_spatial_dimension()
-        tau = numpy.zeros((sd*(sd+1)//2,))
-
-        alphas = []
-        cur = 0
-        for i in range(sd):
-            for j in range(i, sd):
-                alpha = [0] * sd
+        tau = defaultdict(float)
+        for index in numpy.ndindex(S.shape):
+            alpha = [0] * sd
+            for i in index:
                 alpha[i] += 1
-                alpha[j] += 1
-                alphas.append(tuple(alpha))
-                tau[cur] = s1[i] * s2[j] + (i != j) * s2[i] * s1[j]
-                cur += 1
+            tau[tuple(alpha)] += S[index]
 
-        dpt_dict = {tuple(pt): [(tau[i], alphas[i], comp) for i in range(len(alphas))]}
+        dpt_dict = {tuple(pt): [(tau[alpha], alpha, comp) for alpha in tau]}
 
         super().__init__(ref_el, shp, {}, dpt_dict, nm or "PointSecondDeriv")
 
@@ -320,48 +316,54 @@ class IntegralMoment(Functional):
 
 
 class IntegralMomentOfDerivative(Functional):
-    """Functional giving directional derivative integrated against some function on a facet."""
+    """Functional giving multi-directional derivative integrated against some function.
 
-    def __init__(self, ref_el, s, Q, f_at_qpts, comp=(), shp=()):
-        self.f_at_qpts = f_at_qpts
+    :arg ref_el: a :class:`Cell`.
+    :arg Q: a :class:`QuadratureRule`.
+    :arg f_at_qpts: an array tabulating the function f at the quadrature
+         points.
+    :arg *directions: a list of vectors of directions of differentiation.
+    :arg comp: Optional argument indicating that only a particular
+         component of the input function should be integrated against f
+    :arg shp: Optional argument giving the value shape of input functions.
+    """
+
+    def __init__(self, ref_el, Q, f_at_qpts, *directions, comp=(), shp=(), nm=""):
         self.Q = Q
+        self.f_at_qpts = f_at_qpts
+        self.comp = comp
+
+        S = directions[0]
+        for dj in directions[1:]:
+            S = numpy.outer(S, dj)
 
         sd = ref_el.get_spatial_dimension()
+        tau = defaultdict(float)
+        for index in numpy.ndindex(S.shape):
+            alpha = [0] * sd
+            for i in index:
+                alpha[i] += 1
+            tau[tuple(alpha)] += S[index]
 
         points = Q.get_points()
         weights = numpy.multiply(f_at_qpts, Q.get_weights())
+        self.weights = {alpha: weights*tau[alpha] for alpha in tau}
 
-        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {tuple(pt): [(wt*s[i], alphas[i], comp) for i in range(sd)]
+        dpt_dict = {tuple(pt): [(wt*tau[alpha], alpha, comp) for alpha in tau]
                     for pt, wt in zip(points, weights)}
 
-        super().__init__(ref_el, shp,
-                         {}, dpt_dict, "IntegralMomentOfDerivative")
+        super().__init__(ref_el, shp, {}, dpt_dict, nm or "IntegralMomentOfDerivative")
 
 
-class IntegralMomentOfNormalDerivative(Functional):
+class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
     """Functional giving normal derivative integrated against some function on a facet."""
 
-    def __init__(self, ref_el, facet_no, Q, f_at_qpts):
+    def __init__(self, ref_el, facet_no, Q_face, f_at_qpts):
         n = ref_el.compute_normal(facet_no)
-        self.n = n
-        self.f_at_qpts = f_at_qpts
-        self.Q = Q
-
-        sd = ref_el.get_spatial_dimension()
-
         # map points onto facet
-        transform = ref_el.get_entity_transform(sd-1, facet_no)
-        points = transform(Q.get_points())
-        self.dpts = points
-        weights = numpy.multiply(f_at_qpts, Q.get_weights())
-
-        alphas = tuple(map(tuple, numpy.eye(sd, dtype=int)))
-        dpt_dict = {tuple(pt): [(wt*n[i], alphas[i], tuple()) for i in range(sd)]
-                    for pt, wt in zip(points, weights)}
-
-        super().__init__(ref_el, tuple(),
-                         {}, dpt_dict, "IntegralMomentOfNormalDerivative")
+        sd = ref_el.get_spatial_dimension()
+        Q = quadrature.FacetQuadratureRule(ref_el, sd-1, facet_no, Q_face, avg=True)
+        super().__init__(ref_el, Q, f_at_qpts, n, nm="IntegralMomentOfNormalDerivative")
 
 
 class FrobeniusIntegralMoment(IntegralMoment):

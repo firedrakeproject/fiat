@@ -2,6 +2,8 @@ import FIAT
 import finat
 import numpy as np
 import pytest
+import pprint
+
 from gem.interpreter import evaluate
 from finat.physically_mapped import PhysicallyMappedElement
 
@@ -80,24 +82,33 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     Vh, residual, *_ = np.linalg.lstsq(Phi.T, phi.T)
     Mh = Vh.T
     Mh = Mh[:num_dofs]
-    Mh[abs(Mh) < 1E-10] = 0
-    M[abs(M) < 1E-10] = 0
+    tol = 1E-10
+    Mh[abs(Mh) < tol] = 0
+    M[abs(M) < tol] = 0
 
+    delta = M.T - Mh.T
+    delta[abs(delta) < tol] = 0
     with np.errstate(divide='ignore', invalid='ignore'):
-        error = M.T / Mh.T - 1
+        error = delta / Mh.T
     error[error != error] = 0
-    error[abs(error) < 1E-10] = 0
-    error = error[np.ix_(*map(np.unique, np.nonzero(error)))]
+    error[delta == 0] = 0
+    error[abs(error) < tol] = 0
+
+    inds = tuple(map(np.unique, np.nonzero(error)))
+    error = error[np.ix_(*inds)]
     error[error != 0] += 1
 
-    assert np.allclose(residual, 0), str(error)
-    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), str(error)
+    pp = pprint.PrettyPrinter(width=140, compact=True)
+    assert np.allclose(residual, 0), pp.pformat((np.round(error, 8).tolist(), *inds))
+    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), pp.pformat((np.round(error, 8).tolist(), *inds))
 
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
                          finat.Bell,
+                         finat.WuXuH3NC,
+                         finat.WuXuRobustH3NC,
                          ])
 def test_C1_triangle(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[2])
@@ -105,6 +116,7 @@ def test_C1_triangle(ref_to_phys, element):
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
+                         finat.Walkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):
     check_zany_mapping(element, ref_to_phys[3])
@@ -124,9 +136,11 @@ def test_C1_macroelements(ref_to_phys, element):
 
 @pytest.mark.parametrize("element, degree", [
     *((finat.Argyris, k) for k in range(5, 8)),
-    *((finat.HsiehCloughTocher, k) for k in range(3, 6))
+    *((finat.HsiehCloughTocher, k) for k in range(3, 6)),
+    *((finat.AlfeldC2, k) for k in range(5, 7)),
+    *((finat.BrambleZlamalC2, k) for k in range(9, 11)),
 ])
-def test_high_order_C1_elements(ref_to_phys, element, degree):
+def test_high_order_Ck_elements(ref_to_phys, element, degree):
     check_zany_mapping(element, ref_to_phys[2], degree, avg=True)
 
 
