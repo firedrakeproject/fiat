@@ -691,24 +691,6 @@ class Indexed(Scalar):
             elif isinstance(aggregate, ListTensor):
                 return aggregate.array[multiindex]
 
-        # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
-        if isinstance(aggregate, ComponentTensor):
-            B, = aggregate.children
-            jj = aggregate.multiindex
-            ii = multiindex
-
-            if isinstance(B, Indexed):
-                C, = B.children
-                kk = B.multiindex
-                if not isinstance(C, ComponentTensor):
-                    rep = dict(zip(jj, ii))
-                    ll = tuple(rep.get(k, k) for k in kk)
-                    B = Indexed(C, ll)
-                    jj = tuple(j for j in jj if j not in kk)
-                    ii = tuple(rep[j] for j in jj)
-                    if not ii:
-                        return B
-
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
         self.multiindex = multiindex

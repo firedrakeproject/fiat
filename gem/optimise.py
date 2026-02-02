@@ -110,7 +110,7 @@ def expand_fixedindices_indexed(node, self):
             slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
             sub = aggregate.array[slices]
             sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
-            return self(Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int))))
+            return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
 
     return reuse_if_untouched(node, self)
 
