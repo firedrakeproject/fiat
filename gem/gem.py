@@ -684,12 +684,12 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
-        # Simplify Literal and ListTensor
-        if isinstance(aggregate, (Constant, ListTensor)):
-            if all(isinstance(i, int) for i in multiindex):
-                # All indices fixed
-                sub = aggregate.array[multiindex]
-                return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
+        # All indices fixed
+        if all(isinstance(i, int) for i in multiindex):
+            if isinstance(aggregate, Constant):
+                return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
+            elif isinstance(aggregate, ListTensor):
+                return aggregate.array[multiindex]
 
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         if isinstance(aggregate, ComponentTensor):
