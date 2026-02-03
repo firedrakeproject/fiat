@@ -684,6 +684,22 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
+        # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
+        if isinstance(aggregate, ComponentTensor):
+            B, = aggregate.children
+            jj = aggregate.multiindex
+            ii = multiindex
+            if isinstance(B, Indexed):
+                C, = B.children
+                kk = B.multiindex
+                if not isinstance(C, ComponentTensor):
+                    rep = dict(zip(jj, ii))
+                    ll = tuple(rep.get(k, k) for k in kk)
+                    jj = tuple(j for j in jj if j not in kk)
+                    ii = tuple(rep[j] for j in jj)
+                    if not ii:
+                        return Indexed(C, ll)
+
         # All indices fixed
         if all(isinstance(i, int) for i in multiindex):
             if isinstance(aggregate, Constant):
@@ -905,17 +921,22 @@ class ListTensor(Node):
         child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
 
-        # Simplify [v[multiindex, j] for j in range(n)] -> partial_indexed(v, multiindex)
+        # Simplify [tensor[multiindex, j] for j in range(n)] -> partial_indexed(tensor, multiindex)
         if all(isinstance(elem, Indexed) for elem in array.flat):
             tensor = e0.children[0]
-            multiindex = tuple(i for i in e0.multiindex if not isinstance(i, Integral))
-            index_shape = tuple(i.extent for i in multiindex if isinstance(i, Index))
-            if index_shape + array.shape + child_shape == tensor.shape:
-                if all(elem.children[0] == tensor for elem in array.flat[1:]):
-                    if all(elem.multiindex == multiindex + idx for idx, elem in numpy.ndenumerate(array)):
+            if all(elem.children[0] == tensor for elem in array.flat[1:]):
+                multiindex = tuple(e0.multiindex)
+                for elem in array.flat[1:]:
+                    while elem.multiindex[:len(multiindex)] != multiindex:
+                        multiindex = multiindex[:-1]
+                    if len(multiindex) == 0:
+                        break
+                index_shape = tuple(i.extent if isinstance(i, Index) else 1 for i in multiindex)
+                if index_shape + array.shape + child_shape == tensor.shape:
+                    if all(elem.multiindex[len(multiindex):] == idx for idx, elem in numpy.ndenumerate(array)):
                         return partial_indexed(tensor, multiindex)
 
-        # Simplify [v[j, ...] for j in range(n)] -> v
+        # Simplify [tensor[j, ...] for j in range(n)] -> tensor
         if all(isinstance(elem, ComponentTensor) and isinstance(elem.children[0], Indexed)
                for elem in array.flat):
             tensor = e0.children[0].children[0]
