@@ -685,6 +685,8 @@ class Indexed(Scalar):
             return Zero(dtype=aggregate.dtype)
 
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
+        # This pattern corresponds to an index replacement rule jj -> ii applied to
+        # the innermost multiindex kk to produce ll.
         if isinstance(aggregate, ComponentTensor):
             B, = aggregate.children
             jj = aggregate.multiindex
@@ -692,16 +694,16 @@ class Indexed(Scalar):
             if isinstance(B, Indexed):
                 C, = B.children
                 kk = B.multiindex
-                if not isinstance(C, ComponentTensor):
+                ff = C.free_indices
+                if not any((j in ff) for j in jj):
+                    # Only replace indices that are not present in C
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
-                    jj = tuple(j for j in jj if j not in kk)
-                    ii = tuple(rep[j] for j in jj)
-                    if not ii:
-                        return Indexed(C, ll)
+                    aggregate = C
+                    multiindex = ll
 
         # All indices fixed
-        if all(isinstance(i, int) for i in multiindex):
+        if all(isinstance(i, Integral) for i in multiindex):
             if isinstance(aggregate, Constant):
                 return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
             elif isinstance(aggregate, ListTensor):
@@ -925,6 +927,7 @@ class ListTensor(Node):
         if all(isinstance(elem, Indexed) for elem in array.flat):
             tensor = e0.children[0]
             if all(elem.children[0] == tensor for elem in array.flat[1:]):
+                # Extract maximal subset of leading indices that is common over all array entries
                 multiindex = tuple(e0.multiindex)
                 for elem in array.flat[1:]:
                     while elem.multiindex[:len(multiindex)] != multiindex:

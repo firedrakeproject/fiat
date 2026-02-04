@@ -55,6 +55,28 @@ def test_componenttensor_from_indexed(A):
     assert A == gem.ComponentTensor(Aij, (i, j))
 
 
+def test_indexed_transpose(A):
+    i, j = gem.indices(2)
+    ATij = gem.Indexed(A.T, (i, j))
+    Aji = gem.Indexed(A, (j, i))
+    assert ATij == Aji
+
+    i, = gem.indices(1)
+    j = 1
+    ATij = gem.Indexed(A.T, (i, j))
+    Aji = gem.Indexed(A, (j, i))
+    assert ATij == Aji
+
+    i, j = (0, 1)
+    ATij = gem.Indexed(A.T, (i, j))
+    Aji = gem.Indexed(A, (j, i))
+    assert ATij == Aji
+
+
+def test_double_transpose(A):
+    assert A.T.T == A
+
+
 def test_flatten_indexsum(A):
     i, j = gem.indices(2)
     Aij = gem.Indexed(A, (i, j))

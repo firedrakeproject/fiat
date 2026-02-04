@@ -136,7 +136,7 @@ def replace_indices_indexed(node, self, subst):
                 # All indices fixed
                 sub = child.array[multiindex]
                 child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else sub
-                multiindex = tuple()
+                multiindex = ()
 
             elif any(isinstance(i, Integral) for i in multiindex):
                 # Some indices fixed
