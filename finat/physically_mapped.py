@@ -82,6 +82,17 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         result = super().basis_evaluation(order, ps, entity=entity)
         return self.map_tabulation(result, coordinate_mapping)
 
+    def dual_transformation(self, Q, coordinate_mapping=None):
+        M = self.basis_transformation(coordinate_mapping)
+
+        M = M.array
+        if M.shape[0] != M.shape[1]:
+            M = M[:, :self.space_dimension()]
+        M_dual = gem.ListTensor(inverse(M.T))
+
+        key = None
+        return MappedTabulation(M_dual, {key: Q})[key]
+
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
     """Base class for directly defined elements such as direct
@@ -181,3 +192,76 @@ def identity(*shape):
     for multiindex in numpy.ndindex(V.shape):
         V[multiindex] = zero if V[multiindex] == 0 else one
     return V
+
+
+def determinant(A):
+    """Returns the determinant of A"""
+    n = A.shape[0]
+    if n == 0:
+        return 1
+    elif n == 1:
+        return A[0, 0]
+    elif n == 2:
+        return A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
+    else:
+        detA = A[0, 0] * determinant(A[1:, 1:])
+        cols = numpy.ones(A.shape[1], dtype=bool)
+        for j in range(1, n):
+            cols[j] = False
+            detA += (-1)**j * A[0, j] * determinant(A[1:][:, cols])
+            cols[j] = True
+        return detA
+
+
+def adjugate(A):
+    """Returns the adjugate matrix of A"""
+    A = numpy.asarray(A)
+    C = numpy.zeros_like(A)
+    rows = numpy.ones(A.shape[0], dtype=bool)
+    cols = numpy.ones(A.shape[1], dtype=bool)
+    for i in range(A.shape[0]):
+        rows[i] = False
+        for j in range(A.shape[1]):
+            cols[j] = False
+            C[j, i] = (-1)**(i+j)*determinant(A[rows, :][:, cols])
+            cols[j] = True
+        rows[i] = True
+    return C
+
+
+def inverse(A):
+    """Returns the inverse of A.
+
+    Exploits block-diagonal structure with repeated blocks.
+    """
+    m, n = A.shape
+    if m != n:
+        raise ValueError("A must be square.")
+    M = A.copy()
+    cache = {}
+    candidates = set(range(m))
+    while len(candidates) > 0:
+        # Extract a connected component
+        seed = {min(candidates)}
+        while True:
+            ids = set(seed)
+            for i in seed:
+                ids.update(j for j in candidates if not isinstance(M[j, i], gem.Zero))
+                ids.update(j for j in candidates if not isinstance(M[i, j], gem.Zero))
+            if len(ids) == len(seed):
+                break
+            seed = ids
+        candidates -= ids
+        ids = list(ids)
+        Mii = M[numpy.ix_(ids, ids)]
+
+        # Have we already done this?
+        key = gem.ListTensor(Mii)
+        try:
+            Minv = cache[key]
+        except KeyError:
+            Minv = adjugate(Mii) / determinant(Mii)
+            cache[key] = Minv
+
+        M[numpy.ix_(ids, ids)] = Minv
+    return M
