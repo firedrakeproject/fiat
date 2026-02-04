@@ -4,14 +4,14 @@ from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.restricted import RestrictedElement
 
 
-def BrezziDouglasFortinMarini(ref_el, degree, variant=None):
+def BrezziDouglasFortinMarini(ref_el, degree, variant=None, quad_scheme=None):
     """The BDFM element"""
     if variant == "point":
         BDM_I = RestrictedElement(BrezziDouglasMarini(ref_el, degree, variant=variant), restriction_domain="interior")
         BDM_F = RestrictedElement(BrezziDouglasMarini(ref_el, degree-1, variant=variant), restriction_domain="facet")
         return NodalEnrichedElement(BDM_I, BDM_F)
     else:
-        BDM = BrezziDouglasMarini(ref_el, degree, variant=variant)
+        BDM = BrezziDouglasMarini(ref_el, degree, variant=variant, quad_scheme=quad_scheme)
         entity_ids = BDM.dual.get_entity_ids()
         sd = ref_el.get_spatial_dimension()
         indices = []
