@@ -5,8 +5,8 @@ from gem import ListTensor
 
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
-from finat.piola_mapped import adjugate, normal_tangential_edge_transform, normal_tangential_face_transform
+from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
+from finat.piola_mapped import normal_tangential_edge_transform, normal_tangential_face_transform
 
 
 def _facet_transform(fiat_cell, facet_moment_degree, coordinate_mapping):
