@@ -7,12 +7,17 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 import numpy
+from itertools import chain
+from collections import defaultdict
 
 from FIAT import polynomial_set, functional
+from FIAT.reference_element import compute_unflattening_map
 
 
 class DualSet(object):
     def __init__(self, nodes, ref_el, entity_ids, entity_permutations=None):
+        if ref_el.get_dimension() != max(entity_ids):
+            entity_ids = unflatten_entity_ids(ref_el, entity_ids)
         nodes, ref_el, entity_ids, entity_permutations = merge_entities(nodes, ref_el, entity_ids, entity_permutations)
         self.nodes = nodes
         self.ref_el = ref_el
@@ -114,36 +119,37 @@ class DualSet(object):
         riesz_shape = (num_nodes, *tshape, num_exp)
         mat = numpy.zeros(riesz_shape, "d")
 
-        pts = set()
-        dpts = set()
-        Qs_to_ells = dict()
-        for i, ell in enumerate(self.nodes):
-            if len(ell.deriv_dict) > 0:
-                dpts.update(ell.deriv_dict.keys())
-                continue
-            if isinstance(ell, functional.IntegralMoment):
-                Q = ell.Q
-            else:
-                Q = None
-                pts.update(ell.pt_dict.keys())
-            if Q in Qs_to_ells:
+        def map_quadratures_to_points(nodes, deriv=False):
+            Qs_to_ells = defaultdict(list)
+            for i, ell in enumerate(nodes):
+                if deriv and len(ell.deriv_dict) == 0:
+                    continue
+                elif not deriv and len(ell.pt_dict) == 0:
+                    continue
+                if isinstance(ell, (functional.IntegralMoment, functional.IntegralMomentOfDerivative)):
+                    Q = ell.Q
+                else:
+                    Q = None
                 Qs_to_ells[Q].append(i)
-            else:
-                Qs_to_ells[Q] = [i]
-
-        Qs_to_pts = {}
-        if len(pts) > 0:
-            Qs_to_pts[None] = tuple(sorted(pts))
-        for Q in Qs_to_ells:
-            if Q is not None:
-                cur_pts = tuple(map(tuple, Q.pts))
+            pts = set()
+            Qs_to_pts = {}
+            for Q in Qs_to_ells:
+                if Q is None:
+                    if deriv:
+                        cur_pts = chain.from_iterable(nodes[i].deriv_dict.keys() for i in Qs_to_ells[None])
+                    else:
+                        cur_pts = chain.from_iterable(nodes[i].pt_dict.keys() for i in Qs_to_ells[None])
+                    cur_pts = tuple(set(cur_pts))
+                else:
+                    cur_pts = tuple(map(tuple, Q.pts))
                 Qs_to_pts[Q] = cur_pts
                 pts.update(cur_pts)
+            pts = list(sorted(pts))
+            return Qs_to_ells, Qs_to_pts, pts
 
         # Now tabulate the function values
-        pts = list(sorted(pts))
+        Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes)
         expansion_values = numpy.transpose(es.tabulate(ed, pts))
-
         for Q in Qs_to_ells:
             ells = Qs_to_ells[Q]
             cur_pts = Qs_to_pts[Q]
@@ -168,25 +174,35 @@ class DualSet(object):
         # Tabulate the derivative values that are needed
         max_deriv_order = max(ell.max_deriv_order for ell in self.nodes)
         if max_deriv_order > 0:
-            dpts = list(sorted(dpts))
+            Qs_to_ells, Qs_to_pts, pts = map_quadratures_to_points(self.nodes, deriv=True)
             # It's easiest/most efficient to get derivatives of the
             # expansion set through the polynomial set interface.
             # This is creating a short-lived set to do just this.
             coeffs = numpy.eye(num_exp)
             expansion = polynomial_set.PolynomialSet(self.ref_el, ed, ed, es, coeffs)
-            dexpansion_values = expansion.tabulate(dpts, max_deriv_order)
-
-            ells = [k for k, ell in enumerate(self.nodes) if len(ell.deriv_dict) > 0]
-            wshape = (len(ells), *tshape, len(dpts))
-            dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
-            for i, k in enumerate(ells):
-                ell = self.nodes[k]
-                for pt, wac_list in ell.deriv_dict.items():
-                    j = dpts.index(pt)
-                    for (w, alpha, c) in wac_list:
-                        dwts[alpha][i][c][j] = w
-            for alpha in dwts:
-                mat[ells] += numpy.dot(dwts[alpha], dexpansion_values[alpha].T)
+            dexpansion_values = expansion.tabulate(pts, max_deriv_order)
+            for Q in Qs_to_ells:
+                ells = Qs_to_ells[Q]
+                cur_pts = Qs_to_pts[Q]
+                indices = list(map(pts.index, cur_pts))
+                wshape = (len(ells), *tshape, len(cur_pts))
+                dwts = {alpha: numpy.zeros(wshape, "d") for alpha in dexpansion_values if sum(alpha) > 0}
+                if Q is None:
+                    for i, k in enumerate(ells):
+                        ell = self.nodes[k]
+                        for pt, wac_list in ell.deriv_dict.items():
+                            j = cur_pts.index(pt)
+                            for (w, alpha, c) in wac_list:
+                                dwts[alpha][i][c][j] = w
+                else:
+                    for i, k in enumerate(ells):
+                        ell = self.nodes[k]
+                        for alpha in ell.weights:
+                            dwts[alpha][i][ell.comp][:] = ell.weights[alpha]
+                for alpha in dwts:
+                    wts = dwts[alpha]
+                    expansion_values = dexpansion_values[alpha].T
+                    mat[ells] += numpy.dot(wts, expansion_values[indices])
         return mat
 
     def get_indices(self, restriction_domain, take_closure=True):
@@ -213,6 +229,8 @@ class DualSet(object):
             dim = 2
         elif restriction_domain == "facet":
             dim = self.get_reference_element().get_spatial_dimension() - 1
+        elif restriction_domain == "ridge":
+            dim = self.get_reference_element().get_spatial_dimension() - 2
         else:
             raise RuntimeError("Invalid restriction domain")
 
@@ -256,6 +274,18 @@ def make_entity_closure_ids(ref_el, entity_ids):
             entity_closure_ids[d][e] = ids
 
     return entity_closure_ids
+
+
+def unflatten_entity_ids(ref_el, entity_ids):
+    """Reconstruct entity_ids to match the entities of ref_el."""
+    topology = ref_el.get_topology()
+    unflattening_map = compute_unflattening_map(topology)
+    unflattened_entity_ids = {dim: {} for dim in sorted(topology)}
+    for dim in sorted(entity_ids):
+        for entity in sorted(entity_ids[dim]):
+            unflat_dim, unflat_entity = unflattening_map[(dim, entity)]
+            unflattened_entity_ids[unflat_dim][unflat_entity] = entity_ids[dim][entity]
+    return unflattened_entity_ids
 
 
 def lexsort_nodes(ref_el, nodes, entity=None, offset=0):

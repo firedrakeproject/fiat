@@ -3,9 +3,10 @@ import FIAT
 import numpy
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
-from finat.piola_mapped import adjugate, normal_tangential_edge_transform, normal_tangential_face_transform
+from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
+from finat.piola_mapped import normal_tangential_edge_transform, normal_tangential_face_transform
 
 
 def _facet_transform(fiat_cell, facet_moment_degree, coordinate_mapping):
@@ -52,8 +53,7 @@ def _evaluation_transform(fiat_cell, coordinate_mapping):
 
 class ArnoldWintherNC(PhysicallyMappedElement, FiatElement):
     def __init__(self, cell, degree=2):
-        if Citations is not None:
-            Citations().register("Arnold2003")
+        cite("Arnold2003")
         super().__init__(FIAT.ArnoldWintherNC(cell, degree))
 
     def basis_transformation(self, coordinate_mapping):
@@ -84,8 +84,7 @@ class ArnoldWintherNC(PhysicallyMappedElement, FiatElement):
 
 class ArnoldWinther(PhysicallyMappedElement, FiatElement):
     def __init__(self, cell, degree=3):
-        if Citations is not None:
-            Citations().register("Arnold2002")
+        cite("Arnold2002")
         super().__init__(FIAT.ArnoldWinther(cell, degree))
 
     def basis_transformation(self, coordinate_mapping):

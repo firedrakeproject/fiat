@@ -31,7 +31,12 @@ def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
     else:
         rule_ref_cell = fiat_ref_cell
 
-    rule = make_quadrature(rule_ref_cell, degree, scheme=scheme)
+    if isinstance(scheme, AbstractQuadratureRule):
+        rule = scheme
+        assert rule.ref_el >= rule_ref_cell
+    else:
+        rule = make_quadrature(rule_ref_cell, degree, scheme=scheme)
+
     return QuadratureElement(fiat_ref_cell, rule)
 
 
@@ -68,10 +73,14 @@ class QuadratureElement(FiniteElementBase):
 
     @cached_property
     def _entity_dofs(self):
+        ps = self._rule.point_set
+        sd = self.cell.get_spatial_dimension()
+        if not isinstance(ps, UnknownPointSet) and ps.dimension == sd:
+            return self.cell.point_entity_ids(ps.points)
+
         top = self.cell.get_topology()
         entity_dofs = {dim: {entity: [] for entity in entities}
                        for dim, entities in top.items()}
-        ps = self._rule.point_set
         num_pts = len(ps.points)
         to_int = lambda x: sum(x) if isinstance(x, tuple) else x
         cur = 0
@@ -125,10 +134,13 @@ class QuadratureElement(FiniteElementBase):
         :param ps: the point set object.
         :param entity: the cell entity on which to tabulate.
         '''
-        rule_dim = self._rule.point_set.dimension
         if entity is None:
-            entity = (rule_dim, 0)
+            entity = (self.cell.get_dimension(), 0)
         entity_dim, entity_id = entity
+        if isinstance(entity_dim, tuple):
+            entity_dim = sum(entity_dim)
+
+        rule_dim = self._rule.point_set.dimension
         if entity_dim != rule_dim:
             raise ValueError(f"Cannot tabulate QuadratureElement of dimension {rule_dim}"
                              f" on subentities of dimension {entity_dim}.")

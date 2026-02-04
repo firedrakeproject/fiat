@@ -8,16 +8,15 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-from FIAT import dual_set, finite_element, polynomial_set
-from FIAT.check_format_variant import check_format_variant
+from FIAT import dual_set, finite_element, polynomial_set, macro
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.functional import (PointwiseInnerProductEvaluation,
                              TensorBidirectionalIntegralMoment as BidirectionalMoment)
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
 
 
 class ReggeDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, qdegree):
+    def __init__(self, ref_el, degree, variant, qdegree, quad_scheme):
         top = ref_el.get_topology()
         entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
@@ -41,15 +40,14 @@ class ReggeDual(dual_set.DualSet):
                 if dim == 0 or k < 0:
                     continue
                 facet = ref_el.construct_subelement(dim)
-                Q = create_quadrature(facet, qdegree + k)
+                Q = parse_quadrature_scheme(facet, qdegree + k, quad_scheme)
                 P = polynomial_set.ONPolynomialSet(facet, k)
                 phis = P.tabulate(Q.get_points())[(0,)*dim]
                 for entity in sorted(top[dim]):
                     cur = len(nodes)
                     tangents = ref_el.compute_face_edge_tangents(dim, entity)
-                    Q_mapped = FacetQuadratureRule(ref_el, dim, entity, Q)
-                    detJ = Q_mapped.jacobian_determinant()
-                    nodes.extend(BidirectionalMoment(ref_el, t, t/detJ, Q_mapped, phi)
+                    Q_mapped = FacetQuadratureRule(ref_el, dim, entity, Q, avg=True)
+                    nodes.extend(BidirectionalMoment(ref_el, t, t, Q_mapped, phi)
                                  for phi in phis for t in tangents)
                     entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
@@ -61,7 +59,7 @@ class Regge(finite_element.CiarletElement):
        REG(k) is the space of symmetric-matrix-valued polynomials of degree k
        or less with tangential-tangential continuity.
     """
-    def __init__(self, ref_el, degree=0, variant=None):
+    def __init__(self, ref_el, degree=0, variant=None, quad_scheme=None):
         if degree < 0:
             raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
 
@@ -69,8 +67,13 @@ class Regge(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
-        dual = ReggeDual(ref_el, degree, variant, qdegree)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+
+        dual = ReggeDual(ref_el, degree, variant, qdegree, quad_scheme)
         formdegree = (1, 1)
         mapping = "double covariant piola"
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)

@@ -4,7 +4,7 @@ import pytest
 from FIAT import (Lagrange, DiscontinuousLagrange, IntegratedLegendre, Legendre, P0,
                   Nedelec, NedelecSecondKind, RaviartThomas, BrezziDouglasMarini,
                   Regge, HellanHerrmannJohnson, GopalakrishnanLedererSchoberlSecondKind,
-                  CrouzeixRaviart)
+                  CrouzeixRaviart, KongMulderVeldhuizen)
 from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet, MacroPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import ufc_simplex, UFCSimplex
@@ -94,8 +94,35 @@ def test_macro_quadrature(split, cell):
     Q = create_quadrature(ref_el, 2*degree)
     pts, wts = Q.get_points(), Q.get_weights()
 
+    Qcell = create_quadrature(cell, 2*degree)
+    assert len(pts) == len(ref_el.topology[sd]) * len(Qcell.pts)
+
     # Test that the mass matrix for an orthogonal basis is diagonal
     fe = Legendre(ref_el, degree)
+    phis = fe.tabulate(0, pts)[(0,)*sd]
+    M = numpy.dot(numpy.multiply(phis, wts), phis.T)
+    M = M - numpy.diag(M.diagonal())
+    assert numpy.allclose(M, 0)
+
+
+@pytest.mark.parametrize("split", (AlfeldSplit, PowellSabinSplit))
+def test_macro_lump_quadrature(split, cell):
+    ref_el = split(cell)
+    sd = ref_el.get_spatial_dimension()
+
+    degree = 2
+    Q = create_quadrature(ref_el, degree, "KMV")
+    pts, wts = Q.get_points(), Q.get_weights()
+    assert len(pts) == len(numpy.unique(numpy.round(pts, decimals=10), axis=0))
+
+    fe_ref = KongMulderVeldhuizen(cell, degree)
+    edofs = fe_ref.entity_dofs()
+    top = ref_el.topology
+    assert len(pts) < len(top[sd]) * fe_ref.space_dimension()
+    assert len(pts) == sum(len(top[dim]) * len(edofs[dim][0]) for dim in top)
+
+    # Test that the lumped mass matrix is diagonal
+    fe = KongMulderVeldhuizen(ref_el, degree)
     phis = fe.tabulate(0, pts)[(0,)*sd]
     M = numpy.dot(numpy.multiply(phis, wts), phis.T)
     M = M - numpy.diag(M.diagonal())
@@ -371,23 +398,12 @@ def test_Ck_basis(cell, order, degree, variant):
 
 
 def test_C2_double_alfeld():
+    from FIAT.c2_elements import AlfeldC2Space
     # Construct the quintic C2 spline on the double Alfeld split
     # See Section 7.5 of Lai & Schumacher
     K = ufc_simplex(2)
-    DCT = AlfeldSplit(AlfeldSplit(K))
-
     degree = 5
-
-    # C3 on major split facets, C2 elsewhere
-    order = {}
-    order[1] = dict.fromkeys(DCT.get_interior_facets(1), 2)
-    order[1].update(dict.fromkeys(range(3, 6), 3))
-
-    # C4 at minor split barycenters, C3 at major split barycenter
-    order[0] = dict.fromkeys(DCT.get_interior_facets(0), 4)
-    order[0][3] = 3
-
-    P = CkPolynomialSet(DCT, degree, order=order, variant="bubble")
+    P = AlfeldC2Space(K, degree)
     assert P.get_num_members() == 27
 
 

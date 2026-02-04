@@ -8,17 +8,16 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-from FIAT import dual_set, finite_element, polynomial_set
-from FIAT.check_format_variant import check_format_variant
+from FIAT import dual_set, finite_element, polynomial_set, macro
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.functional import (PointwiseInnerProductEvaluation,
                              ComponentPointEvaluation,
                              TensorBidirectionalIntegralMoment as BidirectionalMoment)
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
 
 
 class HellanHerrmannJohnsonDual(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, qdegree):
+    def __init__(self, ref_el, degree, variant, qdegree, quad_scheme):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {i: [] for i in sorted(top[dim])} for dim in sorted(top)}
@@ -62,20 +61,19 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
         elif variant == "integral":
             # Face dofs
             ref_facet = ref_el.construct_subelement(sd-1)
-            Q_ref = create_quadrature(ref_facet, qdegree + degree)
+            Q_ref = parse_quadrature_scheme(ref_facet, qdegree + degree, quad_scheme)
             P = polynomial_set.ONPolynomialSet(ref_facet, degree)
             Phis = P.tabulate(Q_ref.get_points())[(0,)*(sd-1)]
 
             for f in sorted(top[sd-1]):
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
-                detJ = Q.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref, avg=True)
                 # n[f]^T u n[f] integrated against a basis for Pk
-                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f]/detJ, Q, phi) for phi in Phis)
+                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f], Q, phi) for phi in Phis)
                 entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
             ref_facet = ref_el.construct_subelement(sd)
-            Q_ref = create_quadrature(ref_facet, qdegree + degree)
+            Q_ref = parse_quadrature_scheme(ref_facet, qdegree + degree, quad_scheme)
             P = polynomial_set.ONPolynomialSet(ref_facet, degree)
             Phis = P.tabulate(Q_ref.get_points())[(0,) * sd]
             dimPkm1 = P.expansion_set.get_num_members(degree-1)
@@ -84,13 +82,12 @@ class HellanHerrmannJohnsonDual(dual_set.DualSet):
             for entity in sorted(top[sd]):
                 cur = len(nodes)
                 faces = cell_to_faces[entity]
-                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
-                detJ = Q.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref, avg=True)
                 # n[f]^T u n[f] integrated against a basis for P_{k-1}
-                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f]/detJ, Q, phi)
+                nodes.extend(BidirectionalMoment(ref_el, n[f], n[f], Q, phi)
                              for phi in Phis[:dimPkm1] for f in faces)
                 # n[i+1]^T u n[i+2] integrated against a basis for Pk
-                nodes.extend(BidirectionalMoment(ref_el, n[faces[i+1]], n[faces[i+2]]/detJ, Q, phi)
+                nodes.extend(BidirectionalMoment(ref_el, n[faces[i+1]], n[faces[i+2]], Q, phi)
                              for phi in Phis for i in range((sd-1)*(sd-2)))
                 entity_ids[sd][entity].extend(range(cur, len(nodes)))
 
@@ -102,7 +99,7 @@ class HellanHerrmannJohnson(finite_element.CiarletElement):
        HHJ(k) is the space of symmetric-matrix-valued polynomials of degree k
        or less with normal-normal continuity.
     """
-    def __init__(self, ref_el, degree=0, variant=None):
+    def __init__(self, ref_el, degree=0, variant=None, quad_scheme=None):
         if degree < 0:
             raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
 
@@ -110,8 +107,13 @@ class HellanHerrmannJohnson(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
-        dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
+
+        dual = HellanHerrmannJohnsonDual(ref_el, degree, variant, qdegree, quad_scheme)
         sd = ref_el.get_spatial_dimension()
         formdegree = (sd-1, sd-1)
         mapping = "double contravariant piola"

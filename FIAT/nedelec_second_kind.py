@@ -7,6 +7,7 @@
 
 import numpy
 
+from FIAT import macro
 from FIAT.finite_element import CiarletElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import ONPolynomialSet
@@ -14,8 +15,7 @@ from FIAT.functional import PointEdgeTangentEvaluation as Tangent
 from FIAT.functional import FrobeniusIntegralMoment as IntegralMoment
 from FIAT.raviart_thomas import RaviartThomas
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
-from FIAT.check_format_variant import check_format_variant
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 
 
 class NedelecSecondKindDual(DualSet):
@@ -47,14 +47,14 @@ class NedelecSecondKindDual(DualSet):
     these elements coincide with the CG_k elements.)
     """
 
-    def __init__(self, cell, degree, variant, interpolant_deg):
+    def __init__(self, cell, degree, variant, interpolant_deg, quad_scheme):
 
         # Define degrees of freedom
-        (dofs, ids) = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg)
+        (dofs, ids) = self.generate_degrees_of_freedom(cell, degree, variant, interpolant_deg, quad_scheme)
         # Call init of super-class
         super().__init__(dofs, cell, ids)
 
-    def generate_degrees_of_freedom(self, cell, degree, variant, interpolant_deg):
+    def generate_degrees_of_freedom(self, cell, degree, variant, interpolant_deg, quad_scheme):
         "Generate dofs and geometry-to-dof maps (ids)."
 
         dofs = []
@@ -68,27 +68,27 @@ class NedelecSecondKindDual(DualSet):
         ids[0] = {i: [] for i in sorted(cell.topology[0])}
 
         # (degree+1) degrees of freedom per entity of codimension 1 (edges)
-        (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg)
+        (edge_dofs, ids[1]) = self._generate_edge_dofs(cell, degree, 0, variant, interpolant_deg, quad_scheme)
         dofs.extend(edge_dofs)
 
         # Include face degrees of freedom if 3D
         if d == 3:
             face_dofs, ids[d-1] = self._generate_facet_dofs(d-1, cell, degree,
-                                                            len(dofs), variant, interpolant_deg)
+                                                            len(dofs), variant, interpolant_deg, quad_scheme)
             dofs.extend(face_dofs)
 
         # Varying degrees of freedom (possibly zero) per cell
-        cell_dofs, ids[d] = self._generate_facet_dofs(d, cell, degree, len(dofs), variant, interpolant_deg)
+        cell_dofs, ids[d] = self._generate_facet_dofs(d, cell, degree, len(dofs), variant, interpolant_deg, quad_scheme)
         dofs.extend(cell_dofs)
 
         return (dofs, ids)
 
-    def _generate_edge_dofs(self, cell, degree, offset, variant, interpolant_deg):
+    def _generate_edge_dofs(self, cell, degree, offset, variant, interpolant_deg, quad_scheme):
         """Generate degrees of freedom (dofs) for entities of
         codimension 1 (edges)."""
 
         if variant == "integral":
-            return self._generate_facet_dofs(1, cell, degree, offset, variant, interpolant_deg)
+            return self._generate_facet_dofs(1, cell, degree, offset, variant, interpolant_deg, quad_scheme)
 
         # (degree+1) tangential component point evaluation degrees of
         # freedom per entity of codimension 1 (edges)
@@ -109,7 +109,7 @@ class NedelecSecondKindDual(DualSet):
 
         return (dofs, ids)
 
-    def _generate_facet_dofs(self, dim, cell, degree, offset, variant, interpolant_deg):
+    def _generate_facet_dofs(self, dim, cell, degree, offset, variant, interpolant_deg, quad_scheme):
         """Generate degrees of freedom (dofs) for facets."""
 
         # Initialize empty dofs and identifiers (ids)
@@ -127,7 +127,7 @@ class NedelecSecondKindDual(DualSet):
 
         # Construct quadrature scheme for the reference facet
         ref_facet = cell.construct_subelement(dim)
-        Q_ref = create_quadrature(ref_facet, interpolant_deg + rt_degree)
+        Q_ref = parse_quadrature_scheme(ref_facet, interpolant_deg + rt_degree, quad_scheme)
         if dim == 1:
             Phi = ONPolynomialSet(ref_facet, rt_degree, (dim,))
         else:
@@ -191,7 +191,7 @@ class NedelecSecondKind(CiarletElement):
     interpolation.
     """
 
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
@@ -201,11 +201,16 @@ class NedelecSecondKind(CiarletElement):
 
         # Get dimension
         d = ref_el.get_spatial_dimension()
+
         # Construct polynomial basis for d-vector fields
-        Ps = ONPolynomialSet(ref_el, degree, (d, ))
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = ONPolynomialSet(ref_el, degree, (d, ))
 
         # Construct dual space
-        Ls = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg)
+        Ls = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg, quad_scheme)
 
         # Set form degree
         formdegree = 1  # 1-form
@@ -214,4 +219,4 @@ class NedelecSecondKind(CiarletElement):
         mapping = "covariant piola"
 
         # Call init of super-class
-        super().__init__(Ps, Ls, degree, formdegree, mapping=mapping)
+        super().__init__(poly_set, Ls, degree, formdegree, mapping=mapping)

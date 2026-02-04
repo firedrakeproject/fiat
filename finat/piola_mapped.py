@@ -1,44 +1,10 @@
 import numpy
 
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
-from gem import Literal, ListTensor
+from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
+from gem import Literal, ListTensor, Zero
 from copy import deepcopy
-
-
-def determinant(A):
-    """Return the determinant of A"""
-    n = A.shape[0]
-    if n == 0:
-        return 1
-    elif n == 1:
-        return A[0, 0]
-    elif n == 2:
-        return A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
-    else:
-        detA = A[0, 0] * determinant(A[1:, 1:])
-        cols = numpy.ones(A.shape[1], dtype=bool)
-        for j in range(1, n):
-            cols[j] = False
-            detA += (-1)**j * A[0, j] * determinant(A[1:][:, cols])
-            cols[j] = True
-        return detA
-
-
-def adjugate(A):
-    """Return the adjugate matrix of A"""
-    A = numpy.asarray(A)
-    C = numpy.zeros_like(A)
-    rows = numpy.ones(A.shape[0], dtype=bool)
-    cols = numpy.ones(A.shape[1], dtype=bool)
-    for i in range(A.shape[0]):
-        rows[i] = False
-        for j in range(A.shape[1]):
-            cols[j] = False
-            C[j, i] = (-1)**(i+j)*determinant(A[rows, :][:, cols])
-            cols[j] = True
-        rows[i] = True
-    return C
+from itertools import chain
 
 
 def piola_inverse(fiat_cell, J, detJ):
@@ -156,4 +122,25 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
             cur_dofs = dofs[sd-1][f]
             cur_bfs = bfs[sd-1][f][1:]
             V[numpy.ix_(cur_bfs, cur_dofs)] = rows[..., :len(cur_dofs)]
+
+        # Fix discrepancy between normal and tangential moments
+        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof
+        if needs_facet_vertex_coupling:
+            perp = lambda *t: numpy.array([t[0][1], -t[0][0]]) if len(t) == 1 else numpy.cross(*t)
+
+            dim = max(d for d in range(sd-1) if len(dofs[d][0]) > 0)
+            vdofs = chain.from_iterable(dofs[dim].values())
+            vdofs = [i for i in vdofs if nodes[i].max_deriv_order == 0]
+            fdofs = list(chain.from_iterable(dofs[sd-1].values()))
+
+            T = numpy.full((len(fdofs), len(vdofs)), Zero(), dtype=object)
+            for f in sorted(dofs[sd-1]):
+                nhat = perp(*self.cell.compute_tangents(sd-1, f))
+                Tfv = ((-1/sd) * nhat) @ Finv
+                for v in self.cell.connectivity[(sd-1, dim)][f]:
+                    curvdofs = [vdofs.index(i) for i in dofs[dim][v] if i in vdofs]
+                    for fdof in dofs[sd-1][f]:
+                        T[fdofs.index(fdof), curvdofs] = Tfv
+
+            V[ndof:, vdofs] += V[ndof:, fdofs] @ T
         return ListTensor(V.T)

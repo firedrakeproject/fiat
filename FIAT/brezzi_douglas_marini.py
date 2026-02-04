@@ -6,15 +6,14 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import (finite_element, functional, dual_set,
-                  polynomial_set, nedelec)
-from FIAT.check_format_variant import check_format_variant
-from FIAT.quadrature_schemes import create_quadrature
+                  polynomial_set, nedelec, macro)
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.quadrature import FacetQuadratureRule
 import numpy
 
 
 class BDMDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, interpolant_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg, quad_scheme):
         nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
@@ -30,14 +29,13 @@ class BDMDualSet(dual_set.DualSet):
             facet = ref_el.construct_subelement(sd-1)
             # Facet nodes are \int_F v\cdot n p ds where p \in P_{q}
             # degree is q
-            Q_ref = create_quadrature(facet, interpolant_deg + degree)
+            Q_ref = parse_quadrature_scheme(facet, interpolant_deg + degree, quad_scheme)
             Pq = polynomial_set.ONPolynomialSet(facet, degree)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                Q = FacetQuadratureRule(ref_el, sd - 1, f, Q_ref, avg=True)
+                n = ref_el.compute_scaled_normal(f)
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -59,7 +57,7 @@ class BDMDualSet(dual_set.DualSet):
                 interpolant_deg = degree
 
             cell = ref_el.construct_subelement(sd)
-            Q_ref = create_quadrature(cell, interpolant_deg + degree - 1)
+            Q_ref = parse_quadrature_scheme(cell, interpolant_deg + degree - 1, quad_scheme)
             Nedel = nedelec.Nedelec(cell, degree - 1, variant)
             Ned_at_qpts = Nedel.tabulate(0, Q_ref.get_points())[(0,) * sd]
             for entity in top[sd]:
@@ -93,7 +91,7 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     interpolation.
     """
 
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
 
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
@@ -103,7 +101,12 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
             raise Exception("BDM_k elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
-        dual = BDMDualSet(ref_el, degree, variant, interpolant_deg)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd, ))
+
+        dual = BDMDualSet(ref_el, degree, variant, interpolant_deg, quad_scheme)
         formdegree = sd - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

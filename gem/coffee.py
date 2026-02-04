@@ -47,6 +47,33 @@ def index_extent(factor, linear_indices):
     return numpy.prod([i.extent for i in factor.free_indices if i in linear_indices])
 
 
+def sort_monomials(monomials):
+    """Sort monomials to produce a better initial guess for :func:`find_optimal_atomics`.
+
+    :arg monomials: A list of :class:`Monomial`s
+
+    :returns: the reordered list of monomials.
+    """
+    # Construct a monomial subset with non-intersecting atomics
+    head = []
+    rest = []
+    atomics = set()
+    for m in monomials:
+        if atomics.intersection(m.atomics):
+            rest.append(m)
+        else:
+            atomics.update(m.atomics)
+            head.append(m)
+    # Put non-intersecting subset first
+    monomials = head + rest
+    # Sort the unique atomics as they appear in the monomials
+    atomics = tuple(dict.fromkeys(chain.from_iterable(monomial.atomics for monomial in monomials)))
+    # Sort the rest by the sum of the indices of their atomics
+    rest.sort(key=lambda m: sum(map(atomics.index, m.atomics)))
+    monomials = head + rest
+    return monomials
+
+
 def find_optimal_atomics(monomials, linear_indices):
     """Find optimal atomic common subexpressions, which produce least number of
     terms in the resultant IndexSum when factorised.
@@ -57,6 +84,8 @@ def find_optimal_atomics(monomials, linear_indices):
 
     :returns: list of atomic GEM expressions
     """
+    monomials = sort_monomials(monomials)
+
     atomics = tuple(dict.fromkeys(chain.from_iterable(monomial.atomics for monomial in monomials)))
 
     def cost(solution):

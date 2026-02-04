@@ -47,7 +47,7 @@ def tensor_name(request):
 
 @pytest.fixture(params=[ufl.interval, ufl.triangle,
                         ufl.quadrilateral],
-                ids=lambda x: x.cellname())
+                ids=lambda x: x.cellname)
 def ufl_A(request, tensor_name):
     return finat.ufl.FiniteElement(tensor_name, request.param, 1)
 
@@ -90,6 +90,23 @@ def test_interval_variant(family, variant, expected_cls):
     assert isinstance(create_element(ufl_element), expected_cls)
 
 
+@pytest.mark.parametrize('cell', [ufl.triangle, ufl.tetrahedron])
+@pytest.mark.parametrize('family,degree,quad_scheme',
+                         [('CR', 1, 'default'),
+                          ('CR', 1, 'KMV(1)'),
+                          ('CR', 1, 'KMV(2)'),
+                          ('CR', 1, 'KMV(2),powell-sabin')])
+def test_quad_scheme(cell, family, degree, quad_scheme):
+    ufl_element = finat.ufl.FiniteElement(family, cell, degree, variant="integral", quad_scheme=quad_scheme)
+    fe = create_element(ufl_element)
+    Q, ps = fe.dual_basis
+    assert fe.space_dimension() == fe.cell.get_spatial_dimension() + 1
+    if quad_scheme in {'KMV(1)', 'default'}:
+        assert len(ps.points) == fe.space_dimension()
+    else:
+        assert len(ps.points) > fe.space_dimension()
+
+
 def test_triangle_variant_spectral():
     ufl_element = finat.ufl.FiniteElement('DP', ufl.triangle, 2, variant='spectral')
     create_element(ufl_element)
@@ -122,6 +139,17 @@ def test_quadrilateral_variant_spectral_dq_l2():
     element = create_element(finat.ufl.FiniteElement('DQ L2', ufl.quadrilateral, 1, variant='spectral'))
     assert isinstance(element.product.factors[0], finat.GaussLegendre)
     assert isinstance(element.product.factors[1], finat.GaussLegendre)
+
+
+@pytest.mark.parametrize("cell, degree",
+                         [(ufl.triangle, p) for p in range(1, 7)]
+                         + [(ufl.tetrahedron, p) for p in range(1, 4)])
+def test_kmv(cell, degree):
+    ufl_element = finat.ufl.FiniteElement('KMV', cell, degree)
+    finat_element = create_element(ufl_element)
+    assert ufl_element.degree() == degree
+    assert ufl_element.embedded_superdegree == finat_element.degree
+    assert (finat_element.degree > degree) or (degree == 1)
 
 
 def test_cache_hit(ufl_element):
