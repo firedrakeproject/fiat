@@ -1,46 +1,76 @@
 import FIAT
+import numpy
 
-from gem import ListTensor
+from gem import ListTensor, partial_indexed, Literal, Power
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 class Morley(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=2):
-        if Citations is not None:
-            Citations().register("Morley1971")
-        super().__init__(FIAT.Morley(cell))
+        cite("Morley1971")
+        cite("MingXu2006")
+        super().__init__(FIAT.Morley(cell, degree=degree))
 
     def basis_transformation(self, coordinate_mapping):
-        # Jacobians at edge midpoints
-        J = coordinate_mapping.jacobian_at([1/3, 1/3])
-
-        rns = coordinate_mapping.reference_normals()
-        pns = coordinate_mapping.physical_normals()
-
-        pts = coordinate_mapping.physical_tangents()
-
-        pel = coordinate_mapping.physical_edge_lengths()
-
+        sd = self.cell.get_spatial_dimension()
+        top = self.cell.get_topology()
+        # Jacobians at barycenter
+        bary, = self.cell.make_points(sd, 0, sd+1)
+        J = coordinate_mapping.jacobian_at(bary)
+        detJ = coordinate_mapping.detJ_at(bary)
         V = identity(self.space_dimension())
 
-        for i in range(3):
-            V[i+3, i+3] = (rns[i, 0]*(pns[i, 0]*J[0, 0] + pns[i, 1]*J[1, 0])
-                           + rns[i, 1]*(pns[i, 0]*J[0, 1] + pns[i, 1]*J[1, 1]))
+        offset = len(top[sd-2])
+        if sd == 2:
+            pel = coordinate_mapping.physical_edge_lengths()
+            pts = coordinate_mapping.physical_tangents()
+            pns = coordinate_mapping.physical_normals()
+            for e in top[sd-1]:
+                s = offset + e
+                t = partial_indexed(pts, (e,))
+                n = partial_indexed(pns, (e,))
+                nhat = self.cell.compute_normal(e)
+                Jn = J @ Literal(nhat)
+                Bnn = Jn @ n
+                Bnt = Jn @ t
+                V[s, s] = Bnn
+                v = list(top[sd-1][e])
+                V[s, v] = Bnt / pel[e]
+                V[s, v[0]] *= -1
 
-        for i, c in enumerate([(1, 2), (0, 2), (0, 1)]):
-            B12 = (rns[i, 0]*(pts[i, 0]*J[0, 0] + pts[i, 1]*J[1, 0])
-                   + rns[i, 1]*(pts[i, 0]*J[0, 1] + pts[i, 1]*J[1, 1]))
-            V[3+i, c[0]] = -1*B12 / pel[i]
-            V[3+i, c[1]] = B12 / pel[i]
+        else:
+            adjugate = lambda A: ListTensor([[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]])
+            edges = self.cell.get_connectivity()[(sd-1, sd-2)]
+            for face in top[sd-1]:
+                s = offset + face
+                thats = self.cell.compute_tangents(sd-1, face)
+                nhat = numpy.cross(*thats)
+                ahat = numpy.linalg.norm(nhat)
+                nhat /= numpy.dot(nhat, nhat)
+
+                Jn = J @ Literal(nhat)
+                Jt = J @ Literal(thats.T)
+                Gnt = Jn.T @ Jt
+                Gtt = Jt.T @ Jt
+                detG = Gtt[0, 0]*Gtt[1, 1] - Gtt[0, 1]*Gtt[1, 0]
+                area = Power(detG, Literal(0.5))
+
+                Bnn = detJ / area
+                Bnt = Gnt @ adjugate(Gtt) / detG
+                Bnn *= ahat
+                Bnt *= ahat
+                V[s, s] = Bnn
+                V[s, list(edges[face])] = (-1*(Bnt[0] + Bnt[1]), Bnt[0], Bnt[1])
 
         # diagonal post-scaling to patch up conditioning
         h = coordinate_mapping.cell_size()
-
-        for e in range(3):
-            v0id, v1id = [i for i in range(3) if i != e]
-            for i in range(6):
-                V[i, 3+e] = 2*V[i, 3+e] / (h[v0id] + h[v1id])
+        for face in top[sd-1]:
+            s = offset + face
+            verts = top[sd-1][face]
+            havg = sum(h[v] for v in verts) / len(verts)
+            V[:, s] *= 1/havg
 
         return ListTensor(V.T)

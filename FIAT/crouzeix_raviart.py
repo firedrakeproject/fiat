@@ -10,7 +10,7 @@
 # Last changed: 2010-01-28
 
 import numpy
-from FIAT import finite_element, polynomial_set, dual_set, functional
+from FIAT import finite_element, polynomial_set, dual_set, functional, macro
 from FIAT.check_format_variant import check_format_variant
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
@@ -81,12 +81,18 @@ class CrouzeixRaviart(finite_element.CiarletElement):
     """
 
     def __init__(self, ref_el, degree, variant=None):
-
-        variant, interpolant_deg = check_format_variant(variant, degree)
-
         if degree % 2 != 1:
             raise ValueError("Crouzeix-Raviart only defined for odd degree")
 
-        space = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
+
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
+
         dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg)
-        super().__init__(space, dual, degree)
+        super().__init__(poly_set, dual, degree)

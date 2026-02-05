@@ -1,10 +1,13 @@
 import math
 import numpy
 import pytest
-from FIAT import DiscontinuousLagrange, Lagrange, Legendre, P0
-from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet
+from FIAT import (Lagrange, DiscontinuousLagrange, IntegratedLegendre, Legendre, P0,
+                  Nedelec, NedelecSecondKind, RaviartThomas, BrezziDouglasMarini,
+                  Regge, HellanHerrmannJohnson, GopalakrishnanLedererSchoberlSecondKind,
+                  CrouzeixRaviart)
+from FIAT.macro import AlfeldSplit, IsoSplit, PowellSabinSplit, CkPolynomialSet, MacroPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import ufc_simplex
+from FIAT.reference_element import ufc_simplex, UFCSimplex
 from FIAT.expansions import polynomial_entity_ids, polynomial_cell_node_map
 from FIAT.polynomial_set import make_bubbles, PolynomialSet, ONPolynomialSet
 from FIAT.barycentric_interpolation import get_lagrange_points
@@ -438,3 +441,127 @@ def test_macro_sympy(cell, element):
         results = phis(*numpy.transpose(pts))
         tab_numpy = fe.tabulate(0, pts)[(0,) * dim]
         assert numpy.allclose(results, tab_numpy)
+
+
+@pytest.mark.parametrize("element,degree", [
+    (Lagrange, 1), (Nedelec, 1), (RaviartThomas, 1), (DiscontinuousLagrange, 0),
+    (Regge, 0), (HellanHerrmannJohnson, 0),
+    (GopalakrishnanLedererSchoberlSecondKind, 0)])
+@pytest.mark.parametrize("dim", (2, 3))
+def test_macro_polynomial_set(dim, element, degree):
+    K = ufc_simplex(dim)
+    A = IsoSplit(K)
+
+    fe = element(K, degree)
+    mapping = fe.mapping()[0]
+    fdim = fe.formdegree
+    if isinstance(fdim, tuple):
+        fdim = max(fdim)
+    comps = []
+    pts = []
+    for entity in A.topology[fdim]:
+        pts_cur = A.make_points(fdim, entity, 1+fdim)
+        pts.extend(pts_cur)
+
+        if mapping == "affine":
+            comp = numpy.ones(())
+        elif mapping == "covariant contravariant piola":
+            ts = A.compute_tangents(fdim, entity)
+            n = A.compute_scaled_normal(entity)
+            comp = ts[..., None] * n[None, None, :]
+
+        elif mapping.endswith("covariant piola"):
+            comp = A.compute_edge_tangent(entity)
+        elif mapping.endswith("contravariant piola"):
+            comp = A.compute_scaled_normal(entity)
+        if mapping.startswith("double"):
+            comp = numpy.outer(comp, comp)
+
+        comps.extend(comp for pt in pts_cur)
+
+    P = MacroPolynomialSet(A, fe)
+    phis = P.tabulate(pts)[(0,)*dim]
+    shape = phis.shape
+    shp = shape[1:-1]
+    ncomp = comp.shape[:-len(shp)]
+
+    result = numpy.zeros((shape[0], *ncomp, shape[-1]))
+    ax = (tuple(range(-len(shp), 0)), )*2
+    for i, comp in enumerate(comps):
+        result[..., i] = numpy.tensordot(comp, phis[..., i], ax).T
+    result[abs(result) < 1E-14] = 0
+    result = result[:len(pts)*numpy.prod(ncomp, dtype=int)]
+
+    if ncomp:
+        result = result.transpose((*range(1, len(ncomp)+1), 0, -1))
+        result = result.reshape((shape[0], -1))
+    assert numpy.allclose(numpy.diag(numpy.diag(result)), result)
+
+
+def compare_macro_variant(element, K, degree, variant):
+    """Test CiarletElement by comparing macro variant to their non-macro
+       counterparts."""
+    # Test unisolvence
+    fe_macro = element(K, degree, variant=variant)
+
+    # Ensure that we have a macroelement
+    ref_complex = fe_macro.get_reference_complex()
+    assert ref_complex.is_macrocell()
+    top = ref_complex.topology
+    dim = ref_complex.get_spatial_dimension()
+    assert len(top[dim]) > 1
+
+    # Construct the non-macro element on a subcell
+    subcell = max(top[dim])
+    vids = list(top[dim][subcell])
+    subtop = {d: dict(enumerate(tuple(map(vids.index, top[d][e]))
+                                for e in top[d]
+                                if set(top[d][e]) <= set(vids)))
+              for d in sorted(top)}
+    vertices = ref_complex.get_vertices_of_subcomplex(vids)
+    Ksub = UFCSimplex(K.shape, vertices, subtop)
+    fe_ref = element(Ksub, degree)
+
+    # Compute Vandermonde matrix on the subcell
+    P = fe_macro.get_nodal_basis()
+    B = P.get_coeffs()
+    A = fe_ref.dual.to_riesz(P)
+    V = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
+
+    # Assert that V = permutation matrix
+    V[abs(V) < 1E-12] = 0
+    rows, cols = numpy.nonzero(V)
+    assert len(rows) == fe_ref.space_dimension()
+    assert numpy.allclose(V[rows, cols], 1)
+
+    # Test tabulation on interior points
+    pts = Ksub.make_points(dim, 0, degree+dim, interior=1)
+    tab_macro = fe_macro.tabulate(1, pts)
+    tab_ref = fe_ref.tabulate(1, pts)
+    for alpha in tab_ref:
+        expected = tab_ref[alpha][rows]
+        result = tab_macro[alpha][cols]
+        assert numpy.allclose(result, expected)
+
+
+@pytest.mark.parametrize("element,degree", [
+    (IntegratedLegendre, 4), (Legendre, 1),
+    (Nedelec, 3), (NedelecSecondKind, 3),
+    (RaviartThomas, 2), (BrezziDouglasMarini, 2),
+    (Regge, 3), (HellanHerrmannJohnson, 1),
+    (GopalakrishnanLedererSchoberlSecondKind, 1),
+])
+@pytest.mark.parametrize("dim", (2, 3))
+@pytest.mark.parametrize("variant", ("alfeld", "iso"))
+def test_macro_variants(dim, element, degree, variant):
+    K = ufc_simplex(dim)
+    compare_macro_variant(element, K, degree, variant)
+
+
+@pytest.mark.parametrize("element,degree", [
+    (CrouzeixRaviart, 3),
+])
+@pytest.mark.parametrize("variant", ("alfeld", "iso"))
+def test_macro_variants_triangle(element, degree, variant):
+    K = ufc_simplex(2)
+    compare_macro_variant(element, K, degree, variant)

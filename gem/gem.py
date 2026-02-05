@@ -15,7 +15,7 @@ indices.
 """
 
 from abc import ABCMeta
-from itertools import chain
+from itertools import chain, repeat
 from functools import reduce
 from operator import attrgetter
 from numbers import Integral, Number
@@ -55,8 +55,8 @@ class NodeMeta(type):
 
         # Set free_indices if not set already
         if not hasattr(obj, 'free_indices'):
-            obj.free_indices = unique(chain(*[c.free_indices
-                                              for c in obj.children]))
+            obj.free_indices = unique(chain.from_iterable(c.free_indices
+                                                          for c in obj.children))
         # Set dtype if not set already.
         if not hasattr(obj, 'dtype'):
             obj.dtype = obj.inherit_dtype_from_children(obj.children)
@@ -118,9 +118,8 @@ class Node(NodeBase, metaclass=NodeMeta):
             raise ValueError(f"Mismatching shapes {self.shape} and {other.shape} in matmul")
         *i, k = indices(len(self.shape))
         _, *j = indices(len(other.shape))
-        expr = Product(Indexed(self, tuple(i) + (k, )),
-                       Indexed(other, (k, ) + tuple(j)))
-        return ComponentTensor(IndexSum(expr, (k, )), tuple(i) + tuple(j))
+        expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
+        return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
 
     def __rmatmul__(self, other):
         return as_gem(other).__matmul__(self)
@@ -341,7 +340,7 @@ class Sum(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value + b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Sum, cls).__new__(cls)
         self.children = a, b
@@ -356,7 +355,7 @@ class Product(Scalar):
             a, b = args
         except ValueError:
             # Handle more than two arguments
-            return reduce(Product, args)
+            return one if len(args) == 0 else reduce(Product, args)
         assert not a.shape
         assert not b.shape
 
@@ -370,7 +369,7 @@ class Product(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value * b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Product, cls).__new__(cls)
         self.children = a, b
@@ -394,7 +393,7 @@ class Division(Scalar):
             return a
 
         if isinstance(a, Constant) and isinstance(b, Constant):
-            return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children([a, b]))
+            return Literal(a.value / b.value, dtype=Node.inherit_dtype_from_children((a, b)))
 
         self = super(Division, cls).__new__(cls)
         self.children = a, b
@@ -407,7 +406,7 @@ class FloorDiv(Scalar):
     def __new__(cls, a, b):
         assert not a.shape
         assert not b.shape
-        dtype = Node.inherit_dtype_from_children([a, b])
+        dtype = Node.inherit_dtype_from_children((a, b))
         if dtype != uint_type:
             raise ValueError(f"dtype ({dtype}) != unit_type ({uint_type})")
         # Constant folding
@@ -430,7 +429,7 @@ class Remainder(Scalar):
     def __new__(cls, a, b):
         assert not a.shape
         assert not b.shape
-        dtype = Node.inherit_dtype_from_children([a, b])
+        dtype = Node.inherit_dtype_from_children((a, b))
         if dtype != uint_type:
             raise ValueError(f"dtype ({dtype}) != uint_type ({uint_type})")
         # Constant folding
@@ -453,7 +452,7 @@ class Power(Scalar):
     def __new__(cls, base, exponent):
         assert not base.shape
         assert not exponent.shape
-        dtype = Node.inherit_dtype_from_children([base, exponent])
+        dtype = Node.inherit_dtype_from_children((base, exponent))
 
         # Constant folding
         if isinstance(base, Zero):
@@ -569,7 +568,7 @@ class Conditional(Node):
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
         self.shape = then.shape
-        self.dtype = Node.inherit_dtype_from_children([then, else_])
+        self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
 
@@ -932,7 +931,7 @@ class ListTensor(Node):
         """Common subexpression eliminating equality predicate."""
         if type(self) is not type(other):
             return False
-        if (self.array == other.array).all():
+        if numpy.array_equal(self.array, other.array):
             self.array = other.array
             return True
         return False
@@ -973,7 +972,7 @@ class Delta(Scalar, Terminal):
     def __new__(cls, i, j, dtype=None):
         if isinstance(i, tuple) and isinstance(j, tuple):
             # Handle multiindices
-            return Product(*map(Delta, i, j))
+            return Product(*map(Delta, i, j, repeat(dtype)))
         assert isinstance(i, IndexBase)
         assert isinstance(j, IndexBase)
 
@@ -985,25 +984,17 @@ class Delta(Scalar, Terminal):
         if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
 
-        if isinstance(i, Integral):
-            return Indexed(Literal(numpy.eye(j.extent)[i]), (j,))
-
-        if isinstance(j, Integral):
-            return Indexed(Literal(numpy.eye(i.extent)[j]), (i,))
-
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
         # Set up free indices
-        free_indices = []
-        for index in (i, j):
-            if isinstance(index, Index):
-                free_indices.append(index)
-            elif isinstance(index, VariableIndex):
-                raise NotImplementedError("Can not make Delta with VariableIndex")
+        free_indices = [index for index in (i, j) if isinstance(index, Index)]
         self.free_indices = tuple(unique(free_indices))
         self._dtype = dtype
         return self
+
+    def reconstruct(self, *args):
+        return Delta(*args, dtype=self.dtype)
 
 
 class Inverse(Node):

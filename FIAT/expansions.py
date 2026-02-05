@@ -274,10 +274,17 @@ class ExpansionSet(object):
         if scale is None:
             scale = math.sqrt(1.0 / base_ref_el.volume())
         self.scale = scale
+        self.variant = variant
         self.continuity = "C0" if variant == "bubble" else None
         self.recurrence_order = 2
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
+
+    def reconstruct(self, ref_el=None, scale=None, variant=None):
+        """Reconstructs this ExpansionSet with modified arguments."""
+        return ExpansionSet(ref_el or self.ref_el,
+                            scale=scale or self.scale,
+                            variant=variant or self.variant)
 
     def get_scale(self, n, cell=0):
         scale = self.scale
@@ -371,7 +378,7 @@ class ExpansionSet(object):
                     phi[alpha] /= mult[None, ipts]
 
         # Insert subcell tabulations into the corresponding submatrices
-        idx = lambda *args: args if args[1] is Ellipsis else numpy.ix_(*args)
+        idx = lambda *args: args if args[-1] is Ellipsis else numpy.ix_(*args)
         num_phis = self.get_num_members(n)
         cell_node_map = self.get_cell_node_map(n)
         result = {}
@@ -599,7 +606,10 @@ def polynomial_dimension(ref_el, n, continuity=None):
             raise ValueError("Only degree zero polynomials supported on point elements.")
         return 1
     top = ref_el.get_topology()
-    if continuity == "C0":
+
+    if isinstance(continuity, dict):
+        space_dimension = sum(len(continuity[dim][0]) * len(top[dim]) for dim in top)
+    elif continuity == "C0":
         space_dimension = sum(math.comb(n - 1, dim) * len(top[dim]) for dim in top)
     else:
         dim = ref_el.get_spatial_dimension()
@@ -620,7 +630,9 @@ def polynomial_entity_ids(ref_el, n, continuity=None):
     entity_ids = {}
     cur = 0
     for dim in sorted(top):
-        if continuity == "C0":
+        if isinstance(continuity, dict):
+            dofs, = set(len(continuity[dim][entity]) for entity in continuity[dim])
+        elif continuity == "C0":
             dofs = math.comb(n - 1, dim)
         else:
             # DG numbering

@@ -350,6 +350,7 @@ elements = [
     "CubicHermite(T)",
     "CubicHermite(S)",
     "Morley(T)",
+    "Morley(S)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
     "MardalTaiWinther(T, 3)",
