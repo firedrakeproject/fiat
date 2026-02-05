@@ -52,6 +52,7 @@ class BrezziDouglasMariniCube(FiniteElement):
 
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
+        self.fdim = dim
         if dim != 2:
             raise Exception("BDMc_k elements only valid for dimension 2")
 
@@ -79,6 +80,15 @@ class BrezziDouglasMariniCube(FiniteElement):
         super().__init__(ref_el=ref_el, dual=dual,
                          order=degree, formdegree=1,
                          mapping=mapping)
+
+    def value_shape(self):
+        return (self.fdim,)
+
+    def degree(self):
+        return self.get_order()
+
+    def dual_basis(self):
+        raise NotImplementedError(f"dual_basis is not implemented for {type(self).__name__}")
 
     def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to a given order of
