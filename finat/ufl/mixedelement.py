@@ -60,7 +60,7 @@ class MixedElement(FiniteElementBase):
             if not all(e.quadrature_scheme() == quad_scheme for e in elements):
                 raise ValueError("Quadrature scheme mismatch for sub elements of mixed element.")
 
-        # Compute value sizes in global and reference configurations
+        # Compute value sizes in reference configuration
         reference_value_size_sum = sum(product(s.reference_value_shape) for s in self._sub_elements)
 
         # Default reference value shape: Treated simply as all
@@ -75,7 +75,7 @@ class MixedElement(FiniteElementBase):
 
     def __repr__(self):
         """Doc."""
-        return "MixedElement(" + ", ".join(repr(e) for e in self._sub_elements) + ")"
+        return "MixedElement(" + ", ".join(map(repr, self._sub_elements)) + ")"
 
     def _is_linear(self):
         """Doc."""
@@ -87,7 +87,7 @@ class MixedElement(FiniteElementBase):
             return self
         return MixedElement(*elements)
 
-    def symmetry(self, domain):
+    def symmetry(self, domain=None):
         r"""Return the symmetry dict, which is a mapping :math:`c_0 \\to c_1`.
 
         meaning that component :math:`c_0` is represented by component
@@ -103,7 +103,7 @@ class MixedElement(FiniteElementBase):
             st = shape_to_strides(sh)
             # Map symmetries of subelement into index space of this
             # element
-            for c0, c1 in e.symmetry().items():
+            for c0, c1 in e.symmetry(domain).items():
                 j0 = flatten_multiindex(c0, st) + j
                 j1 = flatten_multiindex(c1, st) + j
                 sm[(j0,)] = (j1,)
@@ -111,7 +111,7 @@ class MixedElement(FiniteElementBase):
             j += product(sh)
         if j != product(self.value_shape(domain)):
             raise ValueError("Size mismatch in symmetry algorithm.")
-        return sm or {}
+        return sm
 
     @property
     def sobolev_space(self):
@@ -135,20 +135,21 @@ class MixedElement(FiniteElementBase):
         """Return list of sub elements."""
         return self._sub_elements
 
-    def extract_subelement_component(self, domain, i):
+    def extract_subelement_component(self, i, domain=None):
         """Extract direct subelement index and subelement relative.
 
         component index for a given component index.
         """
         if isinstance(i, int):
             i = (i,)
-        self._check_component(i)
+        self._check_component(i, domain)
 
         # Select between indexing modes
         if len(self.value_shape(domain)) == 1:
             # Indexing into a long vector of flattened subelement
             # shapes
             j, = i
+            j = int(j)
 
             # Find subelement for this index
             for sub_element_index, e in enumerate(self._sub_elements):
@@ -172,13 +173,13 @@ class MixedElement(FiniteElementBase):
             component = i[1:]
         return (sub_element_index, component)
 
-    def extract_component(self, i):
+    def extract_component(self, i, domain=None):
         """Recursively extract component index relative to a (simple) element.
 
         and that element for given value component index.
         """
-        sub_element_index, component = self.extract_subelement_component(i)
-        return self._sub_elements[sub_element_index].extract_component(component)
+        sub_element_index, component = self.extract_subelement_component(i, domain)
+        return self._sub_elements[sub_element_index].extract_component(component, domain)
 
     def extract_subelement_reference_component(self, i):
         """Extract direct subelement index and subelement relative.
@@ -193,6 +194,7 @@ class MixedElement(FiniteElementBase):
         assert len(self.reference_value_shape) == 1
         # Indexing into a long vector of flattened subelement shapes
         j, = i
+        j = int(j)
 
         # Find subelement for this index
         for sub_element_index, e in enumerate(self._sub_elements):
@@ -217,20 +219,20 @@ class MixedElement(FiniteElementBase):
         sub_element_index, reference_component = self.extract_subelement_reference_component(i)
         return self._sub_elements[sub_element_index].extract_reference_component(reference_component)
 
-    def is_cellwise_constant(self, component=None):
+    def is_cellwise_constant(self, component=None, domain=None):
         """Return whether the basis functions of this element is spatially constant over each cell."""
         if component is None:
             return all(e.is_cellwise_constant() for e in self.sub_elements)
         else:
-            i, e = self.extract_component(component)
+            i, e = self.extract_component(component, domain)
             return e.is_cellwise_constant()
 
-    def degree(self, component=None):
+    def degree(self, component=None, domain=None):
         """Return polynomial degree of finite element."""
         if component is None:
             return self._degree  # from FiniteElementBase, computed as max of subelements in __init__
         else:
-            i, e = self.extract_component(component)
+            i, e = self.extract_component(component, domain)
             return e.degree()
 
     @property
@@ -244,11 +246,12 @@ class MixedElement(FiniteElementBase):
         return max(e.embedded_superdegree for e in self.sub_elements)
 
     def reconstruct(self, **kwargs):
-        """Doc."""
-        return MixedElement(*[e.reconstruct(**kwargs) for e in self.sub_elements])
+        """Construct a new FiniteElement object with some properties replaced with new values."""
+        elements = (e.reconstruct(**kwargs) for e in self.sub_elements)
+        return self.reconstruct_from_elements(*elements)
 
     def variant(self):
-        """Doc."""
+        """Return the common variant to all subelements."""
         try:
             variant, = {e.variant() for e in self.sub_elements}
             return variant
@@ -257,7 +260,7 @@ class MixedElement(FiniteElementBase):
 
     def __str__(self):
         """Format as string for pretty printing."""
-        tmp = ", ".join(str(element) for element in self._sub_elements)
+        tmp = ", ".join(map(str, self._sub_elements))
         return "<Mixed element: (" + tmp + ")>"
 
     def shortstr(self):
@@ -282,7 +285,6 @@ class VectorElement(MixedElement):
         if isinstance(family, FiniteElementBase):
             sub_element = family
             cell = sub_element.cell
-            variant = sub_element.variant()
         else:
             if cell is not None:
                 cell = as_cell(cell)
@@ -315,13 +317,8 @@ class VectorElement(MixedElement):
 
         self._sub_element = sub_element
 
-        if variant is None:
-            var_str = ""
-        else:
-            var_str = ", variant='" + variant + "'"
-
         # Cache repr string
-        self._repr = f"VectorElement({repr(sub_element)}, dim={dim}{var_str})"
+        self._repr = f"VectorElement({repr(sub_element)}, dim={dim})"
 
     def __repr__(self):
         """Doc."""
@@ -369,7 +366,6 @@ class TensorElement(MixedElement):
         if isinstance(family, FiniteElementBase):
             sub_element = family
             cell = sub_element.cell
-            variant = sub_element.variant()
         else:
             if cell is not None:
                 cell = as_cell(cell)
@@ -416,7 +412,7 @@ class TensorElement(MixedElement):
             if index in symmetry:
                 continue
             sub_element_mapping[index] = len(sub_elements)
-            sub_elements += [sub_element]
+            sub_elements.append(sub_element)
 
         # Update mapping for symmetry
         for index in indices:
@@ -445,14 +441,9 @@ class TensorElement(MixedElement):
         self._sub_element_mapping = sub_element_mapping
         self._flattened_sub_element_mapping = flattened_sub_element_mapping
 
-        if variant is None:
-            var_str = ""
-        else:
-            var_str = ", variant='" + variant + "'"
-
         # Cache repr string
         self._repr = (f"TensorElement({repr(sub_element)}, shape={shape}, "
-                      f"symmetry={symmetry}{var_str})")
+                      f"symmetry={symmetry})")
 
     @property
     def pullback(self):
@@ -490,25 +481,25 @@ class TensorElement(MixedElement):
         """Doc."""
         return self._flattened_sub_element_mapping
 
-    def extract_subelement_component(self, i):
+    def extract_subelement_component(self, i, domain=None):
         """Extract direct subelement index and subelement relative.
 
         component index for a given component index.
         """
         if isinstance(i, int):
             i = (i,)
-        self._check_component(i)
+        self._check_component(i, domain)
 
-        i = self.symmetry().get(i, i)
-        l = len(self._shape)  # noqa: E741
-        ii = i[:l]
-        jj = i[l:]
+        i = self.symmetry(domain).get(i, i)
+        rank = len(self._shape)
+        ii = i[:rank]
+        jj = i[rank:]
         if ii not in self._sub_element_mapping:
             raise ValueError(f"Illegal component index {i}.")
         k = self._sub_element_mapping[ii]
         return (k, jj)
 
-    def symmetry(self):
+    def symmetry(self, domain=None):
         r"""Return the symmetry dict, which is a mapping :math:`c_0 \\to c_1`.
 
         meaning that component :math:`c_0` is represented by component
