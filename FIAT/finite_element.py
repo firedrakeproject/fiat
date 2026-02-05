@@ -93,7 +93,7 @@ class FiniteElement(object):
 
     def space_dimension(self):
         """Return the dimension of the finite element space."""
-        return len(self.dual_basis())
+        return len(self.get_dual_set())
 
     def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to given order of
