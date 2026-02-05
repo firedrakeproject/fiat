@@ -293,7 +293,7 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
-        return tuple(self.array.flat) == tuple(other.array.flat)
+        return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
         return hash((type(self), self.shape, tuple(self.array.flat)))
@@ -684,8 +684,26 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
+        # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
+        # This pattern corresponds to an index replacement rule jj -> ii applied to
+        # the innermost multiindex kk to produce ll.
+        if isinstance(aggregate, ComponentTensor):
+            B, = aggregate.children
+            jj = aggregate.multiindex
+            ii = multiindex
+            if isinstance(B, Indexed):
+                C, = B.children
+                kk = B.multiindex
+                ff = C.free_indices
+                if not any((j in ff) for j in jj):
+                    # Only replace indices that are not present in C
+                    rep = dict(zip(jj, ii))
+                    ll = tuple(rep.get(k, k) for k in kk)
+                    aggregate = C
+                    multiindex = ll
+
         # All indices fixed
-        if all(isinstance(i, int) for i in multiindex):
+        if all(isinstance(i, Integral) for i in multiindex):
             if isinstance(aggregate, Constant):
                 return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
             elif isinstance(aggregate, ListTensor):
@@ -835,6 +853,11 @@ class ComponentTensor(Node):
         if isinstance(expression, Zero):
             return Zero(shape, dtype=expression.dtype)
 
+        # Index folding
+        if isinstance(expression, Indexed):
+            if multiindex == expression.multiindex:
+                return expression.children[0]
+
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
         self.multiindex = multiindex
@@ -871,6 +894,11 @@ class IndexSum(Scalar):
         if not multiindex:
             return summand
 
+        # Flatten nested sums
+        if isinstance(summand, IndexSum):
+            A, = summand.children
+            return IndexSum(A, summand.multiindex + multiindex)
+
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
         self.multiindex = multiindex
@@ -891,15 +919,46 @@ class ListTensor(Node):
         dtype = Node.inherit_dtype_from_children(tuple(array.flat))
 
         # Handle children with shape
-        child_shape = array.flat[0].shape
+        e0 = array.flat[0]
+        child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
+
+        # Simplify [tensor[multiindex, j] for j in range(n)] -> partial_indexed(tensor, multiindex)
+        if all(isinstance(elem, Indexed) for elem in array.flat):
+            tensor = e0.children[0]
+            if all(elem.children[0] == tensor for elem in array.flat[1:]):
+                # Extract maximal subset of leading indices that is common over all array entries
+                multiindex = tuple(e0.multiindex)
+                for elem in array.flat[1:]:
+                    while elem.multiindex[:len(multiindex)] != multiindex:
+                        multiindex = multiindex[:-1]
+                    if len(multiindex) == 0:
+                        break
+                index_shape = tuple(i.extent if isinstance(i, Index) else 1 for i in multiindex)
+                if index_shape + array.shape + child_shape == tensor.shape:
+                    if all(elem.multiindex[len(multiindex):] == idx for idx, elem in numpy.ndenumerate(array)):
+                        return partial_indexed(tensor, multiindex)
+
+        # Simplify [tensor[j, ...] for j in range(n)] -> tensor
+        if all(isinstance(elem, ComponentTensor) and isinstance(elem.children[0], Indexed)
+               for elem in array.flat):
+            tensor = e0.children[0].children[0]
+            if array.shape + child_shape == tensor.shape:
+                if all(elem.children[0].children[0] == tensor for elem in array.flat[1:]):
+                    if all(elem.children[0].multiindex == idx + elem.multiindex
+                           for idx, elem in numpy.ndenumerate(array)):
+                        return tensor
+
+        # Flatten nested ListTensors
+        if all(isinstance(elem, ListTensor) for elem in array.flat):
+            return ListTensor(asarray([elem.array for elem in array.flat]).reshape(array.shape + child_shape))
 
         if child_shape:
             # Destroy structure
             direct_array = numpy.empty(array.shape + child_shape, dtype=object)
-            for alpha in numpy.ndindex(array.shape):
+            for alpha, elem in numpy.ndenumerate(array):
                 for beta in numpy.ndindex(child_shape):
-                    direct_array[alpha + beta] = Indexed(array[alpha], beta)
+                    direct_array[alpha + beta] = Indexed(elem, beta)
             array = direct_array
 
         # Constant folding

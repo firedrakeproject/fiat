@@ -11,7 +11,7 @@ import numpy
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
-from gem.gem import (Node, Failure, Identity, Literal, Zero,
+from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
@@ -119,6 +119,7 @@ def replace_indices_delta(node, self, subst):
 def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
     child, = node.children
+
     if isinstance(child, ComponentTensor):
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
@@ -127,11 +128,27 @@ def replace_indices_indexed(node, self, subst):
         return self(child.children[0], tuple(sorted(substitute.items())))
     else:
         # Replace indices
-        new_child = self(child, subst)
-        if multiindex == node.multiindex and new_child == child:
+        child = self(child, subst)
+
+        # Remove fixed indices
+        if isinstance(child, (Constant, ListTensor)):
+            if all(isinstance(i, Integral) for i in multiindex):
+                # All indices fixed
+                sub = child.array[multiindex]
+                child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else sub
+                multiindex = ()
+
+            elif any(isinstance(i, Integral) for i in multiindex):
+                # Some indices fixed
+                slices = tuple(i if isinstance(i, Integral) else slice(None) for i in multiindex)
+                sub = child.array[slices]
+                child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else ListTensor(sub)
+                multiindex = tuple(i for i in multiindex if not isinstance(i, Integral))
+
+        if multiindex == node.multiindex and child == node.children[0]:
             return node
         else:
-            return Indexed(new_child, multiindex)
+            return Indexed(child, multiindex)
 
 
 @replace_indices.register(FlexiblyIndexed)
@@ -177,7 +194,7 @@ _constant_fold_zero.register(Node)(reuse_if_untouched)
 
 @_constant_fold_zero.register(Literal)
 def _constant_fold_zero_literal(node, self):
-    if (node.array == 0).all():
+    if numpy.array_equal(node.array, 0):
         # All zeros, make symbolic zero
         return Zero(node.shape)
     else:
@@ -663,8 +680,8 @@ def _(node, self):
         # Unrolling
         summand = self(node.children[0])
         shape = tuple(index.extent for index in unroll)
-        unrolled = Sum(*(Indexed(ComponentTensor(summand, unroll), alpha)
-                         for alpha in numpy.ndindex(shape)))
+        tensor = ComponentTensor(summand, unroll)
+        unrolled = Sum(*(Indexed(tensor, alpha) for alpha in numpy.ndindex(shape)))
         return IndexSum(unrolled, tuple(index for index in node.multiindex
                                         if index not in unroll))
     else:
