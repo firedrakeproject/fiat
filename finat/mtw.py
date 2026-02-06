@@ -16,7 +16,11 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
 
         reduced_dofs = deepcopy(self._element.entity_dofs())
         sd = cell.get_spatial_dimension()
-        fdofs = sd + 1
+
+        dim_P1 = sd
+        dim_Ned1 = (sd*(sd-1))//2
+        fdofs = dim_P1 + dim_Ned1
+
         reduced_dofs[sd][0] = []
         for f in reduced_dofs[sd-1]:
             reduced_dofs[sd-1][f] = reduced_dofs[sd-1][f][:fdofs]
@@ -29,13 +33,18 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         V = identity(numbf, ndof)
 
         sd = self.cell.get_spatial_dimension()
+        if sd == 2:
+            facet_transform = normal_tangential_edge_transform
+        else:
+            raise NotImplementedError
+
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)
         detJ = coordinate_mapping.detJ_at(bary)
         entity_dofs = self.entity_dofs()
         for f in sorted(entity_dofs[sd-1]):
             cur = entity_dofs[sd-1][f][0]
-            V[cur+1, cur:cur+sd] = normal_tangential_edge_transform(self.cell, J, detJ, f)
+            V[cur+1, cur:cur+sd] = facet_transform(self.cell, J, detJ, f)
 
         return ListTensor(V.T)
 
