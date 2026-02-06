@@ -36,130 +36,33 @@
           <div class="body" role="main">
             
   <h1>Source code for FIAT.brezzi_douglas_fortin_marini</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">finite_element</span><span class="p">,</span> <span class="n">functional</span><span class="p">,</span> <span class="n">dual_set</span><span class="p">,</span>
-                  <span class="n">polynomial_set</span><span class="p">,</span> <span class="n">lagrange</span><span class="p">)</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
-
-
-<div class="viewcode-block" id="BDFMDualSet">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_fortin_marini.BDFMDualSet">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">BDFMDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
-
-        <span class="c1"># Initialize containers for map: mesh_entity -&gt; dof number and</span>
-        <span class="c1"># dual basis</span>
-        <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
-
-        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="n">t</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
-
-        <span class="c1"># Define each functional for the dual set</span>
-        <span class="c1"># codimension 1 facet normals.</span>
-        <span class="c1"># note this will die for degree greater than 1.</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])):</span>
-            <span class="n">pts_cur</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">sd</span> <span class="o">+</span> <span class="n">degree</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pts_cur</span><span class="p">)):</span>
-                <span class="n">pt_cur</span> <span class="o">=</span> <span class="n">pts_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
-                <span class="n">f</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointScaledNormalEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">pt_cur</span><span class="p">)</span>
-                <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-
-        <span class="c1"># codimension 1 facet tangents.</span>
-        <span class="c1"># because the tangent component is discontinuous, these actually</span>
-        <span class="c1"># count as internal nodes.</span>
-        <span class="n">tangent_count</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])):</span>
-            <span class="n">pts_cur</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">sd</span> <span class="o">+</span> <span class="n">degree</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
-            <span class="n">tangent_count</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts_cur</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pts_cur</span><span class="p">)):</span>
-                <span class="n">pt_cur</span> <span class="o">=</span> <span class="n">pts_cur</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
-                <span class="n">f</span> <span class="o">=</span> <span class="n">functional</span><span class="o">.</span><span class="n">PointEdgeTangentEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">pt_cur</span><span class="p">)</span>
-                <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
-
-        <span class="c1"># sets vertices (and in 3d, edges) to have no nodes</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
-            <span class="n">entity_ids</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">i</span><span class="p">])):</span>
-                <span class="n">entity_ids</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-
-        <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
-
-        <span class="c1"># set codimension 1 (edges 2d, faces 3d) dof</span>
-        <span class="n">pts_facet_0</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">make_points</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">sd</span> <span class="o">+</span> <span class="n">degree</span><span class="p">)</span>
-        <span class="n">pts_per_facet</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pts_facet_0</span><span class="p">)</span>
-
-        <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="p">[</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">])):</span>
-            <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="n">pts_per_facet</span><span class="p">))</span>
-            <span class="n">cur</span> <span class="o">+=</span> <span class="n">pts_per_facet</span>
-
-        <span class="c1"># internal nodes</span>
-        <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="n">cur</span> <span class="o">+</span> <span class="n">tangent_count</span><span class="p">))}</span>
-        <span class="n">cur</span> <span class="o">+=</span> <span class="n">tangent_count</span>
-
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="BDFMSpace">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_fortin_marini.BDFMSpace">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">BDFMSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">):</span>
-    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-    <span class="k">if</span> <span class="n">sd</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;BDFM_k elements only valid for dim 2&quot;</span><span class="p">)</span>
-    <span class="c1"># Note that order will be 2.</span>
-
-    <span class="c1"># Linear vector valued space. Since the embedding degree of this element</span>
-    <span class="c1"># is 2, this is implemented by taking the quadratic space and selecting</span>
-    <span class="c1"># the linear polynomials.</span>
-    <span class="n">vec_poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,))</span>
-    <span class="c1"># Linears are the first three polynomials in each dimension.</span>
-    <span class="n">vec_poly_set</span> <span class="o">=</span> <span class="n">vec_poly_set</span><span class="o">.</span><span class="n">take</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">8</span><span class="p">])</span>
-
-    <span class="c1"># Scalar quadratic Lagrange element.</span>
-    <span class="n">lagrange_ele</span> <span class="o">=</span> <span class="n">lagrange</span><span class="o">.</span><span class="n">Lagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
-    <span class="c1"># Select the dofs associated with the edges.</span>
-    <span class="n">edge_dofs_dict</span> <span class="o">=</span> <span class="n">lagrange_ele</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()[</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
-    <span class="n">edge_dofs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([(</span><span class="n">edge</span><span class="p">,</span> <span class="n">dof</span><span class="p">)</span>
-                             <span class="k">for</span> <span class="n">edge</span><span class="p">,</span> <span class="n">dofs</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">edge_dofs_dict</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
-                             <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">dofs</span><span class="p">])</span>
-
-    <span class="n">tangent_polys</span> <span class="o">=</span> <span class="n">lagrange_ele</span><span class="o">.</span><span class="n">poly_set</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">edge_dofs</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span>
-    <span class="n">new_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">tangent_polys</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(),</span> <span class="n">sd</span><span class="p">,</span> <span class="n">tangent_polys</span><span class="o">.</span><span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
-
-    <span class="c1"># Outer product of the tangent vectors with the quadratic edge polynomials.</span>
-    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">edge</span><span class="p">,</span> <span class="n">dof</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">edge_dofs</span><span class="p">):</span>
-        <span class="n">tangent</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">edge</span><span class="p">)</span>
-
-        <span class="n">new_coeffs</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">tangent</span><span class="p">,</span> <span class="n">tangent_polys</span><span class="o">.</span><span class="n">coeffs</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:])</span>
-
-    <span class="n">bubble_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span>
-                                              <span class="n">order</span><span class="p">,</span>
-                                              <span class="n">order</span><span class="p">,</span>
-                                              <span class="n">vec_poly_set</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span>
-                                              <span class="n">new_coeffs</span><span class="p">)</span>
-
-    <span class="n">element_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">polynomial_set_union_normalized</span><span class="p">(</span><span class="n">bubble_set</span><span class="p">,</span> <span class="n">vec_poly_set</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">element_set</span></div>
-
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.expansions</span><span class="w"> </span><span class="kn">import</span> <span class="n">polynomial_dimension</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.brezzi_douglas_marini</span><span class="w"> </span><span class="kn">import</span> <span class="n">BrezziDouglasMarini</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.nodal_enriched</span><span class="w"> </span><span class="kn">import</span> <span class="n">NodalEnrichedElement</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.restricted</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestrictedElement</span>
 
 
 <div class="viewcode-block" id="BrezziDouglasFortinMarini">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.brezzi_douglas_fortin_marini.BrezziDouglasFortinMarini">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">BrezziDouglasFortinMarini</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">BrezziDouglasFortinMarini</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The BDFM element&quot;&quot;&quot;</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
-
-        <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;BDFM_k elements only valid for k == 2&quot;</span><span class="p">)</span>
-
-        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">BDFMSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
-        <span class="n">dual</span> <span class="o">=</span> <span class="n">BDFMDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
-        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span>
-                         <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
+    <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;point&quot;</span><span class="p">:</span>
+        <span class="n">BDM_I</span> <span class="o">=</span> <span class="n">RestrictedElement</span><span class="p">(</span><span class="n">BrezziDouglasMarini</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">),</span> <span class="n">restriction_domain</span><span class="o">=</span><span class="s2">&quot;interior&quot;</span><span class="p">)</span>
+        <span class="n">BDM_F</span> <span class="o">=</span> <span class="n">RestrictedElement</span><span class="p">(</span><span class="n">BrezziDouglasMarini</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">),</span> <span class="n">restriction_domain</span><span class="o">=</span><span class="s2">&quot;facet&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">NodalEnrichedElement</span><span class="p">(</span><span class="n">BDM_I</span><span class="p">,</span> <span class="n">BDM_F</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">BDM</span> <span class="o">=</span> <span class="n">BrezziDouglasMarini</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="n">variant</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
+        <span class="n">entity_ids</span> <span class="o">=</span> <span class="n">BDM</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()</span>
+        <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="n">s</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dim</span><span class="p">),</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">s</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]):</span>
+                <span class="n">indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">][</span><span class="n">s</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">RestrictedElement</span><span class="p">(</span><span class="n">BDM</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span></div>
 
 </pre></div>
 
