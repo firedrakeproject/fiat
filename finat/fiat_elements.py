@@ -427,8 +427,8 @@ class BrezziDouglasMariniCubeFace(VectorFiatElement):
 
 
 class BrezziDouglasFortinMarini(VectorFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.BrezziDouglasFortinMarini(cell, degree))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.BrezziDouglasFortinMarini(cell, degree, **kwargs))
 
 
 class Nedelec(VectorFiatElement):

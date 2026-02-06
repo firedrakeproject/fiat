@@ -30,5 +30,5 @@ source scripts/parameters
 DATA_ID=$1 && [ -z "$DATA_ID" ] && DATA_ID=`cat $DATA_ID_FILE`
 
 # Checkout data referenced by id
-(cd $DATA_DIR && git checkout -B auto $DATA_ID)
+(cd $DATA_DIR && git checkout -B main $DATA_ID)
 exit $?
