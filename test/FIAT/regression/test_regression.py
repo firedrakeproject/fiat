@@ -224,7 +224,10 @@ def quadrature_test_case_name(test_case):
                         ("Brezzi-Douglas-Marini", 3, 1),
                         ("Brezzi-Douglas-Marini", 3, 2),
                         ("Brezzi-Douglas-Marini", 3, 3),
+                        ("Brezzi-Douglas-Fortin-Marini", 2, 1),
                         ("Brezzi-Douglas-Fortin-Marini", 2, 2),
+                        ("Brezzi-Douglas-Fortin-Marini", 3, 1),
+                        ("Brezzi-Douglas-Fortin-Marini", 3, 2),
                         ("Raviart-Thomas", 2, 1),
                         ("Raviart-Thomas", 2, 2),
                         ("Raviart-Thomas", 2, 3),
@@ -281,7 +284,7 @@ def test_quadrature(quadrature_reference_data, quadrature_test_case):
         '''Create the reference data.
         '''
         kwargs = {}
-        if family in {"Crouzeix-Raviart", "Regge", "Hellan-Herrmann-Johnson", "Brezzi-Douglas-Fortin-Marini"}:
+        if family in {"Crouzeix-Raviart", "Regge", "Hellan-Herrmann-Johnson"}:
             kwargs["variant"] = "point"
         # Get domain and element class
         domain = ufc_simplex(dim)
