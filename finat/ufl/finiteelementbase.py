@@ -20,6 +20,20 @@ from ufl.finiteelement import AbstractFiniteElement
 from ufl.utils.sequences import product
 
 
+# Dict of supported pullback names and their ufl representation
+supported_pullbacks = {
+    "identity": pullback.identity_pullback,
+    "L2 Piola": pullback.l2_piola,
+    "covariant Piola": pullback.covariant_piola,
+    "contravariant Piola": pullback.contravariant_piola,
+    "double covariant Piola": pullback.double_covariant_piola,
+    "double contravariant Piola": pullback.double_contravariant_piola,
+    "covariant contravariant Piola": pullback.covariant_contravariant_piola,
+    "custom": pullback.custom_pullback,
+    "physical": pullback.physical_pullback,
+}
+
+
 class FiniteElementBase(AbstractFiniteElement):
     """Base class for all finite elements."""
     __slots__ = ("_family", "_cell", "_degree", "_quad_scheme",
@@ -121,6 +135,14 @@ class FiniteElementBase(AbstractFiniteElement):
         """Return whether the basis functions of this element is spatially constant over each cell."""
         return self._is_globally_constant() or self.degree() == 0
 
+    def value_shape(self, domain=None):
+        """Return the shape of the value space on a physical domain."""
+        return self.pullback.physical_value_shape(self, domain)
+
+    def value_size(self, domain=None):
+        """Return the integer product of the value shape on a physical domain."""
+        return product(self.value_shape(domain))
+
     @property
     def reference_value_shape(self):
         """Return the shape of the value space on the reference cell."""
@@ -131,7 +153,7 @@ class FiniteElementBase(AbstractFiniteElement):
         """Return the integer product of the reference value shape."""
         return product(self.reference_value_shape)
 
-    def symmetry(self):  # FIXME: different approach
+    def symmetry(self, domain=None):
         r"""Return the symmetry dict.
 
         This is a mapping :math:`c_0 \\to c_1`
@@ -141,37 +163,37 @@ class FiniteElementBase(AbstractFiniteElement):
         """
         return {}
 
-    def _check_component(self, domain, i):
+    def _check_component(self, i, domain=None):
         """Check that component index i is valid."""
-        sh = self.value_shape(domain.geometric_dimension())
+        sh = self.value_shape(domain)
         r = len(sh)
-        if not (len(i) == r and all(j < k for (j, k) in zip(i, sh))):
+        if not (len(i) == r and all(int(j) < k for (j, k) in zip(i, sh))):
             raise ValueError(
                 f"Illegal component index {i} (value rank {len(i)}) "
                 f"for element (value rank {r}).")
 
-    def extract_subelement_component(self, domain, i):
+    def extract_subelement_component(self, i, domain=None):
         """Extract direct subelement index and subelement relative component index for a given component index."""
         if isinstance(i, int):
             i = (i,)
-        self._check_component(domain, i)
+        self._check_component(i, domain)
         return (None, i)
 
-    def extract_component(self, domain, i):
+    def extract_component(self, i, domain=None):
         """Recursively extract component index relative to a (simple) element.
 
         and that element for given value component index.
         """
         if isinstance(i, int):
             i = (i,)
-        self._check_component(domain, i)
+        self._check_component(i, domain)
         return (i, self)
 
     def _check_reference_component(self, i):
         """Check that reference component index i is valid."""
         sh = self.reference_value_shape
         r = len(sh)
-        if not (len(i) == r and all(j < k for (j, k) in zip(i, sh))):
+        if not (len(i) == r and all(int(j) < k for (j, k) in zip(i, sh))):
             raise ValueError(
                 f"Illegal component index {i} (value rank {len(i)}) "
                 f"for element (value rank {r}).")
@@ -246,23 +268,7 @@ class FiniteElementBase(AbstractFiniteElement):
     @property
     def pullback(self):
         """Get the pull back."""
-        if self.mapping() == "identity":
-            return pullback.identity_pullback
-        elif self.mapping() == "L2 Piola":
-            return pullback.l2_piola
-        elif self.mapping() == "covariant Piola":
-            return pullback.covariant_piola
-        elif self.mapping() == "contravariant Piola":
-            return pullback.contravariant_piola
-        elif self.mapping() == "double covariant Piola":
-            return pullback.double_covariant_piola
-        elif self.mapping() == "double contravariant Piola":
-            return pullback.double_contravariant_piola
-        elif self.mapping() == "covariant contravariant Piola":
-            return pullback.covariant_contravariant_piola
-        elif self.mapping() == "custom":
-            return pullback.custom_pullback
-        elif self.mapping() == "physical":
-            return pullback.physical_pullback
-
-        raise ValueError(f"Unsupported mapping: {self.mapping()}")
+        try:
+            return supported_pullbacks[self.mapping()]
+        except KeyError:
+            raise ValueError(f"Unsupported mapping: {self.mapping()}")
