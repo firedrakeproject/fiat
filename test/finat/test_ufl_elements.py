@@ -16,7 +16,9 @@ def test_extract_subelement_component(domain):
     Q = finat.ufl.FiniteElement("Lagrange", cell, 1)
     Z = V * Q
 
-    space = ufl.FunctionSpace(domain, Z)
+    # ufl.MixedFunction space now requires a MeshSequence
+    mixed_mesh = ufl.MeshSequence([domain]*len(Z.sub_elements))
+    space = ufl.FunctionSpace(mixed_mesh, Z)
     test = ufl.TestFunction(space)
 
     for i in range(3):
