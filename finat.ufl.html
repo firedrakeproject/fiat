@@ -334,7 +334,7 @@ element is nodal.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.finiteelementbase.FiniteElementBase.extract_component">
-<span class="sig-name descname"><span class="pre">extract_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.extract_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.extract_component" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">extract_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.extract_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.extract_component" title="Link to this definition">¶</a></dt>
 <dd><p>Recursively extract component index relative to a (simple) element.</p>
 <p>and that element for given value component index.</p>
 </dd></dl>
@@ -348,7 +348,7 @@ element is nodal.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.finiteelementbase.FiniteElementBase.extract_subelement_component">
-<span class="sig-name descname"><span class="pre">extract_subelement_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.extract_subelement_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.extract_subelement_component" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">extract_subelement_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.extract_subelement_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.extract_subelement_component" title="Link to this definition">¶</a></dt>
 <dd><p>Extract direct subelement index and subelement relative component index for a given component index.</p>
 </dd></dl>
 
@@ -421,12 +421,24 @@ element is nodal.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.finiteelementbase.FiniteElementBase.symmetry">
-<span class="sig-name descname"><span class="pre">symmetry</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.symmetry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.symmetry" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">symmetry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.symmetry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.symmetry" title="Link to this definition">¶</a></dt>
 <dd><p>Return the symmetry dict.</p>
 <p>This is a mapping <span class="math notranslate nohighlight">\(c_0 \\to c_1\)</span>
 meaning that component <span class="math notranslate nohighlight">\(c_0\)</span> is represented by component
 <span class="math notranslate nohighlight">\(c_1\)</span>.
 A component is a tuple of one or more ints.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.ufl.finiteelementbase.FiniteElementBase.value_shape">
+<span class="sig-name descname"><span class="pre">value_shape</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.value_shape"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.value_shape" title="Link to this definition">¶</a></dt>
+<dd><p>Return the shape of the value space on a physical domain.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.ufl.finiteelementbase.FiniteElementBase.value_size">
+<span class="sig-name descname"><span class="pre">value_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#FiniteElementBase.value_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.FiniteElementBase.value_size" title="Link to this definition">¶</a></dt>
+<dd><p>Return the integer product of the value shape on a physical domain.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -622,7 +634,7 @@ remapped = WithMapping(E, “identity”)</p>
 <p>A finite element composed of a nested hierarchy of mixed or simple elements.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.MixedElement.degree">
-<span class="sig-name descname"><span class="pre">degree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">component</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.degree" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">degree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">component</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.degree" title="Link to this definition">¶</a></dt>
 <dd><p>Return polynomial degree of finite element.</p>
 </dd></dl>
 
@@ -640,7 +652,7 @@ remapped = WithMapping(E, “identity”)</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.MixedElement.extract_component">
-<span class="sig-name descname"><span class="pre">extract_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.extract_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.extract_component" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">extract_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.extract_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.extract_component" title="Link to this definition">¶</a></dt>
 <dd><p>Recursively extract component index relative to a (simple) element.</p>
 <p>and that element for given value component index.</p>
 </dd></dl>
@@ -654,7 +666,7 @@ remapped = WithMapping(E, “identity”)</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.MixedElement.extract_subelement_component">
-<span class="sig-name descname"><span class="pre">extract_subelement_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.extract_subelement_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.extract_subelement_component" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">extract_subelement_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.extract_subelement_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.extract_subelement_component" title="Link to this definition">¶</a></dt>
 <dd><p>Extract direct subelement index and subelement relative.</p>
 <p>component index for a given component index.</p>
 </dd></dl>
@@ -668,7 +680,7 @@ remapped = WithMapping(E, “identity”)</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.MixedElement.is_cellwise_constant">
-<span class="sig-name descname"><span class="pre">is_cellwise_constant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">component</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.is_cellwise_constant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.is_cellwise_constant" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">is_cellwise_constant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">component</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.is_cellwise_constant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.is_cellwise_constant" title="Link to this definition">¶</a></dt>
 <dd><p>Return whether the basis functions of this element is spatially constant over each cell.</p>
 </dd></dl>
 
@@ -693,7 +705,7 @@ remapped = WithMapping(E, “identity”)</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.MixedElement.reconstruct">
 <span class="sig-name descname"><span class="pre">reconstruct</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.reconstruct"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.reconstruct" title="Link to this definition">¶</a></dt>
-<dd><p>Doc.</p>
+<dd><p>Construct a new FiniteElement object with some properties replaced with new values.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -722,7 +734,7 @@ remapped = WithMapping(E, “identity”)</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.MixedElement.symmetry">
-<span class="sig-name descname"><span class="pre">symmetry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.symmetry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.symmetry" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">symmetry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.symmetry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.symmetry" title="Link to this definition">¶</a></dt>
 <dd><p>Return the symmetry dict, which is a mapping <span class="math notranslate nohighlight">\(c_0 \\to c_1\)</span>.</p>
 <p>meaning that component <span class="math notranslate nohighlight">\(c_0\)</span> is represented by component
 <span class="math notranslate nohighlight">\(c_1\)</span>.
@@ -732,7 +744,7 @@ A component is a tuple of one or more ints.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.MixedElement.variant">
 <span class="sig-name descname"><span class="pre">variant</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#MixedElement.variant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.MixedElement.variant" title="Link to this definition">¶</a></dt>
-<dd><p>Doc.</p>
+<dd><p>Return the common variant to all subelements.</p>
 </dd></dl>
 
 </dd></dl>
@@ -744,7 +756,7 @@ A component is a tuple of one or more ints.</p>
 <p>A special case of a mixed finite element where all elements are equal.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.TensorElement.extract_subelement_component">
-<span class="sig-name descname"><span class="pre">extract_subelement_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#TensorElement.extract_subelement_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.TensorElement.extract_subelement_component" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">extract_subelement_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#TensorElement.extract_subelement_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.TensorElement.extract_subelement_component" title="Link to this definition">¶</a></dt>
 <dd><p>Extract direct subelement index and subelement relative.</p>
 <p>component index for a given component index.</p>
 </dd></dl>
@@ -781,7 +793,7 @@ A component is a tuple of one or more ints.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.ufl.mixedelement.TensorElement.symmetry">
-<span class="sig-name descname"><span class="pre">symmetry</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#TensorElement.symmetry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.TensorElement.symmetry" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">symmetry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/ufl/mixedelement.html#TensorElement.symmetry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.mixedelement.TensorElement.symmetry" title="Link to this definition">¶</a></dt>
 <dd><p>Return the symmetry dict, which is a mapping <span class="math notranslate nohighlight">\(c_0 \\to c_1\)</span>.</p>
 <p>meaning that component <span class="math notranslate nohighlight">\(c_0\)</span> is represented by component
 <span class="math notranslate nohighlight">\(c_1\)</span>.
@@ -1090,6 +1102,8 @@ A component is a tuple of one or more ints.</p>
 <li><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase.sobolev_space"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.sobolev_space</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase.sub_elements"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.sub_elements</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase.symmetry"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.symmetry()</span></code></a></li>
+<li><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase.value_shape"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.value_shape()</span></code></a></li>
+<li><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase.value_size"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.value_size()</span></code></a></li>
 <li><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase.variant"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.variant()</span></code></a></li>
 </ul>
 </li>
