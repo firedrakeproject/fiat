@@ -25,7 +25,7 @@ def test_dofs():
                 for m in (0, 1):
                     normal_moments[bf, m] += wts[k] * nvals[bf, k] * linevals[m, k]
         right = np.zeros((9, 2))
-        right[3*ed, 0] = 1.0
+        right[3*ed+1, 0] = 1.0
         right[3*ed+2, 1] = 1.0
         assert np.allclose(normal_moments, right)
     for ed in range(3):
@@ -39,5 +39,5 @@ def test_dofs():
             for k in range(len(Qline.wts)):
                 tangent_moments[bf] += wts[k] * tvals[bf, k] * linevals[0, k]
         right = np.zeros(9)
-        right[3*ed + 1] = 1.0
+        right[3*ed] = 1.0
         assert np.allclose(tangent_moments, right)
