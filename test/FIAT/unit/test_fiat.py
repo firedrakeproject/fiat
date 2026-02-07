@@ -361,6 +361,7 @@ elements = [
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
     "MardalTaiWinther(T, 3)",
+    "MardalTaiWinther(S, 4)",
     "ArnoldWintherNC(T, 2)",
     "ArnoldWinther(T, 3)",
     "HuZhang(T, 3)",

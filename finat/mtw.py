@@ -1,12 +1,10 @@
 import FIAT
-
 from gem import ListTensor
 
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.piola_mapped import normal_tangential_edge_transform
-from copy import deepcopy
 
 
 class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
@@ -14,42 +12,25 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         cite("Mardal2002")
         super().__init__(FIAT.MardalTaiWinther(cell, degree))
 
-        reduced_dofs = deepcopy(self._element.entity_dofs())
-        sd = cell.get_spatial_dimension()
-
-        dim_P1 = sd
-        dim_Ned1 = (sd*(sd-1))//2
-        fdofs = dim_P1 + dim_Ned1
-
-        reduced_dofs[sd][0] = []
-        for f in reduced_dofs[sd-1]:
-            reduced_dofs[sd-1][f] = reduced_dofs[sd-1][f][:fdofs]
-        self._entity_dofs = reduced_dofs
-        self._space_dimension = fdofs * len(reduced_dofs[sd-1])
-
     def basis_transformation(self, coordinate_mapping):
-        numbf = self._element.space_dimension()
-        ndof = self.space_dimension()
-        V = identity(numbf, ndof)
-
         sd = self.cell.get_spatial_dimension()
+        bary, = self.cell.make_points(sd, 0, sd+1)
+        J = coordinate_mapping.jacobian_at(bary)
+        detJ = coordinate_mapping.detJ_at(bary)
+        entity_dofs = self.entity_dofs()
         if sd == 2:
             facet_transform = normal_tangential_edge_transform
         else:
             raise NotImplementedError
 
-        bary, = self.cell.make_points(sd, 0, sd+1)
-        J = coordinate_mapping.jacobian_at(bary)
-        detJ = coordinate_mapping.detJ_at(bary)
-        entity_dofs = self.entity_dofs()
+        # dim_P1 = sd
+        # dim_Ned1 = (sd*(sd-1))//2
+        # fdofs = dim_P1 + dim_Ned1
+
+        ndof = self.space_dimension()
+        V = identity(ndof, ndof)
         for f in sorted(entity_dofs[sd-1]):
             cur = entity_dofs[sd-1][f][0]
-            V[cur+1, cur:cur+sd] = facet_transform(self.cell, J, detJ, f)
+            V[cur, cur:cur+sd] = facet_transform(self.cell, J, detJ, f)[::-1]
 
         return ListTensor(V.T)
-
-    def entity_dofs(self):
-        return self._entity_dofs
-
-    def space_dimension(self):
-        return self._space_dimension
