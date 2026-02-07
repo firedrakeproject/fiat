@@ -111,7 +111,7 @@ register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, No
 # Zany elements
 register_element("Bernardi-Raugel", "BR", 1, H1, "contravariant Piola", (1, None), simplices[1:])
 register_element("Bernardi-Raugel Bubble", "BRB", 1, H1, "contravariant Piola", (None, None), simplices[1:])
-register_element("Mardal-Tai-Winther", "MTW", 1, H1, "contravariant Piola", (3, 3), ("triangle",))
+register_element("Mardal-Tai-Winther", "MTW", 1, H1, "contravariant Piola", (3, 4), ("triangle", "tetrahedron"))
 register_element("Hermite", "HER", 0, H1, "custom", (3, 3), simplices)
 register_element("Argyris", "ARG", 0, H2, "custom", (5, None), ("triangle",))
 register_element("Bell", "BELL", 0, H2, "custom", (5, 5), ("triangle",))
