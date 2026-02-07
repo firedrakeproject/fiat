@@ -116,12 +116,6 @@ def phys_el():
                      (-0.1, -0.2, 1.38))
     return K
 
-    K[3].vertices = ((0., 0., 0.),
-                     (1., 0., 0.),
-                     (0., 1., 0.),
-                     (0., 0., 2.))
-    return K
-
 
 @pytest.fixture
 def ref_to_phys(ref_el, phys_el):

@@ -50,11 +50,8 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
                 V[tdofs, tdofs] = detJ / detA
 
                 Q = numpy.dot(thats, thats.T)
-                a = Bnt[1][0]
-                b = -1*Bnt[0][0]
-                a, b = Q @ (a, b)
-
-                V[tdofs[:2], ndofs[0]] += (a, b)
-                V[tdofs[2], ndofs[1:]] += (a, b)
+                Bnt = Q @ (Bnt[1][0], -1*Bnt[0][0])
+                V[tdofs[:2], ndofs[0]] += Bnt
+                V[tdofs[2], ndofs[1:]] += Bnt
 
         return gem.ListTensor(V.T)
