@@ -38,15 +38,24 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
                 ndofs = entity_dofs[sd-1][f][dim_Ned1:]
 
                 thats = self.cell.compute_tangents(sd-1, f)
-                Jt = J @ gem.Literal(thats.T)
-                Gtt = Jt.T @ Jt
-                detG = Gtt[0, 0]*Gtt[1, 1] - Gtt[0, 1]*Gtt[1, 0]
+                nhat = numpy.cross(*thats)
+                nhat /= numpy.dot(nhat, nhat)
+                orths = numpy.array([numpy.cross(thats[1], nhat),
+                                     numpy.cross(nhat, thats[0])])
+                Jts = J @ gem.Literal(thats.T)
+                Jorths = J @ gem.Literal(orths.T)
+                A = Jorths.T @ Jts
 
-                V[numpy.ix_(tdofs[:2], tdofs[:2])] = adjugate(Gtt)
-                V[numpy.ix_(tdofs[:2], tdofs[:2])] *= detJ / detG
-                #V[tdofs[2], tdofs[2]] = detJ # / detG
+
+                detA = A[0, 0]*A[1, 1] - A[0, 1]*A[1, 0]
+
+                V[numpy.ix_(tdofs[:2], tdofs[:2])] = adjugate(A)
+                V[numpy.ix_(tdofs[:2], tdofs[:2])] *= detJ / detA
+                V[tdofs[2], tdofs[2]] = detJ / detA
 
                 V[tdofs[0], ndofs[0]] = -1*Bnt[0][0]
                 V[tdofs[1], ndofs[0]] = -1*Bnt[1][0]
+
+                V[tdofs[2], ndofs[1:]] += Bnt[0][1:]
 
         return gem.ListTensor(V.T)
