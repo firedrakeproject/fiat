@@ -1,14 +1,17 @@
 import FIAT
-from gem import ListTensor
+import gem
+import numpy
 
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
-from finat.piola_mapped import normal_tangential_edge_transform
+from finat.piola_mapped import normal_tangential_edge_transform, normal_tangential_face_transform
 
 
 class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
-    def __init__(self, cell, degree=3):
+    def __init__(self, cell, degree=None):
+        if degree is None:
+            degree = cell.get_spatial_dimension()+1
         cite("Mardal2002")
         super().__init__(FIAT.MardalTaiWinther(cell, degree))
 
@@ -18,19 +21,32 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         J = coordinate_mapping.jacobian_at(bary)
         detJ = coordinate_mapping.detJ_at(bary)
         entity_dofs = self.entity_dofs()
-        if sd == 2:
-            facet_transform = normal_tangential_edge_transform
-        else:
-            raise NotImplementedError
-
-        # dim_P1 = sd
-        # dim_Ned1 = (sd*(sd-1))//2
-        # fdofs = dim_P1 + dim_Ned1
 
         ndof = self.space_dimension()
         V = identity(ndof, ndof)
-        for f in sorted(entity_dofs[sd-1]):
-            cur = entity_dofs[sd-1][f][0]
-            V[cur, cur:cur+sd] = facet_transform(self.cell, J, detJ, f)[::-1]
+        if sd == 2:
+            for f in sorted(entity_dofs[sd-1]):
+                Bnt = normal_tangential_edge_transform(self.cell, J, detJ, f)
+                cur = entity_dofs[sd-1][f][0]
+                V[cur, cur:cur+sd] = Bnt[::-1]
+        else:
+            adjugate = lambda A: [[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]]
+            dim_Ned1 = (sd*(sd-1))//2
+            for f in sorted(entity_dofs[sd-1]):
+                Bnt = normal_tangential_face_transform(self.cell, J, detJ, f)
+                tdofs = entity_dofs[sd-1][f][:dim_Ned1]
+                ndofs = entity_dofs[sd-1][f][dim_Ned1:]
 
-        return ListTensor(V.T)
+                thats = self.cell.compute_tangents(sd-1, f)
+                Jt = J @ gem.Literal(thats.T)
+                Gtt = Jt.T @ Jt
+                detG = Gtt[0, 0]*Gtt[1, 1] - Gtt[0, 1]*Gtt[1, 0]
+
+                V[numpy.ix_(tdofs[:2], tdofs[:2])] = adjugate(Gtt)
+                V[numpy.ix_(tdofs[:2], tdofs[:2])] *= detJ / detG
+                #V[tdofs[2], tdofs[2]] = detJ # / detG
+
+                V[tdofs[0], ndofs[0]] = -1*Bnt[0][0]
+                V[tdofs[1], ndofs[0]] = -1*Bnt[1][0]
+
+        return gem.ListTensor(V.T)
