@@ -24,18 +24,20 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
 
         ndof = self.space_dimension()
         V = identity(ndof, ndof)
+        dimP1 = sd
         if sd == 2:
             for f in sorted(entity_dofs[sd-1]):
                 Bnt = normal_tangential_edge_transform(self.cell, J, detJ, f)
-                cur = entity_dofs[sd-1][f][0]
-                V[cur, cur:cur+sd] = Bnt[::-1]
+                ndofs = entity_dofs[sd-1][f][:dimP1]
+                tdofs = entity_dofs[sd-1][f][dimP1:]
+
+                V[tdofs[0], ndofs[0]] = Bnt[0]
+                V[tdofs[0], tdofs[0]] = Bnt[1]
         else:
-            dim_Ned1 = (sd*(sd-1))//2
             for f in sorted(entity_dofs[sd-1]):
                 Bnt = normal_tangential_face_transform(self.cell, J, detJ, f)
-
-                tdofs = entity_dofs[sd-1][f][:dim_Ned1]
-                ndofs = entity_dofs[sd-1][f][dim_Ned1:]
+                ndofs = entity_dofs[sd-1][f][:dimP1]
+                tdofs = entity_dofs[sd-1][f][dimP1:]
 
                 thats = self.cell.compute_tangents(sd-1, f)
                 nhat = numpy.cross(*thats)

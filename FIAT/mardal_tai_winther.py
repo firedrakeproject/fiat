@@ -95,13 +95,15 @@ class MardalTaiWintherDual(dual_set.DualSet):
             cur = len(nodes)
             n = ref_el.compute_scaled_normal(f)
             Qf = FacetQuadratureRule(ref_el, sd-1, f, Q, avg=True)
+            # Normal moments against P1
+            nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, numpy.outer(n, phi)) for phi in P1_at_qpts)
+            # Tangential moments against RT0
             Jf = ref_el.compute_tangents(sd-1, f)
             phis = numpy.tensordot(Jf.T, Phis.transpose((1, 0, 2)), (1, 0)).transpose((1, 0, 2))
             if sd == 2:
                 nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, phi) for phi in phis)
             else:
                 nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, numpy.cross(n, phi, axis=0)) for phi in phis)
-            nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, numpy.outer(n, phi)) for phi in P1_at_qpts)
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
