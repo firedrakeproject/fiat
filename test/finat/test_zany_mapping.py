@@ -96,7 +96,7 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
 
     inds = tuple(map(np.unique, np.nonzero(error)))
     error = error[np.ix_(*inds)]
-    #error[error != 0] += 1
+    error[error != 0] += 1
 
     pp = pprint.PrettyPrinter(width=140, compact=True)
     assert np.allclose(residual, 0), pp.pformat((np.round(error, 8).tolist(), *inds))

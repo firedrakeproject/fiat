@@ -30,10 +30,10 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
                 cur = entity_dofs[sd-1][f][0]
                 V[cur, cur:cur+sd] = Bnt[::-1]
         else:
-            adjugate = lambda A: [[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]]
             dim_Ned1 = (sd*(sd-1))//2
             for f in sorted(entity_dofs[sd-1]):
                 Bnt = normal_tangential_face_transform(self.cell, J, detJ, f)
+
                 tdofs = entity_dofs[sd-1][f][:dim_Ned1]
                 ndofs = entity_dofs[sd-1][f][dim_Ned1:]
 
@@ -42,20 +42,19 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
                 nhat /= numpy.dot(nhat, nhat)
                 orths = numpy.array([numpy.cross(thats[1], nhat),
                                      numpy.cross(nhat, thats[0])])
+
                 Jts = J @ gem.Literal(thats.T)
                 Jorths = J @ gem.Literal(orths.T)
                 A = Jorths.T @ Jts
-
-
                 detA = A[0, 0]*A[1, 1] - A[0, 1]*A[1, 0]
+                V[tdofs, tdofs] = detJ / detA
 
-                V[numpy.ix_(tdofs[:2], tdofs[:2])] = adjugate(A)
-                V[numpy.ix_(tdofs[:2], tdofs[:2])] *= detJ / detA
-                V[tdofs[2], tdofs[2]] = detJ / detA
+                Q = numpy.dot(thats, thats.T)
+                a = Bnt[1][0]
+                b = -1*Bnt[0][0]
+                a, b = Q @ (a, b)
 
-                V[tdofs[0], ndofs[0]] = -1*Bnt[0][0]
-                V[tdofs[1], ndofs[0]] = -1*Bnt[1][0]
-
-                V[tdofs[2], ndofs[1:]] += Bnt[0][1:]
+                V[tdofs[:2], ndofs[0]] += (a, b)
+                V[tdofs[2], ndofs[1:]] += (a, b)
 
         return gem.ListTensor(V.T)
