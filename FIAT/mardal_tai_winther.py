@@ -42,7 +42,7 @@ def MardalTaiWintherSpace(ref_el):
     # Project curl(B [P1]^d) into [Pk]^d
     BP1 = polynomial_set.make_bubbles(ref_el, degree+1, shape=((sd*(sd-1))//2,))
 
-    Q = create_quadrature(ref_el, degree*2)
+    Q = create_quadrature(ref_el, 2*degree)
     qpts = Q.get_points()
     qwts = Q.get_weights()
     Pk_at_qpts = Pk.tabulate(qpts)
@@ -71,25 +71,23 @@ class MardalTaiWintherDual(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
 
-        # no vertex dofs
-
         # On each facet, let n be its normal.  We need to integrate
-        # u.n and u.t against the first Legendre polynomial (constant)
-        # and u.n against the second (linear).
+        # u.n against a Dubiner basis for P1
+        # and u x n against a basis for lowest-order RT.
         ref_facet = ref_el.get_facet_element()
-        # Facet nodes are \int_F v.n p ds where p \in P_{q-1}
-        # degree is q - 1
         Q = create_quadrature(ref_facet, degree+1)
         P1 = polynomial_set.ONPolynomialSet(ref_facet, 1)
         P1_at_qpts = P1.tabulate(Q.get_points())[(0,)*(sd - 1)]
         if sd == 2:
-            Phis = P1_at_qpts[:1, None, :]
+            # For 2D just take the constant
+            RT_at_qpts = P1_at_qpts[:1, None, :]
         else:
-            Phis = numpy.zeros((3, sd-1, P1_at_qpts.shape[-1]))
-            Phis[0, 0, :] = P1_at_qpts[0, None, :]
-            Phis[1, 1, :] = P1_at_qpts[0, None, :]
-            Phis[2, 0, :] = P1_at_qpts[1, None, :]
-            Phis[2, 1, :] = P1_at_qpts[2, None, :]
+            # Basis for lowest-order RT [(1, 0), (0, 1), (x, y)]
+            RT_at_qpts = numpy.zeros((3, sd-1, P1_at_qpts.shape[-1]))
+            RT_at_qpts[0, 0, :] = P1_at_qpts[0, None, :]
+            RT_at_qpts[1, 1, :] = P1_at_qpts[0, None, :]
+            RT_at_qpts[2, 0, :] = P1_at_qpts[1, None, :]
+            RT_at_qpts[2, 1, :] = P1_at_qpts[2, None, :]
 
         for f in sorted(top[sd-1]):
             cur = len(nodes)
@@ -97,13 +95,13 @@ class MardalTaiWintherDual(dual_set.DualSet):
             Qf = FacetQuadratureRule(ref_el, sd-1, f, Q, avg=True)
             # Normal moments against P1
             nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, numpy.outer(n, phi)) for phi in P1_at_qpts)
-            # Tangential moments against RT0
-            Jf = ref_el.compute_tangents(sd-1, f)
-            phis = numpy.tensordot(Jf.T, Phis.transpose((1, 0, 2)), (1, 0)).transpose((1, 0, 2))
-            if sd == 2:
-                nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, phi) for phi in phis)
-            else:
-                nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, numpy.cross(n, phi, axis=0)) for phi in phis)
+            # Map the RT basis into the facet
+            Jf = Qf.jacobian()
+            phis = numpy.tensordot(Jf, RT_at_qpts.transpose(1, 0, 2), (1, 0)).transpose(1, 0, 2)
+            if sd == 3:
+                # Moments against cross(n, RT)
+                phis = numpy.cross(n[None, :, None], phis, axis=1)
+            nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, phi) for phi in phis)
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
