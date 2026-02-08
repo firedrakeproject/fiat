@@ -49,9 +49,11 @@ def normal_tangential_face_transform(fiat_cell, J, detJ, f):
     det0 = A[1, 0] * A[2, 1] - A[1, 1] * A[2, 0]
     det1 = A[2, 0] * A[0, 1] - A[2, 1] * A[0, 0]
     det2 = A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
-    scale = detJ / det0
-    rows = ((-1 * det1 / det0, -1 * scale * A[2, 1], scale * A[2, 0]),
-            (-1 * det2 / det0, scale * A[1, 1], -1 * scale * A[1, 0]))
+    rows = numpy.array((-1 * det1 / det0, -1 * det2 / det0, detJ / det0))
+
+    Q = numpy.dot(thats, thats.T)
+    R = numpy.array([[0, 1], [-1, 0]])
+    rows[:2] = Q @ R @ rows[:2]
     return rows
 
 
@@ -118,10 +120,10 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
             transform = normal_tangential_face_transform
 
         for f in sorted(dofs[sd-1]):
-            rows = numpy.asarray(transform(self.cell, J, detJ, f))
-            cur_dofs = dofs[sd-1][f]
+            *Bnt, Btt = transform(self.cell, J, detJ, f)
+            cur_dof = dofs[sd-1][f][0]
             cur_bfs = bfs[sd-1][f][1:]
-            V[numpy.ix_(cur_bfs, cur_dofs)] = rows[..., :len(cur_dofs)]
+            V[cur_bfs, cur_dof] = Bnt
 
         # Fix discrepancy between normal and tangential moments
         needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof

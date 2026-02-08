@@ -116,6 +116,9 @@ class BernardiRaugelDualSet(dual_set.DualSet):
                         Q = Qt[f]
                         phi = ft_at_qpts
                         udir = thats[f][i-1]
+                        if sd == 3:
+                            udir = numpy.cross(perp(*thats[f]), udir)
+
                     nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(udir, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)

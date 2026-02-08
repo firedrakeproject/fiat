@@ -28,7 +28,12 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, dim, f, Qref, avg=True)
             thats = ref_el.compute_tangents(dim, f)
-            nhat = numpy.dot(R, *thats) if sd == 2 else numpy.cross(*thats)
+            if sd == 2:
+                nhat = numpy.dot(R, *thats)
+            else:
+                nhat = numpy.cross(*thats)
+                thats = numpy.cross(nhat[None, :], thats, axis=1)
+
             nodes.extend(TensorBidirectionalIntegralMoment(ref_el, nhat, comp, Q, phi)
                          for phi in phis for comp in (nhat, *thats))
             entity_ids[dim][f].extend(range(cur, len(nodes)))

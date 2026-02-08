@@ -1,6 +1,5 @@
 import FIAT
 import gem
-import numpy
 
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
@@ -25,35 +24,21 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         ndof = self.space_dimension()
         V = identity(ndof, ndof)
         dimP1 = sd
+
         if sd == 2:
-            for f in sorted(entity_dofs[sd-1]):
-                Bnt = normal_tangential_edge_transform(self.cell, J, detJ, f)
-                ndofs = entity_dofs[sd-1][f][:dimP1]
-                tdofs = entity_dofs[sd-1][f][dimP1:]
-
-                V[tdofs[0], ndofs[0]] = Bnt[0]
-                V[tdofs[0], tdofs[0]] = Bnt[1]
+            transform = normal_tangential_edge_transform
         else:
-            for f in sorted(entity_dofs[sd-1]):
-                Bnt = normal_tangential_face_transform(self.cell, J, detJ, f)
-                ndofs = entity_dofs[sd-1][f][:dimP1]
-                tdofs = entity_dofs[sd-1][f][dimP1:]
+            transform = normal_tangential_face_transform
 
-                thats = self.cell.compute_tangents(sd-1, f)
-                nhat = numpy.cross(*thats)
-                nhat /= numpy.dot(nhat, nhat)
-                orths = numpy.array([numpy.cross(thats[1], nhat),
-                                     numpy.cross(nhat, thats[0])])
-
-                Jts = J @ gem.Literal(thats.T)
-                Jorths = J @ gem.Literal(orths.T)
-                A = Jorths.T @ Jts
-                detA = A[0, 0]*A[1, 1] - A[0, 1]*A[1, 0]
-                V[tdofs, tdofs] = detJ / detA
-
-                Q = numpy.dot(thats, thats.T)
-                Bnt = Q @ (Bnt[1][0], -1*Bnt[0][0])
-                V[tdofs[:2], ndofs[0]] += Bnt
-                V[tdofs[2], ndofs[1:]] += Bnt
+        for f in sorted(entity_dofs[sd-1]):
+            *Bnt, Btt = transform(self.cell, J, detJ, f)
+            ndofs = entity_dofs[sd-1][f][:dimP1]
+            tdofs = entity_dofs[sd-1][f][dimP1:]
+            V[tdofs, tdofs] = Btt
+            if sd == 2:
+                V[tdofs, ndofs[0]] = Bnt
+            else:
+                V[tdofs[-1], ndofs[1:]] = Bnt
+                V[tdofs[:-1], ndofs[0]] = Bnt
 
         return gem.ListTensor(V.T)

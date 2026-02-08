@@ -28,10 +28,14 @@ def _facet_transform(fiat_cell, facet_moment_degree, coordinate_mapping):
         transform = normal_tangential_face_transform
 
     for f in range(num_facets):
-        rows = transform(fiat_cell, J, detJ, f)
+        *Bnt, Btt = transform(fiat_cell, J, detJ, f)
         for i in range(dimPk_facet):
             s = dofs_per_facet*f + i * sd
-            V[s+1:s+sd, s:s+sd] = rows
+            ndof = s
+            tdofs = range(s+1, s+sd)
+            V[tdofs, ndof] = Bnt
+            V[tdofs, tdofs] = Btt
+
     return V
 
 
