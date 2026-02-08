@@ -1,5 +1,5 @@
 import FIAT
-import gem
+from gem import ListTensor
 
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
@@ -19,10 +19,8 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)
         detJ = coordinate_mapping.detJ_at(bary)
-        entity_dofs = self.entity_dofs()
 
-        ndof = self.space_dimension()
-        V = identity(ndof, ndof)
+        V = identity(self.space_dimension())
         dimP1 = sd
 
         if sd == 2:
@@ -30,6 +28,7 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         else:
             transform = normal_tangential_face_transform
 
+        entity_dofs = self.entity_dofs()
         for f in sorted(entity_dofs[sd-1]):
             *Bnt, Btt = transform(self.cell, J, detJ, f)
             ndofs = entity_dofs[sd-1][f][:dimP1]
@@ -41,4 +40,4 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
                 V[tdofs[-1], ndofs[1:]] = Bnt
                 V[tdofs[:-1], ndofs[0]] = Bnt
 
-        return gem.ListTensor(V.T)
+        return ListTensor(V.T)

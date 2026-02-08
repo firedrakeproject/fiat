@@ -493,7 +493,7 @@ class IntegralMomentOfTensorDivergence(Functional):
         dpt_dict = {tuple(pt): [(wt[i], alphas[j], (i, j)) for i, j in numpy.ndindex(shp)]
                     for pt, wt in zip(points, weights)}
 
-        super().__init__(ref_el, tuple(), {}, dpt_dict, "IntegralMomentOfDivergence")
+        super().__init__(ref_el, shp, {}, dpt_dict, "IntegralMomentOfDivergence")
 
 
 class PointNormalEvaluation(Functional):

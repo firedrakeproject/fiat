@@ -53,7 +53,7 @@ def normal_tangential_face_transform(fiat_cell, J, detJ, f):
 
     Q = numpy.dot(thats, thats.T)
     R = numpy.array([[0, 1], [-1, 0]])
-    rows[:2] = Q @ R @ rows[:2]
+    rows[:2] = (Q @ R) @ rows[:2]
     return rows
 
 

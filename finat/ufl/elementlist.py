@@ -127,6 +127,7 @@ register_element("QuadraticPowellSabin12", "PS12", 0, H2, "custom", (2, 2), ("tr
 register_element("Hsieh-Clough-Tocher", "HCT", 0, H2, "custom", (3, None), ("triangle",))
 register_element("Reduced-Hsieh-Clough-Tocher", "HCT-red", 0, H2, "custom", (3, 3), ("triangle",))
 register_element("Johnson-Mercier", "JM", 2, HDiv, "double contravariant Piola", (1, 1), simplices[1:])
+register_element("Reduced Johnson-Mercier", "JM-red", 2, HDiv, "double contravariant Piola", (1, 1), simplices[1:])
 register_element("Walkington", "WALK", 0, H2, "custom", (5, 5), ("tetrahedron",))
 register_element("Alfeld C2", "ALF-C2", 0, H3, "custom", (5, None), ("triangle",))
 
