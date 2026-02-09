@@ -615,8 +615,10 @@ class SimplicialComplex(Cell):
 
     def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
         """Returns the barycentric coordinates of a list of points on the complex."""
-        if len(points) == 0:
+
+        if isinstance(points, numpy.ndarray) and len(points) == 0:
             return points
+
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         entity_dim, entity_id = entity
@@ -640,8 +642,11 @@ class SimplicialComplex(Cell):
             h = 1 / numpy.linalg.norm(A, axis=1)
             b *= h
             A *= h[:, None]
-        out = numpy.dot(points, A.T)
-        return numpy.add(out, b, out=out)
+        # out = numpy.dot(points, A.T)
+        out = points @ A.T
+
+        # return numpy.add(out, b)
+        return out + b
 
     def compute_bubble(self, points, entity=None):
         """Returns the lowest-order bubble on an entity evaluated at the given
@@ -1406,6 +1411,47 @@ class TensorProductCell(Cell):
     def is_macrocell(self):
         return any(c.is_macrocell() for c in self.cells)
 
+    def compute_axis_barycentric_coordinates(self, points, entity=None, rescale=False):
+        """Compute barycentric coordinates on each axis (factor) of a tensor-product cell.
+
+        Parameters
+        ----------
+        points: numpy.ndarray or GEM.Node
+            The reference coordinates of the points.
+
+        Returns
+        -------
+        numpy.ndarray
+            A flattened array of shape ``(total_bary_coords, )`` and dtype object if points are GEM nodes,
+            otherwise dtype numeric. The i-th entry contains the barycentric coordinates
+            on the i-th factor cell. If factor i is a simplex of dimension d, this will
+            have shape ``(npoints, d+1)``. If factor i is a hypercube of dimension d,
+            this will have shape ``(npoints, 2*d)``.
+        """
+        import gem
+
+        if isinstance(points, numpy.ndarray) and len(points) == 0:
+            return points
+
+        axis_dims = [c.get_spatial_dimension() for c in self.cells]
+        point_slices = TensorProductCell._split_slices(axis_dims)
+
+        result = numpy.empty(len(self.cells), dtype=object)
+        for k, (factor, s) in enumerate(zip(self.cells, point_slices)):
+            result[k] = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
+
+        # Flatten the array
+        # NOTE: cannot construct the flat array directly since we may not know upfront the total number
+        # of barycentric coordinates (e.g., in a simplex: d+1, in a hypercube: 2*d)
+        flat_result = numpy.array([bary[j] for bary in result for j in range(bary.shape[0])])
+
+        if isinstance(points, numpy.ndarray):
+            return flat_result
+        elif isinstance(points, gem.Node):
+            return gem.as_gem(flat_result)
+        else:
+            raise ValueError(f"Expected a numpy.ndarray or gem.Node, got {type(points)}")
+
 
 class Hypercube(Cell):
     """Abstract class for a reference hypercube"""
@@ -1422,6 +1468,8 @@ class Hypercube(Cell):
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
+
+        self.facet_perm = compute_facet_permutation(self.unflattening_map, self.product)
 
     def get_dimension(self):
         """Returns the subelement dimension of the cell.  Same as the
@@ -1520,6 +1568,27 @@ class Hypercube(Cell):
 
     def __le__(self, other):
         return self.product <= other
+
+    def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
+        """Returns the barycentric coordinates of a list of points on the hypercube.
+
+        Parameters
+        ----------
+        points: numpy.ndarray or GEM.Node
+            The reference coordinates of the points.
+
+        Returns
+        -------
+        List of numpy.ndarray or GEM.ComponentTensor
+            Returns a list of barycentric coordinates in local facet order such that for any point
+            lying on local facet `lf` of the cell, the barycentric coordinate at index `lf` vanishes.
+        """
+        if isinstance(points, numpy.ndarray) and len(points) == 0:
+            return points
+
+        tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points, entity, rescale)
+
+        return tp_bary_coords[self.facet_perm]
 
 
 class UFCHypercube(Hypercube):
@@ -1837,6 +1906,56 @@ def compute_unflattening_map(topology_dict):
             unflattening_map[(flat_dim, flat_entity)] = (dim, entity)
 
     return unflattening_map
+
+
+def compute_facet_permutation(unflattening_map, product):
+    """
+    Return a permutation mapping each hypercube facet to the index of its
+    vanishing barycentric coordinate in the axis-structured barycentric array.
+    """
+    # First compute axis offsets into the flattened barycentric coordinate array.
+    axis_offsets = []
+    offset = 0
+    for axis_cell in product.cells:
+        axis_offsets.append(offset)
+        offset += axis_cell.get_dimension() + 1
+
+    # Initialise the integer permutation array
+    sd = len(product.cells)
+    num_facets = 2 * sd
+    perm = numpy.zeros(num_facets, dtype=int)
+
+    for f in range(num_facets):
+        # Recover the tensor-product representation of the facet as given by the unflattening map
+        dim_tuple, tp_entity = unflattening_map[(sd - 1, f)]
+
+        # Determine the axis that's orthogonal to the facet
+        # E.g., in a quad:
+        # if dim_tuple = (0,1) -> facet has dimension 0 on the first component -> fixed at x = 0 or x = 1
+        # if dim_tuple = (1,0) -> facet has dimension 0 on the second component -> fixed at y = 0 or y = 1
+        axis = next(
+            i for i, d in enumerate(dim_tuple)
+            if d == product.cells[i].get_dimension() - 1
+        )
+
+        # Determine the index of the endpoint that produces the facet
+        # which gives the local facet number in the axis space
+        entity_shape = tuple(
+            len(c.get_topology()[d])
+            for c, d in zip(product.cells, dim_tuple)
+        )
+        tuple_ei = numpy.unravel_index(tp_entity, entity_shape)
+        local_facet = tuple_ei[axis]
+
+        # For a simplex (UFCInterval, UFCTriangle), the barycentric coordinate that vanishes on local facet i
+        # corresponds to the ID of the vertex that doesn't belong to that facet
+        all_vertices = set(product.cells[axis].get_topology()[0].keys())
+        facet_vertices = set(product.cells[axis].get_topology()[0][local_facet])
+        bary_index = next(iter(all_vertices - facet_vertices))
+
+        perm[f] = axis_offsets[axis] + bary_index
+
+    return perm
 
 
 def max_complex(complexes):
