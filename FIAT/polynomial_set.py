@@ -284,7 +284,7 @@ class TracelessTensorPolynomialSet(PolynomialSet):
 
 class ConstrainedPolynomialSet(PolynomialSet):
 
-    def __init__(self, nodes, poly_set):
+    def __init__(self, nodes, poly_set, nullspace=True):
         from FIAT.dual_set import DualSet
         ref_el = poly_set.get_reference_element()
         top = ref_el.get_topology()
@@ -295,7 +295,8 @@ class ConstrainedPolynomialSet(PolynomialSet):
         A = dual.to_riesz(poly_set)
         B = poly_set.get_coeffs()
         dualmat = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
-        coeffs = spanning_basis(dualmat, nullspace=True)
+        nsp = spanning_basis(dualmat, nullspace=nullspace)
+        coeffs = numpy.tensordot(nsp, B, (1, 0))
         degree = poly_set.degree
         super().__init__(ref_el, degree, degree, poly_set.get_expansion_set(), coeffs)
 
