@@ -1,7 +1,7 @@
 import numpy
 
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
+from finat.physically_mapped import adjugate, determinant, identity, PhysicallyMappedElement
 from gem import Literal, ListTensor, Zero
 from copy import deepcopy
 from itertools import chain
@@ -38,23 +38,21 @@ def normal_tangential_face_transform(fiat_cell, J, detJ, f):
     thats = fiat_cell.compute_tangents(2, f)
     nhat = numpy.cross(*thats)
     nhat /= numpy.dot(nhat, nhat)
-    orth_vecs = numpy.array([nhat,
-                             numpy.cross(nhat, thats[1]),
-                             numpy.cross(thats[0], nhat)])
-    # Compute A = (alpha, beta, gamma)
-    Jts = J @ Literal(thats.T)
-    Jorths = J @ Literal(orth_vecs.T)
-    A = Jorths.T @ Jts
-    # Compute the last two rows of inv([[1, 0, 0], A.T/detJ])
-    det0 = A[1, 0] * A[2, 1] - A[1, 1] * A[2, 0]
-    det1 = A[2, 0] * A[0, 1] - A[2, 1] * A[0, 0]
-    det2 = A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
-    rows = numpy.array((-1 * det1 / det0, -1 * det2 / det0, detJ / det0))
+    orths = numpy.cross(thats, nhat[None, :], axis=1)
+
+    Jn = J @ Literal(nhat)
+    Jthats = J @ Literal(thats.T)
+    Jorths = J @ Literal(orths.T)
+    A = Jthats.T @ Jorths
+    B = Jn @ Jthats
+    A = numpy.array([[A[i, j] for j in range(A.shape[1])] for i in range(A.shape[0])])
+    B = numpy.array([B[i] for i in range(B.shape[0])])
 
     Q = numpy.dot(thats, thats.T)
-    R = numpy.array([[0, 1], [-1, 0]])
-    rows[:2] = (Q @ R) @ rows[:2]
-    return rows
+    beta = determinant(A)
+    alpha = Q @ (adjugate(A) @ B)
+    row = (alpha[0] / beta, alpha[1] / beta, detJ / beta)
+    return row
 
 
 class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
