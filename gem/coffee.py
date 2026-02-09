@@ -4,7 +4,7 @@ algorithm operating on a GEM representation.
 This file is NOT for code generation as a COFFEE AST.
 """
 
-from itertools import chain, repeat
+from itertools import chain
 import logging
 
 import numpy
@@ -54,6 +54,8 @@ def sort_monomials(monomials):
 
     :returns: the reordered list of monomials.
     """
+    if len(monomials) <= 2:
+        return monomials
     # Construct a monomial subset with non-intersecting atomics
     head = []
     rest = []
@@ -64,13 +66,8 @@ def sort_monomials(monomials):
         else:
             atomics.update(m.atomics)
             head.append(m)
-    # Put non-intersecting subset first
-    monomials = head + rest
-    # Sort the unique atomics as they appear in the monomials
-    atomics = tuple(dict.fromkeys(chain.from_iterable(monomial.atomics for monomial in monomials)))
-    # Sort the rest by the sum of the indices of their atomics
-    rest.sort(key=lambda m: sum(map(atomics.index, m.atomics)))
-    monomials = head + rest
+    # Put non-intersecting subset first and recurse on the rest
+    monomials = head + sort_monomials(rest)
     return monomials
 
 
@@ -88,24 +85,26 @@ def find_optimal_atomics(monomials, linear_indices):
 
     atomics = tuple(dict.fromkeys(chain.from_iterable(monomial.atomics for monomial in monomials)))
 
+    monomial_atomics = [set(map(atomics.index, m.atomics)) for m in monomials]
+
     def cost(solution):
-        extent = sum(map(index_extent, solution, repeat(linear_indices)))
+        extent = sum(index_extent(atomics[i], linear_indices) for i in solution)
         # Prefer shorter solutions, but larger extents
         return (len(solution), -extent)
 
-    optimal_solution = set(atomics)  # pessimal but feasible solution
+    optimal_solution = set(range(len(atomics)))  # pessimal but feasible solution
     solution = set()
 
     max_it = 1 << 12
     it = iter(range(max_it))
 
     def solve(idx):
-        while idx < len(monomials) and solution.intersection(monomials[idx].atomics):
+        while idx < len(monomials) and solution.intersection(monomial_atomics[idx]):
             idx += 1
 
         if idx < len(monomials):
             if len(solution) < len(optimal_solution):
-                for atomic in monomials[idx].atomics:
+                for atomic in monomial_atomics[idx]:
                     solution.add(atomic)
                     solve(idx + 1)
                     solution.remove(atomic)
@@ -122,7 +121,7 @@ def find_optimal_atomics(monomials, linear_indices):
         logger.warning("Solution to ILP problem may not be optimal: search "
                        "interrupted after examining %d solutions.", max_it)
 
-    return tuple(atomic for atomic in atomics if atomic in optimal_solution)
+    return tuple(atomics[i] for i in optimal_solution)
 
 
 def factorise_atomics(monomials, optimal_atomics, linear_indices):
