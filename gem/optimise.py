@@ -13,7 +13,7 @@ from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
-                     Index, VariableIndex, Indexed, FlexiblyIndexed,
+                     Index, VariableIndex, ListIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
                      partial_indexed, one)
 
@@ -144,6 +144,13 @@ def replace_indices_indexed(node, self, subst):
                 sub = child.array[slices]
                 child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else ListTensor(sub)
                 multiindex = tuple(i for i in multiindex if not isinstance(i, Integral))
+
+            elif isinstance(child, ListTensor) and len(multiindex) == 1 and isinstance(multiindex[0], ListIndex):
+                # ListIndex into a ListTensor: apply the permutation at compile time
+                # by reordering the ListTensor elements, eliminating the free index.
+                list_index = multiindex[0]
+                child = ListTensor(child.array[list_index.index_array])
+                multiindex = (list_index.free_index,)
 
         if multiindex == node.multiindex and child == node.children[0]:
             return node
