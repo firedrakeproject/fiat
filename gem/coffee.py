@@ -4,7 +4,7 @@ algorithm operating on a GEM representation.
 This file is NOT for code generation as a COFFEE AST.
 """
 
-from itertools import chain
+from itertools import chain, repeat
 import logging
 
 import numpy
@@ -85,10 +85,14 @@ def find_optimal_atomics(monomials, linear_indices):
 
     atomics = tuple(dict.fromkeys(chain.from_iterable(monomial.atomics for monomial in monomials)))
 
+    # Create a list of sets of indices to avoid any hashing during the search
     monomial_atomics = [set(map(atomics.index, m.atomics)) for m in monomials]
 
+    # Precompute the cost of each atomic
+    atomic_cost = list(map(index_extent, atomics, repeat(linear_indices)))
+
     def cost(solution):
-        extent = sum(index_extent(atomics[i], linear_indices) for i in solution)
+        extent = sum(atomic_cost[i] for i in solution)
         # Prefer shorter solutions, but larger extents
         return (len(solution), -extent)
 
