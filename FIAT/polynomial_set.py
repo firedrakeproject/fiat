@@ -282,24 +282,6 @@ class TracelessTensorPolynomialSet(PolynomialSet):
         super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)
 
 
-class ConstrainedPolynomialSet(PolynomialSet):
-
-    def __init__(self, nodes, poly_set):
-        from FIAT.dual_set import DualSet
-        ref_el = poly_set.get_reference_element()
-        top = ref_el.get_topology()
-        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-        entity_ids[max(top)][0] = list(range(len(nodes)))
-
-        dual = DualSet(nodes, ref_el, entity_ids)
-        A = dual.to_riesz(poly_set)
-        B = poly_set.get_coeffs()
-        dualmat = numpy.tensordot(A, B, axes=(range(1, A.ndim), range(1, B.ndim)))
-        coeffs = spanning_basis(dualmat, nullspace=True)
-        degree = poly_set.degree
-        super().__init__(ref_el, degree, degree, poly_set.get_expansion_set(), coeffs)
-
-
 def make_bubbles(ref_el, degree, codim=0, shape=(), scale="L2 piola"):
     """Construct a polynomial set with codim bubbles up to the given degree.
     """
