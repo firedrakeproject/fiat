@@ -1405,6 +1405,25 @@ class TensorProductCell(Cell):
 
     def is_macrocell(self):
         return any(c.is_macrocell() for c in self.cells)
+    
+    def compute_axis_barycentric_coordinates(self, points, entity=None, rescale=None):
+        """Compute axis-structured barycentric coordinates on a tensor-product cell.
+
+        Returns a list of arrays, one per axis. The i-th entry has shape (npoints, nfacets_axis_i) and 
+        contains the barycentric coordinates associated with facets normal to axis i.
+        """
+        axis_dims = self.get_dimension()
+        point_slices = TensorProductCell._split_slices(axis_dims)
+        bary_coord_per_axis = []
+
+        # Compute barycentric coordinates independently on each axis
+        for cell, s in zip(self.cells, point_slices):
+            bary_axis = cell.compute_barycentric_coordinates(
+                points[..., s], entity=None, rescale=rescale
+            )
+            bary_coord_per_axis.append(bary_axis)
+        
+        return bary_coord_per_axis
 
 
 class Hypercube(Cell):
@@ -1521,6 +1540,22 @@ class Hypercube(Cell):
     def __le__(self, other):
         return self.product <= other
 
+    def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
+        """Returns the barycentric coordinates of a list of points on the hypercube."""
+        if len(points) == 0:
+            return points
+        if entity is not None:
+            raise NotImplementedError(
+                "Sub-entity barycentric coordinates are not supported on tensor-product elements."
+            )
+
+        tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points)
+        tp_bary_coords = numpy.hstack(tp_bary_coords) # flatten barycentric coords.
+
+        # Reorder the barycentric coords. in facet order
+        bary_coords = tp_bary_coords[:, self.facet_perm]
+
+        return bary_coords
 
 class UFCHypercube(Hypercube):
     """Reference UFC Hypercube
@@ -1838,6 +1873,65 @@ def compute_unflattening_map(topology_dict):
 
     return unflattening_map
 
+def compute_facet_perm(unflattening_map, product):
+    """
+    For a given tensor-product cell, this function returns a mapping between the cell's facets and its barycentric coords. indices.
+
+    For each facet:
+        - determine which axis the facet is orthogonal to in the tensor-product representation of the cell (i.e., fixed at an endpoint)
+        - determine which endpoint on that axis the facet corresponds to
+        - map the endpoint to the correct barycentric coordinate index
+    """
+    # First compute axis offsets into the flattened barycentric vector 
+    axis_offsets = []
+    offset = 0
+    for axis_cell in product.cells:
+        axis_offsets.append(offset)
+        offset += axis_cell.get_dimension() + 1 
+    
+    # Initialise the permutation array
+    sd = len(product.cells)
+    num_facets = 2 * sd
+    perm = numpy.zeroes(num_facets, dtype=int)
+
+    for f in range(num_facets):
+        # Recover the tensor-product representation of the facet
+        dim_tuple, tp_entity = unflattening_map[(sd - 1, f)]
+
+        # Determine the axis that's orthogonal to the facet
+        #   quad: dim_tuple = (0,1) -> facet is on the boundary of axis 0 (x fixed) -> x = 0 or x = 1
+        #         dim_tuple = (1,0) -> facet is on the boundary of axis 1 (y fixed) -> y = 0 or y = 1
+        axis = next(
+            i for i, d in enumerate(dim_tuple)
+            if d == product.cells[i].get_dimension() - 1
+        )
+
+        # Determine the index of the endpoint that produces the facet (local facet number in the axis space)
+        entity_shape = tuple(
+            len(c.get_topology()[d])
+            for c, d in zip(product.cells, dim_tuple)
+        )
+        tuple_ei = numpy.unravel_index(tp_entity, entity_shape)
+        local_facet = tuple_ei[axis]
+
+        # Map the local_facet index to the corresponding barycentric coordinate index.
+        #
+        # For a 1D interval with endpoints 0 and 1, the barycentric coordinates are:
+        #   lambda_0 = 1 - x
+        #   lambda_1 = x
+        #
+        # Each endpoint facet is characterised by one barycentric coordinate vanishing:
+        #   facet at x = 0  -> lambda_1 = 0   (opposite vertex 1)
+        #   facet at x = 1  -> lambda_0 = 0   (opposite vertex 0)
+        #
+        # In general, FIAT's convention is: barycentric coordinate i vanishes on the
+        # facet opposite vertex i.
+        bary_index = get_bary_index_from_local_facet(axis_cell, local_facet)
+
+        perm[f] = axis_offsets[axis] + bary_index
+
+    return perm
+
 
 def max_complex(complexes):
     max_cell = max(complexes)
@@ -1845,3 +1939,12 @@ def max_complex(complexes):
         return max_cell
     else:
         raise ValueError("Cannot find the maximal complex")
+
+def get_bary_index_from_local_facet(simplicial_cell, local_facet):
+    """Return the barycentric coords. index that vanishes on a given facet. """
+
+    all_vertices = set(simplicial_cell.get_topology()[0].keys())
+    facet_dim = simplicial_cell.get_dimension() - 1
+    facet_vertices = set(simplicial_cell.get_topology()[facet_dim][local_facet])
+    missing = all_vertices - facet_vertices
+    return next(iter(missing))
