@@ -82,11 +82,12 @@ class ReducedJohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric 
                 V[cdofs, ndofs[1]] = Bnt
             else:
                 V[tdofs[:-1], ndofs[0]] = Bnt
+                # n x (t0 * x + t1 * y)
                 V[tdofs[-1], ndofs[1:]] = Bnt
-                # (n x t0) * (y - x)
-                V[cdofs[0], ndofs[1:]] = (-1*Bnt[0], Bnt[0])
-                # (n x t1) * (y - x)
-                V[cdofs[1], ndofs[1:]] = (-1*Bnt[1], Bnt[1])
+                # n x (t0 * y + t1 * x)
+                V[cdofs[0], ndofs[1:]] = (Bnt[1], Bnt[0])
+                # n x (t0 * x - t1 * y)
+                V[cdofs[1], ndofs[1:]] = (Bnt[0], -1*Bnt[1])
                 # n x (t0 * y - t1 * x)
                 V[cdofs[2], ndofs[1:]] = (-1*Bnt[1], Bnt[0])
 

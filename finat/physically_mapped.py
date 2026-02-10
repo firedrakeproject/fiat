@@ -38,8 +38,8 @@ class MappedTabulation(Mapping):
                  for i, js in enumerate(self.csr)]
 
         val = gem.ListTensor(exprs)
-        # val = self.M @ table
-        return gem.optimise.aggressive_unroll(val)
+        # val = gem.optimise.aggressive_unroll(self.M @ table)
+        return val
 
     def __getitem__(self, alpha):
         try:

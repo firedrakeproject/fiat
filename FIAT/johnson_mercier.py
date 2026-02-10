@@ -94,22 +94,24 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
 
         ref_facet = ref_el.get_facet_element()
         Q = parse_quadrature_scheme(ref_facet, degree+1, quad_scheme)
-        P1 = polynomial_set.ONPolynomialSet(ref_facet, degree)
+        P1 = polynomial_set.ONPolynomialSet(ref_facet, degree, scale="orthonormal")
         P1_at_qpts = P1.tabulate(Q.get_points())[(0,)*(sd - 1)]
         dimP1 = len(P1)*(sd-1)
         dimNed1 = dimP1 // 2
         if sd == 3:
             # Basis for lowest-order RT [(1, 0), (0, 1), (x, y)]
             RT_at_qpts = numpy.zeros((dimP1, sd-1, P1_at_qpts.shape[-1]))
-            RT_at_qpts[0, 0, :] = P1_at_qpts[0]
-            RT_at_qpts[1, 1, :] = P1_at_qpts[0]
-            RT_at_qpts[2, 0, :] = P1_at_qpts[1]
-            RT_at_qpts[2, 1, :] = P1_at_qpts[2]
-            # Basis for complement of RT [(y-x, 0), (0, y-x), (y, -x)]
-            RT_at_qpts[3, 0, :] = P1_at_qpts[2] - P1_at_qpts[1]
-            RT_at_qpts[4, 1, :] = P1_at_qpts[2] - P1_at_qpts[1]
-            RT_at_qpts[5, 0, :] = P1_at_qpts[2]
-            RT_at_qpts[5, 1, :] = -P1_at_qpts[1]
+            RT_at_qpts[0, 0] = P1_at_qpts[0]
+            RT_at_qpts[1, 1] = P1_at_qpts[0]
+            RT_at_qpts[2, 0] = P1_at_qpts[1]
+            RT_at_qpts[2, 1] = P1_at_qpts[2]
+            # Basis for the complement of RT [(y, x), (x, -y), (y, -x)]
+            RT_at_qpts[3, 0] = P1_at_qpts[2]
+            RT_at_qpts[3, 1] = P1_at_qpts[1]
+            RT_at_qpts[4, 0] = P1_at_qpts[1]
+            RT_at_qpts[4, 1] = -P1_at_qpts[2]
+            RT_at_qpts[5, 0] = P1_at_qpts[2]
+            RT_at_qpts[5, 1] = -P1_at_qpts[1]
         else:
             RT_at_qpts = P1_at_qpts[:, None, :]
 

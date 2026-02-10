@@ -43,8 +43,15 @@ def test_johnson_mercier_divergence_rigid_body_motions(cell, reduced):
     N1_at_qpts = N1.tabulate(0, qpts)
     rbms = N1_at_qpts[(0,)*sd]
     ells = rbms * qwts[None, None, :]
+    L = numpy.tensordot(div, ells, axes=((1, 2), (1, 2)))
 
     edofs = JM.entity_dofs()
-    idofs = edofs[sd][0]
-    L = numpy.tensordot(div, ells, axes=((1, 2), (1, 2)))
-    assert numpy.allclose(L[idofs], 0)
+    idofs = list(edofs[sd][0])
+    if reduced:
+        dimP1 = sd
+        dimNed1 = (sd*(sd-1))//2
+        for f in edofs[sd-1]:
+            idofs.extend(edofs[sd-1][f][dimP1+dimNed1:])
+
+    L = L[idofs].reshape(len(idofs), -1)
+    assert numpy.allclose(L, 0)
