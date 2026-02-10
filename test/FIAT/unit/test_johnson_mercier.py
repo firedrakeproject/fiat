@@ -1,7 +1,7 @@
 import pytest
 import numpy
 
-from FIAT import JohnsonMercier, Nedelec
+from FIAT import JohnsonMercier, ReducedJohnsonMercier, Nedelec
 from FIAT.reference_element import ufc_simplex
 from FIAT.quadrature_schemes import create_quadrature
 
@@ -20,13 +20,16 @@ def cell(request):
     return K
 
 
-def test_johnson_mercier_divergence_rigid_body_motions(cell):
+@pytest.mark.parametrize("reduced", (False, True))
+def test_johnson_mercier_divergence_rigid_body_motions(cell, reduced):
     # test that the divergence of interior JM basis functions is orthogonal to
     # the rigid-body motions
     degree = 1
-    variant = None
     sd = cell.get_spatial_dimension()
-    JM = JohnsonMercier(cell, degree, variant=variant)
+    if reduced:
+        JM = ReducedJohnsonMercier(cell, degree)
+    else:
+        JM = JohnsonMercier(cell, degree)
 
     ref_complex = JM.get_reference_complex()
     Q = create_quadrature(ref_complex, 2*(degree)-1)
@@ -45,13 +48,3 @@ def test_johnson_mercier_divergence_rigid_body_motions(cell):
     idofs = edofs[sd][0]
     L = numpy.tensordot(div, ells, axes=((1, 2), (1, 2)))
     assert numpy.allclose(L[idofs], 0)
-
-    if variant == "divergence":
-        edofs = JM.entity_dofs()
-        cdofs = []
-        for entity in edofs[sd-1]:
-            cdofs.extend(edofs[sd-1][entity][:sd])
-        D = L[cdofs]
-        M = numpy.tensordot(rbms, ells, axes=((1, 2), (1, 2)))
-        X = numpy.linalg.solve(M, D.T)
-        assert numpy.allclose(numpy.tensordot(X, rbms, axes=(0, 0)), div[cdofs])

@@ -59,7 +59,7 @@ from FIAT.arnold_qin import ArnoldQin                           # noqa: F401
 from FIAT.christiansen_hu import ChristiansenHu                 # noqa: F401
 from FIAT.guzman_neilan import GuzmanNeilanFirstKindH1          # noqa: F401
 from FIAT.guzman_neilan import GuzmanNeilanSecondKindH1         # noqa: F401
-from FIAT.johnson_mercier import JohnsonMercier                 # noqa: F401
+from FIAT.johnson_mercier import JohnsonMercier, ReducedJohnsonMercier  # noqa: F401
 from FIAT.bubble import Bubble, FacetBubble                     # noqa: F401
 from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
@@ -387,6 +387,8 @@ elements = [
     "AlfeldC2(T, 6)",
     "JohnsonMercier(T)",
     "JohnsonMercier(S)",
+    "ReducedJohnsonMercier(T)",
+    "ReducedJohnsonMercier(S)",
     "AlfeldSorokina(T)",
     "AlfeldSorokina(S)",
     "ArnoldQin(T, reduced=False)",
