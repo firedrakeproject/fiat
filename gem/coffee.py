@@ -228,6 +228,22 @@ def optimise_monomials(monomials, linear_indices):
 
     result = [m for m in monomials if not m.atomics]  # skipped monomials
     active_monomials = [m for m in monomials if m.atomics]
-    optimal_atomics = find_optimal_atomics(active_monomials, linear_indices)
-    result += factorise_atomics(active_monomials, optimal_atomics, linear_indices)
+
+    while len(active_monomials) > 0:
+        # Extract a connected component: subset of active monomials with intersecting atomics
+        subset = {0}
+        for candidate in range(1, len(active_monomials)):
+            candidate_atomics = set(active_monomials[candidate].atomics)
+            if any(candidate_atomics.intersection(active_monomials[j].atomics) for j in subset):
+                subset.add(candidate)
+        connected_monomials = [active_monomials[j] for j in subset]
+
+        # Optimise the connected component and append to the result
+        optimal_atomics = find_optimal_atomics(connected_monomials, linear_indices)
+        result += factorise_atomics(connected_monomials, optimal_atomics, linear_indices)
+
+        # Discard the connected component
+        rest = set(range(len(active_monomials))) - subset
+        active_monomials = [active_monomials[j] for j in rest]
+
     return result
