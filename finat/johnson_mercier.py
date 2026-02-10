@@ -23,12 +23,11 @@ class JohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric matrix 
 
 
 class ReducedJohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric matrix valued
-
     def __init__(self, cell, degree=1, variant=None, quad_scheme=None):
         cite("Gopalakrishnan2024")
         super().__init__(FIAT.ReducedJohnsonMercier(cell, degree, variant=variant, quad_scheme=quad_scheme))
-        # On each facet we expect the normal dof followed by the tangential ones
-        # The tangential dofs should be numbered last, and are constrained to be zero
+        # On each facet we expect the normal dofs followed by the tangential ones
+        # The tangential and interior constraints should be numbered last.
         sd = self.cell.get_spatial_dimension()
         reduced_dofs = deepcopy(self._element.entity_dofs())
         reduced_dim = 0
@@ -70,14 +69,12 @@ class ReducedJohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric 
         else:
             transform = normal_tangential_face_transform
 
-        entity_dofs = self.entity_dofs()
-        constraints = {f: list(range(num_dofs+f*dimNed1, num_dofs+(f+1)*dimNed1))
-                       for f in entity_dofs[sd-1]}
+        entity_dofs = self._element.entity_dofs()
         for f in sorted(entity_dofs[sd-1]):
             *Bnt, Btt = transform(self.cell, J, detJ, f)
             ndofs = entity_dofs[sd-1][f][:dimP1]
-            tdofs = entity_dofs[sd-1][f][dimP1:]
-            cdofs = constraints[f]
+            tdofs = entity_dofs[sd-1][f][dimP1:(dimP1+dimNed1)]
+            cdofs = entity_dofs[sd-1][f][dimP1+dimNed1:]
 
             V[tdofs, tdofs] = Btt
             if sd == 2:

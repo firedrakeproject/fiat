@@ -3,7 +3,6 @@ from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import (FrobeniusIntegralMoment, IntegralMomentOfTensorDivergence,
                              TensorBidirectionalIntegralMoment)
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
 from FIAT.nedelec_second_kind import NedelecSecondKind
 import numpy
 
@@ -87,7 +86,6 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
             raise ValueError("Reduced Johnson-Mercier only defined for degree=1")
         if variant is not None:
             raise ValueError(f"Reduced Johnson-Mercier does not have the {variant} variant")
-
         ref_el = ref_complex.get_parent()
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
@@ -95,7 +93,7 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
         nodes = []
 
         ref_facet = ref_el.get_facet_element()
-        Q = create_quadrature(ref_facet, degree+1)
+        Q = parse_quadrature_scheme(ref_facet, degree+1, quad_scheme)
         P1 = polynomial_set.ONPolynomialSet(ref_facet, degree)
         P1_at_qpts = P1.tabulate(Q.get_points())[(0,)*(sd - 1)]
         dimP1 = len(P1)*(sd-1)
@@ -145,9 +143,9 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
             nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, phi) for phi in phis)
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
-        # Interior constraints: moments of divergence against the orthogonal complement of RBMs
+        # Interior constraints: moments of divergence against (P1 \ Nedelec)
         ref_complex = macro.AlfeldSplit(ref_el)
-        Q = create_quadrature(ref_complex, 2*degree-1)
+        Q = parse_quadrature_scheme(ref_complex, 2*degree-1)
         comp_space = rbm_complement(ref_el)
         phis = comp_space.tabulate(Q.get_points())[(0,)*sd]
         cur = len(nodes)
