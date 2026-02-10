@@ -1,5 +1,4 @@
 import FIAT
-import numpy
 from gem import ListTensor
 
 from finat.aw import _facet_transform
@@ -87,9 +86,11 @@ class ReducedJohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric 
             else:
                 V[tdofs[:-1], ndofs[0]] = Bnt
                 V[tdofs[-1], ndofs[1:]] = Bnt
-                # FIXME
-                V[cdofs[0], ndofs[1:]] = Bnt
-                V[cdofs[1], ndofs[1:]] = Bnt
-                V[cdofs[2], ndofs[1:]] = Bnt
+                # (n x t0) * (y - x)
+                V[cdofs[0], ndofs[1:]] = (-1*Bnt[0], Bnt[0])
+                # (n x t1) * (y - x)
+                V[cdofs[1], ndofs[1:]] = (-1*Bnt[1], Bnt[1])
+                # n x (t0 * y - t1 * x)
+                V[cdofs[2], ndofs[1:]] = (-1*Bnt[1], Bnt[0])
 
         return ListTensor(V.T)
