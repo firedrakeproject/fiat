@@ -1442,6 +1442,8 @@ class Hypercube(Cell):
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
 
+        self.facet_perm = compute_facet_perm(self.unflattening_map, self.product)
+
     def get_dimension(self):
         """Returns the subelement dimension of the cell.  Same as the
         spatial dimension."""
@@ -1892,7 +1894,7 @@ def compute_facet_perm(unflattening_map, product):
     # Initialise the permutation array
     sd = len(product.cells)
     num_facets = 2 * sd
-    perm = numpy.zeroes(num_facets, dtype=int)
+    perm = numpy.zeros(num_facets, dtype=int)
 
     for f in range(num_facets):
         # Recover the tensor-product representation of the facet
