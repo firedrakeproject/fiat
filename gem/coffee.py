@@ -89,33 +89,43 @@ def find_optimal_atomics(monomials, linear_indices):
     monomial_atomics = [set(map(atomics.index, m.atomics)) for m in monomials]
 
     # Precompute the cost of each atomic
-    atomic_cost = list(map(index_extent, atomics, repeat(linear_indices)))
+    atomic_costs = list(map(index_extent, atomics, repeat(linear_indices)))
 
     def cost(solution):
-        extent = sum(atomic_cost[i] for i in solution)
+        extent = sum(atomic_costs[i] for i in solution)
         # Prefer shorter solutions, but larger extents
         return (len(solution), -extent)
 
     optimal_solution = set(range(len(atomics)))  # pessimal but feasible solution
+    optimal_cost = cost(optimal_solution)
     solution = set()
+    solution_cost = (0, 0)
 
     max_it = 1 << 12
     it = iter(range(max_it))
 
     def solve(idx):
+        nonlocal solution_cost, optimal_cost
+
         while idx < len(monomials) and solution.intersection(monomial_atomics[idx]):
             idx += 1
 
         if idx < len(monomials):
             if len(solution) < len(optimal_solution):
                 for atomic in monomial_atomics[idx]:
-                    solution.add(atomic)
-                    solve(idx + 1)
-                    solution.remove(atomic)
+                    atomic_cost = atomic_costs[atomic]
+                    old_solution_cost = solution_cost
+                    solution_cost = (solution_cost[0]+1, solution_cost[1]-atomic_cost)
+                    if solution_cost < optimal_cost:
+                        solution.add(atomic)
+                        solve(idx + 1)
+                        solution.remove(atomic)
+                    solution_cost = old_solution_cost
         else:
-            if cost(solution) < cost(optimal_solution):
+            if solution_cost < optimal_cost:
                 optimal_solution.clear()
                 optimal_solution.update(solution)
+                optimal_cost = solution_cost
             next(it)
 
     try:
