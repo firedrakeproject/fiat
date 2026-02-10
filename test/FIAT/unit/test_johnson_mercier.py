@@ -47,11 +47,5 @@ def test_johnson_mercier_divergence_rigid_body_motions(cell, reduced):
 
     edofs = JM.entity_dofs()
     idofs = list(edofs[sd][0])
-    if reduced:
-        dimP1 = sd
-        dimNed1 = (sd*(sd-1))//2
-        for f in edofs[sd-1]:
-            idofs.extend(edofs[sd-1][f][dimP1+dimNed1:])
-
     L = L[idofs].reshape(len(idofs), -1)
     assert numpy.allclose(L, 0)

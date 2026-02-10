@@ -66,18 +66,37 @@ class JohnsonMercier(finite_element.CiarletElement):
         super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
 
 
-def rbm_complement(ref_el):
-    """Constructs a basis for the complement of the rigid body motions over P1."""
-    if ref_el.get_spatial_dimension() == 1:
-        P1 = polynomial_set.ONPolynomialSet(ref_el, 1, shape=(1,))
-        return P1.take(range(1, len(P1)))
-    else:
-        P1 = NedelecSecondKind(ref_el, 1)
-        entity_ids = P1.entity_dofs()
-        ids = []
-        for entity in entity_ids[1]:
-            ids.extend(entity_ids[1][entity][1:])
-        return P1.get_nodal_basis().take(ids)
+class DG0Alfeld(finite_element.CiarletElement):
+
+    def __init__(self, ref_complex, P1=None, quad_scheme=None):
+        ref_el = ref_complex.get_parent()
+        sd = ref_el.get_spatial_dimension()
+        if P1 is None:
+            if sd == 1:
+                P1 = polynomial_set.ONPolynomialSet(ref_el, 1, shape=(sd,))
+            else:
+                P1 = NedelecSecondKind(ref_el, 1)
+
+        Q = parse_quadrature_scheme(ref_complex, P1.degree(), quad_scheme)
+        phis = P1.tabulate(0, Q.get_points())[(0,)*sd]
+        nodes = [FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis]
+        dual = dual_set.DualSet(nodes, ref_el, P1.entity_dofs())
+
+        poly_set = polynomial_set.ONPolynomialSet(ref_complex, 0, shape=(sd,))
+        formdegree = sd
+        super().__init__(poly_set, dual, poly_set.degree, formdegree)
+
+
+def rbm_complement(ref_complex):
+    """Constructs a basis for the complement of the rigid body motions over P0(Alfeld)."""
+    P0 = DG0Alfeld(ref_complex)
+    P0 = DG0Alfeld(ref_complex, P1=P0)
+
+    entity_ids = P0.entity_dofs()
+    ids = []
+    for entity in entity_ids[1]:
+        ids.extend(entity_ids[1][entity][1:])
+    return P0.get_nodal_basis().take(ids)
 
 
 class ReducedJohnsonMercierDualSet(dual_set.DualSet):
@@ -147,8 +166,8 @@ class ReducedJohnsonMercierDualSet(dual_set.DualSet):
 
         # Interior constraints: moments of divergence against (P1 \ Nedelec)
         ref_complex = macro.AlfeldSplit(ref_el)
-        Q = parse_quadrature_scheme(ref_complex, 2*degree-1)
-        comp_space = rbm_complement(ref_el)
+        Q = parse_quadrature_scheme(ref_complex, 2*(degree-1))
+        comp_space = rbm_complement(ref_complex)
         phis = comp_space.tabulate(Q.get_points())[(0,)*sd]
         cur = len(nodes)
         nodes.extend(IntegralMomentOfTensorDivergence(ref_el, Q, phi) for phi in phis)
