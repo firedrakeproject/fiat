@@ -617,6 +617,10 @@ class SimplicialComplex(Cell):
         """Returns the barycentric coordinates of a list of points on the complex."""
         if len(points) == 0:
             return points
+        
+        if points.ndim == 1:
+            points = points[None, :]
+
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         entity_dim, entity_id = entity
@@ -1546,6 +1550,12 @@ class Hypercube(Cell):
         """Returns the barycentric coordinates of a list of points on the hypercube."""
         if len(points) == 0:
             return points
+        
+        # Accept a single point of shape (gdim, ) as well as a batch of points of shape (npoints, gdim)
+        points = numpy.asarray(points)
+        if points.ndim == 1:
+            points = points[None, :]
+
         if entity is not None:
             raise NotImplementedError(
                 "Sub-entity barycentric coordinates are not supported on tensor-product elements."
