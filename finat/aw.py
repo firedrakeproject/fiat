@@ -6,7 +6,7 @@ from gem import ListTensor
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
-from finat.piola_mapped import normal_tangential_edge_transform, normal_tangential_face_transform
+from finat.piola_mapped import normal_tangential_transform
 
 
 def _facet_transform(fiat_cell, facet_moment_degree, coordinate_mapping):
@@ -22,13 +22,8 @@ def _facet_transform(fiat_cell, facet_moment_degree, coordinate_mapping):
     bary, = fiat_cell.make_points(sd, 0, sd+1)
     J = coordinate_mapping.jacobian_at(bary)
     detJ = coordinate_mapping.detJ_at(bary)
-    if sd == 2:
-        transform = normal_tangential_edge_transform
-    elif sd == 3:
-        transform = normal_tangential_face_transform
-
     for f in range(num_facets):
-        *Bnt, Btt = transform(fiat_cell, J, detJ, f)
+        Bnt, Btt = normal_tangential_transform(fiat_cell, J, detJ, f)
         for i in range(dimPk_facet):
             s = dofs_per_facet*f + i * sd
             ndof = s

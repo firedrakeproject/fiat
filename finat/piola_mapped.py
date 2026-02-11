@@ -27,8 +27,7 @@ def normal_tangential_edge_transform(fiat_cell, J, detJ, f):
     alpha = Jn @ Jt
     beta = Jt @ Jt
     # Compute the last row of inv([[1, 0], [alpha/detJ, beta/detJ]])
-    row = (-1 * alpha / beta, detJ / beta)
-    return row
+    return (-1 * alpha / beta, detJ / beta)
 
 
 def normal_tangential_face_transform(fiat_cell, J, detJ, f):
@@ -51,8 +50,16 @@ def normal_tangential_face_transform(fiat_cell, J, detJ, f):
     Q = numpy.dot(thats, thats.T)
     beta = determinant(A)
     alpha = Q @ (adjugate(A) @ B)
-    row = (alpha[0] / beta, alpha[1] / beta, detJ / beta)
-    return row
+    return (alpha / beta, detJ / beta)
+
+
+def normal_tangential_transform(fiat_cell, J, detJ, f):
+    """Return the basis transformation of
+    normal and tangential face moments"""
+    if fiat_cell.get_spatial_dimension() == 2:
+        return normal_tangential_edge_transform(fiat_cell, J, detJ, f)
+    else:
+        return normal_tangential_face_transform(fiat_cell, J, detJ, f)
 
 
 class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
@@ -90,9 +97,9 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
 
         dofs = self.entity_dofs()
         bfs = self._element.entity_dofs()
-        ndof = self.space_dimension()
+        numdof = self.space_dimension()
         numbf = self._element.space_dimension()
-        V = identity(numbf, ndof)
+        V = identity(numbf, numdof)
 
         # Undo the Piola transform for non-facet bubble basis functions
         nodes = self._element.get_dual_set().nodes
@@ -112,19 +119,16 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                         V[numpy.ix_(s, s)] = Finv
                         k += sd
         # Unpick the normal component for the facet bubbles
-        if sd == 2:
-            transform = normal_tangential_edge_transform
-        elif sd == 3:
-            transform = normal_tangential_face_transform
-
         for f in sorted(dofs[sd-1]):
-            *Bnt, Btt = transform(self.cell, J, detJ, f)
-            cur_dof = dofs[sd-1][f][0]
-            cur_bfs = bfs[sd-1][f][1:]
-            V[cur_bfs, cur_dof] = Bnt
+            Bnt, Btt = normal_tangential_transform(self.cell, J, detJ, f)
+            ndof, *tdofs = dofs[sd-1][f]
+            nbf, *tbfs = bfs[sd-1][f]
+            V[tbfs, ndof] = Bnt
+            if len(tdofs) > 0:
+                V[tbfs, tdofs] = Btt
 
         # Fix discrepancy between normal and tangential moments
-        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof
+        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > numdof
         if needs_facet_vertex_coupling:
             perp = lambda *t: numpy.array([t[0][1], -t[0][0]]) if len(t) == 1 else numpy.cross(*t)
 
@@ -142,5 +146,5 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                     for fdof in dofs[sd-1][f]:
                         T[fdofs.index(fdof), curvdofs] = Tfv
 
-            V[ndof:, vdofs] += V[ndof:, fdofs] @ T
+            V[numdof:, vdofs] += V[numdof:, fdofs] @ T
         return ListTensor(V.T)

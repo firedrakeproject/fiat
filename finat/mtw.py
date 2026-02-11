@@ -4,7 +4,7 @@ from gem import ListTensor
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
-from finat.piola_mapped import normal_tangential_edge_transform, normal_tangential_face_transform
+from finat.piola_mapped import normal_tangential_transform
 
 
 class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
@@ -23,14 +23,9 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         V = identity(self.space_dimension())
         dimP1 = sd
 
-        if sd == 2:
-            transform = normal_tangential_edge_transform
-        else:
-            transform = normal_tangential_face_transform
-
         entity_dofs = self.entity_dofs()
         for f in sorted(entity_dofs[sd-1]):
-            *Bnt, Btt = transform(self.cell, J, detJ, f)
+            Bnt, Btt = normal_tangential_transform(self.cell, J, detJ, f)
             ndofs = entity_dofs[sd-1][f][:dimP1]
             tdofs = entity_dofs[sd-1][f][dimP1:]
             V[tdofs, tdofs] = Btt
