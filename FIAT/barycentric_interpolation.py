@@ -33,8 +33,9 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
         # Use the second barycentric interpolation formula
         phi = numpy.add.outer(-nodes, pts.flatten())
         with numpy.errstate(divide='ignore', invalid='ignore'):
-            numpy.divide(wts[:, None], phi, out=phi)
-            numpy.divide(phi, numpy.sum(phi, axis=0, keepdims=True), out=phi)
+            numpy.reciprocal(phi, out=phi)
+            numpy.multiply(phi, wts[:, None], out=phi)
+            numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
         # Replace nan with one
         phi[phi != phi] = 1.0
 
