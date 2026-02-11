@@ -161,6 +161,7 @@ zany_piola_elements = {
         finat.AlfeldSorokina,
         finat.ChristiansenHu,
         finat.JohnsonMercier,
+        finat.ReducedJohnsonMercier,
         finat.GuzmanNeilanFirstKindH1,
         finat.GuzmanNeilanSecondKindH1,
         finat.GuzmanNeilanBubble,
