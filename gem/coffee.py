@@ -240,7 +240,7 @@ def optimise_monomials(monomials, linear_indices):
                     candidate_atomics = frozenset(candidate.atomics)
                     if any(candidate_atomics.intersection(m.atomics) for m in subset):
                         subset.add(candidate)
-        connected_monomials = list(subset)
+        connected_monomials = [m for m in active_monomials if m in subset]
 
         # Optimise the connected component and append to the result
         optimal_atomics = find_optimal_atomics(connected_monomials, linear_indices)
