@@ -54,8 +54,17 @@ def normal_tangential_face_transform(fiat_cell, J, detJ, f):
 
 
 def normal_tangential_transform(fiat_cell, J, detJ, f):
-    """Return the basis transformation of
-    normal and tangential face moments"""
+    """Return the basis transformation of normal and tangential face moments
+
+    :arg fiat_cell: a :class:`FIAT.reference_element.Cell`
+    :arg J: the Jacobian of the coordinate transformation
+    :arg detJ: the Jacobian determinant of the coordinate transformation
+    :arg f: the face id.
+
+    :returns: a 2-tuple of (Bnt, Btt) where
+        Bnt is the numpy.ndarray of normal-tangential coefficients, and
+        Btt is the tangential-tangential coefficient.
+    """
     if fiat_cell.get_spatial_dimension() == 2:
         return normal_tangential_edge_transform(fiat_cell, J, detJ, f)
     else:
