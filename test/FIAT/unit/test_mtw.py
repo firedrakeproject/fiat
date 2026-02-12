@@ -1,14 +1,16 @@
 import numpy as np
-from FIAT import ufc_simplex, MardalTaiWinther, make_quadrature, expansions
+from FIAT import ufc_simplex, MardalTaiWinther, expansions
+from FIAT.quadrature_schemes import create_quadrature
 
 
 def test_dofs():
     line = ufc_simplex(1)
     T = ufc_simplex(2)
     T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.25), (-0.75, 1.1)])
-    MTW = MardalTaiWinther(T, 3)
+    MTW = MardalTaiWinther(T)
+    assert MTW.degree() == T.get_spatial_dimension()+1
 
-    Qline = make_quadrature(line, 6)
+    Qline = create_quadrature(line, 2*MTW.degree())
 
     linebfs = expansions.LineExpansionSet(line)
     linevals = linebfs.tabulate(1, Qline.pts)
