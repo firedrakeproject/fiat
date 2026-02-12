@@ -38,6 +38,7 @@ class MappedTabulation(Mapping):
                  for i, js in enumerate(self.csr)]
 
         result = gem.ListTensor(exprs)
+        result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
         # result = gem.optimise.aggressive_unroll(self.M @ table)
         return result
 
