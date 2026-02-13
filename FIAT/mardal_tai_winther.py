@@ -132,7 +132,8 @@ class MardalTaiWinther(finite_element.CiarletElement):
         if not ref_el.is_simplex():
             raise ValueError(f"{type(self).__name__} only defined on simplices.")
         if order >= sd:
-            raise ValueError(f"{type(self).__name__} only defined for order < dim.")
+            raise ValueError(f"{type(self).__name__} only defined for 1 <= order < dim. "
+                             "The order is defined as the embedded sub-degree, with 1 for lowest-order case.")
 
         dual = MardalTaiWintherDual(ref_el, order, quad_scheme)
         poly_set = MardalTaiWintherSpace(ref_el, order)
