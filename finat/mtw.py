@@ -1,46 +1,42 @@
 import FIAT
-
+from math import comb
 from gem import ListTensor
 
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
-from finat.piola_mapped import normal_tangential_edge_transform
-from copy import deepcopy
+from finat.piola_mapped import normal_tangential_transform
 
 
 class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
-    def __init__(self, cell, degree=3):
-        cite("Mardal2002")
-        super().__init__(FIAT.MardalTaiWinther(cell, degree))
-
-        reduced_dofs = deepcopy(self._element.entity_dofs())
-        sd = cell.get_spatial_dimension()
-        fdofs = sd + 1
-        reduced_dofs[sd][0] = []
-        for f in reduced_dofs[sd-1]:
-            reduced_dofs[sd-1][f] = reduced_dofs[sd-1][f][:fdofs]
-        self._entity_dofs = reduced_dofs
-        self._space_dimension = fdofs * len(reduced_dofs[sd-1])
+    def __init__(self, cell, order=1):
+        if cell.get_spatial_dimension() == 2:
+            cite("Mardal2002")
+        else:
+            cite("Xie2008")
+        super().__init__(FIAT.MardalTaiWinther(cell, order=order))
 
     def basis_transformation(self, coordinate_mapping):
-        numbf = self._element.space_dimension()
-        ndof = self.space_dimension()
-        V = identity(numbf, ndof)
-
         sd = self.cell.get_spatial_dimension()
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)
         detJ = coordinate_mapping.detJ_at(bary)
+
+        V = identity(self.space_dimension())
+        q = self._element.order
+        dimP1 = comb(1+sd-1, 1)
+        dimPq = comb(q+sd-1, q)
+
         entity_dofs = self.entity_dofs()
         for f in sorted(entity_dofs[sd-1]):
-            cur = entity_dofs[sd-1][f][0]
-            V[cur+1, cur:cur+sd] = normal_tangential_edge_transform(self.cell, J, detJ, f)
+            Bnt, Btt = normal_tangential_transform(self.cell, J, detJ, f)
+            ndofs = entity_dofs[sd-1][f][:dimPq]
+            tdofs = entity_dofs[sd-1][f][dimPq:]
+            V[tdofs, tdofs] = Btt
+            if sd == 2:
+                V[tdofs, ndofs[0]] = Bnt
+            else:
+                V[tdofs[:-1], ndofs[0]] = Bnt
+                V[tdofs[-1], ndofs[1:dimP1]] = Bnt
 
         return ListTensor(V.T)
-
-    def entity_dofs(self):
-        return self._entity_dofs
-
-    def space_dimension(self):
-        return self._space_dimension
