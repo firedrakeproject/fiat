@@ -93,10 +93,13 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M = M.array
         if M.shape[0] != M.shape[1]:
             M = M[:, :self.space_dimension()]
-        M_dual = gem.ListTensor(inverse(M.T))
+        M_dual = inverse(M.T)
+        if self.indices is not None:
+            M_dual = M_dual[numpy.ix_(self.indices, self.indices)]
+        M_dual = gem.ListTensor(M_dual)
 
         key = None
-        return MappedTabulation(M_dual, {key: Q}, indices=self.indices)[key]
+        return MappedTabulation(M_dual, {key: Q})[key]
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
