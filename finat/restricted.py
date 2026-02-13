@@ -59,7 +59,7 @@ def restrict_fiat(element, domain, take_closure):
         return null_element
 
     if element.space_dimension() == re.space_dimension():
-        # FIAT.RestrictedElement wipes out entity_permuations.
+        # FIAT.RestrictedElement wipes out entity_permutations.
         # In case the restriction is trivial we return the original element
         # to avoid reconstructing the space with an undesired permutation.
         return element
