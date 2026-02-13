@@ -1,5 +1,6 @@
 from functools import singledispatch
 from itertools import chain
+from copy import deepcopy
 
 import FIAT
 from FIAT.polynomial_set import mis
@@ -11,6 +12,24 @@ from finat.physically_mapped import PhysicallyMappedElement
 
 # Sentinel for when restricted element is empty
 null_element = object()
+
+
+class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
+    """A restricted PhysicallyMappedElement."""
+    def __init__(self, element, indices, entity_dofs):
+        super().__init__(element._element)
+        self.indices = indices
+        self._entity_dofs = entity_dofs
+        self.full_element = element
+
+    def basis_transformation(self, coordinate_mapping):
+        return self.full_element.basis_transformation(coordinate_mapping)
+
+    def space_dimension(self):
+        return len(self.indices)
+
+    def entity_dofs(self):
+        return self._entity_dofs
 
 
 @singledispatch
@@ -30,6 +49,7 @@ def restrict(element, domain, take_closure):
 
 
 @restrict.register(FiatElement)
+@restrict.register(PhysicallyMappedElement)
 def restrict_fiat(element, domain, take_closure):
     try:
         re = FIAT.RestrictedElement(element._element,
@@ -43,12 +63,23 @@ def restrict_fiat(element, domain, take_closure):
         # In case the restriction is trivial we return the original element
         # to avoid reconstructing the space with an undesired permutation.
         return element
+
+    if isinstance(element, PhysicallyMappedElement) and not (domain == "interior" and not take_closure):
+        dual = element._element.get_dual_set()
+        indices = dual.get_indices(domain, take_closure)
+        if element.space_dimension() < element._element.space_dimension():
+            # Throw away constraint dofs
+            indices = [i for i in indices if i < element.space_dimension()]
+            entity_dofs = deepcopy(element.entity_dofs())
+            for dim in entity_dofs:
+                for entity in entity_dofs[dim]:
+                    ids = entity_dofs[dim][entity]
+                    entity_dofs[dim][entity] = [indices.index(i) for i in ids if i in indices]
+        else:
+            entity_dofs = re.entity_dofs()
+        return RestrictedPhysicallyMappedElement(element, indices, entity_dofs)
+
     return FiatElement(re)
-
-
-@restrict.register(PhysicallyMappedElement)
-def restrict_physically_mapped(element, domain, take_closure):
-    raise NotImplementedError("Can't restrict Physically Mapped things")
 
 
 @restrict.register(finat.FlattenedDimensions)

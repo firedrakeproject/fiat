@@ -19,13 +19,16 @@ class MappedTabulation(Mapping):
     """A lazy tabulation dict that applies the basis transformation only
     on the requested derivatives."""
 
-    def __init__(self, M, ref_tabulation):
+    def __init__(self, M, ref_tabulation, indices=None):
         self.M = M
         self.ref_tabulation = ref_tabulation
+        if indices is None:
+            indices = list(range(M.shape[0]))
+        self.indices = indices
         # we expect M to be sparse with O(1) nonzeros per row
         # for each row, get the column index of each nonzero entry
         csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
-               for i in range(M.shape[0])]
+               for i in indices]
         self.csr = csr
         self._tabulation_cache = {}
 
@@ -35,8 +38,7 @@ class MappedTabulation(Mapping):
         phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
         # the sum approach is faster than calling numpy.dot or gem.IndexSum
         exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
-                 for i, js in enumerate(self.csr)]
-
+                 for i, js in zip(self.indices, self.csr)]
         val = gem.ListTensor(exprs)
         # val = self.M @ table
         return gem.optimise.aggressive_unroll(val)
@@ -63,6 +65,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         super().__init__(*args, **kwargs)
         cite("Kirby2018zany")
         cite("Kirby2019zany")
+        self.indices = None
 
     @abstractmethod
     def basis_transformation(self, coordinate_mapping):
@@ -74,7 +77,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation)
+        return MappedTabulation(M, ref_tabulation, indices=self.indices)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
@@ -93,7 +96,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M_dual = gem.ListTensor(inverse(M.T))
 
         key = None
-        return MappedTabulation(M_dual, {key: Q})[key]
+        return MappedTabulation(M_dual, {key: Q}, indices=self.indices)[key]
 
 
 class DirectlyDefinedElement(NeedsCoordinateMappingElement):
