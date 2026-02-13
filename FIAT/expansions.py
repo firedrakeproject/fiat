@@ -200,7 +200,7 @@ def C0_basis(dim, n, tabulations):
         icur = 0
         phi[icur] *= -1.0
         for inext in range(1, dim+1):
-            phi[icur] += phi[inext]
+            phi[icur] -= phi[inext]
         if dim == 2:
             for i in range(2, n+1):
                 phi[idx(0, i)] -= phi[idx(1, i-1)]
