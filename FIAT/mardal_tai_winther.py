@@ -8,85 +8,116 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 
+import numpy
 from FIAT import dual_set, expansions, finite_element, polynomial_set
-from FIAT.functional import (IntegralMomentOfNormalEvaluation,
-                             IntegralMomentOfTangentialEvaluation,
-                             IntegralLegendreNormalMoment,
-                             IntegralMomentOfDivergence)
-
+from FIAT.check_format_variant import parse_quadrature_scheme
+from FIAT.functional import FrobeniusIntegralMoment
+from FIAT.nedelec import Nedelec
+from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
 
 
-def DivergenceDubinerMoments(ref_el, start_deg, stop_deg, comp_deg):
-    sd = ref_el.get_spatial_dimension()
-    P = polynomial_set.ONPolynomialSet(ref_el, stop_deg)
-    Q = create_quadrature(ref_el, comp_deg + stop_deg)
+def curl(tabulation):
+    """
+    Compute the curl of a vector (the skew-symmetric part of the gradient) or the rot of scalar in 2D.
 
-    dim0 = expansions.polynomial_dimension(ref_el, start_deg-1)
-    dim1 = expansions.polynomial_dimension(ref_el, stop_deg)
-    indices = list(range(dim0, dim1))
-    phis = P.take(indices).tabulate(Q.get_points())[(0,)*sd]
-    for phi in phis:
-        yield IntegralMomentOfDivergence(ref_el, Q, phi)
+    :arg tabulation: a dictionary with at least the first order tabulation.
+    :returns: a numpy.ndarray with the curl.
+    """
+    grad_u = {alpha.index(1): tabulation[alpha] for alpha in tabulation if sum(alpha) == 1}
+    shp = grad_u[0].shape[1:-1]
+    if shp == ():
+        curl_u = [grad_u[1], -grad_u[0]]
+    else:
+        d = len(grad_u)
+        indices = ((i, j) for i in reversed(range(d)) for j in reversed(range(i+1, d)))
+        curl_u = [((-1)**k) * (grad_u[j][:, i, :] - grad_u[i][:, j, :]) for k, (i, j) in enumerate(indices)]
+    return numpy.transpose(curl_u, (1, 0, 2))
+
+
+def MardalTaiWintherSpace(ref_el, order=1):
+    """Construct the MTW space BDM(order) + curl(B [P1]^d)."""
+    sd = ref_el.get_spatial_dimension()
+    k = sd + 1
+    assert order < k
+    # [Pk]^d = vector polynomials of degree k = sd+1
+    Pk = polynomial_set.ONPolynomialSet(ref_el, k, shape=(sd,), scale="orthonormal")
+
+    # Grab BDM(order) = [P_order]^d from [Pk]^d
+    dimP1 = expansions.polynomial_dimension(ref_el, order)
+    dimPk = expansions.polynomial_dimension(ref_el, k)
+    ids = [i+dimPk*j for i in range(dimP1) for j in range(sd)]
+    BDM = Pk.take(ids)
+
+    # Project curl(B [P1]^d) into [Pk]^d
+    shape = () if sd == 2 else ((sd*(sd-1))//2,)
+    BP1 = polynomial_set.make_bubbles(ref_el, k+1, shape=shape)
+
+    Q = create_quadrature(ref_el, 2*k)
+    qpts = Q.get_points()
+    qwts = Q.get_weights()
+    Pk_at_qpts = Pk.tabulate(qpts)
+    BP1_at_qpts = BP1.tabulate(qpts, 1)
+
+    inner = lambda u, v, qwts: numpy.tensordot(u, numpy.multiply(v, qwts), axes=(range(1, u.ndim),)*2)
+    C = inner(curl(BP1_at_qpts), Pk_at_qpts[(0,)*sd], qwts)
+    coeffs = numpy.tensordot(C, Pk.get_coeffs(), axes=(1, 0))
+    curlBP1 = polynomial_set.PolynomialSet(ref_el, k, k, Pk.get_expansion_set(), coeffs)
+
+    return polynomial_set.polynomial_set_union_normalized(BDM, curlBP1)
 
 
 class MardalTaiWintherDual(dual_set.DualSet):
     """Degrees of freedom for Mardal-Tai-Winther elements."""
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el, order, quad_scheme):
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
-
-        if sd != 2:
-            raise ValueError("Mardal-Tai-Winther elements are only defined in dimension 2.")
-
-        if degree != 3:
-            raise ValueError("Mardal-Tai-Winther elements are only defined for degree 3.")
-
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
-
-        # no vertex dofs
+        degree = sd + 1
 
         # On each facet, let n be its normal.  We need to integrate
-        # u.n and u.t against the first Legendre polynomial (constant)
-        # and u.n against the second (linear).
-        facet = ref_el.get_facet_element()
-        # Facet nodes are \int_F v.n p ds where p \in P_{q-1}
-        # degree is q - 1
-        Q = create_quadrature(facet, degree+1)
-        Pq = polynomial_set.ONPolynomialSet(facet, 1)
-        phis = Pq.tabulate(Q.get_points())[(0,)*(sd - 1)]
+        # u.n against a Dubiner basis for P1
+        # and u x n against a basis for lowest-order RT.
+        ref_facet = ref_el.get_facet_element()
+        Q = parse_quadrature_scheme(ref_facet, degree+order, quad_scheme)
+
+        P1 = polynomial_set.ONPolynomialSet(ref_facet, order)
+        P1_at_qpts = P1.tabulate(Q.get_points())[(0,)*(sd - 1)]
+        if sd == 2:
+            # For 2D just take the constant
+            RT_at_qpts = P1_at_qpts[:1, None, :]
+        else:
+            # Basis for lowest-order RT [(1, 0), (0, 1), (x, y)]
+            RT_at_qpts = numpy.zeros((3, sd-1, P1_at_qpts.shape[-1]))
+            RT_at_qpts[0, 0, :] = P1_at_qpts[0, None, :]
+            RT_at_qpts[1, 1, :] = P1_at_qpts[0, None, :]
+            RT_at_qpts[2, 0, :] = P1_at_qpts[1, None, :]
+            RT_at_qpts[2, 1, :] = P1_at_qpts[2, None, :]
+
         for f in sorted(top[sd-1]):
             cur = len(nodes)
-            nodes.append(IntegralMomentOfNormalEvaluation(ref_el, Q, phis[0], f))
-            nodes.append(IntegralMomentOfTangentialEvaluation(ref_el, Q, phis[0], f))
-            nodes.append(IntegralMomentOfNormalEvaluation(ref_el, Q, phis[1], f))
+            n = ref_el.compute_scaled_normal(f)
+            Qf = FacetQuadratureRule(ref_el, sd-1, f, Q, avg=True)
+            # Normal moments against P_{order}
+            nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, numpy.outer(n, phi)) for phi in P1_at_qpts)
+            # Map the RT basis into the facet
+            Jf = Qf.jacobian()
+            phis = numpy.tensordot(Jf, RT_at_qpts.transpose(1, 0, 2), (1, 0)).transpose(1, 0, 2)
+            if sd == 3:
+                # Moments against cross(n, RT)
+                phis = numpy.cross(n[None, :, None], phis, axis=1)
+            nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, phi) for phi in phis)
             entity_ids[sd-1][f].extend(range(cur, len(nodes)))
 
-        # Generate constraint nodes on the cell and facets
-        # * div(v) must be constant on the cell.  Since v is a cubic and
-        #   div(v) is quadratic, we need the integral of div(v) against the
-        #   linear and quadratic Dubiner polynomials to vanish.
-        #   There are two linear and three quadratics, so these are five
-        #   constraints
-        # * v.n must be linear on each facet.  Since v.n is cubic, we need
-        #   the integral of v.n against the cubic and quadratic Legendre
-        #   polynomial to vanish on each facet.
-
-        # So we introduce functionals whose kernel describes this property,
-        # as described in the FIAT paper.
-        start_order = 2
-        stop_order = 3
-        qdegree = degree + stop_order
-        for f in sorted(top[sd-1]):
+        # Interior nodes: moments against Nedelec(order-1)
+        if order > 1:
+            Q = parse_quadrature_scheme(ref_el, degree+order-1, quad_scheme)
+            Ned = Nedelec(ref_el, order-1)
+            phis = Ned.tabulate(0, Q.get_points())[(0,) * sd]
             cur = len(nodes)
-            nodes.extend(IntegralLegendreNormalMoment(ref_el, f, order, qdegree)
-                         for order in range(start_order, stop_order+1))
-            entity_ids[sd-1][f].extend(range(cur, len(nodes)))
-
-        cur = len(nodes)
-        nodes.extend(DivergenceDubinerMoments(ref_el, start_order-1, stop_order-1, degree))
-        entity_ids[sd][0].extend(range(cur, len(nodes)))
+            nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
+            entity_ids[sd][0] = list(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -94,12 +125,17 @@ class MardalTaiWintherDual(dual_set.DualSet):
 class MardalTaiWinther(finite_element.CiarletElement):
     """The definition of the Mardal-Tai-Winther element.
     """
-    def __init__(self, ref_el, degree=3):
+    def __init__(self, ref_el, order=1, quad_scheme=None):
         sd = ref_el.get_spatial_dimension()
-        assert degree == 3, "Only defined for degree 3"
-        assert sd == 2, "Only defined for dimension 2"
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, (sd,))
-        dual = MardalTaiWintherDual(ref_el, degree)
-        formdegree = sd-1
-        mapping = "contravariant piola"
-        super().__init__(poly_set, dual, degree, formdegree, mapping=mapping)
+        if sd not in (2, 3):
+            raise ValueError(f"{type(self).__name__} only defined in dimension 2 and 3.")
+        if not ref_el.is_simplex():
+            raise ValueError(f"{type(self).__name__} only defined on simplices.")
+        if order >= sd:
+            raise ValueError(f"{type(self).__name__} only defined for 1 <= order < dim. "
+                             "The order is defined as the embedded sub-degree, with 1 for lowest-order case.")
+
+        dual = MardalTaiWintherDual(ref_el, order, quad_scheme)
+        poly_set = MardalTaiWintherSpace(ref_el, order)
+        formdegree = sd - 1
+        super().__init__(poly_set, dual, order, formdegree, mapping="contravariant piola")

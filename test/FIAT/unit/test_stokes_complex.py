@@ -14,6 +14,7 @@ from FIAT.quadrature_schemes import create_quadrature
 from FIAT.macro import CkPolynomialSet
 from FIAT.alfeld_sorokina import AlfeldSorokinaSpace
 from FIAT.arnold_qin import ArnoldQinSpace
+from FIAT.bernardi_raugel import BernardiRaugel
 from FIAT.christiansen_hu import ChristiansenHuSpace
 from FIAT.guzman_neilan import (
     GuzmanNeilanFirstKindH1,
@@ -21,10 +22,14 @@ from FIAT.guzman_neilan import (
     GuzmanNeilanH1div,
     GuzmanNeilanSpace)
 from FIAT.restricted import RestrictedElement
-
+from FIAT.quadrature import FacetQuadratureRule
 
 T = ufc_simplex(2)
 S = ufc_simplex(3)
+
+
+def inner(u, v, qwts):
+    return numpy.tensordot(numpy.multiply(u, qwts), v, axes=(tuple(range(1, u.ndim)), )*2)
 
 
 def rHCT(cell):
@@ -182,12 +187,13 @@ def test_gn_stokes_pairs(cell, kind):
     check_stokes_complex(spaces, degree)
 
 
+@pytest.mark.parametrize("element", (GuzmanNeilanFirstKindH1, BernardiRaugel))
 @pytest.mark.parametrize("quad_scheme", (None, "KMV(2),powell-sabin"))
 @pytest.mark.parametrize("sd", (2, 3))
-def test_gn_dofs(sd, quad_scheme):
+def test_gn_dofs(element, sd, quad_scheme):
     cell = symmetric_simplex(sd)
 
-    fe = GuzmanNeilanFirstKindH1(cell, 1, quad_scheme=quad_scheme)
+    fe = element(cell, 1, quad_scheme=quad_scheme)
     degree = fe.degree()
     assert degree == sd
     ref_complex = fe.get_reference_complex()
@@ -204,6 +210,39 @@ def test_gn_dofs(sd, quad_scheme):
         expected[fdof] = (-1.0)**f / factorial(sd-1)
 
     assert numpy.allclose(div_moments, expected)
+
+
+@pytest.mark.parametrize("sd", (2, 3))
+def test_gn_trace(sd):
+    degree = 1
+    cell = symmetric_simplex(sd)
+
+    gn = GuzmanNeilanFirstKindH1(cell, degree)
+    br = BernardiRaugel(cell, degree)
+
+    sd = cell.get_spatial_dimension()
+    ref_face = cell.construct_subelement(sd-1)
+    Q_face = create_quadrature(ref_face, 2*degree)
+
+    Phis = ONPolynomialSet(ref_face, degree)
+    phis_at_qpts = Phis.tabulate(Q_face.get_points())[(0,)*(sd-1)]
+
+    for f in cell.topology[sd-1]:
+        Q = FacetQuadratureRule(cell, sd-1, f, Q_face)
+        vals = gn.tabulate(0, Q.get_points())[(0,)*sd]
+        vals -= br.tabulate(0, Q.get_points())[(0,)*sd]
+
+        # Assert that the normal component is the same
+        n = cell.compute_normal(f)
+        normal_trace = numpy.tensordot(vals, n, axes=(1, 0))
+        normal_moments = inner(normal_trace, phis_at_qpts, Q.get_weights())
+        assert numpy.allclose(normal_moments, 0)
+
+        # Assert that the tangential components are the same
+        for t in cell.compute_tangents(sd-1, f):
+            tangential_trace = numpy.tensordot(vals, t, axes=(1, 0))
+            tangential_moments = inner(tangential_trace, phis_at_qpts, Q.get_weights())
+            assert numpy.allclose(tangential_moments, 0)
 
 
 @pytest.mark.parametrize("cell", (T, S))

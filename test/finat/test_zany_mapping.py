@@ -150,12 +150,12 @@ def test_argyris_point(ref_to_phys):
 
 zany_piola_elements = {
     2: [
-        finat.MardalTaiWinther,
         finat.ReducedArnoldQin,
         finat.ArnoldWinther,
         finat.ArnoldWintherNC,
     ],
     3: [
+        finat.MardalTaiWinther,
         finat.BernardiRaugel,
         finat.BernardiRaugelBubble,
         finat.AlfeldSorokina,
@@ -170,18 +170,19 @@ zany_piola_elements = {
 
 
 @pytest.mark.parametrize("dimension, element", [
-                         *((2, e) for e in zany_piola_elements[2]),
-                         *((2, e) for e in zany_piola_elements[3]),
-                         *((3, e) for e in zany_piola_elements[3]),
-                         ])
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in zany_piola_elements[3]),
+    *((3, e) for e in zany_piola_elements[3]),
+])
 def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
 
 
-def test_quadratic_guzman_neilan(ref_to_phys):
-    element = finat.GuzmanNeilanFirstKindH1
-    dimension = 3
-    degree = 2
+@pytest.mark.parametrize("dimension, element, degree", [
+    (3, finat.MardalTaiWinther, 2),
+    (3, finat.GuzmanNeilanFirstKindH1, 2),
+])
+def test_high_order_stokes_elements(ref_to_phys, element, dimension, degree):
     check_zany_mapping(element, ref_to_phys[dimension], degree)
 
 

@@ -459,6 +459,7 @@ class IntegralMomentOfDivergence(Functional):
         self.Q = Q
 
         sd = ref_el.get_spatial_dimension()
+        shp = f_at_qpts.shape[1:-1] + (sd,)
 
         points = Q.get_points()
         self.dpts = points
@@ -468,7 +469,7 @@ class IntegralMomentOfDivergence(Functional):
         dpt_dict = {tuple(pt): [(wt, alphas[i], (i,)) for i in range(sd)]
                     for pt, wt in zip(points, weights)}
 
-        super().__init__(ref_el, tuple(), {}, dpt_dict,
+        super().__init__(ref_el, shp, {}, dpt_dict,
                          "IntegralMomentOfDivergence")
 
 
