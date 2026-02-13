@@ -178,6 +178,13 @@ def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
 
 
+def test_quadratic_guzman_neilan(ref_to_phys):
+    element = finat.GuzmanNeilanFirstKindH1
+    dimension = 3
+    degree = 2
+    check_zany_mapping(element, ref_to_phys[dimension], degree)
+
+
 @pytest.mark.parametrize("element, degree, variant", [
     *((finat.HuZhang, k, v) for v in ("integral", "point") for k in range(3, 6)),
 ])
