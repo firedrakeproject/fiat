@@ -89,7 +89,7 @@ class CrouzeixRaviart(finite_element.CiarletElement):
             base_element = type(self)(ref_el.get_parent(), degree)
             poly_set = macro.MacroPolynomialSet(ref_el, base_element)
         else:
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble", scale=1)
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
 
         dual = CrouzeixRaviartDualSet(ref_el, degree, variant, interpolant_deg, quad_scheme)
         super().__init__(poly_set, dual, degree)
