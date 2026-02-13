@@ -13,7 +13,6 @@
 
 from finat.ufl.finiteelementbase import FiniteElementBase
 from finat.ufl.mixedelement import MixedElement, VectorElement, TensorElement
-from ufl.sobolevspace import L2
 
 valid_restriction_domains = ("interior", "facet", "ridge", "face", "edge", "vertex", "reduced")
 
