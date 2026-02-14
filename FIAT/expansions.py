@@ -243,7 +243,7 @@ def C0_basis(dim, n, tabulations):
 def xi_triangle(eta):
     """Maps from [-1,1]^2 to the (-1,1) reference triangle."""
     eta1, eta2 = eta
-    xi1 = 0.5 * (1.0 + eta1) * (1.0 - eta2) - 1.0
+    xi1 = -0.5 * (eta1 + 1.0) * (eta2 - 1.0) - 1.0
     xi2 = eta2
     return (xi1, xi2)
 
@@ -251,9 +251,9 @@ def xi_triangle(eta):
 def xi_tetrahedron(eta):
     """Maps from [-1,1]^3 to the -1/1 reference tetrahedron."""
     eta1, eta2, eta3 = eta
-    xi1 = 0.25 * (1. + eta1) * (1. - eta2) * (1. - eta3) - 1.
-    xi2 = 0.5 * (1. + eta2) * (1. - eta3) - 1.
     xi3 = eta3
+    xi2 = -0.5 * (eta2 + 1.0) * (eta3 - 1.0) - 1.0
+    xi1 = 0.25 * (eta1 + 1.0) * (eta2 - 1.0) * (eta3 - 1.0) - 1.0
     return xi1, xi2, xi3
 
 
