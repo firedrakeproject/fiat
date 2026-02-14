@@ -152,7 +152,7 @@ class FiatElement(FiniteElementBase):
 
         # Apply symbolic simplification
         vals = result.values()
-        vals = map(gem.optimise.ffc_rounding, vals, [1E-15]*len(vals))
+        vals = map(gem.optimise.ffc_rounding, vals, [1E-13]*len(vals))
         vals = gem.optimise.constant_fold_zero(vals)
         vals = map(gem.optimise.aggressive_unroll, vals)
         vals = gem.optimise.remove_componenttensors(vals)
