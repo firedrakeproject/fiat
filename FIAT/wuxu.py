@@ -28,27 +28,30 @@ import numpy
 polydim = expansions.polynomial_dimension
 
 
-def WuXuRobustH3NCSpace(ref_el):
-    """Constructs a basis for the the Wu Xu H^3 nonconforming space
-    P^{(3,2)}(T) = P_3(T) + b_T P_1(T) + b_T^2 P_1(T),
+def WuXuH3NCSpace(ref_el, robust=False):
+    """Constructs a basis for the the Wu Xu H^3 nonconforming spaces
+
+    P^{(3,1)}(T) = P_3(T) + b_T P_1(T), if robust = False
+
+    P^{(3,2)}(T) = P_3(T) + b_T P_1(T) + b_T^2 P_1(T), if robust = True
+
     where b_T is the standard cubic bubble."""
 
     sd = ref_el.get_spatial_dimension()
     assert sd == 2
 
-    em_deg = 7
-
     # Unfortunately,  b_T^2 P_1 has degree 7 (cubic squared times a linear)
     # so we need a high embedded degree!
-    p7 = polynomial_set.ONPolynomialSet(ref_el, 7)
+    embedded_degree = 7 if robust else 4
+    pk = polynomial_set.ONPolynomialSet(ref_el, embedded_degree)
 
     dimp1 = polydim(ref_el, 1)
     dimp3 = polydim(ref_el, 3)
-    dimp7 = polydim(ref_el, 7)
+    dimpk = polydim(ref_el, embedded_degree)
 
     # Here's the first bit we'll work with.  It's already expressed in terms
     # of the ON basis for P7, so we're golden.
-    p3fromp7 = p7.take(list(range(dimp3)))
+    p3frompk = pk.take(list(range(dimp3)))
 
     # Rather than creating the barycentric coordinates ourself, let's
     # reuse the existing bubble functionality
@@ -56,56 +59,33 @@ def WuXuRobustH3NCSpace(ref_el):
     p1 = Lagrange(ref_el, 1)
 
     # next, we'll have to project b_T P1 and b_T^2 P1 onto P^7
-    Q = create_quadrature(ref_el, 14)
+    Q = create_quadrature(ref_el, 2*embedded_degree)
     Qpts = numpy.array(Q.get_points())
     Qwts = numpy.array(Q.get_weights())
 
-    zero_index = tuple([0 for i in range(sd)])
-
     # it's just one bubble function: let's get a 1d array!
-    bT_at_qpts = bT.tabulate(0, Qpts)[zero_index][0, :]
-    p1_at_qpts = p1.tabulate(0, Qpts)[zero_index]
+    bT_at_qpts = bT.tabulate(0, Qpts)[(0,)*sd][0, :]
+    p1_at_qpts = p1.tabulate(0, Qpts)[(0,)*sd]
 
-    # Note: difference in signature because bT, p1 are FE and p7 is a
+    # Note: difference in signature because bT, p1 are FE and pk is a
     # polynomial set
-    p7_at_qpts = p7.tabulate(Qpts)[zero_index]
+    pk_at_qpts = pk.tabulate(Qpts)[(0,)*sd]
 
-    bubble_coeffs = numpy.zeros((6, dimp7), "d")
+    bubble_coeffs = numpy.zeros((6, dimpk), "d")
 
     # first three: bT P1, last three will be bT^2 P1
     foo = bT_at_qpts * p1_at_qpts * Qwts
-    bubble_coeffs[:dimp1, :] = numpy.dot(foo, p7_at_qpts.T)
+    bubble_coeffs[:dimp1, :] = numpy.dot(foo, pk_at_qpts.T)
 
-    foo = bT_at_qpts * foo
-    bubble_coeffs[dimp1:2*dimp1, :] = numpy.dot(foo, p7_at_qpts.T)
+    if robust:
+        foo = bT_at_qpts * foo
+        bubble_coeffs[dimp1:2*dimp1, :] = numpy.dot(foo, pk_at_qpts.T)
 
-    bubbles = polynomial_set.PolynomialSet(ref_el, 3, em_deg,
-                                           p7.get_expansion_set(),
+    bubbles = polynomial_set.PolynomialSet(ref_el, 3, embedded_degree,
+                                           pk.get_expansion_set(),
                                            bubble_coeffs)
 
-    return polynomial_set.polynomial_set_union_normalized(p3fromp7, bubbles)
-
-
-def WuXuH3NCSpace(ref_el):
-    """Constructs a basis for the the Wu Xu H^3 nonconforming space
-    P(T) = P_3(T) + b_T P_1(T),
-    where b_T is the standard cubic bubble."""
-
-    assert ref_el.get_spatial_dimension() == 2
-
-    em_deg = 4
-    p4 = polynomial_set.ONPolynomialSet(ref_el, em_deg)
-
-    # Here's the first bit we'll work with.  It's already expressed in terms
-    # of the ON basis for P4, so we're golden.
-    dimp3 = polydim(ref_el, 3)
-    p3fromp4 = p4.take(list(range(dimp3)))
-
-    # Rather than creating the barycentric coordinates ourself, let's
-    # reuse the existing bubble functionality
-    bT = Bubble(ref_el, 4)
-
-    return polynomial_set.polynomial_set_union_normalized(p3fromp4, bT.get_nodal_basis())
+    return polynomial_set.polynomial_set_union_normalized(p3frompk, bubbles)
 
 
 class WuXuRobustH3NCDualSet(dual_set.DualSet):
@@ -176,7 +156,7 @@ class WuXuH3NCDualSet(dual_set.DualSet):
 class WuXuRobustH3NC(finite_element.CiarletElement):
     """The Wu-Xu robust H3 nonconforming finite element"""
     def __init__(self, ref_el, degree=7):
-        poly_set = WuXuRobustH3NCSpace(ref_el)
+        poly_set = WuXuH3NCSpace(ref_el, robust=True)
         assert degree == poly_set.degree
         dual = WuXuRobustH3NCDualSet(ref_el, degree)
         super().__init__(poly_set, dual, degree)
