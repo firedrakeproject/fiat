@@ -25,22 +25,24 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
     if pts.dtype == object:
-        from sympy import simplify
-        sp_simplify = numpy.vectorize(simplify)
+        # Do not use barycentric interpolation at unknown points
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        phis = [wi * numpy.prod(phi[:i], axis=0) * numpy.prod(phi[i+1:], axis=0) for i, wi in enumerate(wts)]
+        phi = numpy.asarray(phis)
     else:
-        sp_simplify = lambda x: x
-    phi = numpy.add.outer(-nodes, pts.flatten())
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        numpy.reciprocal(phi, out=phi)
-        numpy.multiply(phi, wts[:, None], out=phi)
-        numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
-    phi[phi != phi] = 1.0
-    phi = phi.reshape(-1, *pts.shape[:-1])
+        # Use the second barycentric interpolation formula
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        with numpy.errstate(divide='ignore', invalid='ignore'):
+            numpy.reciprocal(phi, out=phi)
+            numpy.multiply(phi, wts[:, None], out=phi)
+            numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
+        # Replace nan with one
+        phi[phi != phi] = 1.0
 
-    phi = sp_simplify(phi)
+    phi = phi.reshape(-1, *pts.shape[:-1])
     results = {(0,): phi}
     for r in range(1, order+1):
-        phi = sp_simplify(numpy.dot(dmat, phi))
+        phi = numpy.dot(dmat, phi)
         results[(r,)] = phi
     return results
 
