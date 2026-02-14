@@ -151,17 +151,17 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                 dfcur = a * dfa - b * dfb
                 dfprev = -c * dfc
                 dphi[inext] = fcur * dphi[icur]
-                dphi[inext] += fprev * dphi[iprev]
                 dphi[inext] += phi[icur] * dfcur
+                dphi[inext] += fprev * dphi[iprev]
                 dphi[inext] += phi[iprev] * dfprev
                 if ddphi is None:
                     continue
 
                 ddfprev = -c * ddfc
                 ddphi[inext] = fcur * ddphi[icur]
-                ddphi[inext] += fprev * ddphi[iprev]
                 ddphi[inext] += outer(dfcur, dphi[icur])
                 ddphi[inext] += outer(dphi[icur], dfcur)
+                ddphi[inext] += fprev * ddphi[iprev]
                 ddphi[inext] += outer(dfprev, dphi[iprev])
                 ddphi[inext] += outer(dphi[iprev], dfprev)
                 ddphi[inext] += phi[iprev] * ddfprev
