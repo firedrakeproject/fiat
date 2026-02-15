@@ -93,7 +93,7 @@ register_element("Raviart-Thomas", "RT", 1, HDiv, "contravariant Piola", (1, Non
 
 # Elements not in the periodic table
 # TODO: Implement generic Tear operator for elements instead of this:
-register_element("Brezzi-Douglas-Fortin-Marini", "BDFM", 1, HDiv, "contravariant Piola", (1, None), simplices[1:])
+register_element("Brezzi-Douglas-Fortin-Marini", "BDFM", 1, HDiv, "contravariant Piola", (2, 2), ("triangle",))
 register_element("Crouzeix-Raviart", "CR", 0, L2, "identity", (1, None), simplices[1:])
 register_element("Discontinuous Raviart-Thomas", "DRT", 1, L2, "contravariant Piola", (1, None), simplices[1:])
 register_element("Kong-Mulder-Veldhuizen", "KMV", 0, H1, "identity", (1, None), simplices[1:])
@@ -106,7 +106,7 @@ register_element("Gopalakrishnan-Lederer-Schoberl 2nd kind", "GLS2", 2, HCurlDiv
 
 register_element("Nonconforming Arnold-Winther", "AWnc", 2, HDiv, "double contravariant Piola", (2, 2), ("triangle",))
 register_element("Conforming Arnold-Winther", "AWc", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
-register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle"))
+register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
 
 # Zany elements
 register_element("Bernardi-Raugel", "BR", 1, H1, "contravariant Piola", (1, None), simplices[1:])
@@ -148,7 +148,7 @@ register_element("Quadrature", "Quadrature", 0, L2, "identity", (0, None), any_c
 register_element("Real", "R", 0, HInf, "identity", (0, 0), any_cell + ("TensorProductCell",))
 register_element("Undefined", "U", 0, L2, "identity", (0, None), any_cell)
 register_element("Radau", "Rad", 0, L2, "identity", (0, None), ("interval",))
-register_element("HDiv Trace", "HDivT", 0, L2, "identity", (0, None), any_cell)
+register_element("HDiv Trace", "HDivT", 0, L2, "identity", (0, None), (None, *simplices[1:], *cubes[1:], "prism", "pyramid"))
 
 # Spectral elements.
 register_element("Gauss-Legendre", "GL", 0, L2, "identity", (0, None), ("interval",))
