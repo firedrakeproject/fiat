@@ -618,6 +618,7 @@ class SimplicialComplex(Cell):
         if len(points) == 0:
             return points
         
+        points = numpy.asarray(points)
         if points.ndim == 1:
             points = points[None, :]
 
@@ -1410,21 +1411,55 @@ class TensorProductCell(Cell):
     def is_macrocell(self):
         return any(c.is_macrocell() for c in self.cells)
     
-    def compute_axis_barycentric_coordinates(self, points, entity=None, rescale=None):
+    @property
+    def simplex_cells(self):
+        """Return a cached flattened list of simplex axis factors.
+        
+        Example:
+        interval_x_interval -> (UFCInterval(), UFCInterval())
+        quadrilateral_x_interval -> (UFCInterval(), UFCInterval(), UFCInterval())
+        hexahedron -> (UFCInterval(), UFCInterval(), UFCInterval())
+        """
+        if not hasattr(self, "_simplex_cells"):
+            def _flatten(cell):
+                if cell.is_simplex():
+                    return [cell]
+                if hasattr(cell, "product"):
+                    return _flatten(cell.product)
+                if isinstance(cell, TensorProductCell):
+                    out = []
+                    for sub in cell.cells:
+                        out.extend(_flatten(sub))
+                    return out
+                raise NotImplementedError(f"Cannot flatten factor {cell}")
+            out = []
+            for c in self.cells:
+                out.extend(_flatten(c))
+            self._simplex_cells = tuple(out)
+        return self._simplex_cells
+        
+    def compute_axis_barycentric_coordinates(self, points, entity=None, rescale=False):
         """Compute axis-structured barycentric coordinates on a tensor-product cell.
 
-        Returns a list of arrays, one per axis. The i-th entry has shape (npoints, nfacets_axis_i) and 
-        contains the barycentric coordinates associated with facets normal to axis i.
+        Returns a list of arrays, one per simplicial axis. 
+        The i-th entry has shape (npoints, nfacets_axis_i) and contains the barycentric coordinates 
+        associated with the tensor-product facets normal to axis i.
         """
-        axis_dims = self.get_dimension()
+        if len(points) == 0:
+            return points
+        
+        points = numpy.asarray(points)
+        if points.ndim == 1:
+            points = numpy.asarray(points)[None, :] # convert to (1, dim) shape
+        
+        flat_factors = self.simplex_cells 
+        axis_dims = [c.get_spatial_dimension() for c in flat_factors]
         point_slices = TensorProductCell._split_slices(axis_dims)
         bary_coord_per_axis = []
 
-        # Compute barycentric coordinates independently on each axis
-        for cell, s in zip(self.cells, point_slices):
-            bary_axis = cell.compute_barycentric_coordinates(
-                points[..., s], entity=None, rescale=rescale
-            )
+        # Compute barycentric coordinates axis-by-axis
+        for factor, s in zip(flat_factors, point_slices):
+            bary_axis = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
             bary_coord_per_axis.append(bary_axis)
         
         return bary_coord_per_axis
@@ -1551,7 +1586,6 @@ class Hypercube(Cell):
         if len(points) == 0:
             return points
         
-        # Accept a single point of shape (gdim, ) as well as a batch of points of shape (npoints, gdim)
         points = numpy.asarray(points)
         if points.ndim == 1:
             points = points[None, :]
@@ -1561,7 +1595,7 @@ class Hypercube(Cell):
                 "Sub-entity barycentric coordinates are not supported on tensor-product elements."
             )
 
-        tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points)
+        tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points, entity, rescale)
         tp_bary_coords = numpy.hstack(tp_bary_coords) # flatten barycentric coords.
 
         # Reorder the barycentric coords. in facet order
@@ -1953,7 +1987,7 @@ def max_complex(complexes):
         raise ValueError("Cannot find the maximal complex")
 
 def get_bary_index_from_local_facet(simplicial_cell, local_facet):
-    """Return the barycentric coords. index that vanishes on a given facet. """
+    """Return the barycentric coordinate index that vanishes on a given facet. """
 
     all_vertices = set(simplicial_cell.get_topology()[0].keys())
     facet_dim = simplicial_cell.get_dimension() - 1
