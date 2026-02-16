@@ -1444,6 +1444,10 @@ class TensorProductCell(Cell):
         if len(points) == 0:
             return points
         
+        points = numpy.asarray(points)
+        if points.ndim == 1:
+            points = points[None, :]
+        
         flat_factors = self.simplex_cells 
         axis_dims = [c.get_spatial_dimension() for c in flat_factors]
         point_slices = TensorProductCell._split_slices(axis_dims)
