@@ -91,8 +91,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M = self.basis_transformation(coordinate_mapping)
 
         M = M.array
-        if M.shape[0] != M.shape[1]:
-            M = M[:, :self.space_dimension()]
+        if M.shape[1] > M.shape[0]:
+            M = M[:, :M.shape[0]]
+
         M_dual = inverse(M.T)
         if self.indices is not None:
             M_dual = M_dual[numpy.ix_(self.indices, self.indices)]
