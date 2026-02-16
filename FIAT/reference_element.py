@@ -617,10 +617,6 @@ class SimplicialComplex(Cell):
         """Returns the barycentric coordinates of a list of points on the complex."""
         if len(points) == 0:
             return points
-        
-        points = numpy.asarray(points)
-        if points.ndim == 1:
-            points = points[None, :]
 
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
@@ -1448,10 +1444,6 @@ class TensorProductCell(Cell):
         if len(points) == 0:
             return points
         
-        points = numpy.asarray(points)
-        if points.ndim == 1:
-            points = numpy.asarray(points)[None, :] # convert to (1, dim) shape
-        
         flat_factors = self.simplex_cells 
         axis_dims = [c.get_spatial_dimension() for c in flat_factors]
         point_slices = TensorProductCell._split_slices(axis_dims)
@@ -1585,10 +1577,6 @@ class Hypercube(Cell):
         """Returns the barycentric coordinates of a list of points on the hypercube."""
         if len(points) == 0:
             return points
-        
-        points = numpy.asarray(points)
-        if points.ndim == 1:
-            points = points[None, :]
 
         if entity is not None:
             raise NotImplementedError(
