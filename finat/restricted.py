@@ -21,12 +21,19 @@ class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
     """
     def __init__(self, element, indices):
         super().__init__(element._element)
-        self.restriction_indices = indices
-        # Restrict the entity_dofs dict
+        # First sanitise the restriction indices
+        # Some finat elements, e.g. Bell, are the restriction of a FIAT element.
+        # Therefore, we need to compose the restrictions.
         edofs = element.entity_dofs()
+        free_indices = set(chain.from_iterable(edofs[d][e] for d in edofs for e in edofs[d]))
+        indices = [i for i in indices if i in free_indices]
+        self.restriction_indices = indices
+
+        # Restrict the entity_dofs dict
         rdofs = {d: {e: [indices.index(i) for i in edofs[d][e] if i in indices]
                      for e in edofs[d]} for d in edofs}
         self.restriction_entity_dofs = rdofs
+
         # Grab the basis transformation matrix from the parent element
         if isinstance(element, PhysicallyMappedElement):
             self.full_basis_transformation = element.basis_transformation
@@ -62,7 +69,6 @@ def restrict(element, domain, take_closure):
 
 
 @restrict.register(FiatElement)
-@restrict.register(PhysicallyMappedElement)
 def restrict_fiat(element, domain, take_closure):
     try:
         re = FIAT.RestrictedElement(element._element,
@@ -78,14 +84,7 @@ def restrict_fiat(element, domain, take_closure):
         return element
 
     if isinstance(element, PhysicallyMappedElement) and not (domain == "interior" and not take_closure):
-        dual = element._element.get_dual_set()
-        indices = dual.get_indices(domain, take_closure)
-        space_dim = element.space_dimension()
-        if space_dim < element._element.space_dimension():
-            # Throw away constrained DOFs
-            indices = [i for i in indices if i < space_dim]
-
-        return RestrictedPhysicallyMappedElement(element, indices)
+        return RestrictedPhysicallyMappedElement(element, re._indices)
 
     return FiatElement(re)
 
