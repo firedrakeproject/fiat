@@ -65,7 +65,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         super().__init__(*args, **kwargs)
         cite("Kirby2018zany")
         cite("Kirby2019zany")
-        self.indices = None
+        self.restriction_indices = None
 
     @abstractmethod
     def basis_transformation(self, coordinate_mapping):
@@ -77,7 +77,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
         M = self.basis_transformation(coordinate_mapping)
-        return MappedTabulation(M, ref_tabulation, indices=self.indices)
+        return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         result = super().basis_evaluation(order, ps, entity=entity)
@@ -95,8 +95,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
             M = M[:, :M.shape[0]]
 
         M_dual = inverse(M.T)
-        if self.indices is not None:
-            M_dual = M_dual[numpy.ix_(self.indices, self.indices)]
+        if self.restriction_indices is not None:
+            indices = self.restriction_indices
+            M_dual = M_dual[numpy.ix_(indices, indices)]
         M_dual = gem.ListTensor(M_dual)
 
         key = None

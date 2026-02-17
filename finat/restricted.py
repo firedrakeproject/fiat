@@ -1,6 +1,5 @@
 from functools import singledispatch
 from itertools import chain
-from copy import deepcopy
 
 import FIAT
 from FIAT.polynomial_set import mis
@@ -15,21 +14,35 @@ null_element = object()
 
 
 class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
-    """A restricted PhysicallyMappedElement."""
-    def __init__(self, element, indices, entity_dofs):
+    """A restricted PhysicallyMappedElement.
+
+    :arg element: the finat.FiatElement to be restricted.
+    :arg indices: the indices of the degrees of freedom to be kept.
+    """
+    def __init__(self, element, indices):
         super().__init__(element._element)
-        self.indices = indices
-        self._entity_dofs = entity_dofs
-        self.full_element = element
+        self.restriction_indices = indices
+        # Restrict the entity_dofs dict
+        edofs = element.entity_dofs()
+        rdofs = {d: {e: [indices.index(i) for i in edofs[d][e] if i in indices]
+                     for e in edofs[d]} for d in edofs}
+        self.restriction_entity_dofs = rdofs
+        # Grab the basis transformation matrix from the parent element
+        if isinstance(element, PhysicallyMappedElement):
+            self.full_basis_transformation = element.basis_transformation
+        else:
+            self.full_basis_transformation = None
 
     def basis_transformation(self, coordinate_mapping):
-        return self.full_element.basis_transformation(coordinate_mapping)
+        if self.full_basis_transformation is None:
+            raise NotImplementedError("basis_transformation not implemented.")
+        return self.full_basis_transformation(coordinate_mapping)
 
     def space_dimension(self):
-        return len(self.indices)
+        return len(self.restriction_indices)
 
     def entity_dofs(self):
-        return self._entity_dofs
+        return self.restriction_entity_dofs
 
 
 @singledispatch
@@ -68,16 +81,11 @@ def restrict_fiat(element, domain, take_closure):
         dual = element._element.get_dual_set()
         indices = dual.get_indices(domain, take_closure)
         if element.space_dimension() < element._element.space_dimension():
-            # Throw away constraint dofs
-            indices = [i for i in indices if i < element.space_dimension()]
-            entity_dofs = deepcopy(element.entity_dofs())
-            for dim in entity_dofs:
-                for entity in entity_dofs[dim]:
-                    ids = entity_dofs[dim][entity]
-                    entity_dofs[dim][entity] = [indices.index(i) for i in ids if i in indices]
-        else:
-            entity_dofs = re.entity_dofs()
-        return RestrictedPhysicallyMappedElement(element, indices, entity_dofs)
+            # Throw away constrained DOFs
+            space_dim = element.space_dimension()
+            indices = [i for i in indices if i < space_dim]
+
+        return RestrictedPhysicallyMappedElement(element, indices)
 
     return FiatElement(re)
 
