@@ -39,9 +39,11 @@ class MappedTabulation(Mapping):
         # the sum approach is faster than calling numpy.dot or gem.IndexSum
         exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
                  for i, js in zip(self.indices, self.csr)]
-        val = gem.ListTensor(exprs)
-        # val = self.M @ table
-        return gem.optimise.aggressive_unroll(val)
+
+        result = gem.ListTensor(exprs)
+        result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
+        # result = gem.optimise.aggressive_unroll(self.M @ table)
+        return result
 
     def __getitem__(self, alpha):
         try:
