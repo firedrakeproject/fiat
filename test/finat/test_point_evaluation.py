@@ -30,7 +30,7 @@ def test_cellwise_constant(cell, degree):
 @pytest.mark.parametrize("element,degree", [
     (finat.HsiehCloughTocher, 3),
     (finat.Argyris, 5),
-    (finat.MardalTaiWinther, 3),
+    (finat.MardalTaiWinther, 1),
 ])
 def test_point_evaluation_zany(ref_to_phys, element, degree):
     dim = 2

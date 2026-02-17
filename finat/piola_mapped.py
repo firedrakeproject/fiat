@@ -1,7 +1,7 @@
 import numpy
 
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
+from finat.physically_mapped import adjugate, determinant, identity, PhysicallyMappedElement
 from gem import Literal, ListTensor, Zero
 from copy import deepcopy
 from itertools import chain
@@ -27,8 +27,7 @@ def normal_tangential_edge_transform(fiat_cell, J, detJ, f):
     alpha = Jn @ Jt
     beta = Jt @ Jt
     # Compute the last row of inv([[1, 0], [alpha/detJ, beta/detJ]])
-    row = (-1 * alpha / beta, detJ / beta)
-    return row
+    return (-1 * alpha / beta, detJ / beta)
 
 
 def normal_tangential_face_transform(fiat_cell, J, detJ, f):
@@ -38,21 +37,38 @@ def normal_tangential_face_transform(fiat_cell, J, detJ, f):
     thats = fiat_cell.compute_tangents(2, f)
     nhat = numpy.cross(*thats)
     nhat /= numpy.dot(nhat, nhat)
-    orth_vecs = numpy.array([nhat,
-                             numpy.cross(nhat, thats[1]),
-                             numpy.cross(thats[0], nhat)])
-    # Compute A = (alpha, beta, gamma)
-    Jts = J @ Literal(thats.T)
-    Jorths = J @ Literal(orth_vecs.T)
-    A = Jorths.T @ Jts
-    # Compute the last two rows of inv([[1, 0, 0], A.T/detJ])
-    det0 = A[1, 0] * A[2, 1] - A[1, 1] * A[2, 0]
-    det1 = A[2, 0] * A[0, 1] - A[2, 1] * A[0, 0]
-    det2 = A[0, 0] * A[1, 1] - A[0, 1] * A[1, 0]
-    scale = detJ / det0
-    rows = ((-1 * det1 / det0, -1 * scale * A[2, 1], scale * A[2, 0]),
-            (-1 * det2 / det0, scale * A[1, 1], -1 * scale * A[1, 0]))
-    return rows
+    orths = numpy.cross(thats, nhat[None, :], axis=1)
+
+    Jn = J @ Literal(nhat)
+    Jthats = J @ Literal(thats.T)
+    Jorths = J @ Literal(orths.T)
+    A = Jthats.T @ Jorths
+    B = Jn @ Jthats
+    A = numpy.array([[A[i, j] for j in range(A.shape[1])] for i in range(A.shape[0])])
+    B = numpy.array([B[i] for i in range(B.shape[0])])
+
+    Q = numpy.dot(thats, thats.T)
+    beta = determinant(A)
+    alpha = Q @ (adjugate(A) @ B)
+    return (alpha / beta, detJ / beta)
+
+
+def normal_tangential_transform(fiat_cell, J, detJ, f):
+    """Return the basis transformation of normal and tangential face moments
+
+    :arg fiat_cell: a :class:`FIAT.reference_element.Cell`
+    :arg J: the Jacobian of the coordinate transformation
+    :arg detJ: the Jacobian determinant of the coordinate transformation
+    :arg f: the face id.
+
+    :returns: a 2-tuple of (Bnt, Btt) where
+        Bnt is the numpy.ndarray of normal-tangential coefficients, and
+        Btt is the tangential-tangential coefficient.
+    """
+    if fiat_cell.get_spatial_dimension() == 2:
+        return normal_tangential_edge_transform(fiat_cell, J, detJ, f)
+    else:
+        return normal_tangential_face_transform(fiat_cell, J, detJ, f)
 
 
 class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
@@ -90,9 +106,9 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
 
         dofs = self.entity_dofs()
         bfs = self._element.entity_dofs()
-        ndof = self.space_dimension()
+        numdof = self.space_dimension()
         numbf = self._element.space_dimension()
-        V = identity(numbf, ndof)
+        V = identity(numbf, numdof)
 
         # Undo the Piola transform for non-facet bubble basis functions
         nodes = self._element.get_dual_set().nodes
@@ -112,19 +128,16 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                         V[numpy.ix_(s, s)] = Finv
                         k += sd
         # Unpick the normal component for the facet bubbles
-        if sd == 2:
-            transform = normal_tangential_edge_transform
-        elif sd == 3:
-            transform = normal_tangential_face_transform
-
         for f in sorted(dofs[sd-1]):
-            rows = numpy.asarray(transform(self.cell, J, detJ, f))
-            cur_dofs = dofs[sd-1][f]
-            cur_bfs = bfs[sd-1][f][1:]
-            V[numpy.ix_(cur_bfs, cur_dofs)] = rows[..., :len(cur_dofs)]
+            Bnt, Btt = normal_tangential_transform(self.cell, J, detJ, f)
+            ndof, *tdofs = dofs[sd-1][f]
+            nbf, *tbfs = bfs[sd-1][f]
+            V[tbfs, ndof] = Bnt
+            if len(tdofs) > 0:
+                V[tbfs, tdofs] = Btt
 
         # Fix discrepancy between normal and tangential moments
-        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > ndof
+        needs_facet_vertex_coupling = len(dofs[0][0]) > 0 and numbf > numdof
         if needs_facet_vertex_coupling:
             perp = lambda *t: numpy.array([t[0][1], -t[0][0]]) if len(t) == 1 else numpy.cross(*t)
 
@@ -142,5 +155,5 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
                     for fdof in dofs[sd-1][f]:
                         T[fdofs.index(fdof), curvdofs] = Tfv
 
-            V[ndof:, vdofs] += V[ndof:, fdofs] @ T
+            V[numdof:, vdofs] += V[numdof:, fdofs] @ T
         return ListTensor(V.T)

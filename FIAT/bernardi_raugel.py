@@ -106,17 +106,24 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             for i in range(ndir):
                 for f in sorted(facets):
                     cur = len(nodes)
+                    nhat = perp(*thats[f])
                     if i == 0:
-                        # normal DoF
+                        # Normal DoF: face moment against n \phi_n
                         Q = Qn[f]
                         phi = fn_at_qpts
-                        udir = perp(*thats[f])
+                        comp = nhat
                     else:
-                        # tangential constraint
+                        # Tangential constraint
                         Q = Qt[f]
                         phi = ft_at_qpts
-                        udir = thats[f][i-1]
-                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(udir, phi)))
+                        if sd == 2:
+                            # Face moment against t \phi_t
+                            comp = thats[f][i-1]
+                        else:
+                            # Face moment against (n x t_j) \phi_t
+                            comp = perp(nhat, thats[f][i-1])
+
+                    nodes.append(FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi)))
                     entity_ids[sd-1][f].extend(range(cur, len(nodes)))
         super().__init__(nodes, ref_el, entity_ids)
 
