@@ -17,8 +17,12 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
 
 class MappedTabulation(Mapping):
     """A lazy tabulation dict that applies the basis transformation only
-    on the requested derivatives."""
+    on the requested derivatives.
 
+    :arg M: a gem.ListTensor with the basis transformation matrix.
+    :arg ref_tabulation: a dict of tabulations on the reference cell.
+    :kwarg indices: an optional list of restriction indices on the basis functions.
+    """
     def __init__(self, M, ref_tabulation, indices=None):
         self.M = M
         self.ref_tabulation = ref_tabulation

@@ -80,9 +80,9 @@ def restrict_fiat(element, domain, take_closure):
     if isinstance(element, PhysicallyMappedElement) and not (domain == "interior" and not take_closure):
         dual = element._element.get_dual_set()
         indices = dual.get_indices(domain, take_closure)
-        if element.space_dimension() < element._element.space_dimension():
+        space_dim = element.space_dimension()
+        if space_dim < element._element.space_dimension():
             # Throw away constrained DOFs
-            space_dim = element.space_dimension()
             indices = [i for i in indices if i < space_dim]
 
         return RestrictedPhysicallyMappedElement(element, indices)
