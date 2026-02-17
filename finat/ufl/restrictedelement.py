@@ -13,7 +13,6 @@
 
 from finat.ufl.finiteelementbase import FiniteElementBase
 from finat.ufl.mixedelement import MixedElement, VectorElement, TensorElement
-from ufl.sobolevspace import L2
 
 valid_restriction_domains = ("interior", "facet", "ridge", "face", "edge", "vertex", "reduced")
 
@@ -61,10 +60,7 @@ class RestrictedElement(FiniteElementBase):
     @property
     def sobolev_space(self):
         """Doc."""
-        if self._restriction_domain == "interior":
-            return L2
-        else:
-            return self._element.sobolev_space
+        return self._element.sobolev_space
 
     def is_cellwise_constant(self):
         """Return whether the basis functions of this element is spatially constant over each cell."""

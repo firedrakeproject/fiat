@@ -27,7 +27,7 @@ class AbstractPointSet(abc.ABC):
     @property
     @abc.abstractmethod
     def points(self):
-        """A flattened numpy array of points or ``UnknownPointsArray``
+        """A flattened numpy array of points or :class:`UnknownPointsArray`
         object with shape (# of points, point dimension)."""
 
     @property
@@ -81,8 +81,8 @@ class PointSingleton(AbstractPointSet):
 
 class UnknownPointsArray():
     """A placeholder for a set of unknown points with appropriate length
-    and size but without indexable values. For use with
-    :class:`AbstractPointSet`s whose points are not known at compile
+    and size but without indexable values. For use with an
+    :class:`AbstractPointSet` whose points are not known at compile
     time."""
     def __init__(self, shape):
         """
@@ -98,13 +98,13 @@ class UnknownPointsArray():
 
 class UnknownPointSet(AbstractPointSet):
     """A point set representing a vector of points with unknown
-    locations but known ``gem.Variable`` expression.
+    locations but known :class:`gem.gem.Variable` expression.
 
-    The ``.points`` property is an `UnknownPointsArray` object with
+    The ``.points`` property is an :class:`UnknownPointsArray` object with
     shape (N, D) where N is the number of points and D is their
     dimension.
 
-    The ``.expression`` property is a derived `gem.partial_indexed` with
+    The ``.expression`` property is a derived :func:`gem.gem.partial_indexed` with
     shape (D,) and free indices for the points N."""
 
     def __init__(self, points_expr):
