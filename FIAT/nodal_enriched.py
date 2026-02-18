@@ -45,8 +45,10 @@ class NodalEnrichedElement(CiarletElement):
         order = max(e.get_order() for e in elements)
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
+
+        # Grab the ExpansionSet defined on the maximal complex
         # LagrangeExpansionSet has fixed degree, ensure we grab the highest one
-        elem = elements[embedded_degrees.index(embedded_degree)]
+        elem = max(elements, key=lambda e: (e.get_reference_complex(), e.degree()))
         ref_el = elem.get_reference_complex()
         expansion_set = elem.get_nodal_basis().get_expansion_set()
         mapping = elem.mapping()[0]
@@ -54,7 +56,7 @@ class NodalEnrichedElement(CiarletElement):
         sd = ref_el.get_spatial_dimension()
 
         # Sanity check
-        assert all(e.get_reference_complex() == ref_el for e in elements)
+        assert all(e.get_reference_complex() <= ref_el for e in elements)
         assert all(set(e.mapping()) == {mapping, } for e in elements)
         assert all(e.value_shape() == value_shape for e in elements)
 
@@ -70,13 +72,15 @@ class NodalEnrichedElement(CiarletElement):
         else:
             # Obtain coefficients via projection
             Q = create_quadrature(ref_el, 2*embedded_degree)
-            qpts, qwts = Q.get_points(), Q.get_weights()
+            qpts = Q.get_points()
             phis = expansion_set._tabulate(embedded_degree, qpts, 0)[(0,)*sd]
-            PhiW = phis * qwts[None, :]
-            M = np.tensordot(PhiW, phis, (-1, -1))
+            PhiW = phis * Q.get_weights()
+            M = np.tensordot(phis, PhiW, (-1, -1))
             MinvPhiW = np.linalg.solve(M, PhiW)
-            coeffs = [np.tensordot(e.tabulate(0, qpts)[(0,)*sd], MinvPhiW, (-1, -1)) for e in elements]
-            coeffs = np.concatenate(coeffs, axis=0)
+
+            tabulations = np.concatenate([e.tabulate(0, qpts)[(0,)*sd] for e in elements], axis=0)
+            coeffs = np.tensordot(tabulations, MinvPhiW, (-1, -1))
+            assert coeffs.shape[1:-1] == value_shape
 
         poly_set = PolynomialSet(ref_el,
                                  degree,
