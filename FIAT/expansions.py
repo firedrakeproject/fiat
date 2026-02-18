@@ -96,7 +96,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                for k in range(order+1)]
 
     phi, dphi, ddphi = results + [None] * (2-order)
-    phi[0] += scale
+    phi[0] = scale
     if dim == 0 or n == 0:
         return results
     if dim > 3 or dim < 0:
@@ -129,12 +129,12 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             phi[inext] = fcur * phi[icur]
             if dphi is not None:
                 dfcur = a * dfa - b * dfb
-                dphi[inext] = fcur * dphi[icur]
-                dphi[inext] += phi[icur] * dfcur
+                dphi[inext] = phi[icur] * dfcur
+                dphi[inext] += fcur * dphi[icur]
                 if ddphi is not None:
-                    ddphi[inext] = fcur * ddphi[icur]
+                    ddphi[inext] = outer(dphi[icur], dfcur)
                     ddphi[inext] += outer(dfcur, dphi[icur])
-                    ddphi[inext] += outer(dphi[icur], dfcur)
+                    ddphi[inext] += fcur * ddphi[icur]
 
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
@@ -150,21 +150,21 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
                 dfcur = a * dfa - b * dfb
                 dfprev = -c * dfc
-                dphi[inext] = fcur * dphi[icur]
-                dphi[inext] += phi[icur] * dfcur
-                dphi[inext] += fprev * dphi[iprev]
+                dphi[inext] = phi[icur] * dfcur
                 dphi[inext] += phi[iprev] * dfprev
+                dphi[inext] += fcur * dphi[icur]
+                dphi[inext] += fprev * dphi[iprev]
                 if ddphi is None:
                     continue
 
                 ddfprev = -c * ddfc
-                ddphi[inext] = fcur * ddphi[icur]
-                ddphi[inext] += outer(dfcur, dphi[icur])
+                ddphi[inext] = phi[iprev] * ddfprev
                 ddphi[inext] += outer(dphi[icur], dfcur)
-                ddphi[inext] += fprev * ddphi[iprev]
-                ddphi[inext] += outer(dfprev, dphi[iprev])
+                ddphi[inext] += outer(dfcur, dphi[icur])
                 ddphi[inext] += outer(dphi[iprev], dfprev)
-                ddphi[inext] += phi[iprev] * ddfprev
+                ddphi[inext] += outer(dfprev, dphi[iprev])
+                ddphi[inext] += fcur * ddphi[icur]
+                ddphi[inext] += fprev * ddphi[iprev]
 
         # normalize
         d = codim + 1
@@ -243,7 +243,7 @@ def C0_basis(dim, n, tabulations):
 def xi_triangle(eta):
     """Maps from [-1,1]^2 to the (-1,1) reference triangle."""
     eta1, eta2 = eta
-    xi1 = -0.5 * (eta1 + 1.0) * (eta2 - 1.0) - 1.0
+    xi1 = 0.5 * (1.0 + eta1) * (1.0 - eta2) - 1.0
     xi2 = eta2
     return (xi1, xi2)
 
@@ -251,9 +251,9 @@ def xi_triangle(eta):
 def xi_tetrahedron(eta):
     """Maps from [-1,1]^3 to the -1/1 reference tetrahedron."""
     eta1, eta2, eta3 = eta
+    xi1 = 0.25 * (1. + eta1) * (1. - eta2) * (1. - eta3) - 1.
+    xi2 = 0.5 * (1. + eta2) * (1. - eta3) - 1.
     xi3 = eta3
-    xi2 = -0.5 * (eta2 + 1.0) * (eta3 - 1.0) - 1.0
-    xi1 = 0.25 * (eta1 + 1.0) * (eta2 - 1.0) * (eta3 - 1.0) - 1.0
     return xi1, xi2, xi3
 
 
