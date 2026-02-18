@@ -50,7 +50,7 @@ def WuXuH3NCSpace(ref_el, robust=False):
     dimpk = polydim(ref_el, embedded_degree)
 
     # Here's the first bit we'll work with.  It's already expressed in terms
-    # of the ON basis for P7, so we're golden.
+    # of the ON basis for Pk, so we're golden.
     p3frompk = pk.take(list(range(dimp3)))
 
     # Rather than creating the barycentric coordinates ourself, let's
