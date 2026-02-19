@@ -615,9 +615,12 @@ class SimplicialComplex(Cell):
 
     def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
         """Returns the barycentric coordinates of a list of points on the complex."""
-        if len(points) == 0:
+        # if len(points) == 0:
+        #     return points
+        # breakpoint()
+        if isinstance(points, (list, tuple, numpy.ndarray)) and len(points) == 0:
             return points
-
+        
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
         entity_dim, entity_id = entity
@@ -642,7 +645,8 @@ class SimplicialComplex(Cell):
             b *= h
             A *= h[:, None]
         out = numpy.dot(points, A.T)
-        return numpy.add(out, b, out=out)
+        # out = points @ A.T
+        return numpy.add(out, b)
 
     def compute_bubble(self, points, entity=None):
         """Returns the lowest-order bubble on an entity evaluated at the given
@@ -1441,12 +1445,12 @@ class TensorProductCell(Cell):
         The i-th entry has shape (npoints, nfacets_axis_i) and contains the barycentric coordinates 
         associated with the tensor-product facets normal to axis i.
         """
-        if len(points) == 0:
+        if isinstance(points, (list, tuple, numpy.ndarray)) and len(points) == 0:
             return points
         
         points = numpy.asarray(points)
-        if points.ndim == 1:
-            points = points[None, :]
+        # if points.ndim == 1:
+        #     points = points[None, :]
         
         flat_factors = self.simplex_cells 
         axis_dims = [c.get_spatial_dimension() for c in flat_factors]
@@ -1591,7 +1595,7 @@ class Hypercube(Cell):
         tp_bary_coords = numpy.hstack(tp_bary_coords) # flatten barycentric coords.
 
         # Reorder the barycentric coords. in facet order
-        bary_coords = tp_bary_coords[:, self.facet_perm]
+        bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
 
         return bary_coords
 
