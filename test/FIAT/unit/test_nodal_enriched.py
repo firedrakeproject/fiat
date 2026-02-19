@@ -22,9 +22,9 @@ def test_nodal_enriched_mismatching_expansion_set():
 
     # Test nodality
     coeffs = fe.poly_set.get_coeffs()
-    e = numpy.tensordot(GN.dual.to_riesz(fe.poly_set),
+    V = numpy.tensordot(GN.dual.to_riesz(fe.poly_set),
                         coeffs, axes=(range(1, coeffs.ndim),)*2)
-    assert numpy.allclose(e, numpy.eye(*e.shape))
+    assert numpy.allclose(V, numpy.eye(*V.shape))
 
     # Test that the spaces are equal
     degree = GN.degree()
