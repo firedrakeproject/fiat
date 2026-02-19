@@ -5,23 +5,28 @@ from FIAT import (NodalEnrichedElement, RestrictedElement,
 
 
 def test_nodal_enriched_mismatching_expansion_set():
-    # Add two elements with mismatching expansion sets
     sd = 2
     ref_el = ufc_simplex(sd)
 
+    # Extract (non-macro) vector P1 from BR
     BR = BernardiRaugel(ref_el, 1, hierarchical=True)
     P1 = RestrictedElement(BR, restriction_domain="vertex", take_closure=False)
 
+    # Extract the macro face bubbles from GN
     GN = GuzmanNeilanFirstKindH1(ref_el, 1)
-    GNB = RestrictedElement(GN, restriction_domain="facet", take_closure=False)
+    MFB = RestrictedElement(GN, restriction_domain="facet", take_closure=False)
 
-    fe = NodalEnrichedElement(P1, GNB)
+    # Add two elements with mismatching expansion sets
+    # The resulting element should be identical to GN
+    fe = NodalEnrichedElement(P1, MFB)
+
+    # Test nodality
     coeffs = fe.poly_set.get_coeffs()
     e = numpy.tensordot(GN.dual.to_riesz(fe.poly_set),
                         coeffs, axes=(range(1, coeffs.ndim),)*2)
-    e[abs(e) < 1E-12] = 0
-    print(e)
+    assert numpy.allclose(e, numpy.eye(*e.shape))
 
+    # Test that the spaces are equal
     degree = GN.degree()
     ref_complex = GN.get_reference_complex()
     top = ref_complex.topology
@@ -32,9 +37,4 @@ def test_nodal_enriched_mismatching_expansion_set():
 
     result = fe.tabulate(0, pts)[(0,)*sd]
     expected = GN.tabulate(0, pts)[(0,)*sd]
-
-    result -= expected
-    expected = 0
-    result[abs(result) < 1E-12] = 0
-    result = result.reshape((result.shape[0], -1))
     assert numpy.allclose(result, expected)
