@@ -9,7 +9,7 @@ def test_nodal_enriched_mismatching_expansion_set():
     sd = 2
     ref_el = ufc_simplex(sd)
 
-    BR = BernardiRaugel(ref_el, 1)
+    BR = BernardiRaugel(ref_el, 1, hierarchical=True)
     P1 = RestrictedElement(BR, restriction_domain="vertex", take_closure=False)
 
     GN = GuzmanNeilanFirstKindH1(ref_el, 1)
