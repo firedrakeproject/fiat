@@ -86,19 +86,19 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
         scale = -scale
 
     num_members = math.comb(n + dim, dim)
-    results = tuple([None] * num_members for i in range(order+1))
-    phi, dphi, ddphi = results + (None,) * (2-order)
 
     outer = lambda x, y: x[:, None, ...] * y[None, ...]
     sym_outer = lambda x, y: outer(x, y) + outer(y, x)
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
-    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
-    if dphi is not None:
-        dphi[0] = (phi[0] - phi[0]) * dX[0]
-    if ddphi is not None:
-        ddphi[0] = outer(dphi[0], dX[0])
+
+    phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
+    results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
+               for k in range(order+1)]
+
+    phi, dphi, ddphi = results + [None] * (2-order)
+    phi[0] += scale
     if dim == 0 or n == 0:
         return results
     if dim > 3 or dim < 0:
@@ -183,7 +183,7 @@ def C0_basis(dim, n, tabulations):
     # Recover facet bubbles
     for phi in tabulations:
         icur = 0
-        phi[icur] *= -1
+        phi[icur] *= -1.0
         for inext in range(1, dim+1):
             phi[icur] -= phi[inext]
         if dim == 2:
@@ -723,11 +723,15 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     :kwarg tol: the absolute tolerance.
     :returns: a list of (weighted) characteristic functions for each subcell.
     """
-    from sympy import Piecewise
+    import gem
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     # assert singleton point
     pt = pt.reshape((sd,))
+    if isinstance(pt[0], gem.Node):
+        import gem as backend
+    else:
+        import sympy as backend
 
     # The distance to the nearest cell is equal to the distance to the parent cell
     best = ref_el.get_parent().distance_to_point_l1(pt, rescale=True)
@@ -739,7 +743,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
         pt_near_cell = ref_el.distance_to_point_l1(pt, entity=(sd, cell), rescale=True) < tol
-        masks.append(Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
+        masks.append(backend.Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
         if unique:
             otherwise.append((0.0, pt_near_cell))
     # If the point is on a facet, divide the characteristic function by the facet multiplicity

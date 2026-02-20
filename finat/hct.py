@@ -71,7 +71,7 @@ class ReducedHsiehCloughTocher(PhysicallyMappedElement, ScalarFiatElement):
 
             # vertex points
             V[s, v0id] = 1/5 * Bnt
-            V[s, v1id] = -1 * V[s, v0id]
+            V[s, v1id] = -V[s, v0id]
 
             # vertex derivatives
             for i in range(sd):
