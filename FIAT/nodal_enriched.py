@@ -12,6 +12,7 @@ from FIAT.polynomial_set import PolynomialSet
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
 from FIAT.barycentric_interpolation import LagrangeLineExpansionSet
+from FIAT.quadrature_schemes import create_quadrature
 
 __all__ = ['NodalEnrichedElement']
 
@@ -50,6 +51,7 @@ class NodalEnrichedElement(CiarletElement):
         expansion_set = elem.get_nodal_basis().get_expansion_set()
         mapping = elem.mapping()[0]
         value_shape = elem.value_shape()
+        sd = ref_el.get_spatial_dimension()
 
         # Sanity check
         assert all(e.get_reference_complex() == ref_el for e in elements)
@@ -61,11 +63,21 @@ class NodalEnrichedElement(CiarletElement):
             # Obtain coefficients via interpolation
             points = expansion_set.get_points()
             coeffs = np.vstack([e.tabulate(0, points)[(0,)] for e in elements])
-        else:
-            assert all(e.get_nodal_basis().get_expansion_set() == expansion_set
-                       for e in elements)
+        elif all(e.get_nodal_basis().get_expansion_set() == expansion_set for e in elements):
+            # All elements have the same ExpansionSet, just merge coefficients
             coeffs = [e.get_coeffs() for e in elements]
             coeffs = _merge_coeffs(coeffs, ref_el, embedded_degrees, expansion_set.continuity)
+        else:
+            # Obtain coefficients via projection
+            Q = create_quadrature(ref_el, 2*embedded_degree)
+            qpts, qwts = Q.get_points(), Q.get_weights()
+            phis = expansion_set._tabulate(embedded_degree, qpts, 0)[(0,)*sd]
+            PhiW = phis * qwts[None, :]
+            M = np.tensordot(PhiW, phis, (-1, -1))
+            MinvPhiW = np.linalg.solve(M, PhiW)
+            coeffs = [np.tensordot(e.tabulate(0, qpts)[(0,)*sd], MinvPhiW, (-1, -1)) for e in elements]
+            coeffs = np.concatenate(coeffs, axis=0)
+
         poly_set = PolynomialSet(ref_el,
                                  degree,
                                  embedded_degree,
