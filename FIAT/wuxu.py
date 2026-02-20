@@ -50,7 +50,7 @@ def WuXuH3NCSpace(ref_el, robust=False):
     dimpk = polydim(ref_el, embedded_degree)
 
     # Here's the first bit we'll work with.  It's already expressed in terms
-    # of the ON basis for P7, so we're golden.
+    # of the ON basis for Pk, so we're golden.
     p3frompk = pk.take(list(range(dimp3)))
 
     # Rather than creating the barycentric coordinates ourself, let's
@@ -58,7 +58,7 @@ def WuXuH3NCSpace(ref_el, robust=False):
     bT = Bubble(ref_el, 3)
     p1 = Lagrange(ref_el, 1)
 
-    # next, we'll have to project b_T P1 and b_T^2 P1 onto P^7
+    # next, we'll have to project b_T P1 and b_T^2 P1 onto Pk
     Q = create_quadrature(ref_el, 2*embedded_degree)
     Qpts = numpy.array(Q.get_points())
     Qwts = numpy.array(Q.get_weights())
