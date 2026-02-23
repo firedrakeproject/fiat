@@ -116,10 +116,19 @@ class Node(NodeBase, metaclass=NodeMeta):
             raise ValueError("Both objects must have shape for matmul")
         elif self.shape[-1] != other.shape[0]:
             raise ValueError(f"Mismatching shapes {self.shape} and {other.shape} in matmul")
-        *i, k = indices(len(self.shape))
-        _, *j = indices(len(other.shape))
-        expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
-        return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
+        
+        if self.shape[-1] == 1:
+            # Avoid generation of contraction loops over singleton dimensions (extent-1 indices)
+            # self: (*i, 1), other (1, *j) => result: (*i, *j)
+            i = indices(len(self.shape) - 1)
+            j = indices(len(other.shape) - 1)
+            expr = Product(Indexed(self, (*i, 0)), Indexed(other, (0, *j)))
+            return ComponentTensor(expr, (*i, *j))
+        else: 
+            *i, k = indices(len(self.shape))
+            _, *j = indices(len(other.shape))
+            expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
+            return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
 
     def __rmatmul__(self, other):
         return as_gem(other).__matmul__(self)
@@ -1324,7 +1333,7 @@ def as_gem(expr):
     """
     if isinstance(expr, Node):
         return expr
-    elif isinstance(expr, Number):
+    elif isinstance(expr, Number) or isinstance(expr, numpy.ndarray):
         return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
