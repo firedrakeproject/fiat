@@ -617,7 +617,7 @@ class SimplicialComplex(Cell):
         """Returns the barycentric coordinates of a list of points on the complex."""
         # if len(points) == 0:
         #     return points
-        # breakpoint()
+
         if isinstance(points, (list, tuple, numpy.ndarray)) and len(points) == 0:
             return points
         
@@ -644,9 +644,11 @@ class SimplicialComplex(Cell):
             h = 1 / numpy.linalg.norm(A, axis=1)
             b *= h
             A *= h[:, None]
-        out = numpy.dot(points, A.T)
-        # out = points @ A.T
-        return numpy.add(out, b)
+        # out = numpy.dot(points, A.T)
+        out = points @ A.T
+
+        # return numpy.add(out, b)
+        return out + b
 
     def compute_bubble(self, points, entity=None):
         """Returns the lowest-order bubble on an entity evaluated at the given
@@ -1413,7 +1415,7 @@ class TensorProductCell(Cell):
     
     @property
     def simplex_cells(self):
-        """Return a cached flattened list of simplex axis factors.
+        """Return flattened list of simplex axis factors.
         
         Example:
         interval_x_interval -> (UFCInterval(), UFCInterval())
@@ -1443,23 +1445,27 @@ class TensorProductCell(Cell):
 
         Returns a list of arrays, one per simplicial axis. 
         The i-th entry has shape (npoints, nfacets_axis_i) and contains the barycentric coordinates 
-        associated with the tensor-product facets normal to axis i.
+        associated with the cell facets normal to axis i.
         """
+        import gem
+
         if isinstance(points, (list, tuple, numpy.ndarray)) and len(points) == 0:
             return points
         
-        points = numpy.asarray(points)
-        # if points.ndim == 1:
-        #     points = points[None, :]
+        # points = numpy.asarray(points)
         
-        flat_factors = self.simplex_cells 
+        # NOTE: introduced a method that recursively finds all simplex factors of the tensor-product cells
+        flat_factors = self.simplex_cells
+
         axis_dims = [c.get_spatial_dimension() for c in flat_factors]
         point_slices = TensorProductCell._split_slices(axis_dims)
         bary_coord_per_axis = []
 
         # Compute barycentric coordinates axis-by-axis
         for factor, s in zip(flat_factors, point_slices):
-            bary_axis = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
+            # symbolic or numpy slicing
+            axis_points = gem.view(points, s) if isinstance(points, gem.Node) else numpy.asarray(points)[...,s]
+            bary_axis = factor.compute_barycentric_coordinates(axis_points, entity, rescale)
             bary_coord_per_axis.append(bary_axis)
         
         return bary_coord_per_axis
@@ -1583,7 +1589,9 @@ class Hypercube(Cell):
 
     def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
         """Returns the barycentric coordinates of a list of points on the hypercube."""
-        if len(points) == 0:
+        import gem
+
+        if isinstance(points, (list, tuple, numpy.ndarray)) and len(points) == 0:
             return points
 
         if entity is not None:
@@ -1592,11 +1600,28 @@ class Hypercube(Cell):
             )
 
         tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points, entity, rescale)
-        tp_bary_coords = numpy.hstack(tp_bary_coords) # flatten barycentric coords.
 
-        # Reorder the barycentric coords. in facet order
-        bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
+        # NOTE: Previous operations (flattening + permuting) were only valid if tp_bary_coords returns a list of arrays
 
+        # # Flatten barycentric coords.
+        # tp_bary_coords = numpy.hstack(tp_bary_coords)
+        # # Reorder the barycentric coords. in facet order
+        # bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
+
+        # We now have self.facet_perm return a tuple (axis, axis_index) instead of an integer permutation
+        # in the flattened vector
+    
+        if isinstance(tp_bary_coords[0], gem.Node):
+            # breakpoint()
+            components = [
+                gem.Indexed(tp_bary_coords[axis], (bary_index,))
+                for axis, bary_index in self.facet_perm
+            ]
+            bary_coords = gem.ListTensor(components) # tensor built from scalar GEM expressions
+        else:
+            components = [tp_bary_coords[axis][..., bary_index] for axis, bary_index in self.facet_perm]
+            bary_coords = numpy.stack(components, axis=-1)
+            
         return bary_coords
 
 class UFCHypercube(Hypercube):
@@ -1917,24 +1942,26 @@ def compute_unflattening_map(topology_dict):
 
 def compute_facet_perm(unflattening_map, product):
     """
-    For a given tensor-product cell, this function returns a mapping between the cell's facets and its barycentric coords. indices.
+    For a given tensor-product cell, return a mapping between the cell's facets and the indices 
+    in the axis-structured barycentric coordinate vector.
 
     For each facet:
-        - determine which axis the facet is orthogonal to in the tensor-product representation of the cell (i.e., fixed at an endpoint)
-        - determine which endpoint on that axis the facet corresponds to
+        - determine which axis the facet is orthogonal to
+        - determine which endpoint on that axis the facet corresponds to (facet is fixed at an endpoint)
         - map the endpoint to the correct barycentric coordinate index
     """
     # First compute axis offsets into the flattened barycentric vector 
-    axis_offsets = []
-    offset = 0
-    for axis_cell in product.cells:
-        axis_offsets.append(offset)
-        offset += axis_cell.get_dimension() + 1 
+    # axis_offsets = []
+    # offset = 0
+    # for axis_cell in product.cells:
+    #     axis_offsets.append(offset)
+    #     offset += axis_cell.get_dimension() + 1 
     
     # Initialise the permutation array
     sd = len(product.cells)
     num_facets = 2 * sd
-    perm = numpy.zeros(num_facets, dtype=int)
+    # perm = numpy.zeros(num_facets, dtype=int)
+    perm = [None] * num_facets
 
     for f in range(num_facets):
         # Recover the tensor-product representation of the facet
@@ -1968,9 +1995,11 @@ def compute_facet_perm(unflattening_map, product):
         #
         # In general, FIAT's convention is: barycentric coordinate i vanishes on the
         # facet opposite vertex i.
-        bary_index = get_bary_index_from_local_facet(axis_cell, local_facet)
+        bary_index = get_bary_index_from_local_facet(product.cells[axis], local_facet)
 
-        perm[f] = axis_offsets[axis] + bary_index
+        # NOTE: this assumes that the barycentric coordinate vector is flattened
+        # perm[f] = axis_offsets[axis] + bary_index
+        perm[f] = (axis, bary_index)
 
     return perm
 
