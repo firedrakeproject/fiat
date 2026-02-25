@@ -124,6 +124,7 @@ class Node(NodeBase, metaclass=NodeMeta):
             j = indices(len(other.shape) - 1)
             expr = Product(Indexed(self, (*i, 0)), Indexed(other, (0, *j)))
             return ComponentTensor(expr, (*i, *j))
+        
         else: 
             *i, k = indices(len(self.shape))
             _, *j = indices(len(other.shape))

@@ -1464,10 +1464,13 @@ class TensorProductCell(Cell):
         # Compute barycentric coordinates axis-by-axis
         for factor, s in zip(flat_factors, point_slices):
             # symbolic or numpy slicing
+            # TODO: implement slicing in GEM
+            # implement __getitem__ in GEM
+            # does gem.view() slice on the last dimension by default? what if we want to slice on multiple dimensions?
             axis_points = gem.view(points, s) if isinstance(points, gem.Node) else numpy.asarray(points)[...,s]
             bary_axis = factor.compute_barycentric_coordinates(axis_points, entity, rescale)
             bary_coord_per_axis.append(bary_axis)
-        
+
         return bary_coord_per_axis
 
 
@@ -1605,12 +1608,14 @@ class Hypercube(Cell):
 
         # # Flatten barycentric coords.
         # tp_bary_coords = numpy.hstack(tp_bary_coords)
+
         # # Reorder the barycentric coords. in facet order
+
         # bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
 
         # We now have self.facet_perm return a tuple (axis, axis_index) instead of an integer permutation
         # in the flattened vector
-    
+        
         if isinstance(tp_bary_coords[0], gem.Node):
             # breakpoint()
             components = [
