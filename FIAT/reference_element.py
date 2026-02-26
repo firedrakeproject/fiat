@@ -1415,7 +1415,7 @@ class TensorProductCell(Cell):
     
     @property
     def simplex_cells(self):
-        """Return flattened list of simplex axis factors.
+        """Return a flattened list of simplex axis factors.
         
         Example:
         interval_x_interval -> (UFCInterval(), UFCInterval())
@@ -1597,10 +1597,22 @@ class Hypercube(Cell):
         return self.product <= other
 
     def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
-        """Returns the barycentric coordinates of a list of points on the hypercube."""
+        """Returns the barycentric coordinates of a list of points on the hypercube.
+        
+        Parameters
+        ----------
+        points: numpy.ndarray or GEM.Node
+            The reference coordinates of the points.
+
+        Returns
+        -------
+        List of numpy.ndarray or GEM.ComponentTensor
+            Returns a list of barycentric coordinates in local facet order such that for any point
+            lying on local facet `lf` of the cell, the barycentric coordinate at index `lf` vanishes.
+        """
         import gem
 
-        if isinstance(points, (list, tuple, numpy.ndarray)) and len(points) == 0:
+        if isinstance(points, numpy.ndarray) and len(points) == 0:
             return points
 
         if entity is not None:
@@ -1610,18 +1622,18 @@ class Hypercube(Cell):
 
         tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points, entity, rescale)
 
-        # NOTE: Previous operations (flattening + permuting) were only valid if tp_bary_coords returns a list of arrays
-        """
+        # Previous operations involved numpy and are only valid if tp_bary_coords returns a list of arrays
         # Flatten barycentric coords.
-        tp_bary_coords = numpy.hstack(tp_bary_coords)
+        #tp_bary_coords = numpy.hstack(tp_bary_coords)
 
         # Reorder the barycentric coords. in facet order
-        bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
-        """
+        #bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
+    
         # We now have `self.facet_perm` return a list of tuple (axis, axis_index) instead of an integer permutation
         # describing for each local facet `lf` which axis of the TP cell it corresponds to and which barycentric coordinate
         # on that axis vanishes on the said facet.
-    
+
+        # We use `self.facet_perm` to reorder the barycentric coordinates in facet order
         if isinstance(tp_bary_coords[0], gem.Node):
             # breakpoint()
             components = [
