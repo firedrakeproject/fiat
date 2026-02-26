@@ -1443,31 +1443,37 @@ class TensorProductCell(Cell):
     def compute_axis_barycentric_coordinates(self, points, entity=None, rescale=False):
         """Compute axis-structured barycentric coordinates on a tensor-product cell.
 
-        Returns a list of arrays, one per simplicial axis. 
-        The i-th entry has shape (npoints, nfacets_axis_i) and contains the barycentric coordinates 
-        associated with the cell facets normal to axis i.
-        """
-        import gem
+        Parameters
+        ----------
+        points: numpy.ndarray or GEM.Node
+            The reference coordinates of the points.
 
-        if isinstance(points, (list, tuple, numpy.ndarray)) and len(points) == 0:
+        NOTE: 
+            Should we support computing barycentric coordinates on cell entities? 
+            Should we support rescaling the barycentric coordinates?
+
+        Returns
+        -------
+        List of numpy.ndarray or GEM.ComponentTensor
+            Returns a list of barycentric coordinates computed on each simplicial axis of the tensor-product cell. 
+            The i-th array has shape (npoints, nfacets_axis_i) and contains the barycentric coordinates 
+            associated with the cell facets normal to axis i.
+        """
+        if isinstance(points, numpy.ndarray) and len(points) == 0:
             return points
         
-        # points = numpy.asarray(points)
-        
-        # NOTE: introduced a method that recursively finds all simplex factors of the tensor-product cells
+        # Find all simplex factors of the tensor-product cells
         flat_factors = self.simplex_cells
 
         axis_dims = [c.get_spatial_dimension() for c in flat_factors]
         point_slices = TensorProductCell._split_slices(axis_dims)
         bary_coord_per_axis = []
 
-        # Compute barycentric coordinates axis-by-axis
+        # Compute barycentric coordinates on each axis
         for factor, s in zip(flat_factors, point_slices):
             # symbolic or numpy slicing
-            # TODO: implement slicing in GEM
-            # implement __getitem__ in GEM
-            # does gem.view() slice on the last dimension by default? what if we want to slice on multiple dimensions?
-            axis_points = gem.view(points, s) if isinstance(points, gem.Node) else numpy.asarray(points)[...,s]
+            # axis_points = gem.view(points, s) if isinstance(points, gem.Node) else numpy.asarray(points)[...,s]
+            axis_points = points[..., s]
             bary_axis = factor.compute_barycentric_coordinates(axis_points, entity, rescale)
             bary_coord_per_axis.append(bary_axis)
 
@@ -1599,30 +1605,30 @@ class Hypercube(Cell):
 
         if entity is not None:
             raise NotImplementedError(
-                "Sub-entity barycentric coordinates are not supported on tensor-product elements."
+                "Sub-entity barycentric coordinates are not supported on hypercubes."
             )
 
         tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points, entity, rescale)
 
         # NOTE: Previous operations (flattening + permuting) were only valid if tp_bary_coords returns a list of arrays
+        """
+        # Flatten barycentric coords.
+        tp_bary_coords = numpy.hstack(tp_bary_coords)
 
-        # # Flatten barycentric coords.
-        # tp_bary_coords = numpy.hstack(tp_bary_coords)
-
-        # # Reorder the barycentric coords. in facet order
-
-        # bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
-
-        # We now have self.facet_perm return a tuple (axis, axis_index) instead of an integer permutation
-        # in the flattened vector
-        
+        # Reorder the barycentric coords. in facet order
+        bary_coords = numpy.take(tp_bary_coords, self.facet_perm, axis=-1)
+        """
+        # We now have `self.facet_perm` return a list of tuple (axis, axis_index) instead of an integer permutation
+        # describing for each local facet `lf` which axis of the TP cell it corresponds to and which barycentric coordinate
+        # on that axis vanishes on the said facet.
+    
         if isinstance(tp_bary_coords[0], gem.Node):
             # breakpoint()
             components = [
                 gem.Indexed(tp_bary_coords[axis], (bary_index,))
                 for axis, bary_index in self.facet_perm
             ]
-            bary_coords = gem.ListTensor(components) # tensor built from scalar GEM expressions
+            bary_coords = gem.ListTensor(components)
         else:
             components = [tp_bary_coords[axis][..., bary_index] for axis, bary_index in self.facet_perm]
             bary_coords = numpy.stack(components, axis=-1)
@@ -1947,7 +1953,7 @@ def compute_unflattening_map(topology_dict):
 
 def compute_facet_perm(unflattening_map, product):
     """
-    For a given tensor-product cell, return a mapping between the cell's facets and the indices 
+    For a given hypercube, return a mapping between the cell's facets and the indices 
     in the axis-structured barycentric coordinate vector.
 
     For each facet:
@@ -2017,7 +2023,7 @@ def max_complex(complexes):
         raise ValueError("Cannot find the maximal complex")
 
 def get_bary_index_from_local_facet(simplicial_cell, local_facet):
-    """Return the barycentric coordinate index that vanishes on a given facet. """
+    """Return the barycentric coordinate index that vanishes on a given facet of a simplicial cell. """
 
     all_vertices = set(simplicial_cell.get_topology()[0].keys())
     facet_dim = simplicial_cell.get_dimension() - 1

@@ -80,13 +80,49 @@ class Node(NodeBase, metaclass=NodeMeta):
         if result:
             self.children = other.children
         return result
+    
+    def __getitem__(self, key):
+        """
+        Generalised indexing interface.
 
-    def __getitem__(self, indices):
-        try:
-            indices = tuple(indices)
-        except TypeError:
-            indices = (indices, )
-        return Indexed(self, indices)
+        Parameters
+        ----------
+        key: int, Index, VariableIndex, slice, Ellipsis or tuple
+        """
+        # Normalize to tuple so we can inspect the key
+        if not isinstance(key, tuple):
+            key = (key,)
+
+        # Expand ellipsis -> fill remaining dimensions with slice(None)
+        if Ellipsis in key:
+            if key.count(Ellipsis) > 1:
+                raise NotImplementedError("Multiple ellipses are not supported when indexing a gem.Node tensor")
+            ellipsis_pos = key.index(Ellipsis)
+            num_missing = len(self.shape) - (len(key) - 1)
+            if num_missing < 0:
+                raise IndexError("Too many indices provided when indexing the gem.Node tensor")
+            key = (
+                key[:ellipsis_pos]
+                + (slice(None), ) * num_missing
+                + key[ellipsis_pos + 1:]
+            )
+        # Slice indexing -> delegate to view()
+        if any(isinstance(k, slice) for k in key):
+            # view expects one slice for each axis/dim of the tensor
+            if len(key) != len(self.shape):
+                raise IndexError("Slice indexing expects the number of slices to match the gem.Node tensor rank")
+            return view(self, *key)
+        # Point indexing -> delegate to Index
+        else:
+            return Indexed(self, key)
+
+    # OLD       
+    # def __getitem__(self, indices):
+    #     try:
+    #         indices = tuple(indices)
+    #     except TypeError:
+    #         indices = (indices, )
+    #     return Indexed(self, indices)
 
     def __add__(self, other):
         return componentwise(Sum, self, as_gem(other))
@@ -119,11 +155,10 @@ class Node(NodeBase, metaclass=NodeMeta):
         
         if self.shape[-1] == 1:
             # Avoid generation of contraction loops over singleton dimensions (extent-1 indices)
-            # self: (*i, 1), other (1, *j) => result: (*i, *j)
-            i = indices(len(self.shape) - 1)
-            j = indices(len(other.shape) - 1)
-            expr = Product(Indexed(self, (*i, 0)), Indexed(other, (0, *j)))
-            return ComponentTensor(expr, (*i, *j))
+            i = indices(len(self.shape) - 1) # non-contracted axes of self
+            j = indices(len(other.shape) - 1) # non-contracted axes of other
+            expr = Product(Indexed(self, (*i, 0)), Indexed(other, (0, *j))) # scalar expr with free indices i and j
+            return ComponentTensor(expr, (*i, *j)) 
         
         else: 
             *i, k = indices(len(self.shape))
