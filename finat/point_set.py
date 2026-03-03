@@ -76,7 +76,7 @@ class PointSingleton(AbstractPointSet):
 
     @cached_property
     def expression(self):
-        return gem.Literal(self.point)
+        return gem.as_gem(self.point)
 
 
 class UnknownPointsArray():

@@ -178,10 +178,10 @@ def filtered_replace_indices(node, self, subst):
     return replace_indices(node, self, filtered_subst)
 
 
-def remove_componenttensors(expressions):
+def remove_componenttensors(expressions, subst=()):
     """Removes all ComponentTensors in multi-root expression DAG."""
     mapper = MemoizerArg(filtered_replace_indices)
-    return [mapper(expression, ()) for expression in expressions]
+    return [mapper(expression, subst) for expression in expressions]
 
 
 @singledispatch

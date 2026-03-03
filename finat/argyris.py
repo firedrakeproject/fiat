@@ -124,7 +124,7 @@ def _edge_transform(V, vorder, eorder, fiat_cell, coordinate_mapping, avg=False)
             V[s, v1id] = P1 * Bnt
             V[s, v0id] = P0 * Bnt
             if k > 0:
-                V[s, s + eorder] = -1 * Bnt
+                V[s, s + eorder] = -Bnt
 
 
 class Argyris(PhysicallyMappedElement, ScalarFiatElement):
@@ -167,7 +167,7 @@ class Argyris(PhysicallyMappedElement, ScalarFiatElement):
 
                 # vertex points
                 V[s, v1id] = 15/8 * Bnt
-                V[s, v0id] = -1 * V[s, v1id]
+                V[s, v0id] = -V[s, v1id]
 
                 # vertex derivatives
                 for i in range(sd):
@@ -178,7 +178,7 @@ class Argyris(PhysicallyMappedElement, ScalarFiatElement):
                 tau = [Jt[0]*Jt[0], 2*Jt[0]*Jt[1], Jt[1]*Jt[1]]
                 for i in range(len(tau)):
                     V[s, v1id+3+i] = 1/32 * Bnt * tau[i]
-                    V[s, v0id+3+i] = -1 * V[s, v1id+3+i]
+                    V[s, v0id+3+i] = -V[s, v1id+3+i]
 
         # Patch up conditioning
         h = coordinate_mapping.cell_size()
