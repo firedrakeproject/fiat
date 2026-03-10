@@ -6,18 +6,16 @@
 #
 # Modified by David A. Ham (david.ham@imperial.ac.uk), 2019
 
+from itertools import chain
 import numbers
 import sympy
 from sympy import symbols, legendre, Array, diff, lambdify
 import numpy as np
 from FIAT.finite_element import FiniteElement
 from FIAT.lagrange import Lagrange
-from FIAT.dual_set import make_entity_closure_ids
+from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import mis
-from FIAT.reference_element import (compute_unflattening_map,
-                                    flatten_reference_cube)
-from FIAT.reference_element import make_lattice
-
+from FIAT.reference_element import flatten_reference_cube, make_lattice
 from FIAT.pointwise_dual import compute_pointwise_dual
 
 x, y, z = symbols('x y z')
@@ -29,7 +27,7 @@ def tr(n):
     if n <= 1:
         return 0
     else:
-        return int((n-3)*(n-2)/2)
+        return ((n-3)*(n-2))//2
 
 
 def _replace_numbers_with_symbols(polynomials):
@@ -81,14 +79,8 @@ class Serendipity(FiniteElement):
             dz = None
             z_mid = None
 
-        VL = v_lambda_0(dim, dx, dy, dz)
-        EL = []
-        FL = []
-        IL = []
-        s_list = []
         entity_ids = {}
         cur = 0
-
         for top_dim, entities in flat_topology.items():
             entity_ids[top_dim] = {}
             for entity in entities:
@@ -98,69 +90,46 @@ class Serendipity(FiniteElement):
             entity_ids[0][j] = [cur]
             cur = cur + 1
 
-        EL += e_lambda_0(degree, dim, dx, dy, dz, x_mid, y_mid, z_mid)
-
         for j in sorted(flat_topology[1]):
             entity_ids[1][j] = list(range(cur, cur + degree - 1))
             cur = cur + degree - 1
-
-        FL += f_lambda_0(degree, dim, dx, dy, dz, x_mid, y_mid, z_mid)
 
         for j in sorted(flat_topology[2]):
             entity_ids[2][j] = list(range(cur, cur + tr(degree)))
             cur = cur + tr(degree)
 
         if dim == 3:
-            IL += i_lambda_0(degree, dx, dy, dz, x_mid, y_mid, z_mid)
-
+            IL = i_lambda_0(degree, dx, dy, dz, x_mid, y_mid, z_mid)
             entity_ids[3] = {}
             entity_ids[3][0] = list(range(cur, cur + len(IL)))
             cur = cur + len(IL)
+        else:
+            IL = []
 
-        s_list = VL + EL + FL + IL
+        VL = v_lambda_0(dim, dx, dy, dz)
+        EL = e_lambda_0(degree, dim, dx, dy, dz, x_mid, y_mid, z_mid)
+        FL = f_lambda_0(degree, dim, dx, dy, dz, x_mid, y_mid, z_mid)
+        s_list = list(chain(VL, EL, FL, IL))
         assert len(s_list) == cur
         formdegree = 0
-
-        super().__init__(ref_el=ref_el, dual=None, order=degree, formdegree=formdegree)
 
         self.basis = {(0,)*dim: Array(s_list)}
         polynomials, extra_vars = _replace_numbers_with_symbols(Array(s_list))
         self.basis_callable = {(0,)*dim: [lambdify(variables[:dim], polynomials,
                                                    modules="numpy", dummify=True),
                                           extra_vars]}
-        topology = ref_el.get_topology()
-        unflattening_map = compute_unflattening_map(topology)
-        unflattened_entity_ids = {}
-        unflattened_entity_closure_ids = {}
 
-        entity_closure_ids = make_entity_closure_ids(flat_el, entity_ids)
-
-        for dim, entities in sorted(topology.items()):
-            unflattened_entity_ids[dim] = {}
-            unflattened_entity_closure_ids[dim] = {}
-        for dim, entities in sorted(flat_topology.items()):
-            for entity in entities:
-                unflat_dim, unflat_entity = unflattening_map[(dim, entity)]
-                unflattened_entity_ids[unflat_dim][unflat_entity] = entity_ids[dim][entity]
-                unflattened_entity_closure_ids[unflat_dim][unflat_entity] = entity_closure_ids[dim][entity]
-        self.entity_ids = unflattened_entity_ids
-        self.entity_closure_ids = unflattened_entity_closure_ids
-        self._degree = degree
         self.flat_el = flat_el
-
+        nodes = [None] * cur
+        dual = DualSet(nodes, ref_el, entity_ids)
+        super().__init__(ref_el=ref_el, dual=dual, order=degree, formdegree=formdegree)
         self.dual = compute_pointwise_dual(self, unisolvent_pts(ref_el, degree))
 
     def degree(self):
-        return self._degree + 1
-
-    def get_nodal_basis(self):
-        raise NotImplementedError("get_nodal_basis not implemented for serendipity")
-
-    def get_dual_set(self):
-        raise NotImplementedError("get_dual_set is not implemented for serendipity")
+        return self.order + 1
 
     def get_coeffs(self):
-        raise NotImplementedError("get_coeffs not implemented for serendipity")
+        raise NotImplementedError(f"get_coeffs not implemented for {type(self).__name__}")
 
     def tabulate(self, order, points, entity=None):
 
@@ -172,7 +141,7 @@ class Serendipity(FiniteElement):
         points = transform(points)
 
         phivals = {}
-        dim = self.flat_el.get_spatial_dimension()
+        dim = self.ref_el.get_spatial_dimension()
         if dim <= 1:
             raise NotImplementedError('no tabulate method for serendipity elements of dimension 1 or less.')
         if dim >= 4:
@@ -204,27 +173,8 @@ class Serendipity(FiniteElement):
                 phivals[alpha] = callable(*([points[:, i] for i in range(pointdim)] + extra_arrays))
         return phivals
 
-    def entity_dofs(self):
-        """Return the map of topological entities to degrees of
-        freedom for the finite element."""
-        return self.entity_ids
-
-    def entity_closure_dofs(self):
-        """Return the map of topological entities to degrees of
-        freedom on the closure of those entities for the finite element."""
-        return self.entity_closure_ids
-
     def value_shape(self):
         return ()
-
-    def dmats(self):
-        raise NotImplementedError
-
-    def get_num_members(self, arg):
-        raise NotImplementedError
-
-    def space_dimension(self):
-        return len(self.basis[(0,)*self.flat_el.get_spatial_dimension()])
 
 
 def v_lambda_0(dim, dx, dy, dz):

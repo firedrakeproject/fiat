@@ -3,9 +3,10 @@ import FIAT
 import numpy
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
-from finat.piola_mapped import adjugate, normal_tangential_edge_transform, normal_tangential_face_transform
+from finat.physically_mapped import adjugate, identity, PhysicallyMappedElement
+from finat.piola_mapped import normal_tangential_transform
 
 
 def _facet_transform(fiat_cell, facet_moment_degree, coordinate_mapping):
@@ -21,16 +22,15 @@ def _facet_transform(fiat_cell, facet_moment_degree, coordinate_mapping):
     bary, = fiat_cell.make_points(sd, 0, sd+1)
     J = coordinate_mapping.jacobian_at(bary)
     detJ = coordinate_mapping.detJ_at(bary)
-    if sd == 2:
-        transform = normal_tangential_edge_transform
-    elif sd == 3:
-        transform = normal_tangential_face_transform
-
     for f in range(num_facets):
-        rows = transform(fiat_cell, J, detJ, f)
+        Bnt, Btt = normal_tangential_transform(fiat_cell, J, detJ, f)
         for i in range(dimPk_facet):
             s = dofs_per_facet*f + i * sd
-            V[s+1:s+sd, s:s+sd] = rows
+            ndof = s
+            tdofs = range(s+1, s+sd)
+            V[tdofs, ndof] = Bnt
+            V[tdofs, tdofs] = Btt
+
     return V
 
 
@@ -52,8 +52,7 @@ def _evaluation_transform(fiat_cell, coordinate_mapping):
 
 class ArnoldWintherNC(PhysicallyMappedElement, FiatElement):
     def __init__(self, cell, degree=2):
-        if Citations is not None:
-            Citations().register("Arnold2003")
+        cite("Arnold2003")
         super().__init__(FIAT.ArnoldWintherNC(cell, degree))
 
     def basis_transformation(self, coordinate_mapping):
@@ -84,8 +83,7 @@ class ArnoldWintherNC(PhysicallyMappedElement, FiatElement):
 
 class ArnoldWinther(PhysicallyMappedElement, FiatElement):
     def __init__(self, cell, degree=3):
-        if Citations is not None:
-            Citations().register("Arnold2002")
+        cite("Arnold2002")
         super().__init__(FIAT.ArnoldWinther(cell, degree))
 
     def basis_transformation(self, coordinate_mapping):

@@ -27,7 +27,7 @@ class TensorProductElement(FiniteElementBase):
     :math:`\{ \phi_{j_1} \otimes \phi_{j_2} \otimes \cdots \otimes \phi_{j_d}
     \}` forms a basis for :math:`V`.
     """
-    __slots__ = ("_sub_elements", "_cell")
+    __slots__ = ("_factor_elements", "_cell")
 
     def __init__(self, *elements, **kwargs):
         """Create TensorProductElement from a given list of elements."""
@@ -60,18 +60,18 @@ class TensorProductElement(FiniteElementBase):
 
         FiniteElementBase.__init__(self, family, cell, degree,
                                    quad_scheme, reference_value_shape)
-        self._sub_elements = elements
+        self._factor_elements = elements
         self._cell = cell
 
     def __repr__(self):
         """Doc."""
-        return "TensorProductElement(" + ", ".join(repr(e) for e in self._sub_elements) + f", cell={repr(self._cell)})"
+        return "TensorProductElement(" + ", ".join(repr(e) for e in self._factor_elements) + f", cell={repr(self._cell)})"
 
     def mapping(self):
         """Doc."""
-        if all(e.mapping() == "identity" for e in self._sub_elements):
+        if all(e.mapping() == "identity" for e in self._factor_elements):
             return "identity"
-        elif all(e.mapping() == "L2 Piola" for e in self._sub_elements):
+        elif all(e.mapping() == "L2 Piola" for e in self._factor_elements):
             return "L2 Piola"
         else:
             return "undefined"
@@ -79,7 +79,7 @@ class TensorProductElement(FiniteElementBase):
     @property
     def sobolev_space(self):
         """Return the underlying Sobolev space of the TensorProductElement."""
-        elements = self._sub_elements
+        elements = self._factor_elements
         if all(e.sobolev_space == elements[0].sobolev_space
                for e in elements):
             return elements[0].sobolev_space
@@ -89,30 +89,30 @@ class TensorProductElement(FiniteElementBase):
             orders = []
             for e in elements:
                 # TODO: is this the right value for e_dim
-                e_dim = e.cell.topological_dimension()
+                e_dim = e.cell.topological_dimension
                 e_order = (e.sobolev_space._order,) * e_dim
                 orders.extend(e_order)
             return DirectionalSobolevSpace(orders)
 
     @property
-    def num_sub_elements(self):
-        """Return number of subelements."""
-        return len(self._sub_elements)
+    def num_factor_elements(self):
+        """Return number of tensor product components."""
+        return len(self._factor_elements)
 
     @property
-    def sub_elements(self):
-        """Return subelements (factors)."""
-        return self._sub_elements
+    def factor_elements(self):
+        """Return tensor product components (factors)."""
+        return self._factor_elements
 
     def reconstruct(self, **kwargs):
         """Doc."""
         cell = kwargs.pop("cell", self.cell)
-        return TensorProductElement(*[e.reconstruct(**kwargs) for e in self.sub_elements], cell=cell)
+        return TensorProductElement(*[e.reconstruct(**kwargs) for e in self.factor_elements], cell=cell)
 
     def variant(self):
         """Doc."""
         try:
-            variant, = {e.variant() for e in self.sub_elements}
+            variant, = {e.variant() for e in self.factor_elements}
             return variant
         except ValueError:
             return None
@@ -120,12 +120,12 @@ class TensorProductElement(FiniteElementBase):
     def __str__(self):
         """Pretty-print."""
         return "TensorProductElement(%s, cell=%s)" \
-            % (', '.join([str(e) for e in self._sub_elements]), str(self._cell))
+            % (', '.join([str(e) for e in self._factor_elements]), str(self._cell))
 
     def shortstr(self):
         """Short pretty-print."""
         return "TensorProductElement(%s, cell=%s)" \
-            % (', '.join([e.shortstr() for e in self._sub_elements]), str(self._cell))
+            % (', '.join([e.shortstr() for e in self._factor_elements]), str(self._cell))
 
     @property
     def embedded_superdegree(self):

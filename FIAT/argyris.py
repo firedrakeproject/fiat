@@ -5,18 +5,16 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import finite_element, polynomial_set, dual_set
-from FIAT.check_format_variant import check_format_variant
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.functional import (PointEvaluation, PointDerivative, PointNormalDerivative,
-                             IntegralMoment,
-                             IntegralMomentOfNormalDerivative)
+                             IntegralMoment, IntegralMomentOfDerivative)
 from FIAT.jacobi import eval_jacobi_batch, eval_jacobi_deriv_batch
 from FIAT.quadrature import FacetQuadratureRule
-from FIAT.quadrature_schemes import create_quadrature
 from FIAT.reference_element import TRIANGLE, ufc_simplex
 
 
 class ArgyrisDualSet(dual_set.DualSet):
-    def __init__(self, ref_el, degree, variant, interpolant_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg, quad_scheme):
         if ref_el.get_shape() != TRIANGLE:
             raise ValueError("Argyris only defined on triangles")
 
@@ -38,28 +36,31 @@ class ArgyrisDualSet(dual_set.DualSet):
             # edge dofs
             k = degree - 5
             rline = ufc_simplex(1)
-            Q = create_quadrature(rline, interpolant_deg+k-1)
-            x = 2.0 * Q.get_points() - 1.0
-            phis = eval_jacobi_batch(2, 2, k, x)
-            dphis = eval_jacobi_deriv_batch(2, 2, k, x)
+            Q_ref = parse_quadrature_scheme(rline, interpolant_deg+k-1, quad_scheme)
+            x = rline.compute_barycentric_coordinates(Q_ref.get_points())
+            xref = x[:, [1]] - x[:, [0]]
+            phis = eval_jacobi_batch(2, 2, k, xref)
+            dphis = 2*eval_jacobi_deriv_batch(2, 2, k, xref)
             for e in sorted(top[1]):
-                Q_mapped = FacetQuadratureRule(ref_el, 1, e, Q)
-                scale = 2 / Q_mapped.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, 1, e, Q_ref, avg=True)
+                n = ref_el.compute_normal(e)
                 cur = len(nodes)
-                nodes.extend(IntegralMomentOfNormalDerivative(ref_el, e, Q, phi) for phi in phis)
-                nodes.extend(IntegralMoment(ref_el, Q_mapped, dphi * scale) for dphi in dphis[1:])
+                nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, n) for phi in phis)
+                nodes.extend(IntegralMoment(ref_el, Q, dphi) for dphi in dphis[1:])
                 entity_ids[1][e].extend(range(cur, len(nodes)))
 
             # interior dofs
             q = degree - 6
             if q >= 0:
-                Q = create_quadrature(ref_el, interpolant_deg + q)
-                Pq = polynomial_set.ONPolynomialSet(ref_el, q, scale=1)
-                phis = Pq.tabulate(Q.get_points())[(0,) * sd]
-                scale = ref_el.volume()
-                cur = len(nodes)
-                nodes.extend(IntegralMoment(ref_el, Q, phi/scale) for phi in phis)
-                entity_ids[sd][0] = list(range(cur, len(nodes)))
+                cell = ref_el.construct_subelement(sd)
+                Q_ref = parse_quadrature_scheme(cell, interpolant_deg + q, quad_scheme)
+                Pq = polynomial_set.ONPolynomialSet(cell, q, scale=1)
+                phis = Pq.tabulate(Q_ref.get_points())[(0,) * sd]
+                for entity in sorted(top[sd]):
+                    Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref, avg=True)
+                    cur = len(nodes)
+                    nodes.extend(IntegralMoment(ref_el, Q, phi) for phi in phis)
+                    entity_ids[sd][entity] = list(range(cur, len(nodes)))
 
         elif variant == "point":
             # edge dofs
@@ -77,9 +78,10 @@ class ArgyrisDualSet(dual_set.DualSet):
             # interior dofs
             if degree > 5:
                 cur = len(nodes)
-                internalpts = ref_el.make_points(2, 0, degree - 3)
-                nodes.extend(PointEvaluation(ref_el, pt) for pt in internalpts)
-                entity_ids[2][0] = list(range(cur, len(nodes)))
+                for entity in sorted(top[sd]):
+                    internalpts = ref_el.make_points(sd, entity, degree - 3)
+                    nodes.extend(PointEvaluation(ref_el, pt) for pt in internalpts)
+                    entity_ids[sd][entity] = list(range(cur, len(nodes)))
         else:
             raise ValueError("Invalid variant for Argyris")
         super().__init__(nodes, ref_el, entity_ids)
@@ -101,10 +103,12 @@ class Argyris(finite_element.CiarletElement):
     degree required for unisolvence plus q.
     """
 
-    def __init__(self, ref_el, degree=5, variant=None):
+    def __init__(self, ref_el, degree=5, variant=None, quad_scheme=None):
 
-        variant, interpolant_deg = check_format_variant(variant, degree)
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            raise NotImplementedError(f"{type(self).__name__} is not implemented as a macroelement.")
 
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble")
-        dual = ArgyrisDualSet(ref_el, degree, variant, interpolant_deg)
+        dual = ArgyrisDualSet(ref_el, degree, variant, interpolant_deg, quad_scheme)
         super().__init__(poly_set, dual, degree)

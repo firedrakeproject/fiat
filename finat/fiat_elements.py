@@ -1,43 +1,10 @@
 import FIAT
 import gem
 import numpy as np
-import sympy as sp
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSet
-from finat.sympy2gem import sympy2gem
-
-try:
-    from firedrake_citations import Citations
-    Citations().add("Geevers2018new", """
-@article{Geevers2018new,
- title={New higher-order mass-lumped tetrahedral elements for wave propagation modelling},
- author={Geevers, Sjoerd and Mulder, Wim A and van der Vegt, Jaap JW},
- journal={SIAM journal on scientific computing},
- volume={40},
- number={5},
- pages={A2830--A2857},
- year={2018},
- publisher={SIAM},
- doi={https://doi.org/10.1137/18M1175549},
-}
-""")
-    Citations().add("Chin1999higher", """
-@article{chin1999higher,
- title={Higher-order triangular and tetrahedral finite elements with mass lumping for solving the wave equation},
- author={Chin-Joe-Kong, MJS and Mulder, Wim A and Van Veldhuizen, M},
- journal={Journal of Engineering Mathematics},
- volume={35},
- number={4},
- pages={405--426},
- year={1999},
- publisher={Springer},
- doi={https://doi.org/10.1023/A:1004420829610},
-}
-""")
-except ImportError:
-    Citations = None
+from finat.point_set import PointSet, PointSingleton
 
 
 class FiatElement(FiniteElementBase):
@@ -98,10 +65,8 @@ class FiatElement(FiniteElementBase):
         :param ps: the point set.
         :param entity: the cell entity on which to tabulate.
         '''
-        space_dimension = self._element.space_dimension()
-        value_size = np.prod(self._element.value_shape(), dtype=int)
-        fiat_result = self._element.tabulate(order, ps.points, entity)
-        result = {}
+        fiat_element = self._element
+        fiat_result = fiat_element.tabulate(order, ps.points, entity)
         # In almost all cases, we have
         # self.space_dimension() == self._element.space_dimension()
         # But for Bell, FIAT reports 21 basis functions,
@@ -109,52 +74,53 @@ class FiatElement(FiniteElementBase):
         # basis functions, and the additional 3 are for
         # dealing with transformations between physical
         # and reference space).
-        index_shape = (self._element.space_dimension(),)
+        value_shape = self.value_shape
+        space_dimension = fiat_element.space_dimension()
+        if self.space_dimension() == space_dimension:
+            beta = self.get_indices()
+            index_shape = tuple(index.extent for index in beta)
+        else:
+            index_shape = (space_dimension,)
+            beta = tuple(gem.Index(extent=i) for i in index_shape)
+            assert len(beta) == len(self.get_indices())
+
+        zeta = self.get_value_indices()
+        basis_indices = beta + zeta
+
+        result = {}
         for alpha, fiat_table in fiat_result.items():
             if isinstance(fiat_table, Exception):
-                shape = ps.points.shape[:-1] + self.index_shape + self.value_shape
+                shape = ps.points.shape[:-1] + index_shape + value_shape
                 result[alpha] = gem.partial_indexed(gem.Failure(shape, fiat_table), ps.indices)
                 continue
 
+            point_indices = ()
+            replace_indices = ()
             derivative = sum(alpha)
-            shp = (space_dimension, value_size, *ps.points.shape[:-1])
-            table_roll = np.moveaxis(fiat_table.reshape(shp), 0, -1)
-
-            exprs = []
-            for table in table_roll:
-                if derivative == self.degree and not self.complex.is_macrocell():
-                    # Make sure numerics satisfies theory
-                    exprs.append(gem.Literal(table[0]))
-                elif derivative > self.degree:
-                    # Make sure numerics satisfies theory
-                    assert np.allclose(table, 0.0)
-                    exprs.append(gem.Literal(np.zeros(self.index_shape)))
+            if derivative == self.degree and self.complex.is_simplex():
+                # Ensure a cellwise constant tabulation
+                if fiat_table.dtype == object:
+                    replace_indices = tuple((i, 0) for i in ps.expression.free_indices)
                 else:
-                    point_indices = ps.indices
-                    point_shape = tuple(index.extent for index in point_indices)
-
-                    exprs.append(gem.partial_indexed(
-                        gem.Literal(table.reshape(point_shape + index_shape)),
-                        point_indices
-                    ))
-            if self.value_shape:
-                # As above, this extent may be different from that
-                # advertised by the finat element.
-                beta = tuple(gem.Index(extent=i) for i in index_shape)
-                assert len(beta) == len(self.get_indices())
-
-                zeta = self.get_value_indices()
-                result[alpha] = gem.ComponentTensor(
-                    gem.Indexed(
-                        gem.ListTensor(np.array(
-                            [gem.Indexed(expr, beta) for expr in exprs]
-                        ).reshape(self.value_shape)),
-                        zeta),
-                    beta + zeta
-                )
+                    fiat_table = fiat_table.reshape(*index_shape, *value_shape, -1)
+                    assert np.allclose(fiat_table, fiat_table[..., 0, None])
+                    fiat_table = fiat_table[..., 0]
+            elif derivative > self.degree:
+                # Ensure a zero tabulation
+                if fiat_table.dtype != object:
+                    assert np.allclose(fiat_table, 0.0)
+                fiat_table = np.zeros(index_shape + value_shape)
             else:
-                expr, = exprs
-                result[alpha] = expr
+                point_indices = ps.indices
+
+            point_shape = tuple(i.extent for i in point_indices)
+            fiat_table = fiat_table.reshape(index_shape + value_shape + point_shape)
+            gem_table = gem.as_gem(fiat_table)
+            expr = gem.Indexed(gem_table, basis_indices + point_indices)
+            expr = gem.ComponentTensor(expr, basis_indices)
+            if replace_indices:
+                expr, = gem.optimise.remove_componenttensors((expr,), subst=replace_indices)
+            result[alpha] = expr
         return result
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
@@ -179,7 +145,20 @@ class FiatElement(FiniteElementBase):
         esd = self.cell.construct_subelement(entity_dim).get_spatial_dimension()
         assert isinstance(refcoords, gem.Node) and refcoords.shape == (esd,)
 
-        return point_evaluation(self._element, order, refcoords, (entity_dim, entity_i))
+        # Coordinates on the reference entity (GEM)
+        Xi = tuple(gem.Indexed(refcoords, i) for i in np.ndindex(refcoords.shape))
+        ps = PointSingleton(Xi)
+        result = self.basis_evaluation(order, ps, entity=entity,
+                                       coordinate_mapping=coordinate_mapping)
+
+        # Apply symbolic simplification
+        vals = result.values()
+        vals = map(gem.optimise.ffc_rounding, vals, [1E-13]*len(vals))
+        vals = gem.optimise.constant_fold_zero(vals)
+        vals = map(gem.optimise.aggressive_unroll, vals)
+        vals = gem.optimise.remove_componenttensors(vals)
+        result = dict(zip(result.keys(), vals))
+        return result
 
     @cached_property
     def _dual_basis(self):
@@ -188,6 +167,11 @@ class FiatElement(FiniteElementBase):
         # point set over and over in case it is used multiple times
         # (in for example a tensorproductelement).
         fiat_dual_basis = self._element.dual_basis()
+
+        if len(fiat_dual_basis) > self.space_dimension():
+            # Throw away constrained degrees of freedom
+            fiat_dual_basis = fiat_dual_basis[:self.space_dimension()]
+
         seen = dict()
         allpts = []
         # Find the unique points to evaluate at.
@@ -205,6 +189,20 @@ class FiatElement(FiniteElementBase):
                 kend = kstart + len(pts)
                 seen[pts] = kstart, kend
                 allpts.extend(pts)
+        # We might still have repeated points from quadratures with points on
+        # the boundary of the integration domain.
+        unique_points = []
+        unique_indices = [None]*len(allpts)
+        atol = 1E-12
+        for i in range(len(allpts)):
+            for j in reversed(range(len(unique_points))):
+                if np.allclose(unique_points[j], allpts[i], atol=atol):
+                    unique_indices[i] = j
+                    break
+            if unique_indices[i] is None:
+                unique_indices[i] = len(unique_points)
+                unique_points.append(allpts[i])
+        allpts = unique_points
         # Build Q.
         # Q is a tensor of weights (of total rank R) to contract with a unique
         # vector of points to evaluate at, giving a tensor (of total rank R-1)
@@ -221,7 +219,7 @@ class FiatElement(FiniteElementBase):
             point_dict = dual.get_point_dict()
             pts = tuple(sorted(point_dict.keys()))
             kstart, kend = seen[pts]
-            for p, k in zip(pts, range(kstart, kend)):
+            for p, k in zip(pts, unique_indices[kstart:kend]):
                 for weight, cmp in point_dict[p]:
                     Q[(i, k, *cmp)] = weight
         if all(len(set(key)) == 1 and np.isclose(weight, 1) and len(key) == 2
@@ -273,67 +271,24 @@ class FiatElement(FiniteElementBase):
             return result
 
 
-def point_evaluation(fiat_element, order, refcoords, entity):
-    # Coordinates on the reference entity (SymPy)
-    esd, = refcoords.shape
-    Xi = sp.symbols('X Y Z')[:esd]
-
-    space_dimension = fiat_element.space_dimension()
-    value_size = np.prod(fiat_element.value_shape(), dtype=int)
-    fiat_result = fiat_element.tabulate(order, [Xi], entity)
-    result = {}
-    for alpha, fiat_table in fiat_result.items():
-        if isinstance(fiat_table, Exception):
-            result[alpha] = gem.Failure((space_dimension,) + fiat_element.value_shape(), fiat_table)
-            continue
-
-        # Convert SymPy expression to GEM
-        mapper = gem.node.Memoizer(sympy2gem)
-        mapper.bindings = {s: gem.Indexed(refcoords, (i,))
-                           for i, s in enumerate(Xi)}
-        gem_table = np.vectorize(mapper)(fiat_table)
-
-        table_roll = gem_table.reshape(space_dimension, value_size).transpose()
-
-        exprs = []
-        for table in table_roll:
-            exprs.append(gem.ListTensor(table.reshape(space_dimension)))
-        if fiat_element.value_shape():
-            beta = (gem.Index(extent=space_dimension),)
-            zeta = tuple(gem.Index(extent=d)
-                         for d in fiat_element.value_shape())
-            result[alpha] = gem.ComponentTensor(
-                gem.Indexed(
-                    gem.ListTensor(np.array(
-                        [gem.Indexed(expr, beta) for expr in exprs]
-                    ).reshape(fiat_element.value_shape())),
-                    zeta),
-                beta + zeta
-            )
-        else:
-            expr, = exprs
-            result[alpha] = expr
-    return result
-
-
 class Regge(FiatElement):  # symmetric matrix valued
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Regge(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Regge(cell, degree, **kwargs))
 
 
 class HellanHerrmannJohnson(FiatElement):  # symmetric matrix valued
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.HellanHerrmannJohnson(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.HellanHerrmannJohnson(cell, degree, **kwargs))
 
 
 class GopalakrishnanLedererSchoberlFirstKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlFirstKind(cell, degree, **kwargs))
 
 
 class GopalakrishnanLedererSchoberlSecondKind(FiatElement):  # traceless matrix valued
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.GopalakrishnanLedererSchoberlSecondKind(cell, degree, **kwargs))
 
 
 class ScalarFiatElement(FiatElement):
@@ -349,36 +304,28 @@ class Bernstein(ScalarFiatElement):
 
 
 class Bubble(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Bubble(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Bubble(cell, degree, **kwargs))
 
 
 class FacetBubble(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.FacetBubble(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.FacetBubble(cell, degree, **kwargs))
 
 
 class CrouzeixRaviart(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.CrouzeixRaviart(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.CrouzeixRaviart(cell, degree, **kwargs))
 
 
 class Lagrange(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Lagrange(cell, degree, variant=variant))
-
-
-class KongMulderVeldhuizen(ScalarFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.KongMulderVeldhuizen(cell, degree))
-        if Citations is not None:
-            Citations().register("Chin1999higher")
-            Citations().register("Geevers2018new")
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Lagrange(cell, degree, **kwargs))
 
 
 class DiscontinuousLagrange(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.DiscontinuousLagrange(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.DiscontinuousLagrange(cell, degree, **kwargs))
 
 
 class Histopolation(ScalarFiatElement):
@@ -406,8 +353,8 @@ class DiscontinuousTaylor(ScalarFiatElement):
 
 
 class HDivTrace(ScalarFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.HDivTrace(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.HDivTrace(cell, degree, **kwargs))
 
 
 class VectorFiatElement(FiatElement):
@@ -417,8 +364,8 @@ class VectorFiatElement(FiatElement):
 
 
 class RaviartThomas(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.RaviartThomas(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.RaviartThomas(cell, degree, **kwargs))
 
 
 class TrimmedSerendipityFace(VectorFiatElement):
@@ -458,8 +405,8 @@ class TrimmedSerendipityCurl(VectorFiatElement):
 
 
 class BrezziDouglasMarini(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.BrezziDouglasMarini(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.BrezziDouglasMarini(cell, degree, **kwargs))
 
 
 class BrezziDouglasMariniCubeEdge(VectorFiatElement):
@@ -481,15 +428,15 @@ class BrezziDouglasMariniCubeFace(VectorFiatElement):
 
 
 class BrezziDouglasFortinMarini(VectorFiatElement):
-    def __init__(self, cell, degree):
-        super().__init__(FIAT.BrezziDouglasFortinMarini(cell, degree))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.BrezziDouglasFortinMarini(cell, degree, **kwargs))
 
 
 class Nedelec(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.Nedelec(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.Nedelec(cell, degree, **kwargs))
 
 
 class NedelecSecondKind(VectorFiatElement):
-    def __init__(self, cell, degree, variant=None):
-        super().__init__(FIAT.NedelecSecondKind(cell, degree, variant=variant))
+    def __init__(self, cell, degree, **kwargs):
+        super().__init__(FIAT.NedelecSecondKind(cell, degree, **kwargs))

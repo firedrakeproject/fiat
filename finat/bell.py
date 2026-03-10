@@ -2,17 +2,17 @@ import FIAT
 from math import comb
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.argyris import _vertex_transform, _normal_tangential_transform
 from copy import deepcopy
 
 
 class Bell(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=5):
-        if Citations is not None:
-            Citations().register("Bell1969")
-        super().__init__(FIAT.Bell(cell))
+        cite("Bell1969")
+        super().__init__(FIAT.Bell(cell, degree=degree))
 
         reduced_dofs = deepcopy(self._element.entity_dofs())
         sd = cell.get_spatial_dimension()
@@ -44,7 +44,7 @@ class Bell(PhysicallyMappedElement, ScalarFiatElement):
 
             # vertex points
             V[s, v1id] = 1/21 * Bnt
-            V[s, v0id] = -1 * V[s, v1id]
+            V[s, v0id] = -V[s, v1id]
 
             # vertex derivatives
             for i in range(sd):
@@ -55,7 +55,7 @@ class Bell(PhysicallyMappedElement, ScalarFiatElement):
             tau = [Jt[0]*Jt[0], 2*Jt[0]*Jt[1], Jt[1]*Jt[1]]
             for i in range(len(tau)):
                 V[s, v1id+3+i] = 1/252 * Bnt * tau[i]
-                V[s, v0id+3+i] = -1 * V[s, v1id+3+i]
+                V[s, v0id+3+i] = -V[s, v1id+3+i]
 
         # Patch up conditioning
         h = coordinate_mapping.cell_size()
