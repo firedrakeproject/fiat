@@ -83,13 +83,12 @@ class Lagrange(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
         dual = LagrangeDualSet(ref_el, degree, point_variant=point_variant, sort_entities=sort_entities)
-        if ref_el.shape == LINE:
+        if ref_el.shape == LINE and len(ref_el.vertices[0]) == 1:
             # In 1D we can use the primal basis as the expansion set,
             # avoiding any round-off coming from a basis transformation
             points = get_lagrange_points(dual)
             poly_set = LagrangePolynomialSet(ref_el, points)
         else:
-            poly_variant = "bubble" if ref_el.is_macrocell() else None
-            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant=poly_variant)
+            poly_set = polynomial_set.ONPolynomialSet(ref_el, degree, variant="bubble", scale=1)
         formdegree = 0  # 0-form
         super().__init__(poly_set, dual, degree, formdegree)

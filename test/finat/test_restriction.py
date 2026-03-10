@@ -5,10 +5,18 @@ import pytest
 from finat.point_set import PointSet
 from finat.restricted import r_to_codim
 from gem.interpreter import evaluate
+from finat.physically_mapped import NeedsCoordinateMappingElement
+from .conftest import MyMapping
 
 
 def tabulate(element, ps):
-    tabulation, = element.basis_evaluation(0, ps).values()
+    coordinate_mapping = None
+    if isinstance(element, NeedsCoordinateMappingElement):
+        ref_el = element.cell
+        sd = ref_el.get_spatial_dimension()
+        phys_el = FIAT.reference_element.symmetric_simplex(sd)
+        coordinate_mapping = MyMapping(ref_el, phys_el)
+    tabulation, = element.basis_evaluation(0, ps, coordinate_mapping=coordinate_mapping).values()
     result, = evaluate([tabulation])
     # Singleton point
     shape = (int(numpy.prod(element.index_shape)), ) + element.value_shape
@@ -142,3 +150,15 @@ def test_hdiv_restriction(hdiv_element, restriction, ps):
 
 def test_hcurl_restriction(hcurl_element, restriction, ps):
     run_restriction(hcurl_element, restriction, ps)
+
+
+@pytest.fixture
+def zany_element(cell):
+    if len(cell) == 1:
+        return finat.Walkington(cell[0])
+    else:
+        pytest.skip()
+
+
+def test_zany_restriction(zany_element, restriction, ps):
+    run_restriction(zany_element, restriction, ps)

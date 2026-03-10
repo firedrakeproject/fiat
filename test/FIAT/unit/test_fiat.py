@@ -53,6 +53,7 @@ from FIAT.argyris import Argyris                                # noqa: F401
 from FIAT.hermite import CubicHermite                           # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.hct import HsiehCloughTocher                          # noqa: F401
+from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2          # noqa: F401
 from FIAT.alfeld_sorokina import AlfeldSorokina                 # noqa: F401
 from FIAT.arnold_qin import ArnoldQin                           # noqa: F401
 from FIAT.christiansen_hu import ChristiansenHu                 # noqa: F401
@@ -64,6 +65,7 @@ from FIAT.enriched import EnrichedElement                       # noqa: F401
 from FIAT.nodal_enriched import NodalEnrichedElement
 from FIAT.kong_mulder_veldhuizen import KongMulderVeldhuizen    # noqa: F401
 from FIAT.histopolation import Histopolation                    # noqa: F401
+from FIAT.wuxu import WuXuH3NC, WuXuRobustH3NC                  # noqa: F401
 
 P = Point()
 I = UFCInterval()  # noqa: E741
@@ -298,6 +300,9 @@ elements = [
     "GopalakrishnanLedererSchoberlSecondKind(S, 1)",
     "GopalakrishnanLedererSchoberlSecondKind(S, 2)",
     "BrezziDouglasFortinMarini(T, 2)",
+    "BrezziDouglasFortinMarini(T, 3)",
+    "BrezziDouglasFortinMarini(S, 2)",
+    "BrezziDouglasFortinMarini(T, 2, variant='point')",
     "GaussLegendre(I, 0)",
     "GaussLegendre(I, 1)",
     "GaussLegendre(I, 2)",
@@ -346,13 +351,18 @@ elements = [
     "Argyris(T, 5, 'point')",
     "Argyris(T, 5, 'integral')",
     "Argyris(T, 6, 'integral')",
+    "WuXuH3NC(T, 4)",
+    "WuXuRobustH3NC(T, 7)",
     "CubicHermite(I)",
     "CubicHermite(T)",
     "CubicHermite(S)",
     "Morley(T)",
+    "Morley(S)",
     "BernardiRaugel(T)",
     "BernardiRaugel(S)",
-    "MardalTaiWinther(T, 3)",
+    "MardalTaiWinther(T, 1)",
+    "MardalTaiWinther(S, 1)",
+    "MardalTaiWinther(S, 2)",
     "ArnoldWintherNC(T, 2)",
     "ArnoldWinther(T, 3)",
     "HuZhang(T, 3)",
@@ -365,6 +375,8 @@ elements = [
     "KongMulderVeldhuizen(T,4)",
     "KongMulderVeldhuizen(T,5)",
     "KongMulderVeldhuizen(T,6)",
+    "BrambleZlamalC2(T, 9)",
+    "BrambleZlamalC2(T, 10)",
 
     # Macroelements
     "Lagrange(T, 1, 'iso')",
@@ -372,6 +384,8 @@ elements = [
     "Lagrange(T, 2, 'alfeld')",
     "DiscontinuousLagrange(T, 1, 'alfeld')",
     "HsiehCloughTocher(T)",
+    "AlfeldC2(T, 5)",
+    "AlfeldC2(T, 6)",
     "JohnsonMercier(T)",
     "JohnsonMercier(S)",
     "AlfeldSorokina(T)",

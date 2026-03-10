@@ -20,8 +20,8 @@ For more information, visit http://www.fenicsproject.org
    :target: https://github.com/FEniCS/fiat/actions?query=workflow%3A%22FIAT+CI%22
    :alt: Build Status
 
-.. image:: https://coveralls.io/repos/github/FEniCS/fiat/badge.svg?branch=master
-   :target: https://coveralls.io/github/FEniCS/fiat?branch=master
+.. image:: https://coveralls.io/repos/github/FEniCS/fiat/badge.svg?branch=main
+   :target: https://coveralls.io/github/FEniCS/fiat?branch=main
    :alt: Coverage Status
 
 .. image:: https://readthedocs.org/projects/fenics-fiat/badge/?version=latest

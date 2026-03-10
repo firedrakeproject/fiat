@@ -8,7 +8,6 @@
 
 import numpy
 from FIAT import reference_element, expansions, polynomial_set
-from FIAT.functional import index_iterator
 
 
 def get_lagrange_points(nodes):
@@ -26,22 +25,24 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
     if pts.dtype == object:
-        from sympy import simplify
-        sp_simplify = numpy.vectorize(simplify)
+        # Do not use barycentric interpolation at unknown points
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        phis = [wi * numpy.prod(phi[:i], axis=0) * numpy.prod(phi[i+1:], axis=0) for i, wi in enumerate(wts)]
+        phi = numpy.asarray(phis)
     else:
-        sp_simplify = lambda x: x
-    phi = numpy.add.outer(-nodes.flatten(), pts.flatten())
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        numpy.reciprocal(phi, out=phi)
-        numpy.multiply(phi, wts[:, None], out=phi)
-        numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
-    phi[phi != phi] = 1.0
-    phi = phi.reshape(-1, *pts.shape[:-1])
+        # Use the second barycentric interpolation formula
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        with numpy.errstate(divide='ignore', invalid='ignore'):
+            numpy.reciprocal(phi, out=phi)
+            numpy.multiply(phi, wts[:, None], out=phi)
+            numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
+        # Replace nan with one
+        phi[phi != phi] = 1.0
 
-    phi = sp_simplify(phi)
+    phi = phi.reshape(-1, *pts.shape[:-1])
     results = {(0,): phi}
     for r in range(1, order+1):
-        phi = sp_simplify(numpy.dot(dmat, phi))
+        phi = numpy.dot(dmat, phi)
         results[(r,)] = phi
     return results
 
@@ -49,7 +50,7 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
 def make_dmat(x):
     """Returns Lagrange differentiation matrix and barycentric weights
     associated with x[j]."""
-    dmat = numpy.add.outer(-x.flatten(), x.flatten())
+    dmat = numpy.add.outer(-x, x)
     numpy.fill_diagonal(dmat, 1.0)
     wts = numpy.prod(dmat, axis=0)
     numpy.reciprocal(wts, out=wts)
@@ -59,38 +60,22 @@ def make_dmat(x):
 
 
 class LagrangeLineExpansionSet(expansions.LineExpansionSet):
-    """Lagrange polynomial expansion set for given points on the line."""
+    """Lagrange polynomial expansion set for given points the line."""
     def __init__(self, ref_el, pts):
-        if ref_el.get_spatial_dimension() != 1:
-            raise Exception("Must have a line")
-        pts = numpy.asarray(pts)
         self.points = pts
-
+        self.x = numpy.array(pts, dtype="d").flatten()
         self.cell_node_map = expansions.compute_cell_point_map(ref_el, pts, unique=False)
         self.dmats = [None for _ in self.cell_node_map]
         self.weights = [None for _ in self.cell_node_map]
         self.nodes = [None for _ in self.cell_node_map]
-        self.affine_mappings = {}
         for cell, ibfs in self.cell_node_map.items():
-            x = pts[ibfs]
-            if ref_el.is_trace():
-                verts = ref_el.get_vertices_of_subcomplex(ref_el.topology[1][cell])
-                A, = numpy.diff(verts, axis=0)
-                A /= numpy.linalg.norm(A)
-                b = -numpy.dot(numpy.sum(verts, axis=0)/2, A.T)
-                self.affine_mappings[cell] = (A, b)
-                x = numpy.add(numpy.dot(x, A.T), b)
-            self.nodes[cell] = x
-            self.dmats[cell], self.weights[cell] = make_dmat(x)
+            self.nodes[cell] = self.x[ibfs]
+            self.dmats[cell], self.weights[cell] = make_dmat(self.nodes[cell])
 
         self.degree = max(len(wts) for wts in self.weights)-1
         self.recurrence_order = self.degree + 1
-        self.ref_el = ref_el
-        self.variant = None
-        self.scale = 1
-        self.continuity = None if len(pts) == sum(len(xk) for xk in self.nodes) else "C0"
-        self._dmats_cache = {}
-        self._cell_node_map_cache = {}
+        super().__init__(ref_el)
+        self.continuity = None if len(self.x) == sum(len(xk) for xk in self.nodes) else "C0"
 
     def get_num_members(self, n):
         return len(self.points)
@@ -105,44 +90,33 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
         return [self.dmats[cell].T]
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
-        try:
-            A, b = self.affine_mappings[cell]
-            ref_pts = numpy.add(numpy.dot(pts.reshape(-1, A.shape[-1]), A.T), b)
-            pts = ref_pts.reshape(*pts.shape[:-1], -1)
-        except KeyError:
-            pass
         return barycentric_interpolation(self.nodes[cell], self.weights[cell], self.dmats[cell], pts, order=order)
 
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):
 
-    def __init__(self, ref_el, pts, shape=tuple()):
+    def __init__(self, ref_el, pts, shape=()):
         if ref_el.get_shape() != reference_element.LINE:
             raise ValueError("Invalid reference element type.")
 
         expansion_set = LagrangeLineExpansionSet(ref_el, pts)
         degree = expansion_set.degree
-        if shape == tuple():
-            num_components = 1
-        else:
-            flat_shape = numpy.ravel(shape)
-            num_components = numpy.prod(flat_shape)
+        num_components = numpy.prod(shape, dtype=int)
         num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
 
         # set up coefficients
-        if shape == tuple():
+        if shape == ():
             coeffs = numpy.eye(num_members, dtype="d")
         else:
             coeffs_shape = (num_members, *shape, num_exp_functions)
             coeffs = numpy.zeros(coeffs_shape, "d")
-            # use functional's index_iterator function
-            cur_bf = 0
-            for idx in index_iterator(shape):
-                for exp_bf in range(num_exp_functions):
-                    cur_idx = (cur_bf, *idx, exp_bf)
-                    coeffs[cur_idx] = 1.0
-                    cur_bf += 1
+            cur = 0
+            exp_bf = range(num_exp_functions)
+            for idx in numpy.ndindex(shape):
+                cur_bf = range(cur, cur+num_exp_functions)
+                coeffs[(cur_bf, *idx, exp_bf)] = 1.0
+                cur += num_exp_functions
 
         super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)

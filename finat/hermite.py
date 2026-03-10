@@ -1,14 +1,14 @@
 import FIAT
 from gem import ListTensor
 
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 class Hermite(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=3):
-        if Citations is not None:
-            Citations().register("Ciarlet1972")
+        cite("Ciarlet1972")
         super().__init__(FIAT.CubicHermite(cell))
 
     def basis_transformation(self, coordinate_mapping):

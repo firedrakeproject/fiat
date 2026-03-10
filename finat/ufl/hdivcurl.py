@@ -161,7 +161,7 @@ class WithMapping(FiniteElementBase):
     @property
     def reference_value_shape(self):
         """Doc."""
-        tdim = self.cell.topological_dimension()
+        tdim = self.cell.topological_dimension
         mapping = self.mapping()
         if mapping in {"covariant Piola", "contravariant Piola"}:
             return (tdim,)

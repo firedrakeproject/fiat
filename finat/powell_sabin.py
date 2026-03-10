@@ -2,14 +2,14 @@ import FIAT
 from gem import ListTensor
 
 from finat.argyris import _edge_transform
+from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import Citations, identity, PhysicallyMappedElement
+from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 class QuadraticPowellSabin6(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=2):
-        if Citations is not None:
-            Citations().register("PowellSabin1977")
+        cite("PowellSabin1977")
         super().__init__(FIAT.QuadraticPowellSabin6(cell))
 
     def basis_transformation(self, coordinate_mapping):
@@ -36,8 +36,7 @@ class QuadraticPowellSabin6(PhysicallyMappedElement, ScalarFiatElement):
 class QuadraticPowellSabin12(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=2, avg=False):
         self.avg = avg
-        if Citations is not None:
-            Citations().register("PowellSabin1977")
+        cite("PowellSabin1977")
         super().__init__(FIAT.QuadraticPowellSabin12(cell))
 
     def basis_transformation(self, coordinate_mapping):
