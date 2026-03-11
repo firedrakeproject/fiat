@@ -90,8 +90,8 @@ class FiatElement(FiniteElementBase):
         result = {}
         for alpha, fiat_table in fiat_result.items():
             if isinstance(fiat_table, Exception):
-                shape = ps.points.shape[:-1] + index_shape + value_shape
-                result[alpha] = gem.partial_indexed(gem.Failure(shape, fiat_table), ps.indices)
+                shape = index_shape + value_shape + ps.points.shape[:-1]
+                result[alpha] = gem.partial_indexed(gem.Failure(shape, fiat_table).T, ps.indices).T
                 continue
 
             point_indices = ()
