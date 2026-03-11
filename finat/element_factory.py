@@ -163,15 +163,15 @@ def convert_finiteelement(element, **kwargs):
         codim = 1 if element.family() == "Boundary Quadrature" else 0
         return finat.make_quadrature_element(cell, degree, scheme, codim), set()
 
+    make_finat_element = supported_elements[element.family()]
     if element.cell.cellname in {"quadrilateral", "hexahedron"}:
         # Reconstruct Real and Bernstein on tensor product cells
         if element.family() == "Real":
             make_finat_element = None
             element = finat.ufl.FiniteElement("DQ", element.cell, 0)
-        elif element.family() == "Bernstein":
+        elif element.family() in {"Bernstein", "HDiv Trace"}:
             make_finat_element = None
 
-    make_finat_element = supported_elements[element.family()]
     if make_finat_element is None:
         # Handle quadrilateral short names like RTCE/F and NCE/F.
         try:

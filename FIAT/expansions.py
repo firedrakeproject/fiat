@@ -640,9 +640,10 @@ def get_affine_mapping(xs, ys):
 def polynomial_dimension(ref_el, n, continuity=None):
     """Returns the dimension of the space of polynomials of degree no
     greater than n on the reference complex."""
-    if ref_el.get_spatial_dimension() == 0:
+    if ref_el.shape == reference_element.POINT:
         if n > 0:
             raise ValueError("Only degree zero polynomials supported on point elements.")
+        # Ignore continuity on a vertex-only complex
         continuity = None
     top = ref_el.get_topology()
 

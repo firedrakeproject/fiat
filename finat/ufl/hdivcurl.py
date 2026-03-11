@@ -105,7 +105,7 @@ class HDivElement(WrapperElementBase):
     __slots__ = ("_element", )
 
     def __init__(self, element):
-        reference_value_shape = (element.cell.topological_dimension(),)
+        reference_value_shape = (element.cell.topological_dimension,)
         super().__init__(element, reference_value_shape, HDiv, "contravariant Piola")
 
 
@@ -115,7 +115,7 @@ class HCurlElement(WrapperElementBase):
 
     def __init__(self, element):
         """Doc."""
-        reference_value_shape = (element.cell.topological_dimension(),)
+        reference_value_shape = (element.cell.topological_dimension,)
         super().__init__(element, reference_value_shape, HCurl, "covariant Piola")
 
 
@@ -149,7 +149,7 @@ class WithMapping(FiniteElementBase):
 
     def value_shape(self, domain):
         """Doc."""
-        gdim = domain.geometric_dimension()
+        gdim = domain.geometric_dimension
         mapping = self.mapping()
         if mapping in {"covariant Piola", "contravariant Piola"}:
             return (gdim,)

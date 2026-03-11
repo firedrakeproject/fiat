@@ -96,13 +96,13 @@ class FiniteElement(FiniteElementBase):
                                        HCurl(TensorProductElement(Qd_elt, Ic_elt, cell=cell)))
 
             elif family == "HDiv Trace":
-                cell_h, cell_v = cell.sub_cells()
+                cell_h, cell_v = cell.sub_cells
                 if not isinstance(degree, tuple):
                     degree = (degree, degree)
                 hdegree, vdegree = degree
 
-                dg_family = lambda cell: "DG" if cell.is_simplex() else "DQ"
-                is_interval = lambda cell: cell.cellname() == "interval"
+                dg_family = lambda cell: "DG" if cell.is_simplex else "DQ"
+                is_interval = lambda cell: cell.cellname == "interval"
 
                 dg_h = FiniteElement(dg_family(cell_h), cell_h, hdegree, variant=variant)
                 tr_h = FiniteElement("HDiv Trace", cell_h, 0 if is_interval(cell_h) else hdegree, variant=variant)
