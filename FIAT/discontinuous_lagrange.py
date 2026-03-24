@@ -214,6 +214,9 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
                            variant='Alfeld' can be used to obtain a barycentrically refined
                               macroelement for Scott-Vogelius.
     """
+
+    DEFAULT_DEGREE = 0
+
     def __new__(cls, ref_el, degree, variant="equispaced"):
         if degree == 0:
             splitting, _ = parse_lagrange_variant(variant, discontinuous=True)
@@ -223,6 +226,8 @@ class DiscontinuousLagrange(finite_element.CiarletElement):
         return super().__new__(cls)
 
     def __init__(self, ref_el, degree, variant="equispaced"):
+        degree = self._parse_degree(degree)
+
         splitting, point_variant = parse_lagrange_variant(variant, discontinuous=True)
         if splitting is not None:
             ref_el = splitting(ref_el)

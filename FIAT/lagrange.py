@@ -72,7 +72,11 @@ class Lagrange(finite_element.CiarletElement):
                         entity id. The DOFs are always sorted by the entity ordering
                         and then lexicographically by lattice multiindex.
     """
+    DEFAULT_DEGREE = 1
+
     def __init__(self, ref_el, degree, variant="equispaced", sort_entities=False):
+        degree = self._parse_degree(degree)
+
         splitting, point_variant = parse_lagrange_variant(variant)
         if splitting is not None:
             ref_el = splitting(ref_el)

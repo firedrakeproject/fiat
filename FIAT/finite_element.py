@@ -17,13 +17,21 @@ from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
 
 
-class FiniteElement(object):
+class FiniteElement:
     """Class implementing a basic abstraction template for general
     finite element families. Finite elements which inherit from
     this class are non-nodal unless they are CiarletElement subclasses.
     """
 
+    @property
+    def DEFAULT_DEGREE(self):
+        raise NotImplementedError(f"{type(self).__name__} does not specify a "
+                                  "default degree, please pass one explicitly "
+                                  "instead")
+
     def __init__(self, ref_el, dual, order, formdegree=None, mapping="affine", ref_complex=None):
+        order = self._parse_degree(order)
+
         # Relevant attributes that do not necessarily depend on a PolynomialSet object:
         # The order (degree) of the polynomial basis
         self.order = order
@@ -119,6 +127,9 @@ class FiniteElement(object):
 
     def is_macroelement(self):
         return self.ref_el is not self.ref_complex
+
+    def _parse_degree(self, degree):
+        return self.DEFAULT_DEGREE if degree is None else degree
 
 
 class CiarletElement(FiniteElement):
