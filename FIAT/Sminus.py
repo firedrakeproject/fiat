@@ -48,7 +48,7 @@ class TrimmedSerendipity(FiniteElement):
     DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree, mapping):
-        degree = selt._parse_degree(degree)
+        degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         self.fdim = dim
@@ -412,9 +412,8 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
         degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
-        if dim != 2:
-            if dim != 3:
-                raise Exception("Trimmed Serendipity_k edge elements only valid for dimensions 2 and 3")
+        if dim not in {2, 3}:
+            raise Exception("Trimmed Serendipity_k edge elements only valid for dimensions 2 and 3")
 
         verts = flat_el.get_vertices()
 
@@ -448,14 +447,9 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
             else:
                 IL = ()
 
-        Sminus_list = EL + FL
-        if dim == 3:
-            Sminus_list = Sminus_list + IL
+        Sminus_list = EL + FL + IL
 
-        if dim == 2:
-            self.basis = {(0, 0): Array(Sminus_list)}
-        else:
-            self.basis = {(0, 0, 0): Array(Sminus_list)}
+        self.basis = {(0,)*dim: Array(Sminus_list)}
         super().__init__(ref_el=ref_el, degree=degree, mapping="covariant piola")
 
 
@@ -484,5 +478,5 @@ class TrimmedSerendipityFace(TrimmedSerendipity):
 
         Sminus_list = EL + FL
         Sminus_list = [[-a[1], a[0]] for a in Sminus_list]
-        self.basis = {(0, 0): Array(Sminus_list)}
+        self.basis = {(0,)*dim: Array(Sminus_list)}
         super().__init__(ref_el=ref_el, degree=degree, mapping="contravariant piola")
