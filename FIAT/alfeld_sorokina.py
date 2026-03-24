@@ -76,7 +76,10 @@ class AlfeldSorokina(finite_element.CiarletElement):
 
     This element belongs to a Stokes complex, and is paired with CG1(Alfeld).
     """
+    DEFAULT_DEGREE = 2
+
     def __init__(self, ref_el, degree=2):
+        degree = self._parse_degree(degree)
         dual = AlfeldSorokinaDualSet(ref_el, degree)
         poly_set = AlfeldSorokinaSpace(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form

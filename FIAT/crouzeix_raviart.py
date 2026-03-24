@@ -76,8 +76,10 @@ class CrouzeixRaviart(finite_element.CiarletElement):
     Polynomial space:  P_k
     Dual basis:        Evaluation at points or integral moments
     """
+    DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        degree = self._parse_degree(degree)
         if degree % 2 != 1:
             raise ValueError("Crouzeix-Raviart only defined for odd degree")
 

@@ -53,10 +53,12 @@ class MorleyDualSet(dual_set.DualSet):
 
 class Morley(finite_element.CiarletElement):
     """The Morley finite element."""
+    DEFAULT_DEGREE = 2
 
     def __init__(self, ref_el, degree=2):
         if ref_el.get_shape() not in {TRIANGLE, TETRAHEDRON}:
             raise ValueError("Morley only defined on simplices of dimension >= 2")
+        degree = self._parse_degree(degree)
         if degree != 2:
             raise ValueError("{type(self).__name__} only defined for degree == 2")
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)

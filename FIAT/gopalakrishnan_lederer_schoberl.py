@@ -52,7 +52,10 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
     the weak symmetry constraint.
 
     """
+    DEFAULT_DEGREE = 0
+
     def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        degree = self._parse_degree(degree)
 
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         assert variant == "integral"
@@ -81,6 +84,8 @@ def GopalakrishnanLedererSchoberlFirstKind(ref_el, degree, variant=None, quad_sc
 
     Reference: https://doi.org/10.1093/imanum/drz022
     """
+    if degree < 1:
+        raise ValueError("GopalakrishnanLedererSchoberlFirstKind is only defined for degree >= 1.")
     fe = GopalakrishnanLedererSchoberlSecondKind(ref_el, degree, variant=variant, quad_scheme=quad_scheme)
     entity_dofs = fe.entity_dofs()
     sd = ref_el.get_spatial_dimension()

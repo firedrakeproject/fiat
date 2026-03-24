@@ -85,7 +85,10 @@ class C2DualSet(dual_set.DualSet):
 
 class BrambleZlamalC2(finite_element.CiarletElement):
     """The Bramble-Zlamal C2 element."""
+    DEFAULT_DEGREE = 9
+
     def __init__(self, ref_el, degree=9, reduced=False, quad_scheme=None):
+        degree = self._parse_degree(degree)
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = C2DualSet(ref_el, degree, reduced=reduced, quad_scheme=quad_scheme)
         super().__init__(poly_set, dual, degree, formdegree=0)
@@ -109,7 +112,10 @@ class AlfeldC2(finite_element.CiarletElement):
     """The Alfeld C^2 macroelement on a double barycentric split.
     See Section 7.5 of Lai & Schumacher for the quintic C^2 spline.
     """
+    DEFAULT_DEGREE = 5
+
     def __init__(self, ref_el, degree=5, reduced=False, quad_scheme=None):
+        degree = self._parse_degree(degree)
         poly_set = AlfeldC2Space(ref_el, degree)
         ref_complex = poly_set.get_reference_element()
         dual = C2DualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)

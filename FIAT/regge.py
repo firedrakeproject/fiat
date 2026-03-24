@@ -59,9 +59,10 @@ class Regge(finite_element.CiarletElement):
        REG(k) is the space of symmetric-matrix-valued polynomials of degree k
        or less with tangential-tangential continuity.
     """
-    def __init__(self, ref_el, degree=0, variant=None, quad_scheme=None):
-        if degree < 0:
-            raise ValueError(f"{type(self).__name__} only defined for degree >= 0")
+    DEFAULT_DEGREE = 0
+
+    def __init__(self, ref_el, degree=None, variant=None, quad_scheme=None):
+        degree = self._parse_degree(degree)
 
         splitting, variant, qdegree = check_format_variant(variant, degree)
         if splitting is not None:

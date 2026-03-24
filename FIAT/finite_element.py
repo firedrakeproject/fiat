@@ -30,8 +30,6 @@ class FiniteElement:
                                   "instead")
 
     def __init__(self, ref_el, dual, order, formdegree=None, mapping="affine", ref_complex=None):
-        order = self._parse_degree(order)
-
         # Relevant attributes that do not necessarily depend on a PolynomialSet object:
         # The order (degree) of the polynomial basis
         self.order = order
@@ -129,7 +127,10 @@ class FiniteElement:
         return self.ref_el is not self.ref_complex
 
     def _parse_degree(self, degree):
-        return self.DEFAULT_DEGREE if degree is None else degree
+        degree = self.DEFAULT_DEGREE if degree is None else degree
+        if degree < self.DEFAULT_DEGREE:
+            raise ValueError(f"{type(self).__name__} is only defined for degree >= {self.DEFAULT_DEGREE}.")
+        return degree
 
 
 class CiarletElement(FiniteElement):
