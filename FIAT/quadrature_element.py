@@ -19,6 +19,8 @@ from FIAT.functional import PointEvaluation
 class QuadratureElement(FiniteElement):
     """A set of quadrature points pretending to be a finite element."""
 
+    DEFAULT_DEGREE = None
+
     def __init__(self, ref_el, points, weights=None):
         # Create entity dofs.
         entity_dofs = {dim: {entity: [] for entity in entities}
