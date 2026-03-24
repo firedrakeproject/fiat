@@ -45,10 +45,10 @@ def choose_ijk_total(degree):
 
 
 class TrimmedSerendipity(FiniteElement):
-    def __init__(self, ref_el, degree, mapping):
-        if degree < 1:
-            raise Exception("Trimmed serendipity elements only valid for k >= 1")
+    DEFAULT_DEGREE = 1
 
+    def __init__(self, ref_el, degree, mapping):
+        degree = selt._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         self.fdim = dim
@@ -406,10 +406,10 @@ def I_lambda_1_tilde_3d(deg, dx, dy, dz, x_mid, y_mid, z_mid):
 
 # This is always 1-forms regardless of 2 or 3 dimensions.
 class TrimmedSerendipityEdge(TrimmedSerendipity):
-    def __init__(self, ref_el, degree):
-        if degree < 1:
-            raise Exception("Trimmed Serendipity_k edge elements only valid for k >= 1")
+    DEFAULT_DEGREE = 1
 
+    def __init__(self, ref_el, degree):
+        degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
@@ -460,10 +460,10 @@ class TrimmedSerendipityEdge(TrimmedSerendipity):
 
 
 class TrimmedSerendipityFace(TrimmedSerendipity):
-    def __init__(self, ref_el, degree):
-        if degree < 1:
-            raise Exception("Trimmed serendipity face elements only valid for k >= 1")
+    DEFAULT_DEGREE = 1
 
+    def __init__(self, ref_el, degree):
+        degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         if dim != 2:
