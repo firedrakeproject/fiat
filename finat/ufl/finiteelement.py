@@ -117,6 +117,11 @@ class FiniteElement(FiniteElementBase):
                                               for c in cell.sub_cells],
                                             cell=cell)
 
+            elif family == "Real":
+                return TensorProductElement(*[FiniteElement("Real", c, degree, variant=variant)
+                                              for c in cell.sub_cells],
+                                            cell=cell)
+
         return super().__new__(cls)
 
     def __init__(self,
