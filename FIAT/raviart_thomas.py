@@ -145,7 +145,6 @@ class RaviartThomas(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
         degree = self._parse_degree(degree)
-
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)

@@ -76,7 +76,6 @@ class Lagrange(finite_element.CiarletElement):
 
     def __init__(self, ref_el, degree, variant="equispaced", sort_entities=False):
         degree = self._parse_degree(degree)
-
         splitting, point_variant = parse_lagrange_variant(variant)
         if splitting is not None:
             ref_el = splitting(ref_el)
