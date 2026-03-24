@@ -23,9 +23,6 @@ class MixedElement(FiniteElement):
 
     This object offers tabulation of the concatenated basis function
     tables along with an entity_dofs dict."""
-
-    DEFAULT_DEGREE = None
-
     def __init__(self, elements, ref_el=None):
         elements = tuple(elements)
 
