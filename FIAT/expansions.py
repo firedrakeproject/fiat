@@ -263,22 +263,23 @@ class ExpansionSet(object):
         reference element."""
         if cls is not ExpansionSet:
             return super().__new__(cls)
+        ref_el = args[0]
+        shape = ref_el.get_shape()
         try:
-            ref_el = args[0]
             expansion_set = {
                 reference_element.POINT: PointExpansionSet,
                 reference_element.LINE: LineExpansionSet,
                 reference_element.TRIANGLE: TriangleExpansionSet,
                 reference_element.TETRAHEDRON: TetrahedronExpansionSet,
-            }[ref_el.get_shape()]
-            return expansion_set(*args, **kwargs)
+            }[shape]
         except KeyError:
-            raise ValueError("Invalid reference element type.")
+            raise ValueError(f"Invalid reference element type {type(ref_el).__name__}.")
+        return expansion_set(*args, **kwargs)
 
     def __init__(self, ref_el, scale=None, variant=None):
         self.ref_el = ref_el
         self.variant = variant
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         top = ref_el.get_topology()
         base_ref_el = reference_element.default_simplex(sd)
         base_verts = base_ref_el.get_vertices()
@@ -303,7 +304,7 @@ class ExpansionSet(object):
 
     def get_scale(self, n, cell=0):
         scale = self.scale
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.ref_el.get_topological_dimension()
         if isinstance(scale, str):
             vol = self.ref_el.volume_of_subcomplex(sd, cell)
             scale = scale.lower()
@@ -334,7 +335,7 @@ class ExpansionSet(object):
         A, b = self.affine_mappings[cell]
         ref_pts = numpy.add(numpy.dot(pts, A.T), b).T
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.ref_el.get_topological_dimension()
         scale = self.get_scale(n, cell=cell)
         phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
                                  scale, variant=self.variant)
@@ -417,7 +418,7 @@ class ExpansionSet(object):
 
         :returns: a numpy array of tabulations of normal derivative jumps.
         """
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.ref_el.get_topological_dimension()
         transform = self.ref_el.get_entity_transform(sd-1, facet)
         pts = transform(ref_pts)
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
@@ -507,7 +508,7 @@ class ExpansionSet(object):
         if degree == 0:
             return cache.setdefault(key, numpy.zeros((self.ref_el.get_spatial_dimension(), 1, 1), "d"))
 
-        D = self.ref_el.get_dimension()
+        D = self.ref_el.get_topological_dimension()
         top = self.ref_el.get_topology()
         verts = self.ref_el.get_vertices_of_subcomplex(top[D][cell])
         pts = reference_element.make_lattice(verts, degree, variant="gl")
@@ -519,14 +520,14 @@ class ExpansionSet(object):
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.ref_el.get_topological_dimension()
         return self._tabulate(n, pts)[(0,) * sd]
 
     def tabulate_derivatives(self, n, pts):
         from FIAT.polynomial_set import mis
         vals = self._tabulate(n, pts, order=1)
         # Create the ordinary data structure.
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.ref_el.get_topological_dimension()
         v = vals[(0,) * sd]
         dv = [vals[alpha] for alpha in mis(sd, 1)]
         data = [[(v[i, j], [vi[i, j] for vi in dv])
@@ -537,7 +538,7 @@ class ExpansionSet(object):
     def tabulate_jet(self, n, pts, order=1):
         vals = self._tabulate(n, pts, order=order)
         # Create the ordinary data structure.
-        sd = self.ref_el.get_spatial_dimension()
+        sd = self.ref_el.get_topological_dimension()
         v0 = vals[(0,) * sd]
         data = [v0]
         for r in range(1, order+1):
@@ -556,7 +557,7 @@ class ExpansionSet(object):
 class PointExpansionSet(ExpansionSet):
     """Evaluates the point basis on a point reference element."""
     def __init__(self, ref_el, **kwargs):
-        if ref_el.get_spatial_dimension() != 0:
+        if ref_el.get_topological_dimension() != 0:
             raise ValueError("Must have a point")
         super().__init__(ref_el, **kwargs)
 
@@ -570,8 +571,8 @@ class PointExpansionSet(ExpansionSet):
 class LineExpansionSet(ExpansionSet):
     """Evaluates the Legendre basis on a line reference element."""
     def __init__(self, ref_el, **kwargs):
-        if ref_el.get_spatial_dimension() != 1:
-            raise Exception("Must have a line")
+        if ref_el.get_topological_dimension() != 1:
+            raise ValueError("Must have a line")
         super().__init__(ref_el, **kwargs)
 
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
@@ -600,7 +601,7 @@ class TriangleExpansionSet(ExpansionSet):
     """Evaluates the orthonormal Dubiner basis on a triangular
     reference element."""
     def __init__(self, ref_el, **kwargs):
-        if ref_el.get_spatial_dimension() != 2:
+        if ref_el.get_topological_dimension() != 2:
             raise Exception("Must have a triangle")
         super().__init__(ref_el, **kwargs)
 
@@ -608,7 +609,7 @@ class TriangleExpansionSet(ExpansionSet):
 class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expansion on a tetrahedron."""
     def __init__(self, ref_el, **kwargs):
-        if ref_el.get_spatial_dimension() != 3:
+        if ref_el.get_topological_dimension() != 3:
             raise Exception("Must be a tetrahedron")
         super().__init__(ref_el, **kwargs)
 
@@ -627,7 +628,7 @@ def polynomial_dimension(ref_el, n, continuity=None):
     elif continuity == "C0":
         space_dimension = sum(math.comb(n - 1, dim) * len(top[dim]) for dim in top)
     else:
-        dim = ref_el.get_spatial_dimension()
+        dim = ref_el.get_topological_dimension()
         space_dimension = math.comb(n + dim, dim) * len(top[dim])
     return space_dimension
 
@@ -641,7 +642,7 @@ def polynomial_entity_ids(ref_el, n, continuity=None):
     :returns: a dict of dicts mapping dimension and entity id to basis functions.
     """
     top = ref_el.get_topology()
-    sd = ref_el.get_spatial_dimension()
+    sd = ref_el.get_topological_dimension()
     entity_ids = {}
     cur = 0
     for dim in sorted(top):
@@ -668,7 +669,7 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
     :returns: a numpy array mapping cell id to basis functions supported on that cell.
     """
     top = ref_el.get_topology()
-    sd = ref_el.get_spatial_dimension()
+    sd = ref_el.get_topological_dimension()
 
     entity_ids = polynomial_entity_ids(ref_el, n, continuity)
     ref_entity_ids = polynomial_entity_ids(ref_el.construct_subelement(sd), n, continuity)
@@ -697,7 +698,7 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     :returns: a dict mapping cell id to the point ids nearest to that cell.
     """
     top = ref_el.get_topology()
-    sd = ref_el.get_spatial_dimension()
+    sd = ref_el.get_topological_dimension()
     if len(top[sd]) == 1:
         return {0: Ellipsis}
 

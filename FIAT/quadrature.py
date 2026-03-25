@@ -174,7 +174,7 @@ class CollapsedQuadratureSimplexRule(QuadratureRule):
     from the hypercube to the simplex."""
 
     def __init__(self, ref_el, m):
-        dim = ref_el.get_spatial_dimension()
+        dim = ref_el.get_topological_dimension()
         Ref1 = reference_element.default_simplex(dim)
         pts_ref, wts_ref = simplexgausslegendre(dim, m)
         pts, wts = map_quadrature(pts_ref, wts_ref, Ref1, ref_el)

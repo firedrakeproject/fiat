@@ -224,7 +224,7 @@ class ONSymTensorPolynomialSet(PolynomialSet):
     def __init__(self, ref_el, degree, size=None, **kwargs):
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
 
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         if size is None:
             size = sd
 

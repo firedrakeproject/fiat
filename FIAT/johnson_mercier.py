@@ -13,13 +13,13 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             raise ValueError(f"Johnson-Mercier does not have the {variant} variant")
         ref_el = ref_complex.get_parent()
         top = ref_el.get_topology()
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
         # Face dofs: bidirectional (nn and nt) moments
+        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
         dim = sd - 1
-        R = numpy.array([[0, 1], [-1, 0]])
         ref_facet = ref_el.construct_subelement(dim)
         Qref = parse_quadrature_scheme(ref_facet, 2*degree, quad_scheme)
         P = polynomial_set.ONPolynomialSet(ref_facet, degree)
@@ -30,7 +30,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             thats = ref_el.compute_tangents(dim, f)
             if sd == 2:
                 # Face moments of sigma.n against n P1 and t P1
-                nhat = numpy.dot(R, *thats)
+                nhat = n[f]
                 components = (nhat, *thats)
             else:
                 # Face moments of sigma.n against n P1 and (n x t_j) P1
@@ -44,7 +44,6 @@ class JohnsonMercierDualSet(dual_set.DualSet):
 
         cur = len(nodes)
         # Interior dofs: moments for each independent component
-        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
         Q = parse_quadrature_scheme(ref_complex, 2*degree-1, quad_scheme)
         P = polynomial_set.ONPolynomialSet(ref_el, degree-1, scale="L2 piola")
         phis = P.tabulate(Q.get_points())[(0,) * sd]
