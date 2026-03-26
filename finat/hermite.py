@@ -1,5 +1,6 @@
 import FIAT
-from gem import ListTensor
+import numpy
+from gem import ListTensor, partial_indexed
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
@@ -15,18 +16,23 @@ class Hermite(PhysicallyMappedElement, ScalarFiatElement):
         Js = [coordinate_mapping.jacobian_at(vertex)
               for vertex in self.cell.get_vertices()]
 
+        pns = coordinate_mapping.physical_normals()
         h = coordinate_mapping.cell_size()
 
-        d = self.cell.get_dimension()
         M = identity(self.space_dimension())
 
-        cur = 0
-        for i in range(d+1):
-            cur += 1  # skip the vertex
+        entity_ids = self.entity_dofs()
+        for i in entity_ids[0]:
+            # skip the PointEvaluation DOF
+            vids = entity_ids[0][i][1:]
             J = Js[i]
-            for j in range(d):
-                for k in range(d):
-                    M[cur+j, cur+k] = J[j, k] / h[i]
-            cur += d
+
+            gdim, tdim = J.shape
+            if gdim != tdim:
+                assert tdim == 1
+                J = partial_indexed(pns, (i,)) @ J
+
+            Jnp = numpy.reshape([J[i] for i in numpy.ndindex(J.shape)], J.shape)
+            M[numpy.ix_(vids, vids)] = Jnp * (1 / h[i])
 
         return ListTensor(M)

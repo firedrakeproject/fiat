@@ -120,6 +120,13 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
 
 
 @pytest.mark.parametrize("element", [
+                         finat.Hermite,
+                         ])
+def test_C1_interval(ref_to_phys, element):
+    check_zany_mapping(element, ref_to_phys[1.5])
+
+
+@pytest.mark.parametrize("element", [
                          finat.Morley,
                          finat.Hermite,
                          finat.Bell,
@@ -132,6 +139,7 @@ def test_C1_triangle(ref_to_phys, element):
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
+                         finat.Hermite,
                          finat.Walkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):

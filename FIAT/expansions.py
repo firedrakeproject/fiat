@@ -580,7 +580,7 @@ class LineExpansionSet(ExpansionSet):
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a dict of tabulations such that
         tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
-        if self.variant is not None:
+        if self.variant is not None or self.ref_el.get_spatial_dimension() != 1:
             return super()._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
 
         A, b = self.affine_mappings[cell]

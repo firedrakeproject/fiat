@@ -1001,6 +1001,11 @@ class UFCInterval(UFCSimplex):
                     1: edges}
         super().__init__(LINE, verts, topology)
 
+    def compute_normal(self, i):
+        "UFC consistent normal"
+        n = self.compute_tangents(1, 0)[0]
+        return n / numpy.linalg.norm(n)
+
 
 class DefaultTriangle(DefaultSimplex):
     """This is the reference triangle with vertices (-1.0,-1.0),
