@@ -37,14 +37,14 @@ class MyMapping(PhysicalGeometry):
                         for i in sorted(top[1])]))
 
     def reference_normals(self):
-        sd = self.ref_cell.get_spatial_dimension()
+        sd = self.phys_cell.get_topological_dimension()
         top = self.ref_cell.get_topology()
         return gem.Literal(
             np.asarray([self.ref_cell.compute_normal(i)
                         for i in sorted(top[sd-1])]))
 
     def physical_normals(self):
-        sd = self.phys_cell.get_spatial_dimension()
+        sd = self.phys_cell.get_topological_dimension()
         top = self.phys_cell.get_topology()
         return gem.Literal(
             np.asarray([self.phys_cell.compute_normal(i)

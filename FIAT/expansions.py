@@ -92,7 +92,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     dX = pad_jacobian(Jinv, pad_dim)
 
     phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
-    results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
+    results = [numpy.zeros((num_members,) + (len(dX[0]),)*k + phi0.shape[1:], dtype=phi0.dtype)
                for k in range(order+1)]
 
     phi, dphi, ddphi = results + [None] * (2-order)
@@ -335,12 +335,13 @@ class ExpansionSet(object):
         A, b = self.affine_mappings[cell]
         ref_pts = numpy.add(numpy.dot(pts, A.T), b).T
         Jinv = A if direction is None else numpy.dot(A, direction)[:, None]
-        sd = self.ref_el.get_topological_dimension()
+        sd = self.ref_el.get_spatial_dimension()
+        tdim = self.ref_el.get_topological_dimension()
         scale = self.get_scale(n, cell=cell)
-        phi = dubiner_recurrence(sd, n, lorder, ref_pts, Jinv,
+        phi = dubiner_recurrence(tdim, n, lorder, ref_pts, Jinv,
                                  scale, variant=self.variant)
         if self.continuity == "C0":
-            phi = C0_basis(sd, n, phi)
+            phi = C0_basis(tdim, n, phi)
 
         # Pack linearly independent components into a dictionary
         result = {(0,) * sd: numpy.asarray(phi[0])}
@@ -418,8 +419,9 @@ class ExpansionSet(object):
 
         :returns: a numpy array of tabulations of normal derivative jumps.
         """
-        sd = self.ref_el.get_topological_dimension()
-        transform = self.ref_el.get_entity_transform(sd-1, facet)
+        sd = self.ref_el.get_spatial_dimension()
+        tdim = self.ref_el.get_topological_dimension()
+        transform = self.ref_el.get_entity_transform(tdim-1, facet)
         pts = transform(ref_pts)
         cell_point_map = compute_cell_point_map(self.ref_el, pts, unique=False)
         cell_node_map = self.get_cell_node_map(n)
@@ -520,14 +522,14 @@ class ExpansionSet(object):
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        sd = self.ref_el.get_topological_dimension()
+        sd = self.ref_el.get_spatial_dimension()
         return self._tabulate(n, pts)[(0,) * sd]
 
     def tabulate_derivatives(self, n, pts):
         from FIAT.polynomial_set import mis
         vals = self._tabulate(n, pts, order=1)
         # Create the ordinary data structure.
-        sd = self.ref_el.get_topological_dimension()
+        sd = self.ref_el.get_spatial_dimension()
         v = vals[(0,) * sd]
         dv = [vals[alpha] for alpha in mis(sd, 1)]
         data = [[(v[i, j], [vi[i, j] for vi in dv])
@@ -538,7 +540,7 @@ class ExpansionSet(object):
     def tabulate_jet(self, n, pts, order=1):
         vals = self._tabulate(n, pts, order=order)
         # Create the ordinary data structure.
-        sd = self.ref_el.get_topological_dimension()
+        sd = self.ref_el.get_spatial_dimension()
         v0 = vals[(0,) * sd]
         data = [v0]
         for r in range(1, order+1):

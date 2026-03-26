@@ -13,13 +13,13 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             raise ValueError(f"Johnson-Mercier does not have the {variant} variant")
         ref_el = ref_complex.get_parent()
         top = ref_el.get_topology()
-        sd = ref_el.get_topological_dimension()
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
         # Face dofs: bidirectional (nn and nt) moments
-        n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
-        dim = sd - 1
+        tdim = ref_el.get_topological_dimension()
+        dim = tdim - 1
+        n = list(map(ref_el.compute_scaled_normal, sorted(top[dim])))
         ref_facet = ref_el.construct_subelement(dim)
         Qref = parse_quadrature_scheme(ref_facet, 2*degree, quad_scheme)
         P = polynomial_set.ONPolynomialSet(ref_facet, degree)
@@ -28,7 +28,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, dim, f, Qref, avg=True)
             thats = ref_el.compute_tangents(dim, f)
-            if sd == 2:
+            if tdim == 2:
                 # Face moments of sigma.n against n P1 and t P1
                 nhat = n[f]
                 components = (nhat, *thats)
@@ -46,11 +46,12 @@ class JohnsonMercierDualSet(dual_set.DualSet):
         # Interior dofs: moments for each independent component
         Q = parse_quadrature_scheme(ref_complex, 2*degree-1, quad_scheme)
         P = polynomial_set.ONPolynomialSet(ref_el, degree-1, scale="L2 piola")
+        sd = ref_el.get_spatial_dimension()
         phis = P.tabulate(Q.get_points())[(0,) * sd]
         nodes.extend(TensorBidirectionalIntegralMoment(ref_el, n[i+1], n[j+1], Q, phi)
-                     for phi in phis for i in range(sd) for j in range(i, sd))
+                     for phi in phis for i in range(tdim) for j in range(i, tdim))
 
-        entity_ids[sd][0].extend(range(cur, len(nodes)))
+        entity_ids[tdim][0].extend(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 

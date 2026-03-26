@@ -256,7 +256,7 @@ class TracelessTensorPolynomialSet(PolynomialSet):
     def __init__(self, ref_el, degree, size=None, **kwargs):
         expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
 
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         if size is None:
             size = sd
 
@@ -286,11 +286,11 @@ def make_bubbles(ref_el, degree, codim=0, shape=(), scale="L2 piola"):
     """Construct a polynomial set with codim bubbles up to the given degree.
     """
     poly_set = ONPolynomialSet(ref_el, degree, shape=shape, scale=scale, variant="bubble")
-    if ref_el.get_spatial_dimension() == 0:
+    if ref_el.get_topological_dimension() == 0:
         return poly_set
 
     entity_ids = expansions.polynomial_entity_ids(ref_el, degree, continuity="C0")
-    sd = ref_el.get_spatial_dimension()
+    sd = ref_el.get_topological_dimension()
     dim = sd - codim
     indices = list(chain(*entity_ids[dim].values()))
     if shape != ():

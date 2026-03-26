@@ -15,6 +15,7 @@ from FIAT.functional import FrobeniusIntegralMoment
 from FIAT.nedelec import Nedelec
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.reference_element import make_affine_mapping
 
 
 def curl(tabulation):
@@ -37,20 +38,25 @@ def curl(tabulation):
 
 def MardalTaiWintherSpace(ref_el, order=1):
     """Construct the MTW space BDM(order) + curl(B [P1]^d)."""
+    orig_ref_el = ref_el
     sd = ref_el.get_spatial_dimension()
-    k = sd + 1
+    tdim = ref_el.get_topological_dimension()
+    if tdim != sd:
+        ref_el = ref_el.construct_subelement(tdim)
+
+    k = tdim + 1
     assert order < k
-    # [Pk]^d = vector polynomials of degree k = sd+1
-    Pk = polynomial_set.ONPolynomialSet(ref_el, k, shape=(sd,), scale="orthonormal")
+    # [Pk]^d = vector polynomials of degree k = tdim+1
+    Pk = polynomial_set.ONPolynomialSet(ref_el, k, shape=(tdim,), scale="orthonormal")
 
     # Grab BDM(order) = [P_order]^d from [Pk]^d
     dimP1 = expansions.polynomial_dimension(ref_el, order)
     dimPk = expansions.polynomial_dimension(ref_el, k)
-    ids = [i+dimPk*j for i in range(dimP1) for j in range(sd)]
+    ids = [i+dimPk*j for i in range(dimP1) for j in range(tdim)]
     BDM = Pk.take(ids)
 
     # Project curl(B [P1]^d) into [Pk]^d
-    shape = () if sd == 2 else ((sd*(sd-1))//2,)
+    shape = () if tdim == 2 else ((tdim*(tdim-1))//2,)
     BP1 = polynomial_set.make_bubbles(ref_el, k+1, shape=shape)
 
     Q = create_quadrature(ref_el, 2*k)
@@ -60,21 +66,31 @@ def MardalTaiWintherSpace(ref_el, order=1):
     BP1_at_qpts = BP1.tabulate(qpts, 1)
 
     inner = lambda u, v, qwts: numpy.tensordot(u, numpy.multiply(v, qwts), axes=(range(1, u.ndim),)*2)
-    C = inner(curl(BP1_at_qpts), Pk_at_qpts[(0,)*sd], qwts)
+    C = inner(curl(BP1_at_qpts), Pk_at_qpts[(0,)*tdim], qwts)
     coeffs = numpy.tensordot(C, Pk.get_coeffs(), axes=(1, 0))
     curlBP1 = polynomial_set.PolynomialSet(ref_el, k, k, Pk.get_expansion_set(), coeffs)
 
-    return polynomial_set.polynomial_set_union_normalized(BDM, curlBP1)
+    MTW = polynomial_set.polynomial_set_union_normalized(BDM, curlBP1)
+
+    if tdim != sd:
+        # Manifold case
+        J, b = make_affine_mapping(ref_el.vertices, orig_ref_el.vertices)
+        coeffs = MTW.get_coeffs()
+        coeffs = numpy.tensordot(J, coeffs.transpose(1, 0, 2), (1, 0)).transpose(1, 0, 2)
+        expansion_set = Pk.get_expansion_set().reconstruct(ref_el=orig_ref_el)
+        MTW = polynomial_set.PolynomialSet(orig_ref_el, k, k, expansion_set, coeffs)
+    return MTW
 
 
 class MardalTaiWintherDual(dual_set.DualSet):
     """Degrees of freedom for Mardal-Tai-Winther elements."""
     def __init__(self, ref_el, order, quad_scheme):
+        tdim = ref_el.get_topological_dimension()
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
-        degree = sd + 1
+        degree = tdim + 1
 
         # On each facet, let n be its normal.  We need to integrate
         # u.n against a Dubiner basis for P1
@@ -82,33 +98,35 @@ class MardalTaiWintherDual(dual_set.DualSet):
         ref_facet = ref_el.get_facet_element()
         Q = parse_quadrature_scheme(ref_facet, degree+order, quad_scheme)
 
+        fdim = ref_facet.get_spatial_dimension()
         P1 = polynomial_set.ONPolynomialSet(ref_facet, order)
-        P1_at_qpts = P1.tabulate(Q.get_points())[(0,)*(sd - 1)]
-        if sd == 2:
+        P1_at_qpts = P1.tabulate(Q.get_points())[(0,)*fdim]
+        if tdim == 2:
             # For 2D just take the constant
             RT_at_qpts = P1_at_qpts[:1, None, :]
         else:
             # Basis for lowest-order RT [(1, 0), (0, 1), (x, y)]
-            RT_at_qpts = numpy.zeros((3, sd-1, P1_at_qpts.shape[-1]))
+            RT_at_qpts = numpy.zeros((3, tdim-1, P1_at_qpts.shape[-1]))
             RT_at_qpts[0, 0, :] = P1_at_qpts[0, None, :]
             RT_at_qpts[1, 1, :] = P1_at_qpts[0, None, :]
             RT_at_qpts[2, 0, :] = P1_at_qpts[1, None, :]
             RT_at_qpts[2, 1, :] = P1_at_qpts[2, None, :]
 
-        for f in sorted(top[sd-1]):
+        for f in sorted(top[tdim-1]):
             cur = len(nodes)
             n = ref_el.compute_scaled_normal(f)
-            Qf = FacetQuadratureRule(ref_el, sd-1, f, Q, avg=True)
+            Qf = FacetQuadratureRule(ref_el, tdim-1, f, Q, avg=True)
             # Normal moments against P_{order}
             nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, numpy.outer(n, phi)) for phi in P1_at_qpts)
             # Map the RT basis into the facet
+
             Jf = Qf.jacobian()
             phis = numpy.tensordot(Jf, RT_at_qpts.transpose(1, 0, 2), (1, 0)).transpose(1, 0, 2)
-            if sd == 3:
+            if tdim == 3:
                 # Moments against cross(n, RT)
                 phis = numpy.cross(n[None, :, None], phis, axis=1)
             nodes.extend(FrobeniusIntegralMoment(ref_el, Qf, phi) for phi in phis)
-            entity_ids[sd-1][f].extend(range(cur, len(nodes)))
+            entity_ids[tdim-1][f].extend(range(cur, len(nodes)))
 
         # Interior nodes: moments against Nedelec(order-1)
         if order > 1:
@@ -117,7 +135,7 @@ class MardalTaiWintherDual(dual_set.DualSet):
             phis = Ned.tabulate(0, Q.get_points())[(0,) * sd]
             cur = len(nodes)
             nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
-            entity_ids[sd][0] = list(range(cur, len(nodes)))
+            entity_ids[tdim][0] = list(range(cur, len(nodes)))
 
         super().__init__(nodes, ref_el, entity_ids)
 
@@ -126,7 +144,7 @@ class MardalTaiWinther(finite_element.CiarletElement):
     """The definition of the Mardal-Tai-Winther element.
     """
     def __init__(self, ref_el, order=1, quad_scheme=None):
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         if sd not in (2, 3):
             raise ValueError(f"{type(self).__name__} only defined in dimension 2 and 3.")
         if not ref_el.is_simplex():

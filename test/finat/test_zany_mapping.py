@@ -33,12 +33,13 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     ref_element = finat_element._element
     ref_cell = ref_element.get_reference_element()
     phys_cell = phys_element.get_reference_element()
-    sd = ref_cell.get_spatial_dimension()
 
     shape = ref_element.value_shape()
+    sd = ref_cell.get_spatial_dimension()
     ref_pts = make_unisolvent_points(ref_element, interior=True)
     ref_vals = ref_element.tabulate(0, ref_pts)[(0,)*sd]
 
+    sd = phys_cell.get_spatial_dimension()
     phys_pts = make_unisolvent_points(phys_element, interior=True)
     phys_vals = phys_element.tabulate(0, phys_pts)[(0,)*sd]
 
@@ -194,7 +195,9 @@ def test_piola(ref_to_phys, element, dimension):
 
 
 @pytest.mark.parametrize("element", [
+    finat.MardalTaiWinther,
     finat.JohnsonMercier,
+    finat.Morley,
 ])
 def test_piola_manifold(ref_to_phys, element):
     dimension = 2.5
