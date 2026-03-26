@@ -119,11 +119,11 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), pp.pformat((np.round(error, 8).tolist(), *inds))
 
 
-@pytest.mark.parametrize("element", [
-                         finat.Hermite,
-                         ])
-def test_C1_interval(ref_to_phys, element):
-    check_zany_mapping(element, ref_to_phys[1.5])
+@pytest.mark.parametrize("element, degree", [
+    *((finat.Hermite, k) for k in range(3, 6)),
+])
+def test_C1_interval(ref_to_phys, element, degree):
+    check_zany_mapping(element, ref_to_phys[1.5], degree)
 
 
 @pytest.mark.parametrize("element", [

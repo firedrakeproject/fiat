@@ -8,9 +8,9 @@ from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 class Hermite(PhysicallyMappedElement, ScalarFiatElement):
-    def __init__(self, cell, degree=3):
+    def __init__(self, cell, degree=3, variant=None):
         cite("Ciarlet1972")
-        super().__init__(FIAT.CubicHermite(cell))
+        super().__init__(FIAT.CubicHermite(cell, degree=degree, variant=variant))
 
     def basis_transformation(self, coordinate_mapping):
         Js = [coordinate_mapping.jacobian_at(vertex)
