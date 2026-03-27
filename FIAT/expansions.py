@@ -604,7 +604,7 @@ class TriangleExpansionSet(ExpansionSet):
     reference element."""
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_topological_dimension() != 2:
-            raise Exception("Must have a triangle")
+            raise ValueError("Must have a triangle")
         super().__init__(ref_el, **kwargs)
 
 
@@ -612,7 +612,7 @@ class TetrahedronExpansionSet(ExpansionSet):
     """Collapsed orthonormal polynomial expansion on a tetrahedron."""
     def __init__(self, ref_el, **kwargs):
         if ref_el.get_topological_dimension() != 3:
-            raise Exception("Must be a tetrahedron")
+            raise ValueError("Must be a tetrahedron")
         super().__init__(ref_el, **kwargs)
 
 
