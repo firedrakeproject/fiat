@@ -31,7 +31,6 @@ Repository = "https://github.com/firedrakeproject/fiat.git"
 
 [project.optional-dependencies]
 doc = [
-  "setuptools",  # for pkg_resources
   "sphinx",
 ]
 test = ["pytest"]
