@@ -20,7 +20,7 @@ class FuseElement(FiniteElementBase):
             cell = self.triple.cell.to_ufl()
 
         degree = self.triple.degree()
-        self.sobolev_space = self.triple.spaces[1].to_ufl()
+        self.sobolev_space = self.triple.spaces[1]#.to_ufl()
         super(FuseElement, self).__init__("IT", cell, degree, None, triple.get_value_shape())
 
     def __repr__(self):
