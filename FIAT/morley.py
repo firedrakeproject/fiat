@@ -34,8 +34,8 @@ class MorleyDualSet(dual_set.DualSet):
         Q_ref, scale = duals(ref_el, dim, degree)
         for entity in sorted(top[dim]):
             cur = len(nodes)
-            Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-            nodes.append(functional.IntegralMoment(ref_el, Q, scale / Q.jacobian_determinant()))
+            Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
+            nodes.append(functional.IntegralMoment(ref_el, Q, scale))
             entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
         # codim=1 dof -- average of normal derivative at each facet

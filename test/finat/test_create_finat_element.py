@@ -47,7 +47,7 @@ def tensor_name(request):
 
 @pytest.fixture(params=[ufl.interval, ufl.triangle,
                         ufl.quadrilateral],
-                ids=lambda x: x.cellname())
+                ids=lambda x: x.cellname)
 def ufl_A(request, tensor_name):
     return finat.ufl.FiniteElement(tensor_name, request.param, 1)
 
@@ -88,6 +88,23 @@ def test_interval_variant_default(family, expected_cls):
 def test_interval_variant(family, variant, expected_cls):
     ufl_element = finat.ufl.FiniteElement(family, ufl.interval, 3, variant=variant)
     assert isinstance(create_element(ufl_element), expected_cls)
+
+
+@pytest.mark.parametrize('cell', [ufl.triangle, ufl.tetrahedron])
+@pytest.mark.parametrize('family,degree,quad_scheme',
+                         [('CR', 1, 'default'),
+                          ('CR', 1, 'KMV(1)'),
+                          ('CR', 1, 'KMV(2)'),
+                          ('CR', 1, 'KMV(2),powell-sabin')])
+def test_quad_scheme(cell, family, degree, quad_scheme):
+    ufl_element = finat.ufl.FiniteElement(family, cell, degree, variant="integral", quad_scheme=quad_scheme)
+    fe = create_element(ufl_element)
+    Q, ps = fe.dual_basis
+    assert fe.space_dimension() == fe.cell.get_spatial_dimension() + 1
+    if quad_scheme in {'KMV(1)', 'default'}:
+        assert len(ps.points) == fe.space_dimension()
+    else:
+        assert len(ps.points) > fe.space_dimension()
 
 
 def test_triangle_variant_spectral():

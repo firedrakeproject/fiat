@@ -1,14 +1,16 @@
 import numpy as np
-from FIAT import ufc_simplex, MardalTaiWinther, make_quadrature, expansions
+from FIAT import ufc_simplex, MardalTaiWinther, expansions
+from FIAT.quadrature_schemes import create_quadrature
 
 
 def test_dofs():
     line = ufc_simplex(1)
     T = ufc_simplex(2)
     T.vertices = np.asarray([(0.0, 0.0), (1.0, 0.25), (-0.75, 1.1)])
-    MTW = MardalTaiWinther(T, 3)
+    MTW = MardalTaiWinther(T)
+    assert MTW.degree() == T.get_spatial_dimension()+1
 
-    Qline = make_quadrature(line, 6)
+    Qline = create_quadrature(line, 2*MTW.degree())
 
     linebfs = expansions.LineExpansionSet(line)
     linevals = linebfs.tabulate(1, Qline.pts)
@@ -26,7 +28,7 @@ def test_dofs():
                     normal_moments[bf, m] += wts[k] * nvals[bf, k] * linevals[m, k]
         right = np.zeros((9, 2))
         right[3*ed, 0] = 1.0
-        right[3*ed+2, 1] = 1.0
+        right[3*ed+1, 1] = 1.0
         assert np.allclose(normal_moments, right)
     for ed in range(3):
         t = T.compute_edge_tangent(ed)
@@ -39,5 +41,5 @@ def test_dofs():
             for k in range(len(Qline.wts)):
                 tangent_moments[bf] += wts[k] * tvals[bf, k] * linevals[0, k]
         right = np.zeros(9)
-        right[3*ed + 1] = 1.0
+        right[3*ed+2] = 1.0
         assert np.allclose(tangent_moments, right)

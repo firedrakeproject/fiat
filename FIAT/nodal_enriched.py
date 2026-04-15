@@ -12,6 +12,7 @@ from FIAT.polynomial_set import PolynomialSet
 from FIAT.dual_set import DualSet
 from FIAT.finite_element import CiarletElement
 from FIAT.barycentric_interpolation import LagrangeLineExpansionSet
+from FIAT.quadrature_schemes import create_quadrature
 
 __all__ = ['NodalEnrichedElement']
 
@@ -38,36 +39,49 @@ class NodalEnrichedElement(CiarletElement):
                              "of NodalEnrichedElement are nodal")
 
         # Extract common data
-        embedded_degrees = [e.get_nodal_basis().get_embedded_degree() for e in elements]
+        embedded_degrees = [e.degree() for e in elements]
         embedded_degree = max(embedded_degrees)
-        degree = max(e.degree() for e in elements)
         order = max(e.get_order() for e in elements)
         formdegree = None if any(e.get_formdegree() is None for e in elements) \
             else max(e.get_formdegree() for e in elements)
-        # LagrangeExpansionSet has fixed degree, ensure we grab the highest one
-        elem = elements[embedded_degrees.index(embedded_degree)]
+
+        # Grab the ExpansionSet defined on the maximal complex with the highest degree
+        elem = max(elements, key=lambda e: (e.get_reference_complex(), e.degree()))
         ref_el = elem.get_reference_complex()
         expansion_set = elem.get_nodal_basis().get_expansion_set()
         mapping = elem.mapping()[0]
         value_shape = elem.value_shape()
 
         # Sanity check
-        assert all(e.get_reference_complex() == ref_el for e in elements)
+        assert all(e.get_reference_complex() <= ref_el for e in elements)
         assert all(set(e.mapping()) == {mapping, } for e in elements)
         assert all(e.value_shape() == value_shape for e in elements)
 
         # Merge polynomial sets
-        if isinstance(expansion_set, LagrangeLineExpansionSet):
+        if isinstance(expansion_set, LagrangeLineExpansionSet) and expansion_set.degree == embedded_degree:
             # Obtain coefficients via interpolation
             points = expansion_set.get_points()
             coeffs = np.vstack([e.tabulate(0, points)[(0,)] for e in elements])
-        else:
-            assert all(e.get_nodal_basis().get_expansion_set() == expansion_set
-                       for e in elements)
+        elif all(e.get_nodal_basis().get_expansion_set() == expansion_set for e in elements):
+            # All elements have the same ExpansionSet, just merge coefficients
             coeffs = [e.get_coeffs() for e in elements]
             coeffs = _merge_coeffs(coeffs, ref_el, embedded_degrees, expansion_set.continuity)
+        else:
+            # Obtain coefficients via projection
+            sd = ref_el.get_spatial_dimension()
+            Q = create_quadrature(ref_el, 2*embedded_degree)
+            qpts = Q.get_points()
+            phis = expansion_set._tabulate(embedded_degree, qpts, 0)[(0,)*sd]
+            PhiW = np.multiply(phis, Q.get_weights())
+            M = np.tensordot(phis, PhiW, (-1, -1))
+            MinvPhiW = np.linalg.solve(M, PhiW)
+
+            tabulations = np.concatenate([e.tabulate(0, qpts)[(0,)*sd] for e in elements], axis=0)
+            coeffs = np.tensordot(tabulations, MinvPhiW, (-1, -1))
+            assert coeffs.shape[1:-1] == value_shape
+
         poly_set = PolynomialSet(ref_el,
-                                 degree,
+                                 embedded_degree,
                                  embedded_degree,
                                  expansion_set,
                                  coeffs)
@@ -135,5 +149,5 @@ def _merge_entity_ids(entity_ids, offsets):
             for entity in ids[dim]:
                 if entity not in ret[dim]:
                     ret[dim][entity] = []
-                ret[dim][entity].extend(np.array(ids[dim][entity]) + offsets[i])
+                ret[dim][entity].extend(offsets[i] + dof for dof in ids[dim][entity])
     return ret

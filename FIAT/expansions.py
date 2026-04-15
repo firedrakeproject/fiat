@@ -81,24 +81,22 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
         raise ValueError("Higher order derivatives not supported")
     if variant not in [None, "bubble", "dual"]:
         raise ValueError(f"Invalid variant {variant}")
-
     if variant == "bubble":
         scale = -scale
 
     num_members = math.comb(n + dim, dim)
-    results = tuple([None] * num_members for i in range(order+1))
-    phi, dphi, ddphi = results + (None,) * (2-order)
 
     outer = lambda x, y: x[:, None, ...] * y[None, ...]
-    sym_outer = lambda x, y: outer(x, y) + outer(y, x)
 
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
-    phi[0] = sum((ref_pts[i] - ref_pts[i] for i in range(dim)), scale)
-    if dphi is not None:
-        dphi[0] = (phi[0] - phi[0]) * dX[0]
-    if ddphi is not None:
-        ddphi[0] = outer(dphi[0], dX[0])
+
+    phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
+    results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
+               for k in range(order+1)]
+
+    phi, dphi, ddphi = results + [None] * (2-order)
+    phi[0] = scale
     if dim == 0 or n == 0:
         return results
     if dim > 3 or dim < 0:
@@ -127,29 +125,46 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                 a = 0.5 * (alpha + beta) + 1.0
                 b = 0.5 * (alpha - beta)
 
-            factor = a * fa - b * fb
-            phi[inext] = factor * phi[icur]
+            fcur = a * fa - b * fb
+            phi[inext] = fcur * phi[icur]
             if dphi is not None:
-                dfactor = a * dfa - b * dfb
-                dphi[inext] = factor * dphi[icur] + phi[icur] * dfactor
+                dfcur = a * dfa - b * dfb
+                dphi[inext] = phi[icur] * dfcur
+                dphi[inext] += fcur * dphi[icur]
                 if ddphi is not None:
-                    ddphi[inext] = factor * ddphi[icur] + sym_outer(dphi[icur], dfactor)
+                    ddphi[inext] = outer(dphi[icur], dfcur)
+                    ddphi[inext] += outer(dfcur, dphi[icur])
+                    ddphi[inext] += fcur * ddphi[icur]
 
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
                 iprev, icur, inext = icur, inext, idx(*sub_index, i + 1)
                 a, b, c = coefficients(alpha, beta, i)
-                factor = a * fa - b * fb
-                phi[inext] = factor * phi[icur] - c * (fc * phi[iprev])
+
+                fcur = a * fa - b * fb
+                fprev = -c * fc
+                phi[inext] = fcur * phi[icur]
+                phi[inext] += fprev * phi[iprev]
                 if dphi is None:
                     continue
-                dfactor = a * dfa - b * dfb
-                dphi[inext] = (factor * dphi[icur] + phi[icur] * dfactor -
-                               c * (fc * dphi[iprev] + phi[iprev] * dfc))
+
+                dfcur = a * dfa - b * dfb
+                dfprev = -c * dfc
+                dphi[inext] = phi[icur] * dfcur
+                dphi[inext] += phi[iprev] * dfprev
+                dphi[inext] += fcur * dphi[icur]
+                dphi[inext] += fprev * dphi[iprev]
                 if ddphi is None:
                     continue
-                ddphi[inext] = (factor * ddphi[icur] + sym_outer(dphi[icur], dfactor) -
-                                c * (fc * ddphi[iprev] + sym_outer(dphi[iprev], dfc) + phi[iprev] * ddfc))
+
+                ddfprev = -c * ddfc
+                ddphi[inext] = phi[iprev] * ddfprev
+                ddphi[inext] += outer(dphi[icur], dfcur)
+                ddphi[inext] += outer(dfcur, dphi[icur])
+                ddphi[inext] += outer(dphi[iprev], dfprev)
+                ddphi[inext] += outer(dfprev, dphi[iprev])
+                ddphi[inext] += fcur * ddphi[icur]
+                ddphi[inext] += fprev * ddphi[iprev]
 
         # normalize
         d = codim + 1
@@ -183,7 +198,7 @@ def C0_basis(dim, n, tabulations):
     # Recover facet bubbles
     for phi in tabulations:
         icur = 0
-        phi[icur] *= -1
+        phi[icur] *= -1.0
         for inext in range(1, dim+1):
             phi[icur] -= phi[inext]
         if dim == 2:
@@ -723,11 +738,15 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     :kwarg tol: the absolute tolerance.
     :returns: a list of (weighted) characteristic functions for each subcell.
     """
-    from sympy import Piecewise
+    import gem
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()
     # assert singleton point
     pt = pt.reshape((sd,))
+    if isinstance(pt[0], gem.Node):
+        import gem as backend
+    else:
+        import sympy as backend
 
     # The distance to the nearest cell is equal to the distance to the parent cell
     best = ref_el.get_parent().distance_to_point_l1(pt, rescale=True)
@@ -739,7 +758,7 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     for cell in sorted(top[sd]):
         # Bin points based on l1 distance
         pt_near_cell = ref_el.distance_to_point_l1(pt, entity=(sd, cell), rescale=True) < tol
-        masks.append(Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
+        masks.append(backend.Piecewise(*otherwise, (1.0, pt_near_cell), (0.0, True)))
         if unique:
             otherwise.append((0.0, pt_near_cell))
     # If the point is on a facet, divide the characteristic function by the facet multiplicity

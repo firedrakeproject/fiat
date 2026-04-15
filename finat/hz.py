@@ -8,10 +8,10 @@ from finat.aw import _facet_transform, _evaluation_transform
 
 
 class HuZhang(PhysicallyMappedElement, FiatElement):
-    def __init__(self, cell, degree=3, variant=None):
+    def __init__(self, cell, degree=3, variant=None, quad_scheme=None):
         cite("Hu2015")
         self.variant = variant
-        super().__init__(FIAT.HuZhang(cell, degree, variant=variant))
+        super().__init__(FIAT.HuZhang(cell, degree, variant=variant, quad_scheme=quad_scheme))
 
     def basis_transformation(self, coordinate_mapping):
         ndofs = self.space_dimension()
