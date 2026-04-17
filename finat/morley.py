@@ -8,6 +8,29 @@ from finat.fiat_elements import ScalarFiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
+def morley_transform(cell, J, detJ, face):
+    adjugate = lambda A: ListTensor([[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]])
+    sd = cell.get_spatial_dimension()
+    thats = cell.compute_tangents(sd-1, face)
+    nhat = numpy.cross(*thats)
+    ahat = numpy.linalg.norm(nhat)
+    nhat /= numpy.dot(nhat, nhat)
+
+    Jn = J @ Literal(nhat)
+    Jt = J @ Literal(thats.T)
+    Gnt = Jn.T @ Jt
+    Gtt = Jt.T @ Jt
+    detG = Gtt[0, 0]*Gtt[1, 1] - Gtt[0, 1]*Gtt[1, 0]
+    area = Power(detG, Literal(0.5))
+
+    Bnn = detJ / area
+    Bnt = Gnt @ adjugate(Gtt) / detG
+    Bnn *= ahat
+    Bnt *= ahat
+    Bnt = (-1*(Bnt[0] + Bnt[1]), Bnt[0], Bnt[1])
+    return Bnn, Bnt
+
+
 class Morley(PhysicallyMappedElement, ScalarFiatElement):
     def __init__(self, cell, degree=2):
         cite("Morley1971")
@@ -42,28 +65,12 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
                 V[s, v[0]] *= -1
 
         else:
-            adjugate = lambda A: ListTensor([[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]])
             edges = self.cell.get_connectivity()[(sd-1, sd-2)]
             for face in top[sd-1]:
-                s = offset + face
-                thats = self.cell.compute_tangents(sd-1, face)
-                nhat = numpy.cross(*thats)
-                ahat = numpy.linalg.norm(nhat)
-                nhat /= numpy.dot(nhat, nhat)
-
-                Jn = J @ Literal(nhat)
-                Jt = J @ Literal(thats.T)
-                Gnt = Jn.T @ Jt
-                Gtt = Jt.T @ Jt
-                detG = Gtt[0, 0]*Gtt[1, 1] - Gtt[0, 1]*Gtt[1, 0]
-                area = Power(detG, Literal(0.5))
-
-                Bnn = detJ / area
-                Bnt = Gnt @ adjugate(Gtt) / detG
-                Bnn *= ahat
-                Bnt *= ahat
-                V[s, s] = Bnn
-                V[s, list(edges[face])] = (-1*(Bnt[0] + Bnt[1]), Bnt[0], Bnt[1])
+                Bnn, Bnt = morley_transform(self.cell, J, detJ, face)
+                fid = offset + face
+                V[fid, fid] = Bnn
+                V[fid, list(edges[face])] = Bnt
 
         # diagonal post-scaling to patch up conditioning
         h = coordinate_mapping.cell_size()

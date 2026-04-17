@@ -39,7 +39,10 @@ class TensorProductElement(FiniteElementBase):
             raise ValueError("TensorProductElement got an unexpected keyword argument '%s'" % keywords[0])
         cell = kwargs.get("cell")
 
-        family = "TensorProductElement"
+        try:
+            family, = {e.family() for e in elements}
+        except ValueError:
+            family = "TensorProductElement"
 
         if cell is None:
             # Define cell as the product of each elements cell
@@ -89,7 +92,7 @@ class TensorProductElement(FiniteElementBase):
             orders = []
             for e in elements:
                 # TODO: is this the right value for e_dim
-                e_dim = e.cell.topological_dimension()
+                e_dim = e.cell.topological_dimension
                 e_order = (e.sobolev_space._order,) * e_dim
                 orders.extend(e_order)
             return DirectionalSobolevSpace(orders)

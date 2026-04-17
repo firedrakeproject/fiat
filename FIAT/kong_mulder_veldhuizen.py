@@ -6,91 +6,64 @@
 # This file is part of FIAT (https://www.fenicsproject.org)
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
-import numpy
-from FIAT import (
-    finite_element,
-    dual_set,
-    functional,
-    Bubble,
-    FacetBubble,
-    IntegratedLegendre,
-    Lagrange,
-    NodalEnrichedElement,
-    RestrictedElement,
-)
+from FIAT import finite_element, functional, dual_set
+from FIAT.check_format_variant import parse_lagrange_variant
+from FIAT.expansions import polynomial_entity_ids
+from FIAT.polynomial_set import ONPolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import TRIANGLE, TETRAHEDRON
-
-
-def _get_entity_ids(ref_el, points, tol=1e-12):
-    """The topological association in a dictionary"""
-    top = ref_el.topology
-    invtop = {top[d][e]: (d, e) for d in top for e in top[d]}
-    bary = ref_el.compute_barycentric_coordinates(points)
-
-    entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
-    for i in numpy.lexsort(bary.T):
-        verts = tuple(numpy.flatnonzero(abs(bary[i]) > tol))
-        dim, entity = invtop[verts]
-        entity_ids[dim][entity].append(i)
-    return entity_ids
+from FIAT.reference_element import LINE, TRIANGLE, TETRAHEDRON
+import math
 
 
 def bump(T, deg):
-    """Increase degree of polynomial along face/edges"""
+    """Return a tuple with the degree raise for each codimension"""
     sd = T.get_spatial_dimension()
-    if deg == 1:
-        return (0, 0)
-    else:
-        if sd == 2:
-            if deg < 5:
-                return (1, 1)
-            elif deg == 5 or deg == 6:
-                return (2, 2)
-            else:
-                raise ValueError("Degree not supported")
-        elif sd == 3:
-            if deg < 4:
-                return (1, 2)
-            else:
-                raise ValueError("Degree not supported")
+    if deg == 1 or sd == 1:
+        return ()
+    elif sd == 2:
+        if deg < 5:
+            return (1,)
+        elif deg == 5 or deg == 6:
+            return (2,)
         else:
-            raise ValueError("Dimension of element is not supported")
-
-
-def KongMulderVeldhuizenSpace(T, deg):
-    sd = T.get_spatial_dimension()
-    if deg == 1:
-        return Lagrange(T, 1).poly_set
+            raise ValueError("Degree not supported")
+    elif sd == 3:
+        if deg < 4:
+            return (2, 1)
+        else:
+            raise ValueError("Degree not supported")
     else:
-        # NOTE The Lagrange bubbles may lead to an ill-conditioned
-        # Vandermonde system (depending on the points and expansion set).
-        variant = "integral"
-        L = IntegratedLegendre(T, deg, variant=variant)
-        # Toss the bubble from Lagrange since it's dependent
-        # on the higher-dimensional bubbles
-        RL = RestrictedElement(L, restriction_domain="edge")
+        raise ValueError("Dimension of element is not supported")
 
-        # interior cell bubble
-        facet_bump, interior_bump = bump(T, deg)
-        B = Bubble(T, deg + interior_bump, variant=variant)
 
-        elems = [RL, B]
-        if sd == 3:
-            # bubble on the facet
-            elems.append(FacetBubble(T, deg + facet_bump, variant=variant))
+def KongMulderVeldhuizenSpace(ref_el, deg):
+    sd = ref_el.get_spatial_dimension()
+    degree = [deg] * (sd+1)
+    for codim, degree_raise in enumerate(bump(ref_el, deg)):
+        degree[sd-codim] += degree_raise
 
-        return NodalEnrichedElement(*elems).get_nodal_basis()
+    k = max(degree)
+    P = ONPolynomialSet(ref_el, k, variant="bubble")
+    U = P.get_expansion_set()
+    entity_ids = polynomial_entity_ids(ref_el, k, continuity=U.continuity)
+
+    ids = []
+    for dim in entity_ids:
+        num_bubbles = math.comb(degree[dim] - 1, dim)
+        for entity in entity_ids[dim]:
+            ids.extend(entity_ids[dim][entity][:num_bubbles])
+    return P.take(ids)
 
 
 class KongMulderVeldhuizenDualSet(dual_set.DualSet):
     """The dual basis for KMV simplical elements."""
 
     def __init__(self, ref_el, degree):
-        lr = create_quadrature(ref_el, degree, scheme="KMV")
-        entity_ids = _get_entity_ids(ref_el, lr.get_points())
-        nodes = [functional.PointEvaluation(ref_el, x) for x in lr.pts]
-        super(KongMulderVeldhuizenDualSet, self).__init__(nodes, ref_el, entity_ids)
+        Q = create_quadrature(ref_el, degree, scheme="KMV")
+        points = Q.get_points()
+        entity_ids = ref_el.point_entity_ids(points)
+        nodes = [functional.PointEvaluation(ref_el, x) for x in points]
+        super().__init__(nodes, ref_el, entity_ids)
 
 
 class KongMulderVeldhuizen(finite_element.CiarletElement):
@@ -114,9 +87,13 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
 
     """
 
-    def __init__(self, ref_el, degree):
-        if ref_el.shape not in {TRIANGLE, TETRAHEDRON}:
-            raise ValueError("KMV is only valid for triangles and tetrahedrals")
+    def __init__(self, ref_el, degree, variant=None):
+        splitting, variant = parse_lagrange_variant(variant)
+        if splitting:
+            ref_el = splitting(ref_el)
+
+        if ref_el.shape not in {LINE, TRIANGLE, TETRAHEDRON}:
+            raise ValueError("KMV is only valid for simplices of dimension <= 3.")
         if degree > 6 and ref_el.shape == TRIANGLE:
             raise NotImplementedError("Only P < 7 for triangles are implemented.")
         if degree > 3 and ref_el.shape == TETRAHEDRON:
@@ -125,6 +102,4 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
 
         dual = KongMulderVeldhuizenDualSet(ref_el, degree)
         formdegree = 0  # 0-form
-        super(KongMulderVeldhuizen, self).__init__(
-            S, dual, degree + max(bump(ref_el, degree)), formdegree
-        )
+        super().__init__(S, dual, S.degree, formdegree)
