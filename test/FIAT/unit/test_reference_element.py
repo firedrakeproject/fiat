@@ -459,16 +459,23 @@ def test_flatten_maintains_ufc_status(cell):
                          [(interval_x_interval, [0.25, 0.6]),
                           (triangle_x_interval, [0.25, 0.25, 0.5]),
                           (quadrilateral_x_interval, [0.25, 0.25, 0.5])])
-def test_tensorproduct_barycentrics_match_factor_cells(cell, point):
-    bary_axes = cell.compute_axis_barycentric_coordinates(point)
-   
+def test_tp_axis_bary_coords(cell, point, epsilon=1e-12):
+    point = np.asarray(point)
+    axis_bary_coords = cell.compute_axis_barycentric_coordinates(point)
+
+    assert type(axis_bary_coords) is np.ndarray
+
     offset = 0
-    for k, factor in enumerate(cell.simplex_cells):
+    bary_offset = 0
+    for factor in cell.cells:
         sd = factor.get_spatial_dimension()
-        coords_k = point[offset: offset+sd] # coords on factor cell k
+        coords_k = point[offset: offset + sd]
         offset += sd
         expected = factor.compute_barycentric_coordinates(coords_k)
-        assert np.allclose(bary_axes[k], expected)
+        n_bary = len(expected)
+        assert np.allclose(axis_bary_coords[bary_offset: bary_offset + n_bary], expected, atol=epsilon)
+        bary_offset += n_bary
+
 
 @pytest.mark.parametrize(('cell', 'point'),
                          [(quadrilateral, [0.0, 0.3]),
@@ -481,14 +488,22 @@ def test_tensorproduct_barycentrics_match_factor_cells(cell, point):
                           (hexahedron, [0.3, 1.0, 0.4]),
                           (hexahedron, [0.3, 0.4, 0.0]),
                           (hexahedron, [0.3, 0.4, 1.0]),])
-def test_hypercube_barycentrics_match_facet_order(cell, point, epsilon=1e-14):
+def test_hypercube_bary_coords_are_in_facet_order(cell, point, epsilon=1e-12):
+    point = np.asarray(point)
+
     facet_dim = cell.get_spatial_dimension() - 1
     point_entity_ids = cell.point_entity_ids([point])
     facet_hits = [fid for fid, pts in point_entity_ids[facet_dim].items() if len(pts) > 0]
     assert len(facet_hits) == 1
+
     facet_id = facet_hits[0]
-    bary = cell.compute_barycentric_coordinates(point)
-    assert np.isclose(bary[0, facet_id], 0.0, atol=epsilon)
+    bary_coords = cell.compute_barycentric_coordinates(point)
+    assert np.isclose(bary_coords[facet_id], 0.0, atol=epsilon)
+
+    mask = np.ones(len(bary_coords), dtype=bool)
+    mask[facet_id] = False
+    assert np.all(bary_coords[mask] > epsilon)
+
 
 if __name__ == '__main__':
     import os
