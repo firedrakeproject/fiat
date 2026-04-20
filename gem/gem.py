@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """GEM is the intermediate language of TSFC for describing
 tensor-valued mathematical expressions and tensor operations.
 It is similar to Einstein's notation.
@@ -19,6 +21,8 @@ from itertools import chain, repeat
 from functools import partial, reduce
 from operator import attrgetter
 from numbers import Integral, Number
+
+from types import EllipsisType
 
 import numpy
 from numpy import asarray
@@ -80,20 +84,18 @@ class Node(NodeBase, metaclass=NodeMeta):
         if result:
             self.children = other.children
         return result
-    
-    def __getitem__(self, key):
-        """
-        Generalised indexing interface.
 
-        Parameters
-        ----------
-        key: int, Index, VariableIndex, slice, Ellipsis or tuple
-        """
-        # Normalize to tuple so we can inspect the key
+    def __getitem__(
+        self,
+        key: int | Index | VariableIndex | slice | EllipsisType |
+            tuple[int | Index | VariableIndex | slice | EllipsisType, ...]
+    ) -> ComponentTensor | Indexed:
+        """A generalised interface for indexing a Gem.Node"""
+
         if not isinstance(key, tuple):
             key = (key,)
 
-        # Expand ellipsis -> fill remaining dimensions with slice(None)
+        # Expand ellipsis -> fill in remaining dimensions with slice(None)
         if Ellipsis in key:
             if key.count(Ellipsis) > 1:
                 raise NotImplementedError("Multiple ellipses are not supported when indexing a gem.Node tensor")
@@ -106,6 +108,7 @@ class Node(NodeBase, metaclass=NodeMeta):
                 + (slice(None), ) * num_missing
                 + key[ellipsis_pos + 1:]
             )
+
         # Slice indexing -> delegate to view()
         if any(isinstance(k, slice) for k in key):
             # view expects one slice for each axis/dim of the tensor
@@ -115,14 +118,6 @@ class Node(NodeBase, metaclass=NodeMeta):
         # Point indexing -> delegate to Index
         else:
             return Indexed(self, key)
-
-    # OLD       
-    # def __getitem__(self, indices):
-    #     try:
-    #         indices = tuple(indices)
-    #     except TypeError:
-    #         indices = (indices, )
-    #     return Indexed(self, indices)
 
     def __neg__(self):
         return componentwise(Product, minus, self)
@@ -153,7 +148,7 @@ class Node(NodeBase, metaclass=NodeMeta):
             raise ValueError("Both objects must have shape for matmul")
         elif self.shape[-1] != other.shape[0]:
             raise ValueError(f"Mismatching shapes {self.shape} and {other.shape} in matmul")
-        
+
         *i, k = indices(len(self.shape))
         _, *j = indices(len(other.shape))
         expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
@@ -1382,7 +1377,7 @@ def as_gem(expr):
     """
     if isinstance(expr, Node):
         return expr
-    elif isinstance(expr, Number) or isinstance(expr, numpy.ndarray):
+    elif isinstance(expr, Number):
         return Literal(expr)
     elif isinstance(expr, (bool, numpy.bool)):
         return Literal(bool(expr))
