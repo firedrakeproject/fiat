@@ -1413,44 +1413,40 @@ class TensorProductCell(Cell):
     def is_macrocell(self):
         return any(c.is_macrocell() for c in self.cells)
     
-    @property
-    def simplex_cells(self):
-        """Return a flattened list of simplex axis factors.
+    # @property
+    # def simplex_cells(self):
+    #     """Return a flattened list of simplex axis factors.
         
-        Example:
-        interval_x_interval -> (UFCInterval(), UFCInterval())
-        quadrilateral_x_interval -> (UFCInterval(), UFCInterval(), UFCInterval())
-        hexahedron -> (UFCInterval(), UFCInterval(), UFCInterval())
-        """
-        if not hasattr(self, "_simplex_cells"):
-            def _flatten(cell):
-                if cell.is_simplex():
-                    return [cell]
-                if hasattr(cell, "product"):
-                    return _flatten(cell.product)
-                if isinstance(cell, TensorProductCell):
-                    out = []
-                    for sub in cell.cells:
-                        out.extend(_flatten(sub))
-                    return out
-                raise NotImplementedError(f"Cannot flatten factor {cell}")
-            out = []
-            for c in self.cells:
-                out.extend(_flatten(c))
-            self._simplex_cells = tuple(out)
-        return self._simplex_cells
+    #     Example:
+    #     interval_x_interval -> (UFCInterval(), UFCInterval())
+    #     quadrilateral_x_interval -> (UFCInterval(), UFCInterval(), UFCInterval())
+    #     hexahedron -> (UFCInterval(), UFCInterval(), UFCInterval())
+    #     """
+    #     if not hasattr(self, "_simplex_cells"):
+    #         def _flatten(cell):
+    #             if cell.is_simplex():
+    #                 return [cell]
+    #             if hasattr(cell, "product"):
+    #                 return _flatten(cell.product)
+    #             if isinstance(cell, TensorProductCell):
+    #                 out = []
+    #                 for sub in cell.cells:
+    #                     out.extend(_flatten(sub))
+    #                 return out
+    #             raise NotImplementedError(f"Cannot flatten factor {cell}")
+    #         out = []
+    #         for c in self.cells:
+    #             out.extend(_flatten(c))
+    #         self._simplex_cells = tuple(out)
+    #     return self._simplex_cells
         
     def compute_axis_barycentric_coordinates(self, points, entity=None, rescale=False):
-        """Compute axis-structured barycentric coordinates on a tensor-product cell.
+        """Compute barycentric coordinates on each axis (factor) of a tensor-product cell.
 
         Parameters
         ----------
         points: numpy.ndarray or GEM.Node
             The reference coordinates of the points.
-
-        NOTE: 
-            Should we support computing barycentric coordinates on cell entities? 
-            Should we support rescaling the barycentric coordinates?
 
         Returns
         -------
@@ -1462,17 +1458,14 @@ class TensorProductCell(Cell):
         if isinstance(points, numpy.ndarray) and len(points) == 0:
             return points
         
-        # Find all simplex factors of the tensor-product cells
-        flat_factors = self.simplex_cells
-
-        axis_dims = [c.get_spatial_dimension() for c in flat_factors]
+        axis_dims = [c.get_spatial_dimension() for c in self.cells]
         point_slices = TensorProductCell._split_slices(axis_dims)
         bary_coord_per_axis = []
 
-        # Compute barycentric coordinates on each axis
-        for factor, s in zip(flat_factors, point_slices):
-            # symbolic or numpy slicing
-            # axis_points = gem.view(points, s) if isinstance(points, gem.Node) else numpy.asarray(points)[...,s]
+        # Compute barycentric coordinates on each factor
+        for factor, s in zip(self.cells, point_slices):
+            # support symbolic or numpy slicing in the same way
+            # previously did: axis_points = gem.view(points, s) if isinstance(points, gem.Node) else numpy.asarray(points)[...,s]
             axis_points = points[..., s]
             bary_axis = factor.compute_barycentric_coordinates(axis_points, entity, rescale)
             bary_coord_per_axis.append(bary_axis)
@@ -1633,7 +1626,7 @@ class Hypercube(Cell):
         # describing for each local facet `lf` which axis of the TP cell it corresponds to and which barycentric coordinate
         # on that axis vanishes on the said facet.
 
-        # We use `self.facet_perm` to reorder the barycentric coordinates in facet order
+        # We use `self.facet_perm` to reorder the barycentric coordinates in facet order 
         if isinstance(tp_bary_coords[0], gem.Node):
             # breakpoint()
             components = [

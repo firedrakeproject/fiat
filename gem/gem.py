@@ -154,18 +154,10 @@ class Node(NodeBase, metaclass=NodeMeta):
         elif self.shape[-1] != other.shape[0]:
             raise ValueError(f"Mismatching shapes {self.shape} and {other.shape} in matmul")
         
-        if self.shape[-1] == 1:
-            # Avoid generation of contraction loops over singleton dimensions (extent-1 indices)
-            i = indices(len(self.shape) - 1) # non-contracted axes of self
-            j = indices(len(other.shape) - 1) # non-contracted axes of other
-            expr = Product(Indexed(self, (*i, 0)), Indexed(other, (0, *j))) # scalar expr with free indices i and j
-            return ComponentTensor(expr, (*i, *j)) 
-        
-        else: 
-            *i, k = indices(len(self.shape))
-            _, *j = indices(len(other.shape))
-            expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
-            return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
+        *i, k = indices(len(self.shape))
+        _, *j = indices(len(other.shape))
+        expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
+        return ComponentTensor(IndexSum(expr, (k, )), (*i, *j))
 
     def __rmatmul__(self, other):
         return as_gem(other).__matmul__(self)
