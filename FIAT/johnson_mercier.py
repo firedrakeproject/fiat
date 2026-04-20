@@ -17,7 +17,7 @@ class JohnsonMercierDualSet(dual_set.DualSet):
         entity_ids = {dim: {entity: [] for entity in sorted(top[dim])} for dim in sorted(top)}
         nodes = []
 
-        # Face dofs: bidirectional (nn and nt) Legendre moments
+        # Face dofs: bidirectional (nn and nt) moments
         dim = sd - 1
         R = numpy.array([[0, 1], [-1, 0]])
         ref_facet = ref_el.construct_subelement(dim)
@@ -28,9 +28,18 @@ class JohnsonMercierDualSet(dual_set.DualSet):
             cur = len(nodes)
             Q = FacetQuadratureRule(ref_el, dim, f, Qref, avg=True)
             thats = ref_el.compute_tangents(dim, f)
-            nhat = numpy.dot(R, *thats) if sd == 2 else numpy.cross(*thats)
+            if sd == 2:
+                # Face moments of sigma.n against n P1 and t P1
+                nhat = numpy.dot(R, *thats)
+                components = (nhat, *thats)
+            else:
+                # Face moments of sigma.n against n P1 and (n x t_j) P1
+                nhat = numpy.cross(*thats)
+                ncrosst = numpy.cross(nhat[None, :], thats, axis=1)
+                components = (nhat, *ncrosst)
+
             nodes.extend(TensorBidirectionalIntegralMoment(ref_el, nhat, comp, Q, phi)
-                         for phi in phis for comp in (nhat, *thats))
+                         for phi in phis for comp in components)
             entity_ids[dim][f].extend(range(cur, len(nodes)))
 
         cur = len(nodes)

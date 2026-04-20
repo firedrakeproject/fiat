@@ -301,3 +301,14 @@ if petsctools is not None:
   pages={809--820},
   year={1970}
 }""")
+    petsctools.add_citation("Xie2008", """
+@article{Xie2008,
+ title={{Uniformly-stable finite element methods for Darcy-Stokes-Brinkman models}},
+ author = {Xiaoping Xie and Jinchao Xu and Guangri Xue},
+ journal = {Journal of Computational Mathematics},
+ number = {3},
+ pages = {437--455},
+ volume = {26},
+ year = {2008}
+}
+}""")
