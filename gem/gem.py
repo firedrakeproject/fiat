@@ -23,6 +23,7 @@ from operator import attrgetter
 from numbers import Integral, Number
 
 from types import EllipsisType
+import itertools
 
 import numpy
 from numpy import asarray
@@ -87,37 +88,65 @@ class Node(NodeBase, metaclass=NodeMeta):
 
     def __getitem__(
         self,
-        key: int | Index | VariableIndex | slice | EllipsisType |
-            tuple[int | Index | VariableIndex | slice | EllipsisType, ...]
-    ) -> ComponentTensor | Indexed:
+        key: int | Index | VariableIndex | slice | EllipsisType | list | numpy.ndarray |
+            tuple[int | Index | VariableIndex | slice | EllipsisType, ...],
+    ) -> ComponentTensor | Indexed | ListTensor:
         """A generalised interface for indexing a Gem.Node"""
-
+        # Normalize to tuple for inspection
         if not isinstance(key, tuple):
             key = (key,)
+
+        # Support a list or array of integer indices
+        if any(isinstance(k, (list, numpy.ndarray)) for k in key):
+            pos = next(i for i, k in enumerate(key) if isinstance(k, (list, numpy.ndarray)))
+            components = numpy.array(
+                [Indexed(self, key[:pos] + (int(i),) + key[pos + 1:]) for i in key[pos]],
+                dtype=object
+            )
+            return as_gem(components)
 
         # Expand ellipsis -> fill in remaining dimensions with slice(None)
         if Ellipsis in key:
             if key.count(Ellipsis) > 1:
-                raise NotImplementedError("Multiple ellipses are not supported when indexing a gem.Node tensor")
+                raise NotImplementedError("Multiple ellipses are not supported.")
             ellipsis_pos = key.index(Ellipsis)
-            num_missing = len(self.shape) - (len(key) - 1)
-            if num_missing < 0:
-                raise IndexError("Too many indices provided when indexing the gem.Node tensor")
+            remaining_dims = len(self.shape) - (len(key) - 1)
+            if remaining_dims < 0:
+                raise IndexError("Too many indices provided.")
             key = (
                 key[:ellipsis_pos]
-                + (slice(None), ) * num_missing
+                + (slice(None), ) * remaining_dims
                 + key[ellipsis_pos + 1:]
             )
 
         # Slice indexing -> delegate to view()
+        # NOTE: view() produces a ComponentTensor with a FlexiblyIndexed Node that gem's evaluator cannot evaluate
+        # if any(isinstance(k, slice) for k in key):
+        #     # view expects one slice for each axis/dim of the tensor
+        #     if len(key) != len(self.shape):
+        #         raise IndexError("Expects the number of slices to match the gem.Node tensor rank")
+        #     return view(self, *key)
+
+        # Slice indexing -> build ListTensor of Indexed nodes
         if any(isinstance(k, slice) for k in key):
-            # view expects one slice for each axis/dim of the tensor
             if len(key) != len(self.shape):
-                raise IndexError("Slice indexing expects the number of slices to match the gem.Node tensor rank")
-            return view(self, *key)
-        # Point indexing -> delegate to Index
-        else:
-            return Indexed(self, key)
+                raise IndexError("Expects one key per dimension.")
+            # Unpack slices into ranges
+            ranges = [
+                range(
+                    k.start if k.start is not None else 0,
+                    k.stop if k.stop is not None else s,
+                    k.step if k.step is not None else 1
+                ) for k, s in zip(key, self.shape)
+            ]
+            # Extract tensor indices from the cartesian product of ranges
+            components = numpy.array(
+                [Indexed(self, idx) for idx in itertools.product(*ranges)],
+                dtype=object).reshape([len(r) for r in ranges])
+            return as_gem(components)
+
+        # Point indexing
+        return Indexed(self, key)
 
     def __neg__(self):
         return componentwise(Product, minus, self)

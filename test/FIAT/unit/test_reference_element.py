@@ -505,6 +505,30 @@ def test_hypercube_bary_coords_are_in_facet_order(cell, point, epsilon=1e-12):
     assert np.all(bary_coords[mask] > epsilon)
 
 
+@pytest.mark.parametrize(('cell', 'point'),
+                         [(interval, [0.5]),
+                          (triangle, [0.25, 0.25]),
+                          (tetrahedron, [0.25, 0.25, 0.25]),
+                          (quadrilateral, [0.25, 0.5]),
+                          (hexahedron, [0.25, 0.5, 0.25]),])
+def test_bary_coords_gem(cell, point):
+    import gem
+    from gem.interpreter import evaluate
+
+    point = np.asarray(point)
+    sd = cell.get_spatial_dimension()
+
+    coords = gem.Variable('X', (sd,))
+    bindings = {coords: point}
+
+    bary_gem = cell.compute_barycentric_coordinates(coords)
+    results, = evaluate((gem.as_gem(bary_gem),), bindings=bindings)
+    results = results.arr
+
+    bary_numpy = cell.compute_barycentric_coordinates(point)
+    assert np.allclose(results, bary_numpy)
+
+
 if __name__ == '__main__':
     import os
     pytest.main(os.path.abspath(__file__))
