@@ -106,7 +106,7 @@ register_element("Gopalakrishnan-Lederer-Schoberl 2nd kind", "GLS2", 2, HCurlDiv
 
 register_element("Nonconforming Arnold-Winther", "AWnc", 2, HDiv, "double contravariant Piola", (2, 2), ("triangle",))
 register_element("Conforming Arnold-Winther", "AWc", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
-register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle"))
+register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
 
 # Zany elements
 register_element("Bernardi-Raugel", "BR", 1, H1, "contravariant Piola", (1, None), simplices[1:])
@@ -148,7 +148,7 @@ register_element("Quadrature", "Quadrature", 0, L2, "identity", (0, None), any_c
 register_element("Real", "R", 0, HInf, "identity", (0, 0), any_cell + ("TensorProductCell",))
 register_element("Undefined", "U", 0, L2, "identity", (0, None), any_cell)
 register_element("Radau", "Rad", 0, L2, "identity", (0, None), ("interval",))
-register_element("HDiv Trace", "HDivT", 0, L2, "identity", (0, None), any_cell)
+register_element("HDiv Trace", "HDivT", 0, L2, "identity", (0, None), (None, *simplices[1:], *cubes[1:], "prism", "pyramid"))
 
 # Spectral elements.
 register_element("Gauss-Legendre", "GL", 0, L2, "identity", (0, None), ("interval",))
@@ -181,8 +181,8 @@ register_alias("DGT",
                lambda family, dim, order, degree: ("HDiv Trace", order))
 
 # New elements introduced for the periodic table 2014
-register_element("Q", None, 0, H1, "identity", (1, None), cubes)
-register_element("DQ", None, 0, L2, "identity", (0, None), cubes)
+register_element("Q", None, 0, H1, "identity", (1, None), cubes[1:])
+register_element("DQ", None, 0, L2, "identity", (0, None), cubes[1:])
 register_element("RTCE", None, 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
 register_element("RTCF", None, 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
 register_element("NCE", None, 1, HCurl, "covariant Piola", (1, None), ("hexahedron",))
@@ -223,7 +223,7 @@ register_alias("N2F", lambda family, dim, order,
 
 # discontinuous elements using l2 pullbacks
 register_element("DPC L2", None, 0, L2, "L2 Piola", (1, None), cubes)
-register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes)
+register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes[1:])
 register_element("Gauss-Legendre L2", "GL L2", 0, L2, "L2 Piola", (0, None),
                  ("interval",))
 register_element("Discontinuous Lagrange L2", "DG L2", 0, L2, "L2 Piola", (0, None),
