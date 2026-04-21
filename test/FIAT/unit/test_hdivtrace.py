@@ -23,7 +23,7 @@ import pytest
 import numpy as np
 
 
-@pytest.mark.parametrize("dim", (2, 3))
+@pytest.mark.parametrize("dim", (1, 2, 3))
 @pytest.mark.parametrize("degree", range(7))
 @pytest.mark.parametrize("variant", ("spectral", "integral"))
 def test_basis_values(dim, degree, variant):
@@ -56,17 +56,21 @@ def test_basis_values(dim, degree, variant):
                                      entity)[(0,) * dim][nf*facet_id:nf*(facet_id + 1)]
 
         for test_degree in range(degree + 1):
-            coeffs = [n(lambda x: x[0]**test_degree)
-                      for n in facet_element.dual.nodes]
+            if dim == 1:
+                f = lambda x: 1
+            else:
+                f = lambda x: x[0]**test_degree
 
+            coeffs = [n(f) for n in facet_element.dual.nodes]
             cintegral = np.dot(coeffs, np.dot(ctab, quadrule.wts))
             eintegral = np.dot(coeffs, np.dot(etab, quadrule.wts))
             assert np.allclose(cintegral, eintegral, rtol=1e-14)
 
-            reference = np.dot([x[0]**test_degree
-                                for x in quadrule.pts], quadrule.wts)
+            reference = np.dot(list(map(f, quadrule.pts)), quadrule.wts)
             assert np.allclose(cintegral, reference, rtol=1e-14)
             assert np.allclose(eintegral, reference, rtol=1e-14)
+            if dim == 1:
+                break
 
 
 @pytest.mark.parametrize("degree", range(4))
@@ -100,7 +104,7 @@ def test_quad_trace(degree):
             assert np.allclose(integral, reference, rtol=1e-14)
 
 
-@pytest.mark.parametrize("dim", (2, 3))
+@pytest.mark.parametrize("dim", (1, 2, 3))
 @pytest.mark.parametrize("order", range(1, 4))
 @pytest.mark.parametrize("degree", range(4))
 def test_gradient_traceerror(dim, order, degree):
@@ -120,7 +124,7 @@ def test_gradient_traceerror(dim, order, degree):
                 assert isinstance(tab[key], TraceError)
 
 
-@pytest.mark.parametrize("dim", (2, 3))
+@pytest.mark.parametrize("dim", (1, 2, 3))
 @pytest.mark.parametrize("degree", range(4))
 def test_cell_traceerror(dim, degree):
     """Ensure that the TraceError appears in all dict entries when deliberately

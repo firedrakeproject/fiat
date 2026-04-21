@@ -148,7 +148,7 @@ register_element("Quadrature", "Quadrature", 0, L2, "identity", (0, None), any_c
 register_element("Real", "R", 0, HInf, "identity", (0, 0), any_cell + ("TensorProductCell",))
 register_element("Undefined", "U", 0, L2, "identity", (0, None), any_cell)
 register_element("Radau", "Rad", 0, L2, "identity", (0, None), ("interval",))
-register_element("HDiv Trace", "HDivT", 0, L2, "identity", (0, None), (None, *simplices[1:], *cubes[1:], "prism", "pyramid"))
+register_element("HDiv Trace", "HDivT", 0, L2, "identity", (0, None), any_cell)
 
 # Spectral elements.
 register_element("Gauss-Legendre", "GL", 0, L2, "identity", (0, None), ("interval",))

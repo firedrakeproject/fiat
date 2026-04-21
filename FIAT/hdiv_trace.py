@@ -54,7 +54,7 @@ class HDivTrace(FiniteElement):
         :arg variant: The point distribution variant passed on to recursivenodes.
         """
         sd = ref_el.get_spatial_dimension()
-        if sd in (0, 1):
+        if sd == 0:
             raise ValueError("Cannot take the trace of a %d-dim cell." % sd)
 
         # Store the degrees if on a tensor product cell
@@ -68,7 +68,7 @@ class HDivTrace(FiniteElement):
                 "Number of specified degrees must be equal to the number of cells."
             )
         else:
-            if ref_el.get_shape() not in [TRIANGLE, TETRAHEDRON, QUADRILATERAL]:
+            if ref_el.get_shape() not in [LINE, TRIANGLE, TETRAHEDRON, QUADRILATERAL]:
                 raise NotImplementedError(
                     "Trace element on a %s not implemented" % type(ref_el)
                 )
@@ -169,7 +169,7 @@ class HDivTrace(FiniteElement):
         if entity is None or entity == (sd, 0):
             # NOTE: Numerical approximation of the facet id is currently only
             # implemented for simplex reference cells.
-            if self.ref_el.get_shape() not in [TRIANGLE, TETRAHEDRON]:
+            if self.ref_el.get_shape() not in [LINE, TRIANGLE, TETRAHEDRON]:
                 raise NotImplementedError(
                     "Tabulating this element on a %s cell without providing "
                     "an entity is not currently supported." % type(self.ref_el)
@@ -259,7 +259,9 @@ def construct_dg_element(ref_el, degree, variant):
         DG = Legendre
     else:
         DG = DiscontinuousLagrange
-    if ref_el.get_shape() in [LINE, TRIANGLE]:
+    if ref_el.get_shape() in [POINT, LINE, TRIANGLE]:
+        if ref_el.get_spatial_dimension() == 0:
+            degree = 0
         dg_element = DG(ref_el, degree, variant)
 
     # Quadrilateral facets could be on a FiredrakeQuadrilateral.
@@ -324,6 +326,12 @@ def extract_facets(coordinates, tolerance=epsilon):
             # Handle coordinates not on facets
             return ({}, False)
         facet_to_pts[f].append(ipt)
+
+    if len(coordinates[0]) == 2:
+        # UFCInterval has the i-th point as facet i.
+        # For the higher dimensional UFCSimplex, facet i excludes the i-th point.
+        # If we are on the interval we need to swap the facet ids
+        facet_to_pts[0], facet_to_pts[1] = facet_to_pts[1], facet_to_pts[0]
 
     # If all points are on facets, return indices and success
     return (facet_to_pts, True)
