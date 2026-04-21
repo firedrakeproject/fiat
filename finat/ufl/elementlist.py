@@ -181,8 +181,8 @@ register_alias("DGT",
                lambda family, dim, order, degree: ("HDiv Trace", order))
 
 # New elements introduced for the periodic table 2014
-register_element("Q", None, 0, H1, "identity", (1, None), cubes)
-register_element("DQ", None, 0, L2, "identity", (0, None), cubes)
+register_element("Q", None, 0, H1, "identity", (1, None), cubes[1:])
+register_element("DQ", None, 0, L2, "identity", (0, None), cubes[1:])
 register_element("RTCE", None, 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
 register_element("RTCF", None, 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
 register_element("NCE", None, 1, HCurl, "covariant Piola", (1, None), ("hexahedron",))
@@ -223,7 +223,7 @@ register_alias("N2F", lambda family, dim, order,
 
 # discontinuous elements using l2 pullbacks
 register_element("DPC L2", None, 0, L2, "L2 Piola", (1, None), cubes)
-register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes)
+register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes[1:])
 register_element("Gauss-Legendre L2", "GL L2", 0, L2, "L2 Piola", (0, None),
                  ("interval",))
 register_element("Discontinuous Lagrange L2", "DG L2", 0, L2, "L2 Piola", (0, None),
