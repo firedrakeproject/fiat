@@ -13,3 +13,5 @@ release/
 /docs/source/finat.rst
 /docs/source/finat.ufl.rst
 /docs/source/gem.rst
+
+firedrake_fiat.egg-info/
