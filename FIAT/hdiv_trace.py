@@ -260,8 +260,6 @@ def construct_dg_element(ref_el, degree, variant):
     else:
         DG = DiscontinuousLagrange
     if ref_el.get_shape() in [POINT, LINE, TRIANGLE]:
-        if ref_el.get_spatial_dimension() == 0:
-            degree = 0
         dg_element = DG(ref_el, degree, variant)
 
     # Quadrilateral facets could be on a FiredrakeQuadrilateral.
