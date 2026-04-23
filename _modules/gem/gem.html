@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>gem.gem &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>gem.gem &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">gem.gem</a></li> 
       </ul>
@@ -54,7 +54,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCMeta</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">repeat</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">reduce</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span><span class="p">,</span> <span class="n">reduce</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">operator</span><span class="w"> </span><span class="kn">import</span> <span class="n">attrgetter</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">numbers</span><span class="w"> </span><span class="kn">import</span> <span class="n">Integral</span><span class="p">,</span> <span class="n">Number</span>
 
@@ -74,7 +74,7 @@
            <span class="s1">&#39;IndexSum&#39;</span><span class="p">,</span> <span class="s1">&#39;ListTensor&#39;</span><span class="p">,</span> <span class="s1">&#39;Concatenate&#39;</span><span class="p">,</span> <span class="s1">&#39;Delta&#39;</span><span class="p">,</span> <span class="s1">&#39;OrientationVariableIndex&#39;</span><span class="p">,</span>
            <span class="s1">&#39;index_sum&#39;</span><span class="p">,</span> <span class="s1">&#39;partial_indexed&#39;</span><span class="p">,</span> <span class="s1">&#39;reshape&#39;</span><span class="p">,</span> <span class="s1">&#39;view&#39;</span><span class="p">,</span>
            <span class="s1">&#39;indices&#39;</span><span class="p">,</span> <span class="s1">&#39;as_gem&#39;</span><span class="p">,</span> <span class="s1">&#39;FlexiblyIndexed&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;Inverse&#39;</span><span class="p">,</span> <span class="s1">&#39;Solve&#39;</span><span class="p">,</span> <span class="s1">&#39;extract_type&#39;</span><span class="p">,</span> <span class="s1">&#39;uint_type&#39;</span><span class="p">]</span>
+           <span class="s1">&#39;Inverse&#39;</span><span class="p">,</span> <span class="s1">&#39;Solve&#39;</span><span class="p">,</span> <span class="s1">&#39;extract_type&#39;</span><span class="p">,</span> <span class="s1">&#39;uint_type&#39;</span><span class="p">,</span> <span class="s1">&#39;Piecewise&#39;</span><span class="p">]</span>
 
 
 <span class="n">uint_type</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">uintc</span><span class="p">)</span>
@@ -131,6 +131,9 @@
             <span class="n">indices</span> <span class="o">=</span> <span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="p">)</span>
         <span class="k">return</span> <span class="n">Indexed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="fm">__neg__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">minus</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
@@ -138,9 +141,7 @@
         <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__sub__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span>
-            <span class="n">Sum</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span>
-            <span class="n">componentwise</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="o">-</span><span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rsub__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__sub__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
@@ -166,6 +167,24 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rmatmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__matmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__abs__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">MathFunction</span><span class="p">,</span> <span class="s2">&quot;abs&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__pow__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Power</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&lt;=&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&gt;=&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">T</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -330,7 +349,6 @@
     <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dtype&#39;</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="n">array</span> <span class="o">=</span> <span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">Literal</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -369,7 +387,10 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">shape</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__bool__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
 
 
 
@@ -662,8 +683,8 @@
 
 <div class="viewcode-block" id="Conditional">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Conditional">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">Conditional</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,</span> <span class="s1">&#39;shape&#39;</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Conditional</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">then</span><span class="p">,</span> <span class="n">else_</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">condition</span><span class="o">.</span><span class="n">shape</span>
@@ -676,7 +697,6 @@
 
         <span class="bp">self</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">Conditional</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="n">condition</span><span class="p">,</span> <span class="n">then</span><span class="p">,</span> <span class="n">else_</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">then</span><span class="o">.</span><span class="n">shape</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">Node</span><span class="o">.</span><span class="n">inherit_dtype_from_children</span><span class="p">((</span><span class="n">then</span><span class="p">,</span> <span class="n">else_</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span></div>
 
@@ -1448,6 +1468,7 @@
 
 <span class="c1"># Static one object for quicker constant folding</span>
 <span class="n">one</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">minus</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 
 
 <span class="c1"># Syntax sugar</span>
@@ -1510,6 +1531,14 @@
         <span class="k">return</span> <span class="n">expr</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Number</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">bool</span><span class="p">)):</span>
+        <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">expr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">object</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="n">as_gem</span><span class="p">)(</span><span class="n">expr</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ListTensor</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Do not know how to convert </span><span class="si">%r</span><span class="s2"> to GEM&quot;</span> <span class="o">%</span> <span class="n">expr</span><span class="p">)</span></div>
 
@@ -1548,6 +1577,37 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Collects objects of type klass in expressions.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">traversal</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">klass</span><span class="p">))</span></div>
 
+
+
+<div class="viewcode-block" id="Piecewise">
+<a class="viewcode-back" href="../../gem.html#gem.gem.Piecewise">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">Piecewise</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents a piecewise function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    *args</span>
+<span class="sd">        Each argument is a 2-tuple defining an expression and condition.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Node</span>
+<span class="sd">        A nested Conditional.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">expr</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">pieces</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">bool</span><span class="p">,</span> <span class="n">Literal</span><span class="p">))</span> <span class="ow">and</span> <span class="n">c</span><span class="p">:</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>
+            <span class="k">break</span>
+        <span class="n">pieces</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">as_gem</span><span class="p">(</span><span class="n">v</span><span class="p">),</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">c</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">expr</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">pieces</span><span class="p">):</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="n">Conditional</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">expr</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">expr</span></div>
+
 </pre></div>
 
             <div class="clearer"></div>
@@ -1579,7 +1639,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">gem.gem</a></li> 
       </ul>

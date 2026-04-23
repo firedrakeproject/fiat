@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FIAT.barycentric_interpolation &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>FIAT.barycentric_interpolation &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT.barycentric_interpolation</a></li> 
       </ul>
@@ -68,22 +68,24 @@
 <span class="sd">    https://doi.org/10.1137/S0036144502417715 Eq. (4.2) &amp; (9.4)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">object</span><span class="p">:</span>
-        <span class="kn">from</span><span class="w"> </span><span class="nn">sympy</span><span class="w"> </span><span class="kn">import</span> <span class="n">simplify</span>
-        <span class="n">sp_simplify</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="n">simplify</span><span class="p">)</span>
+        <span class="c1"># Do not use barycentric interpolation at unknown points</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="o">-</span><span class="n">nodes</span><span class="p">,</span> <span class="n">pts</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+        <span class="n">phis</span> <span class="o">=</span> <span class="p">[</span><span class="n">wi</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">phi</span><span class="p">[:</span><span class="n">i</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">:],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">wi</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">wts</span><span class="p">)]</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">phis</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">sp_simplify</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span>
-    <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="o">-</span><span class="n">nodes</span><span class="p">,</span> <span class="n">pts</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
-    <span class="k">with</span> <span class="n">numpy</span><span class="o">.</span><span class="n">errstate</span><span class="p">(</span><span class="n">divide</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">invalid</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">):</span>
-        <span class="n">numpy</span><span class="o">.</span><span class="n">reciprocal</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
-        <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">wts</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
-        <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">phi</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
-    <span class="n">phi</span><span class="p">[</span><span class="n">phi</span> <span class="o">!=</span> <span class="n">phi</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
-    <span class="n">phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+        <span class="c1"># Use the second barycentric interpolation formula</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="o">-</span><span class="n">nodes</span><span class="p">,</span> <span class="n">pts</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+        <span class="k">with</span> <span class="n">numpy</span><span class="o">.</span><span class="n">errstate</span><span class="p">(</span><span class="n">divide</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">invalid</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">):</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">reciprocal</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">wts</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
+            <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">phi</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
+        <span class="c1"># Replace nan with one</span>
+        <span class="n">phi</span><span class="p">[</span><span class="n">phi</span> <span class="o">!=</span> <span class="n">phi</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
 
-    <span class="n">phi</span> <span class="o">=</span> <span class="n">sp_simplify</span><span class="p">(</span><span class="n">phi</span><span class="p">)</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
     <span class="n">results</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,):</span> <span class="n">phi</span><span class="p">}</span>
     <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
-        <span class="n">phi</span> <span class="o">=</span> <span class="n">sp_simplify</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">dmat</span><span class="p">,</span> <span class="n">phi</span><span class="p">))</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">dmat</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span>
         <span class="n">results</span><span class="p">[(</span><span class="n">r</span><span class="p">,)]</span> <span class="o">=</span> <span class="n">phi</span>
     <span class="k">return</span> <span class="n">results</span></div>
 
@@ -214,7 +216,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT.barycentric_interpolation</a></li> 
       </ul>

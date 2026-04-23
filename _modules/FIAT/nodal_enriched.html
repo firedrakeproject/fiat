@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FIAT.nodal_enriched &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>FIAT.nodal_enriched &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT.nodal_enriched</a></li> 
       </ul>
@@ -50,6 +50,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.dual_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">DualSet</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.finite_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">CiarletElement</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.barycentric_interpolation</span><span class="w"> </span><span class="kn">import</span> <span class="n">LagrangeLineExpansionSet</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;NodalEnrichedElement&#39;</span><span class="p">]</span>
 
@@ -78,36 +79,49 @@
                              <span class="s2">&quot;of NodalEnrichedElement are nodal&quot;</span><span class="p">)</span>
 
         <span class="c1"># Extract common data</span>
-        <span class="n">embedded_degrees</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">]</span>
+        <span class="n">embedded_degrees</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">]</span>
         <span class="n">embedded_degree</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">embedded_degrees</span><span class="p">)</span>
-        <span class="n">degree</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
         <span class="n">order</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_order</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span> \
             <span class="k">else</span> <span class="nb">max</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_formdegree</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
-        <span class="c1"># LagrangeExpansionSet has fixed degree, ensure we grab the highest one</span>
-        <span class="n">elem</span> <span class="o">=</span> <span class="n">elements</span><span class="p">[</span><span class="n">embedded_degrees</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">embedded_degree</span><span class="p">)]</span>
+
+        <span class="c1"># Grab the ExpansionSet defined on the maximal complex with the highest degree</span>
+        <span class="n">elem</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">(),</span> <span class="n">e</span><span class="o">.</span><span class="n">degree</span><span class="p">()))</span>
         <span class="n">ref_el</span> <span class="o">=</span> <span class="n">elem</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">()</span>
         <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">elem</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
         <span class="n">mapping</span> <span class="o">=</span> <span class="n">elem</span><span class="o">.</span><span class="n">mapping</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">value_shape</span> <span class="o">=</span> <span class="n">elem</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span>
 
         <span class="c1"># Sanity check</span>
-        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">()</span> <span class="o">==</span> <span class="n">ref_el</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="n">ref_el</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">mapping</span><span class="p">())</span> <span class="o">==</span> <span class="p">{</span><span class="n">mapping</span><span class="p">,</span> <span class="p">}</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">value_shape</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
 
         <span class="c1"># Merge polynomial sets</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expansion_set</span><span class="p">,</span> <span class="n">LagrangeLineExpansionSet</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expansion_set</span><span class="p">,</span> <span class="n">LagrangeLineExpansionSet</span><span class="p">)</span> <span class="ow">and</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">degree</span> <span class="o">==</span> <span class="n">embedded_degree</span><span class="p">:</span>
             <span class="c1"># Obtain coefficients via interpolation</span>
             <span class="n">points</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">e</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">points</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)]</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">])</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span> <span class="o">==</span> <span class="n">expansion_set</span>
-                       <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span> <span class="o">==</span> <span class="n">expansion_set</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">):</span>
+            <span class="c1"># All elements have the same ExpansionSet, just merge coefficients</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">]</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="n">_merge_coeffs</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">embedded_degrees</span><span class="p">,</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Obtain coefficients via projection</span>
+            <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">embedded_degree</span><span class="p">)</span>
+            <span class="n">qpts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
+            <span class="n">phis</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">_tabulate</span><span class="p">(</span><span class="n">embedded_degree</span><span class="p">,</span> <span class="n">qpts</span><span class="p">,</span> <span class="mi">0</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
+            <span class="n">PhiW</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">phis</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
+            <span class="n">M</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">phis</span><span class="p">,</span> <span class="n">PhiW</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+            <span class="n">MinvPhiW</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">PhiW</span><span class="p">)</span>
+
+            <span class="n">tabulations</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">e</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">tabulations</span><span class="p">,</span> <span class="n">MinvPhiW</span><span class="p">,</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+            <span class="k">assert</span> <span class="n">coeffs</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">value_shape</span>
+
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">PolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span>
-                                 <span class="n">degree</span><span class="p">,</span>
+                                 <span class="n">embedded_degree</span><span class="p">,</span>
                                  <span class="n">embedded_degree</span><span class="p">,</span>
                                  <span class="n">expansion_set</span><span class="p">,</span>
                                  <span class="n">coeffs</span><span class="p">)</span>
@@ -176,7 +190,7 @@
             <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">[</span><span class="n">dim</span><span class="p">]:</span>
                 <span class="k">if</span> <span class="n">entity</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ret</span><span class="p">[</span><span class="n">dim</span><span class="p">]:</span>
                     <span class="n">ret</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
-                <span class="n">ret</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">])</span> <span class="o">+</span> <span class="n">offsets</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+                <span class="n">ret</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">offsets</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="n">dof</span> <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">ids</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">ret</span>
 </pre></div>
 
@@ -209,7 +223,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT.nodal_enriched</a></li> 
       </ul>

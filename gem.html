@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>gem package &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>gem package &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
     
-    <script src="_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="_static/documentation_options.js?v=18367b28"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -29,7 +29,7 @@
         <li class="right" >
           <a href="finat.ufl.html" title="finat.ufl package"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">gem package</a></li> 
       </ul>
     </div>  
@@ -356,15 +356,10 @@ concatenated expression has shape (8,).</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="gem.gem.Conditional">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">gem.gem.</span></span><span class="sig-name descname"><span class="pre">Conditional</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/gem.html#Conditional"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.gem.Conditional" title="Link to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><code class="xref py py-class docutils literal notranslate"><span class="pre">Node</span></code></a></p>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Scalar</span></code></p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="gem.gem.Conditional.children">
 <span class="sig-name descname"><span class="pre">children</span></span><a class="headerlink" href="#gem.gem.Conditional.children" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="gem.gem.Conditional.shape">
-<span class="sig-name descname"><span class="pre">shape</span></span><a class="headerlink" href="#gem.gem.Conditional.shape" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>
@@ -776,6 +771,26 @@ is not supported (indices are not <cite>Node</cite>).</p>
 </section>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="gem.gem.Piecewise">
+<span class="sig-prename descclassname"><span class="pre">gem.gem.</span></span><span class="sig-name descname"><span class="pre">Piecewise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/gem.html#Piecewise"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.gem.Piecewise" title="Link to this definition">¶</a></dt>
+<dd><p>Represents a piecewise function.</p>
+<section id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt><a href="#id3"><span class="problematic" id="id4">*</span></a>args</dt><dd><p>Each argument is a 2-tuple defining an expression and condition.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>Node</dt><dd><p>A nested Conditional.</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
 <dl class="py class">
 <dt class="sig sig-object py" id="gem.gem.Power">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">gem.gem.</span></span><span class="sig-name descname"><span class="pre">Power</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/gem.html#Power"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.gem.Power" title="Link to this definition">¶</a></dt>
@@ -889,15 +904,15 @@ kernel, but whose value is not known at compile time.</p>
 <dt class="sig sig-object py" id="gem.gem.as_gem">
 <span class="sig-prename descclassname"><span class="pre">gem.gem.</span></span><span class="sig-name descname"><span class="pre">as_gem</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/gem.html#as_gem"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.gem.as_gem" title="Link to this definition">¶</a></dt>
 <dd><p>Attempt to convert an expression into GEM of scalar type.</p>
-<section id="parameters">
-<h3>Parameters<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<section id="id5">
+<h3>Parameters<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>expr<span class="classifier">Node or Number</span></dt><dd><p>The expression.</p>
 </dd>
 </dl>
 </section>
-<section id="returns">
-<h3>Returns<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<section id="id6">
+<h3>Returns<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>Node</dt><dd><p>A GEM representation of the expression.</p>
 </dd>
@@ -1314,7 +1329,7 @@ reference counting</p></li>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>a filtered <code class="docutils literal notranslate"><span class="pre">ops</span></code>, without the unnecessary
-:class:<a href="#id3"><span class="problematic" id="id4">`</span></a>impero.Evaluate`s</p>
+:class:<a href="#id7"><span class="problematic" id="id8">`</span></a>impero.Evaluate`s</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1509,8 +1524,8 @@ not <code class="xref py py-meth docutils literal notranslate"><span class="pre"
 <dt class="sig sig-object py" id="gem.node.collect_refcount">
 <span class="sig-prename descclassname"><span class="pre">gem.node.</span></span><span class="sig-name descname"><span class="pre">collect_refcount</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression_dags</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/node.html#collect_refcount"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.node.collect_refcount" title="Link to this definition">¶</a></dt>
 <dd><p>Collects reference counts for a multi-root expression DAG.</p>
-<section id="id5">
-<h3>Notes<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<section id="id9">
+<h3>Notes<a class="headerlink" href="#id9" title="Link to this heading">¶</a></h3>
 <p>This function also collects reference counts of nodes
 in index expressions (e.g., <cite>VariableIndex`s); see
 ``_make_traversal_children()`</cite>.</p>
@@ -1554,8 +1569,8 @@ recursive calls.</p>
 <dt class="sig sig-object py" id="gem.node.post_traversal">
 <span class="sig-prename descclassname"><span class="pre">gem.node.</span></span><span class="sig-name descname"><span class="pre">post_traversal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression_dags</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/node.html#post_traversal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.node.post_traversal" title="Link to this definition">¶</a></dt>
 <dd><p>Post-order traversal of the nodes of expression DAGs.</p>
-<section id="id6">
-<h3>Notes<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
+<section id="id10">
+<h3>Notes<a class="headerlink" href="#id10" title="Link to this heading">¶</a></h3>
 <p>This function also walks through nodes in index expressions
 (e.g., <cite>VariableIndex`s); see ``_make_traversal_children()`</cite>.</p>
 </section>
@@ -1565,8 +1580,8 @@ recursive calls.</p>
 <dt class="sig sig-object py" id="gem.node.pre_traversal">
 <span class="sig-prename descclassname"><span class="pre">gem.node.</span></span><span class="sig-name descname"><span class="pre">pre_traversal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression_dags</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/node.html#pre_traversal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.node.pre_traversal" title="Link to this definition">¶</a></dt>
 <dd><p>Pre-order traversal of the nodes of expression DAGs.</p>
-<section id="id7">
-<h3>Notes<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
+<section id="id11">
+<h3>Notes<a class="headerlink" href="#id11" title="Link to this heading">¶</a></h3>
 <p>This function also walks through nodes in index expressions
 (e.g., <cite>VariableIndex`s); see ``_make_traversal_children()`</cite>.</p>
 </section>
@@ -1588,8 +1603,8 @@ recursive calls.</p>
 <dt class="sig sig-object py" id="gem.node.traversal">
 <span class="sig-prename descclassname"><span class="pre">gem.node.</span></span><span class="sig-name descname"><span class="pre">traversal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression_dags</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#gem.node.traversal" title="Link to this definition">¶</a></dt>
 <dd><p>Pre-order traversal of the nodes of expression DAGs.</p>
-<section id="id8">
-<h3>Notes<a class="headerlink" href="#id8" title="Link to this heading">¶</a></h3>
+<section id="id12">
+<h3>Notes<a class="headerlink" href="#id12" title="Link to this heading">¶</a></h3>
 <p>This function also walks through nodes in index expressions
 (e.g., <cite>VariableIndex`s); see ``_make_traversal_children()`</cite>.</p>
 </section>
@@ -1639,8 +1654,8 @@ shape.</p>
 </dd>
 </dl>
 <p>We need a separate path for ListTensor so that its <cite>reconstruct</cite>
-method will not be called when the new children are <a href="#id9"><span class="problematic" id="id10">`</span></a>Zero()`s;
-otherwise Literal <a href="#id11"><span class="problematic" id="id12">`</span></a>0`s would be reintroduced.</p>
+method will not be called when the new children are <a href="#id13"><span class="problematic" id="id14">`</span></a>Zero()`s;
+otherwise Literal <a href="#id15"><span class="problematic" id="id16">`</span></a>0`s would be reintroduced.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -1666,13 +1681,14 @@ evaluation in mind.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="gem.optimise.delta_elimination">
-<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">delta_elimination</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sum_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">factors</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#delta_elimination"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.delta_elimination" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">delta_elimination</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sum_indices</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">factors</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_replacer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#delta_elimination"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.delta_elimination" title="Link to this definition">¶</a></dt>
 <dd><p>IndexSum-Delta cancellation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>sum_indices</strong> – free indices for contractions</p></li>
 <li><p><strong>factors</strong> – product factors</p></li>
+<li><p><strong>index_replacer</strong> – MemoizerArg(filtered_replace_indices)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1770,7 +1786,7 @@ expressions from the old to the new indices.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="gem.optimise.remove_componenttensors">
-<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">remove_componenttensors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expressions</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#remove_componenttensors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.remove_componenttensors" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">remove_componenttensors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expressions</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subst</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#remove_componenttensors"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.remove_componenttensors" title="Link to this definition">¶</a></dt>
 <dd><p>Removes all ComponentTensors in multi-root expression DAG.</p>
 </dd></dl>
 
@@ -1867,9 +1883,9 @@ Semantically equivalent to</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="gem.optimise.traverse_product">
-<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">traverse_product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rename_map</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#traverse_product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.traverse_product" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">traverse_product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rename_map</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_replacer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#traverse_product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.traverse_product" title="Link to this definition">¶</a></dt>
 <dd><p>Traverses a product tree and collects factors, also descending into
-tensor contractions (IndexSum).  The nominators of divisions are
+tensor contractions (IndexSum).  The numerators of divisions are
 also broken up, but not the denominators.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1880,6 +1896,7 @@ and returns true for some subexpression, that
 subexpression is not broken into further factors
 even if it is a product-like expression.</p></li>
 <li><p><strong>rename_map</strong> – an rename map for consistent index renaming</p></li>
+<li><p><strong>index_replacer</strong> – MemoizerArg(filtered_replace_indices)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -2031,7 +2048,7 @@ distinguished factors (called atomics).</p>
 <dt class="sig sig-object py" id="gem.refactorise.MonomialSum">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">gem.refactorise.</span></span><span class="sig-name descname"><span class="pre">MonomialSum</span></span><a class="reference internal" href="_modules/gem/refactorise.html#MonomialSum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.refactorise.MonomialSum" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
-<p>Represents a sum of :py:class:<a href="#id13"><span class="problematic" id="id14">`</span></a>Monomial`s.</p>
+<p>Represents a sum of :py:class:<a href="#id17"><span class="problematic" id="id18">`</span></a>Monomial`s.</p>
 <p>The set of <a class="reference internal" href="#gem.refactorise.Monomial" title="gem.refactorise.Monomial"><code class="xref py py-class docutils literal notranslate"><span class="pre">Monomial</span></code></a> summands are represented as a
 mapping from a pair of unordered <code class="docutils literal notranslate"><span class="pre">sum_indices</span></code> and unordered
 <code class="docutils literal notranslate"><span class="pre">atomics</span></code> to a <code class="docutils literal notranslate"><span class="pre">rest</span></code> GEM expression.  This representation
@@ -2045,13 +2062,13 @@ makes it easier to merge similar monomials.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="gem.refactorise.MonomialSum.product">
 <span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/refactorise.html#MonomialSum.product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.refactorise.MonomialSum.product" title="Link to this definition">¶</a></dt>
-<dd><p>Product of multiple :py:class:<a href="#id15"><span class="problematic" id="id16">`</span></a>MonomialSum`s</p>
+<dd><p>Product of multiple :py:class:<a href="#id19"><span class="problematic" id="id20">`</span></a>MonomialSum`s</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="gem.refactorise.MonomialSum.sum">
 <span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">sum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/refactorise.html#MonomialSum.sum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.refactorise.MonomialSum.sum" title="Link to this definition">¶</a></dt>
-<dd><p>Sum of multiple :py:class:<a href="#id17"><span class="problematic" id="id18">`</span></a>MonomialSum`s</p>
+<dd><p>Sum of multiple :py:class:<a href="#id21"><span class="problematic" id="id22">`</span></a>MonomialSum`s</p>
 </dd></dl>
 
 </dd></dl>
@@ -2078,7 +2095,7 @@ classification drives the factorisation.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>list of :py:class:<a href="#id19"><span class="problematic" id="id20">`</span></a>MonomialSum`s</p>
+<dd class="field-even"><p>list of :py:class:<a href="#id23"><span class="problematic" id="id24">`</span></a>MonomialSum`s</p>
 </dd>
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference internal" href="#gem.refactorise.FactorisationError" title="gem.refactorise.FactorisationError"><strong>FactorisationError</strong></a> – Failed to break up some “compound”
@@ -2354,15 +2371,15 @@ unconcatenation, and then add up the results.</p>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">gem.utils.</span></span><span class="sig-name descname"><span class="pre">safe_repr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tuple_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span></dt>
 <dd><p>Return a ‘safe’ repr for an object, accounting for floating point error.</p>
-<section id="id21">
-<h3>Parameters<a class="headerlink" href="#id21" title="Link to this heading">¶</a></h3>
+<section id="id25">
+<h3>Parameters<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>obj :</dt><dd><p>The object to produce a repr for.</p>
 </dd>
 </dl>
 </section>
-<section id="id22">
-<h3>Returns<a class="headerlink" href="#id22" title="Link to this heading">¶</a></h3>
+<section id="id26">
+<h3>Returns<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>str :</dt><dd><p>A repr for the object.</p>
 </dd>
@@ -2437,7 +2454,6 @@ unconcatenation, and then add up the results.</p>
 </li>
 <li><a class="reference internal" href="#gem.gem.Conditional"><code class="docutils literal notranslate"><span class="pre">Conditional</span></code></a><ul>
 <li><a class="reference internal" href="#gem.gem.Conditional.children"><code class="docutils literal notranslate"><span class="pre">Conditional.children</span></code></a></li>
-<li><a class="reference internal" href="#gem.gem.Conditional.shape"><code class="docutils literal notranslate"><span class="pre">Conditional.shape</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#gem.gem.Delta"><code class="docutils literal notranslate"><span class="pre">Delta</span></code></a><ul>
@@ -2550,6 +2566,7 @@ unconcatenation, and then add up the results.</p>
 <li><a class="reference internal" href="#gem.gem.OrientationVariableIndex.expression"><code class="docutils literal notranslate"><span class="pre">OrientationVariableIndex.expression</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#gem.gem.Piecewise"><code class="docutils literal notranslate"><span class="pre">Piecewise()</span></code></a></li>
 <li><a class="reference internal" href="#gem.gem.Power"><code class="docutils literal notranslate"><span class="pre">Power</span></code></a><ul>
 <li><a class="reference internal" href="#gem.gem.Power.children"><code class="docutils literal notranslate"><span class="pre">Power.children</span></code></a></li>
 </ul>
@@ -2825,7 +2842,7 @@ unconcatenation, and then add up the results.</p>
         <li class="right" >
           <a href="finat.ufl.html" title="finat.ufl package"
              >previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">gem package</a></li> 
       </ul>
     </div>

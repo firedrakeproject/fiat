@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>finat.point_set &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>finat.point_set &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat.point_set</a></li> 
       </ul>
@@ -67,7 +67,7 @@
     <span class="nd">@property</span>
     <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;A flattened numpy array of points or ``UnknownPointsArray``</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;A flattened numpy array of points or :class:`UnknownPointsArray`</span>
 <span class="sd">        object with shape (# of points, point dimension).&quot;&quot;&quot;</span>
 
     <span class="nd">@property</span>
@@ -119,7 +119,7 @@
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">expression</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">point</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">as_gem</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">point</span><span class="p">)</span></div>
 
 
 
@@ -127,8 +127,8 @@
 <a class="viewcode-back" href="../../finat.html#finat.point_set.UnknownPointsArray">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">UnknownPointsArray</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A placeholder for a set of unknown points with appropriate length</span>
-<span class="sd">    and size but without indexable values. For use with</span>
-<span class="sd">    :class:`AbstractPointSet`s whose points are not known at compile</span>
+<span class="sd">    and size but without indexable values. For use with an</span>
+<span class="sd">    :class:`AbstractPointSet` whose points are not known at compile</span>
 <span class="sd">    time.&quot;&quot;&quot;</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
@@ -147,13 +147,13 @@
 <a class="viewcode-back" href="../../finat.html#finat.point_set.UnknownPointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">UnknownPointSet</span><span class="p">(</span><span class="n">AbstractPointSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A point set representing a vector of points with unknown</span>
-<span class="sd">    locations but known ``gem.Variable`` expression.</span>
+<span class="sd">    locations but known :class:`gem.gem.Variable` expression.</span>
 
-<span class="sd">    The ``.points`` property is an `UnknownPointsArray` object with</span>
+<span class="sd">    The ``.points`` property is an :class:`UnknownPointsArray` object with</span>
 <span class="sd">    shape (N, D) where N is the number of points and D is their</span>
 <span class="sd">    dimension.</span>
 
-<span class="sd">    The ``.expression`` property is a derived `gem.partial_indexed` with</span>
+<span class="sd">    The ``.expression`` property is a derived :func:`gem.gem.partial_indexed` with</span>
 <span class="sd">    shape (D,) and free indices for the points N.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points_expr</span><span class="p">):</span>
@@ -394,7 +394,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat.point_set</a></li> 
       </ul>

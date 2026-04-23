@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>finat.direct_serendipity &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>finat.direct_serendipity &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat.direct_serendipity</a></li> 
       </ul>
@@ -197,12 +197,14 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">ds1_sym</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">vs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sp</span><span class="o">=</span><span class="n">symbolics</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs lowest-order case of Arbogast&#39;s directly defined C^0 serendipity</span>
 <span class="sd">    elements, which are a special case.</span>
-<span class="sd">    :param ct: The cell topology of the reference quadrilateral.</span>
-<span class="sd">    :param vs: (Optional) coordinates of cell on which to construct the basis.</span>
-<span class="sd">               If it is None, this function constructs symbols for the vertices.</span>
+
+<span class="sd">    :arg ct: The cell topology of the reference quadrilateral.</span>
+<span class="sd">    :kwarg vs: (Optional) coordinates of cell on which to construct the basis.</span>
+<span class="sd">        If it is None, this function constructs symbols for the vertices.</span>
+
 <span class="sd">    :returns: a 3-tuple containing symbols for the physical cell coordinates and the</span>
-<span class="sd">              physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
-<span class="sd">              of the four basis functions.</span>
+<span class="sd">        physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
+<span class="sd">        of the four basis functions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">vs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x:4&#39;</span><span class="p">),</span>
@@ -328,12 +330,14 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs higher-order (&gt;= 2) case of Arbogast&#39;s directly defined C^0 serendipity</span>
 <span class="sd">    elements, which include all polynomials of degree r plus a couple of rational</span>
 <span class="sd">    functions.</span>
-<span class="sd">    :param ct: The cell topology of the reference quadrilateral.</span>
-<span class="sd">    :param vs: (Optional) coordinates of cell on which to construct the basis.</span>
-<span class="sd">               If it is None, this function constructs symbols for the vertices.</span>
+
+<span class="sd">    :arg ct: The cell topology of the reference quadrilateral.</span>
+<span class="sd">    :kwarg vs: (Optional) coordinates of cell on which to construct the basis.</span>
+<span class="sd">        If it is None, this function constructs symbols for the vertices.</span>
+
 <span class="sd">    :returns: a 3-tuple containing symbols for the physical cell coordinates and the</span>
-<span class="sd">              physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
-<span class="sd">              of the four basis functions.</span>
+<span class="sd">        physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
+<span class="sd">        of the four basis functions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">vs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># do vertices symbolically</span>
         <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x:4&#39;</span><span class="p">),</span>
@@ -553,12 +557,14 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">ds_sym</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">vs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sp</span><span class="o">=</span><span class="n">symbolics</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Symbolically Constructs Arbogast&#39;s directly defined C^0 serendipity elements,</span>
 <span class="sd">    which include all polynomials of degree r plus a couple of rational functions.</span>
-<span class="sd">    :param ct: The cell topology of the reference quadrilateral.</span>
-<span class="sd">    :param vs: (Optional) coordinates of cell on which to construct the basis.</span>
-<span class="sd">               If it is None, this function constructs symbols for the vertices.</span>
+
+<span class="sd">    :arg ct: The cell topology of the reference quadrilateral.</span>
+<span class="sd">    :kwarg vs: (Optional) coordinates of cell on which to construct the basis.</span>
+<span class="sd">        If it is None, this function constructs symbols for the vertices.</span>
+
 <span class="sd">    :returns: a 3-tuple containing symbols for the physical cell coordinates and the</span>
-<span class="sd">              physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
-<span class="sd">              of the four basis functions.</span>
+<span class="sd">        physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
+<span class="sd">        of the four basis functions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">ds1_sym</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="n">vs</span><span class="o">=</span><span class="n">vs</span><span class="p">,</span> <span class="n">sp</span><span class="o">=</span><span class="n">sp</span><span class="p">)</span>
@@ -596,7 +602,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat.direct_serendipity</a></li> 
       </ul>

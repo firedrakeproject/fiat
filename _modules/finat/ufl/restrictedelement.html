@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>finat.ufl.restrictedelement &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>finat.ufl.restrictedelement &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat.ufl.restrictedelement</a></li> 
       </ul>
@@ -51,7 +51,6 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.ufl.finiteelementbase</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElementBase</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.ufl.mixedelement</span><span class="w"> </span><span class="kn">import</span> <span class="n">MixedElement</span><span class="p">,</span> <span class="n">VectorElement</span><span class="p">,</span> <span class="n">TensorElement</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ufl.sobolevspace</span><span class="w"> </span><span class="kn">import</span> <span class="n">L2</span>
 
 <span class="n">valid_restriction_domains</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;interior&quot;</span><span class="p">,</span> <span class="s2">&quot;facet&quot;</span><span class="p">,</span> <span class="s2">&quot;ridge&quot;</span><span class="p">,</span> <span class="s2">&quot;face&quot;</span><span class="p">,</span> <span class="s2">&quot;edge&quot;</span><span class="p">,</span> <span class="s2">&quot;vertex&quot;</span><span class="p">,</span> <span class="s2">&quot;reduced&quot;</span><span class="p">)</span>
 
@@ -101,10 +100,7 @@
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">sobolev_space</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;interior&quot;</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">L2</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">sobolev_space</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">sobolev_space</span>
 
 <div class="viewcode-block" id="RestrictedElement.is_cellwise_constant">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.restrictedelement.RestrictedElement.is_cellwise_constant">[docs]</a>
@@ -232,7 +228,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat.ufl.restrictedelement</a></li> 
       </ul>

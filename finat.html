@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>finat package &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>finat package &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
     
-    <script src="_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="_static/documentation_options.js?v=18367b28"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -34,7 +34,7 @@
         <li class="right" >
           <a href="FIAT.html" title="FIAT package"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat package</a></li> 
       </ul>
     </div>  
@@ -793,17 +793,19 @@ indicating how many derivatives in that direction.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.direct_serendipity.ds1_sym">
-<span class="sig-prename descclassname"><span class="pre">finat.direct_serendipity.</span></span><span class="sig-name descname"><span class="pre">ds1_sym</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ct</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;module</span> <span class="pre">'symengine'</span> <span class="pre">from</span> <span class="pre">'/opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/symengine/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#ds1_sym"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.ds1_sym" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.direct_serendipity.</span></span><span class="sig-name descname"><span class="pre">ds1_sym</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ct</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;module</span> <span class="pre">'symengine'</span> <span class="pre">from</span> <span class="pre">'/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/symengine/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#ds1_sym"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.ds1_sym" title="Link to this definition">¶</a></dt>
 <dd><p>Constructs lowest-order case of Arbogast’s directly defined C^0 serendipity
-elements, which are a special case.
-:param ct: The cell topology of the reference quadrilateral.
-:param vs: (Optional) coordinates of cell on which to construct the basis.</p>
-<blockquote>
-<div><p>If it is None, this function constructs symbols for the vertices.</p>
-</div></blockquote>
+elements, which are a special case.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>a 3-tuple containing symbols for the physical cell coordinates and the
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ct</strong> – The cell topology of the reference quadrilateral.</p></li>
+<li><p><strong>vs</strong> – (Optional) coordinates of cell on which to construct the basis.
+If it is None, this function constructs symbols for the vertices.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a 3-tuple containing symbols for the physical cell coordinates and the
 physical cell independent variables (e.g. “x” and “y”) and a list
 of the four basis functions.</p>
 </dd>
@@ -812,17 +814,19 @@ of the four basis functions.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.direct_serendipity.ds_sym">
-<span class="sig-prename descclassname"><span class="pre">finat.direct_serendipity.</span></span><span class="sig-name descname"><span class="pre">ds_sym</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ct</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;module</span> <span class="pre">'symengine'</span> <span class="pre">from</span> <span class="pre">'/opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/symengine/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#ds_sym"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.ds_sym" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.direct_serendipity.</span></span><span class="sig-name descname"><span class="pre">ds_sym</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ct</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;module</span> <span class="pre">'symengine'</span> <span class="pre">from</span> <span class="pre">'/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/symengine/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#ds_sym"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.ds_sym" title="Link to this definition">¶</a></dt>
 <dd><p>Symbolically Constructs Arbogast’s directly defined C^0 serendipity elements,
-which include all polynomials of degree r plus a couple of rational functions.
-:param ct: The cell topology of the reference quadrilateral.
-:param vs: (Optional) coordinates of cell on which to construct the basis.</p>
-<blockquote>
-<div><p>If it is None, this function constructs symbols for the vertices.</p>
-</div></blockquote>
+which include all polynomials of degree r plus a couple of rational functions.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>a 3-tuple containing symbols for the physical cell coordinates and the
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ct</strong> – The cell topology of the reference quadrilateral.</p></li>
+<li><p><strong>vs</strong> – (Optional) coordinates of cell on which to construct the basis.
+If it is None, this function constructs symbols for the vertices.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a 3-tuple containing symbols for the physical cell coordinates and the
 physical cell independent variables (e.g. “x” and “y”) and a list
 of the four basis functions.</p>
 </dd>
@@ -831,18 +835,20 @@ of the four basis functions.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.direct_serendipity.dsr_sym">
-<span class="sig-prename descclassname"><span class="pre">finat.direct_serendipity.</span></span><span class="sig-name descname"><span class="pre">dsr_sym</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ct</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;module</span> <span class="pre">'symengine'</span> <span class="pre">from</span> <span class="pre">'/opt/hostedtoolcache/Python/3.12.12/x64/lib/python3.12/site-packages/symengine/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#dsr_sym"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.dsr_sym" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.direct_serendipity.</span></span><span class="sig-name descname"><span class="pre">dsr_sym</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ct</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">vs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">&lt;module</span> <span class="pre">'symengine'</span> <span class="pre">from</span> <span class="pre">'/opt/hostedtoolcache/Python/3.12.13/x64/lib/python3.12/site-packages/symengine/__init__.py'&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/direct_serendipity.html#dsr_sym"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.direct_serendipity.dsr_sym" title="Link to this definition">¶</a></dt>
 <dd><p>Constructs higher-order (&gt;= 2) case of Arbogast’s directly defined C^0 serendipity
 elements, which include all polynomials of degree r plus a couple of rational
-functions.
-:param ct: The cell topology of the reference quadrilateral.
-:param vs: (Optional) coordinates of cell on which to construct the basis.</p>
-<blockquote>
-<div><p>If it is None, this function constructs symbols for the vertices.</p>
-</div></blockquote>
+functions.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>a 3-tuple containing symbols for the physical cell coordinates and the
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ct</strong> – The cell topology of the reference quadrilateral.</p></li>
+<li><p><strong>vs</strong> – (Optional) coordinates of cell on which to construct the basis.
+If it is None, this function constructs symbols for the vertices.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a 3-tuple containing symbols for the physical cell coordinates and the
 physical cell independent variables (e.g. “x” and “y”) and a list
 of the four basis functions.</p>
 </dd>
@@ -1788,11 +1794,6 @@ intervals.</p>
 
 </dd></dl>
 
-<dl class="py function">
-<dt class="sig sig-object py" id="finat.fiat_elements.point_evaluation">
-<span class="sig-prename descclassname"><span class="pre">finat.fiat_elements.</span></span><span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fiat_element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/fiat_elements.html#point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.fiat_elements.point_evaluation" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
 </section>
 <section id="module-finat.finiteelementbase">
 <span id="finat-finiteelementbase-module"></span><h2>finat.finiteelementbase module<a class="headerlink" href="#module-finat.finiteelementbase" title="Link to this heading">¶</a></h2>
@@ -2662,7 +2663,7 @@ provides physical geometry callbacks (may be None).</p></li>
 <span id="finat-mtw-module"></span><h2>finat.mtw module<a class="headerlink" href="#module-finat.mtw" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.mtw.MardalTaiWinther">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.mtw.</span></span><span class="sig-name descname"><span class="pre">MardalTaiWinther</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/mtw.html#MardalTaiWinther"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.mtw.MardalTaiWinther" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.mtw.</span></span><span class="sig-name descname"><span class="pre">MardalTaiWinther</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/mtw.html#MardalTaiWinther"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.mtw.MardalTaiWinther" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement" title="finat.physically_mapped.PhysicallyMappedElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicallyMappedElement</span></code></a>, <a class="reference internal" href="#finat.fiat_elements.FiatElement" title="finat.fiat_elements.FiatElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiatElement</span></code></a></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.mtw.MardalTaiWinther.basis_transformation">
@@ -2673,19 +2674,6 @@ provides physical geometry callbacks (may be None).</p></li>
 <dd class="field-odd"><p><strong>coordinate_mapping</strong> – Object providing physical geometry.</p>
 </dd>
 </dl>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="finat.mtw.MardalTaiWinther.entity_dofs">
-<span class="sig-name descname"><span class="pre">entity_dofs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/mtw.html#MardalTaiWinther.entity_dofs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.mtw.MardalTaiWinther.entity_dofs" title="Link to this definition">¶</a></dt>
-<dd><p>Return the map of topological entities to degrees of
-freedom for the finite element.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="finat.mtw.MardalTaiWinther.space_dimension">
-<span class="sig-name descname"><span class="pre">space_dimension</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/mtw.html#MardalTaiWinther.space_dimension"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.mtw.MardalTaiWinther.space_dimension" title="Link to this definition">¶</a></dt>
-<dd><p>Return the dimension of the finite element space.</p>
 </dd></dl>
 
 </dd></dl>
@@ -2713,10 +2701,19 @@ serendipity that bypass a coordinate mapping.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="finat.physically_mapped.MappedTabulation">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">MappedTabulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_tabulation</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#MappedTabulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.MappedTabulation" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.physically_mapped.</span></span><span class="sig-name descname"><span class="pre">MappedTabulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ref_tabulation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">indices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#MappedTabulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.MappedTabulation" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mapping</span></code></a></p>
 <p>A lazy tabulation dict that applies the basis transformation only
 on the requested derivatives.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>M</strong> – a gem.ListTensor with the basis transformation matrix.</p></li>
+<li><p><strong>ref_tabulation</strong> – a dict of tabulations on the reference cell.</p></li>
+<li><p><strong>indices</strong> – an optional list of restriction indices on the basis functions.</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="finat.physically_mapped.MappedTabulation.matvec">
 <span class="sig-name descname"><span class="pre">matvec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">table</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#MappedTabulation.matvec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.MappedTabulation.matvec" title="Link to this definition">¶</a></dt>
@@ -2900,11 +2897,6 @@ basis functions.</p>
 <span class="sig-name descname"><span class="pre">map_tabulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_tabulation</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.map_tabulation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.map_tabulation" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="finat.physically_mapped.PhysicallyMappedElement.point_evaluation">
-<span class="sig-name descname"><span class="pre">point_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refcoords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/physically_mapped.html#PhysicallyMappedElement.point_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.physically_mapped.PhysicallyMappedElement.point_evaluation" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
 </dd></dl>
 
 <dl class="py function">
@@ -2980,6 +2972,27 @@ normal and tangential face moments</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="finat.piola_mapped.normal_tangential_transform">
+<span class="sig-prename descclassname"><span class="pre">finat.piola_mapped.</span></span><span class="sig-name descname"><span class="pre">normal_tangential_transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fiat_cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">J</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detJ</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">f</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/piola_mapped.html#normal_tangential_transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.piola_mapped.normal_tangential_transform" title="Link to this definition">¶</a></dt>
+<dd><p>Return the basis transformation of normal and tangential face moments</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fiat_cell</strong> – a <a class="reference internal" href="FIAT.html#FIAT.reference_element.Cell" title="FIAT.reference_element.Cell"><code class="xref py py-class docutils literal notranslate"><span class="pre">FIAT.reference_element.Cell</span></code></a></p></li>
+<li><p><strong>J</strong> – the Jacobian of the coordinate transformation</p></li>
+<li><p><strong>detJ</strong> – the Jacobian determinant of the coordinate transformation</p></li>
+<li><p><strong>f</strong> – the face id.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a 2-tuple of (Bnt, Btt) where
+Bnt is the numpy.ndarray of normal-tangential coefficients, and
+Btt is the tangential-tangential coefficient.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="finat.piola_mapped.piola_inverse">
 <span class="sig-prename descclassname"><span class="pre">finat.piola_mapped.</span></span><span class="sig-name descname"><span class="pre">piola_inverse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fiat_cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">J</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detJ</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/piola_mapped.html#piola_inverse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.piola_mapped.piola_inverse" title="Link to this definition">¶</a></dt>
 <dd><p>Return the basis transformation of evaluation at a point.
@@ -3021,7 +3034,7 @@ point set.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.AbstractPointSet.points">
 <span class="property"><span class="k"><span class="pre">abstract</span></span><span class="w"> </span><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.AbstractPointSet.points" title="Link to this definition">¶</a></dt>
-<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+<dd><p>A flattened numpy array of points or <a class="reference internal" href="#finat.point_set.UnknownPointsArray" title="finat.point_set.UnknownPointsArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code></a>
 object with shape (# of points, point dimension).</p>
 </dd></dl>
 
@@ -3129,7 +3142,7 @@ point set.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.PointSet.points">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.PointSet.points" title="Link to this definition">¶</a></dt>
-<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+<dd><p>A flattened numpy array of points or <a class="reference internal" href="#finat.point_set.UnknownPointsArray" title="finat.point_set.UnknownPointsArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code></a>
 object with shape (# of points, point dimension).</p>
 </dd></dl>
 
@@ -3156,7 +3169,7 @@ object with shape (# of points, point dimension).</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.PointSingleton.points">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.PointSingleton.points" title="Link to this definition">¶</a></dt>
-<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+<dd><p>A flattened numpy array of points or <a class="reference internal" href="#finat.point_set.UnknownPointsArray" title="finat.point_set.UnknownPointsArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code></a>
 object with shape (# of points, point dimension).</p>
 </dd></dl>
 
@@ -3189,7 +3202,7 @@ point set.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.TensorPointSet.points">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.TensorPointSet.points" title="Link to this definition">¶</a></dt>
-<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+<dd><p>A flattened numpy array of points or <a class="reference internal" href="#finat.point_set.UnknownPointsArray" title="finat.point_set.UnknownPointsArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code></a>
 object with shape (# of points, point dimension).</p>
 </dd></dl>
 
@@ -3200,11 +3213,11 @@ object with shape (# of points, point dimension).</p>
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.point_set.</span></span><span class="sig-name descname"><span class="pre">UnknownPointSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">points_expr</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/point_set.html#UnknownPointSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.UnknownPointSet" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#finat.point_set.AbstractPointSet" title="finat.point_set.AbstractPointSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractPointSet</span></code></a></p>
 <p>A point set representing a vector of points with unknown
-locations but known <code class="docutils literal notranslate"><span class="pre">gem.Variable</span></code> expression.</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">.points</span></code> property is an <cite>UnknownPointsArray</cite> object with
+locations but known <a class="reference internal" href="gem.html#gem.gem.Variable" title="gem.gem.Variable"><code class="xref py py-class docutils literal notranslate"><span class="pre">gem.gem.Variable</span></code></a> expression.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">.points</span></code> property is an <a class="reference internal" href="#finat.point_set.UnknownPointsArray" title="finat.point_set.UnknownPointsArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code></a> object with
 shape (N, D) where N is the number of points and D is their
 dimension.</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">.expression</span></code> property is a derived <cite>gem.partial_indexed</cite> with
+<p>The <code class="docutils literal notranslate"><span class="pre">.expression</span></code> property is a derived <a class="reference internal" href="gem.html#gem.gem.partial_indexed" title="gem.gem.partial_indexed"><code class="xref py py-func docutils literal notranslate"><span class="pre">gem.gem.partial_indexed()</span></code></a> with
 shape (D,) and free indices for the points N.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.UnknownPointSet.expression">
@@ -3223,7 +3236,7 @@ point set.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.UnknownPointSet.points">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.UnknownPointSet.points" title="Link to this definition">¶</a></dt>
-<dd><p>A flattened numpy array of points or <code class="docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code>
+<dd><p>A flattened numpy array of points or <a class="reference internal" href="#finat.point_set.UnknownPointsArray" title="finat.point_set.UnknownPointsArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code></a>
 object with shape (# of points, point dimension).</p>
 </dd></dl>
 
@@ -3234,8 +3247,8 @@ object with shape (# of points, point dimension).</p>
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.point_set.</span></span><span class="sig-name descname"><span class="pre">UnknownPointsArray</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">shape</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/point_set.html#UnknownPointsArray"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.UnknownPointsArray" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>A placeholder for a set of unknown points with appropriate length
-and size but without indexable values. For use with
-:class:<a href="#id1"><span class="problematic" id="id2">`</span></a>AbstractPointSet`s whose points are not known at compile
+and size but without indexable values. For use with an
+<a class="reference internal" href="#finat.point_set.AbstractPointSet" title="finat.point_set.AbstractPointSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractPointSet</span></code></a> whose points are not known at compile
 time.</p>
 </dd></dl>
 
@@ -3300,8 +3313,8 @@ eo (extrinsic orientation).</p>
 <dt class="sig sig-object py" id="finat.quadrature.AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">intrinsic_orientation_permutation_map_tuple</span></span><a class="headerlink" href="#finat.quadrature.AbstractQuadratureRule.intrinsic_orientation_permutation_map_tuple" title="Link to this definition">¶</a></dt>
 <dd><p>A tuple of maps from intrinsic orientations to corresponding point permutations for each reference cell axis.</p>
-<section id="id3">
-<h3>Notes<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<section id="id1">
+<h3>Notes<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
 <p>result[axis][io] gives the physical point-reference point permutation array corresponding to
 io (intrinsic orientation) on <code class="docutils literal notranslate"><span class="pre">axis</span></code>.</p>
 </section>
@@ -3610,6 +3623,45 @@ nodal.</p>
 </div>
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="finat.restricted.RestrictedPhysicallyMappedElement">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">RestrictedPhysicallyMappedElement</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">indices</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#RestrictedPhysicallyMappedElement"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.RestrictedPhysicallyMappedElement" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement" title="finat.physically_mapped.PhysicallyMappedElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicallyMappedElement</span></code></a>, <a class="reference internal" href="#finat.fiat_elements.FiatElement" title="finat.fiat_elements.FiatElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiatElement</span></code></a></p>
+<p>A restricted PhysicallyMappedElement.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>element</strong> – the finat.FiatElement to be restricted.</p></li>
+<li><p><strong>indices</strong> – the indices of the degrees of freedom to be kept.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.restricted.RestrictedPhysicallyMappedElement.basis_transformation">
+<span class="sig-name descname"><span class="pre">basis_transformation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#RestrictedPhysicallyMappedElement.basis_transformation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.RestrictedPhysicallyMappedElement.basis_transformation" title="Link to this definition">¶</a></dt>
+<dd><p>Transformation matrix for the basis functions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>coordinate_mapping</strong> – Object providing physical geometry.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.restricted.RestrictedPhysicallyMappedElement.entity_dofs">
+<span class="sig-name descname"><span class="pre">entity_dofs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#RestrictedPhysicallyMappedElement.entity_dofs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.RestrictedPhysicallyMappedElement.entity_dofs" title="Link to this definition">¶</a></dt>
+<dd><p>Return the map of topological entities to degrees of
+freedom for the finite element.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="finat.restricted.RestrictedPhysicallyMappedElement.space_dimension">
+<span class="sig-name descname"><span class="pre">space_dimension</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#RestrictedPhysicallyMappedElement.space_dimension"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.RestrictedPhysicallyMappedElement.space_dimension" title="Link to this definition">¶</a></dt>
+<dd><p>Return the dimension of the finite element space.</p>
+</dd></dl>
+
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.restricted.codim_to_r">
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">codim_to_r</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">codim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#codim_to_r"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.codim_to_r" title="Link to this definition">¶</a></dt>
@@ -3625,8 +3677,6 @@ nodal.</p>
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#restrict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.restrict" title="Link to this definition">¶</a></dt>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.fiat_elements.FiatElement" title="finat.fiat_elements.FiatElement"><span class="pre">FiatElement</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
-<dt class="sig sig-object py">
-<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement" title="finat.physically_mapped.PhysicallyMappedElement"><span class="pre">PhysicallyMappedElement</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.cube.FlattenedDimensions" title="finat.cube.FlattenedDimensions"><span class="pre">FlattenedDimensions</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
 <dt class="sig sig-object py">
@@ -3710,11 +3760,6 @@ element.</p></li>
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.restricted.restrict_mixed">
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict_mixed</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#restrict_mixed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.restrict_mixed" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="finat.restricted.restrict_physically_mapped">
-<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict_physically_mapped</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#restrict_physically_mapped"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.restrict_physically_mapped" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py function">
@@ -4964,7 +5009,6 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.fiat_elements.VectorFiatElement.value_shape"><code class="docutils literal notranslate"><span class="pre">VectorFiatElement.value_shape</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#finat.fiat_elements.point_evaluation"><code class="docutils literal notranslate"><span class="pre">point_evaluation()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-finat.finiteelementbase">finat.finiteelementbase module</a><ul>
@@ -5103,8 +5147,6 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#module-finat.mtw">finat.mtw module</a><ul>
 <li><a class="reference internal" href="#finat.mtw.MardalTaiWinther"><code class="docutils literal notranslate"><span class="pre">MardalTaiWinther</span></code></a><ul>
 <li><a class="reference internal" href="#finat.mtw.MardalTaiWinther.basis_transformation"><code class="docutils literal notranslate"><span class="pre">MardalTaiWinther.basis_transformation()</span></code></a></li>
-<li><a class="reference internal" href="#finat.mtw.MardalTaiWinther.entity_dofs"><code class="docutils literal notranslate"><span class="pre">MardalTaiWinther.entity_dofs()</span></code></a></li>
-<li><a class="reference internal" href="#finat.mtw.MardalTaiWinther.space_dimension"><code class="docutils literal notranslate"><span class="pre">MardalTaiWinther.space_dimension()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -5140,7 +5182,6 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.basis_transformation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.basis_transformation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.dual_transformation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.dual_transformation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.map_tabulation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.map_tabulation()</span></code></a></li>
-<li><a class="reference internal" href="#finat.physically_mapped.PhysicallyMappedElement.point_evaluation"><code class="docutils literal notranslate"><span class="pre">PhysicallyMappedElement.point_evaluation()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#finat.physically_mapped.adjugate"><code class="docutils literal notranslate"><span class="pre">adjugate()</span></code></a></li>
@@ -5158,6 +5199,7 @@ freedom for the finite element.</p>
 </li>
 <li><a class="reference internal" href="#finat.piola_mapped.normal_tangential_edge_transform"><code class="docutils literal notranslate"><span class="pre">normal_tangential_edge_transform()</span></code></a></li>
 <li><a class="reference internal" href="#finat.piola_mapped.normal_tangential_face_transform"><code class="docutils literal notranslate"><span class="pre">normal_tangential_face_transform()</span></code></a></li>
+<li><a class="reference internal" href="#finat.piola_mapped.normal_tangential_transform"><code class="docutils literal notranslate"><span class="pre">normal_tangential_transform()</span></code></a></li>
 <li><a class="reference internal" href="#finat.piola_mapped.piola_inverse"><code class="docutils literal notranslate"><span class="pre">piola_inverse()</span></code></a></li>
 </ul>
 </li>
@@ -5263,6 +5305,12 @@ freedom for the finite element.</p>
 </li>
 <li><a class="reference internal" href="#module-finat.restricted">finat.restricted module</a><ul>
 <li><a class="reference internal" href="#finat.restricted.RestrictedElement"><code class="docutils literal notranslate"><span class="pre">RestrictedElement()</span></code></a></li>
+<li><a class="reference internal" href="#finat.restricted.RestrictedPhysicallyMappedElement"><code class="docutils literal notranslate"><span class="pre">RestrictedPhysicallyMappedElement</span></code></a><ul>
+<li><a class="reference internal" href="#finat.restricted.RestrictedPhysicallyMappedElement.basis_transformation"><code class="docutils literal notranslate"><span class="pre">RestrictedPhysicallyMappedElement.basis_transformation()</span></code></a></li>
+<li><a class="reference internal" href="#finat.restricted.RestrictedPhysicallyMappedElement.entity_dofs"><code class="docutils literal notranslate"><span class="pre">RestrictedPhysicallyMappedElement.entity_dofs()</span></code></a></li>
+<li><a class="reference internal" href="#finat.restricted.RestrictedPhysicallyMappedElement.space_dimension"><code class="docutils literal notranslate"><span class="pre">RestrictedPhysicallyMappedElement.space_dimension()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#finat.restricted.codim_to_r"><code class="docutils literal notranslate"><span class="pre">codim_to_r()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.r_to_codim"><code class="docutils literal notranslate"><span class="pre">r_to_codim()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict"><code class="docutils literal notranslate"><span class="pre">restrict()</span></code></a></li>
@@ -5274,7 +5322,6 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.restricted.restrict_hdiv"><code class="docutils literal notranslate"><span class="pre">restrict_hdiv()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_hdivtrace"><code class="docutils literal notranslate"><span class="pre">restrict_hdivtrace()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_mixed"><code class="docutils literal notranslate"><span class="pre">restrict_mixed()</span></code></a></li>
-<li><a class="reference internal" href="#finat.restricted.restrict_physically_mapped"><code class="docutils literal notranslate"><span class="pre">restrict_physically_mapped()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_tfe"><code class="docutils literal notranslate"><span class="pre">restrict_tfe()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_tpe"><code class="docutils literal notranslate"><span class="pre">restrict_tpe()</span></code></a></li>
 </ul>
@@ -5464,7 +5511,7 @@ freedom for the finite element.</p>
         <li class="right" >
           <a href="FIAT.html" title="FIAT package"
              >previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">finat package</a></li> 
       </ul>
     </div>

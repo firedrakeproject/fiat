@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>gem.optimise &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>gem.optimise &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">gem.optimise</a></li> 
       </ul>
@@ -245,10 +245,10 @@
 
 <div class="viewcode-block" id="remove_componenttensors">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.remove_componenttensors">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">remove_componenttensors</span><span class="p">(</span><span class="n">expressions</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">remove_componenttensors</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">subst</span><span class="o">=</span><span class="p">()):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Removes all ComponentTensors in multi-root expression DAG.&quot;&quot;&quot;</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">[</span><span class="n">mapper</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="p">())</span> <span class="k">for</span> <span class="n">expression</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">]</span></div>
+    <span class="k">return</span> <span class="p">[</span><span class="n">mapper</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">subst</span><span class="p">)</span> <span class="k">for</span> <span class="n">expression</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">]</span></div>
 
 
 
@@ -384,21 +384,25 @@
 
 <div class="viewcode-block" id="delta_elimination">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.delta_elimination">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">delta_elimination</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">delta_elimination</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;IndexSum-Delta cancellation.</span>
 
 <span class="sd">    :arg sum_indices: free indices for contractions</span>
 <span class="sd">    :arg factors: product factors</span>
+<span class="sd">    :kwarg index_replacer: MemoizerArg(filtered_replace_indices)</span>
+
 <span class="sd">    :returns: optimised (sum_indices, factors)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">index_replacer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">index_replacer</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
+
     <span class="n">sum_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span>  <span class="c1"># copy for modification</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">substitute</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">from_</span><span class="p">,</span> <span class="n">to_</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">from_</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">expression</span><span class="o">.</span><span class="n">free_indices</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">expression</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">Delta</span><span class="p">):</span>
-            <span class="n">mapper</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">mapper</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="p">((</span><span class="n">from_</span><span class="p">,</span> <span class="n">to_</span><span class="p">),))</span>
+            <span class="k">return</span> <span class="n">index_replacer</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="p">((</span><span class="n">from_</span><span class="p">,</span> <span class="n">to_</span><span class="p">),))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">Indexed</span><span class="p">(</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="p">(</span><span class="n">from_</span><span class="p">,)),</span> <span class="p">(</span><span class="n">to_</span><span class="p">,))</span>
 
@@ -587,9 +591,9 @@
 
 <div class="viewcode-block" id="traverse_product">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.traverse_product">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">traverse_product</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rename_map</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">traverse_product</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rename_map</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Traverses a product tree and collects factors, also descending into</span>
-<span class="sd">    tensor contractions (IndexSum).  The nominators of divisions are</span>
+<span class="sd">    tensor contractions (IndexSum).  The numerators of divisions are</span>
 <span class="sd">    also broken up, but not the denominators.</span>
 
 <span class="sd">    :arg expression: a GEM expression</span>
@@ -598,6 +602,8 @@
 <span class="sd">                  subexpression is not broken into further factors</span>
 <span class="sd">                  even if it is a product-like expression.</span>
 <span class="sd">    :arg rename_map: an rename map for consistent index renaming</span>
+<span class="sd">    :kwarg index_replacer: MemoizerArg(filtered_replace_indices)</span>
+
 <span class="sd">    :returns: (sum_indices, terms)</span>
 <span class="sd">              - sum_indices: list of indices to sum over</span>
 <span class="sd">              - terms: list of product terms</span>
@@ -605,6 +611,8 @@
     <span class="k">if</span> <span class="n">rename_map</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">rename_map</span> <span class="o">=</span> <span class="n">make_rename_map</span><span class="p">()</span>
     <span class="n">renamer</span> <span class="o">=</span> <span class="n">make_renamer</span><span class="p">(</span><span class="n">rename_map</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">index_replacer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">index_replacer</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
 
     <span class="n">sum_indices</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">terms</span> <span class="o">=</span> <span class="p">[]</span>
@@ -617,7 +625,7 @@
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">IndexSum</span><span class="p">):</span>
             <span class="n">indices</span><span class="p">,</span> <span class="n">applier</span> <span class="o">=</span> <span class="n">renamer</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">multiindex</span><span class="p">)</span>
             <span class="n">sum_indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span>
-            <span class="n">stack</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">remove_componenttensors</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">applier</span><span class="p">,</span> <span class="n">expr</span><span class="o">.</span><span class="n">children</span><span class="p">)))</span>
+            <span class="n">stack</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">index_replacer</span><span class="p">(</span><span class="n">applier</span><span class="p">(</span><span class="n">c</span><span class="p">),</span> <span class="p">())</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">expr</span><span class="o">.</span><span class="n">children</span><span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Product</span><span class="p">):</span>
             <span class="n">stack</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">children</span><span class="p">))</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Division</span><span class="p">):</span>
@@ -678,13 +686,18 @@
 <span class="sd">    This routine was designed with finite element coefficient</span>
 <span class="sd">    evaluation in mind.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Common memoizer to remove ComponentTensors</span>
+    <span class="n">index_replacer</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
+
     <span class="c1"># Eliminate annoying ComponentTensors</span>
-    <span class="n">expression</span><span class="p">,</span> <span class="o">=</span> <span class="n">remove_componenttensors</span><span class="p">([</span><span class="n">expression</span><span class="p">])</span>
+    <span class="n">expression</span> <span class="o">=</span> <span class="n">index_replacer</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="p">())</span>
 
     <span class="c1"># Flatten product tree, eliminate deltas, sum factorise</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">rebuild</span><span class="p">(</span><span class="n">expression</span><span class="p">):</span>
-        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">delta_elimination</span><span class="p">(</span><span class="o">*</span><span class="n">traverse_product</span><span class="p">(</span><span class="n">expression</span><span class="p">))</span>
-        <span class="n">factors</span> <span class="o">=</span> <span class="n">remove_componenttensors</span><span class="p">(</span><span class="n">factors</span><span class="p">)</span>
+        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">traverse_product</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="n">index_replacer</span><span class="p">)</span>
+        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">delta_elimination</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="n">index_replacer</span><span class="p">)</span>
+        <span class="n">factors</span> <span class="o">=</span> <span class="p">[</span><span class="n">index_replacer</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="p">())</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">factors</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">ignore</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="c1"># TODO: This is a really blunt instrument and one might</span>
             <span class="c1"># plausibly want the ignored indices to be contracted on</span>
@@ -713,7 +726,7 @@
         <span class="c1"># Rebuild each split component</span>
         <span class="n">tensor</span> <span class="o">=</span> <span class="n">ComponentTensor</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">lt_fis</span><span class="p">)</span>
         <span class="n">entries</span> <span class="o">=</span> <span class="p">[</span><span class="n">Indexed</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">zeta</span><span class="p">)</span> <span class="k">for</span> <span class="n">zeta</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">)]</span>
-        <span class="n">entries</span> <span class="o">=</span> <span class="n">remove_componenttensors</span><span class="p">(</span><span class="n">entries</span><span class="p">)</span>
+        <span class="n">entries</span> <span class="o">=</span> <span class="p">[</span><span class="n">index_replacer</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="p">())</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">Indexed</span><span class="p">(</span><span class="n">ListTensor</span><span class="p">(</span>
             <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">rebuild</span><span class="p">,</span> <span class="n">entries</span><span class="p">)))</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
         <span class="p">),</span> <span class="n">lt_fis</span><span class="p">)</span>
@@ -858,7 +871,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">gem.optimise</a></li> 
       </ul>

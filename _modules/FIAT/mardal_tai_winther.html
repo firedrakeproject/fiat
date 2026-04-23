@@ -4,11 +4,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FIAT.mardal_tai_winther &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>FIAT.mardal_tai_winther &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/classic.css?v=2bf1fcf8" />
     
-    <script src="../../_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="../../_static/documentation_options.js?v=18367b28"></script>
     <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
     <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
     
@@ -24,7 +24,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT.mardal_tai_winther</a></li> 
       </ul>
@@ -46,28 +46,68 @@
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
 
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">dual_set</span><span class="p">,</span> <span class="n">expansions</span><span class="p">,</span> <span class="n">finite_element</span><span class="p">,</span> <span class="n">polynomial_set</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">IntegralMomentOfNormalEvaluation</span><span class="p">,</span>
-                             <span class="n">IntegralMomentOfTangentialEvaluation</span><span class="p">,</span>
-                             <span class="n">IntegralLegendreNormalMoment</span><span class="p">,</span>
-                             <span class="n">IntegralMomentOfDivergence</span><span class="p">)</span>
-
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.check_format_variant</span><span class="w"> </span><span class="kn">import</span> <span class="n">parse_quadrature_scheme</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.functional</span><span class="w"> </span><span class="kn">import</span> <span class="n">FrobeniusIntegralMoment</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.nedelec</span><span class="w"> </span><span class="kn">import</span> <span class="n">Nedelec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">FacetQuadratureRule</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 
 
-<div class="viewcode-block" id="DivergenceDubinerMoments">
-<a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.DivergenceDubinerMoments">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">DivergenceDubinerMoments</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">start_deg</span><span class="p">,</span> <span class="n">stop_deg</span><span class="p">,</span> <span class="n">comp_deg</span><span class="p">):</span>
-    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-    <span class="n">P</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">stop_deg</span><span class="p">)</span>
-    <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">comp_deg</span> <span class="o">+</span> <span class="n">stop_deg</span><span class="p">)</span>
+<div class="viewcode-block" id="curl">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.curl">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">curl</span><span class="p">(</span><span class="n">tabulation</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the curl of a vector (the skew-symmetric part of the gradient) or the rot of scalar in 2D.</span>
 
-    <span class="n">dim0</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">start_deg</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-    <span class="n">dim1</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">stop_deg</span><span class="p">)</span>
-    <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">dim0</span><span class="p">,</span> <span class="n">dim1</span><span class="p">))</span>
-    <span class="n">phis</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
-    <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">:</span>
-        <span class="k">yield</span> <span class="n">IntegralMomentOfDivergence</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span></div>
+<span class="sd">    :arg tabulation: a dictionary with at least the first order tabulation.</span>
+<span class="sd">    :returns: a numpy.ndarray with the curl.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">grad_u</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span> <span class="n">tabulation</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">tabulation</span> <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">}</span>
+    <span class="n">shp</span> <span class="o">=</span> <span class="n">grad_u</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">shp</span> <span class="o">==</span> <span class="p">():</span>
+        <span class="n">curl_u</span> <span class="o">=</span> <span class="p">[</span><span class="n">grad_u</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="o">-</span><span class="n">grad_u</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">grad_u</span><span class="p">)</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">d</span><span class="p">))</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">d</span><span class="p">)))</span>
+        <span class="n">curl_u</span> <span class="o">=</span> <span class="p">[((</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">**</span><span class="n">k</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">grad_u</span><span class="p">[</span><span class="n">j</span><span class="p">][:,</span> <span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">-</span> <span class="n">grad_u</span><span class="p">[</span><span class="n">i</span><span class="p">][:,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:])</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">indices</span><span class="p">)]</span>
+    <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">curl_u</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="MardalTaiWintherSpace">
+<a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.MardalTaiWintherSpace">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">MardalTaiWintherSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct the MTW space BDM(order) + curl(B [P1]^d).&quot;&quot;&quot;</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">assert</span> <span class="n">order</span> <span class="o">&lt;</span> <span class="n">k</span>
+    <span class="c1"># [Pk]^d = vector polynomials of degree k = sd+1</span>
+    <span class="n">Pk</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;orthonormal&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Grab BDM(order) = [P_order]^d from [Pk]^d</span>
+    <span class="n">dimP1</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+    <span class="n">dimPk</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+    <span class="n">ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="n">dimPk</span><span class="o">*</span><span class="n">j</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dimP1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span>
+    <span class="n">BDM</span> <span class="o">=</span> <span class="n">Pk</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="n">ids</span><span class="p">)</span>
+
+    <span class="c1"># Project curl(B [P1]^d) into [Pk]^d</span>
+    <span class="n">shape</span> <span class="o">=</span> <span class="p">()</span> <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="p">((</span><span class="n">sd</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span><span class="o">//</span><span class="mi">2</span><span class="p">,)</span>
+    <span class="n">BP1</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">make_bubbles</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="n">shape</span><span class="p">)</span>
+
+    <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">k</span><span class="p">)</span>
+    <span class="n">qpts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">()</span>
+    <span class="n">qwts</span> <span class="o">=</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">()</span>
+    <span class="n">Pk_at_qpts</span> <span class="o">=</span> <span class="n">Pk</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)</span>
+    <span class="n">BP1_at_qpts</span> <span class="o">=</span> <span class="n">BP1</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">inner</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">qwts</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">qwts</span><span class="p">),</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">u</span><span class="o">.</span><span class="n">ndim</span><span class="p">),)</span><span class="o">*</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">C</span> <span class="o">=</span> <span class="n">inner</span><span class="p">(</span><span class="n">curl</span><span class="p">(</span><span class="n">BP1_at_qpts</span><span class="p">),</span> <span class="n">Pk_at_qpts</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">],</span> <span class="n">qwts</span><span class="p">)</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">Pk</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">(),</span> <span class="n">axes</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+    <span class="n">curlBP1</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">Pk</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">(),</span> <span class="n">coeffs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">polynomial_set_union_normalized</span><span class="p">(</span><span class="n">BDM</span><span class="p">,</span> <span class="n">curlBP1</span><span class="p">)</span></div>
 
 
 
@@ -75,61 +115,55 @@
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.MardalTaiWintherDual">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MardalTaiWintherDual</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Degrees of freedom for Mardal-Tai-Winther elements.&quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
-
-        <span class="k">if</span> <span class="n">sd</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Mardal-Tai-Winther elements are only defined in dimension 2.&quot;</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Mardal-Tai-Winther elements are only defined for degree 3.&quot;</span><span class="p">)</span>
-
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">entity</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">top</span><span class="p">}</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
-
-        <span class="c1"># no vertex dofs</span>
+        <span class="n">degree</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span>
 
         <span class="c1"># On each facet, let n be its normal.  We need to integrate</span>
-        <span class="c1"># u.n and u.t against the first Legendre polynomial (constant)</span>
-        <span class="c1"># and u.n against the second (linear).</span>
-        <span class="n">facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_facet_element</span><span class="p">()</span>
-        <span class="c1"># Facet nodes are \int_F v.n p ds where p \in P_{q-1}</span>
-        <span class="c1"># degree is q - 1</span>
-        <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">facet</span><span class="p">,</span> <span class="n">degree</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">Pq</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">facet</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
-        <span class="n">phis</span> <span class="o">=</span> <span class="n">Pq</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="c1"># u.n against a Dubiner basis for P1</span>
+        <span class="c1"># and u x n against a basis for lowest-order RT.</span>
+        <span class="n">ref_facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_facet_element</span><span class="p">()</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="n">parse_quadrature_scheme</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">degree</span><span class="o">+</span><span class="n">order</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
+
+        <span class="n">P1</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+        <span class="n">P1_at_qpts</span> <span class="o">=</span> <span class="n">P1</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="c1"># For 2D just take the constant</span>
+            <span class="n">RT_at_qpts</span> <span class="o">=</span> <span class="n">P1_at_qpts</span><span class="p">[:</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Basis for lowest-order RT [(1, 0), (0, 1), (x, y)]</span>
+            <span class="n">RT_at_qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">P1_at_qpts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="n">RT_at_qpts</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">P1_at_qpts</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="n">RT_at_qpts</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">P1_at_qpts</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="n">RT_at_qpts</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">P1_at_qpts</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="n">RT_at_qpts</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">P1_at_qpts</span><span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
+
         <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
             <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfNormalEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phis</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">f</span><span class="p">))</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfTangentialEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phis</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">f</span><span class="p">))</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">IntegralMomentOfNormalEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phis</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">f</span><span class="p">))</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+            <span class="n">Qf</span> <span class="o">=</span> <span class="n">FacetQuadratureRule</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="c1"># Normal moments against P_{order}</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Qf</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">phi</span><span class="p">))</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">P1_at_qpts</span><span class="p">)</span>
+            <span class="c1"># Map the RT basis into the facet</span>
+            <span class="n">Jf</span> <span class="o">=</span> <span class="n">Qf</span><span class="o">.</span><span class="n">jacobian</span><span class="p">()</span>
+            <span class="n">phis</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">tensordot</span><span class="p">(</span><span class="n">Jf</span><span class="p">,</span> <span class="n">RT_at_qpts</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="c1"># Moments against cross(n, RT)</span>
+                <span class="n">phis</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="n">n</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">phis</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Qf</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">)</span>
             <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">f</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
-        <span class="c1"># Generate constraint nodes on the cell and facets</span>
-        <span class="c1"># * div(v) must be constant on the cell.  Since v is a cubic and</span>
-        <span class="c1">#   div(v) is quadratic, we need the integral of div(v) against the</span>
-        <span class="c1">#   linear and quadratic Dubiner polynomials to vanish.</span>
-        <span class="c1">#   There are two linear and three quadratics, so these are five</span>
-        <span class="c1">#   constraints</span>
-        <span class="c1"># * v.n must be linear on each facet.  Since v.n is cubic, we need</span>
-        <span class="c1">#   the integral of v.n against the cubic and quadratic Legendre</span>
-        <span class="c1">#   polynomial to vanish on each facet.</span>
-
-        <span class="c1"># So we introduce functionals whose kernel describes this property,</span>
-        <span class="c1"># as described in the FIAT paper.</span>
-        <span class="n">start_order</span> <span class="o">=</span> <span class="mi">2</span>
-        <span class="n">stop_order</span> <span class="o">=</span> <span class="mi">3</span>
-        <span class="n">qdegree</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">stop_order</span>
-        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+        <span class="c1"># Interior nodes: moments against Nedelec(order-1)</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">Q</span> <span class="o">=</span> <span class="n">parse_quadrature_scheme</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">+</span><span class="n">order</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
+            <span class="n">Ned</span> <span class="o">=</span> <span class="n">Nedelec</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">phis</span> <span class="o">=</span> <span class="n">Ned</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
             <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
-            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralLegendreNormalMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">f</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">qdegree</span><span class="p">)</span>
-                         <span class="k">for</span> <span class="n">order</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">start_order</span><span class="p">,</span> <span class="n">stop_order</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
-            <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="n">f</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
-
-        <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
-        <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">DivergenceDubinerMoments</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">start_order</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">stop_order</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
-        <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">FrobeniusIntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">)</span>
+            <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
 
@@ -140,15 +174,20 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">MardalTaiWinther</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The definition of the Mardal-Tai-Winther element.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-        <span class="k">assert</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">&quot;Only defined for degree 3&quot;</span>
-        <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;Only defined for dimension 2&quot;</span>
-        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="n">sd</span><span class="p">,))</span>
-        <span class="n">dual</span> <span class="o">=</span> <span class="n">MardalTaiWintherDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
-        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span>
-        <span class="n">mapping</span> <span class="o">=</span> <span class="s2">&quot;contravariant piola&quot;</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="n">mapping</span><span class="p">)</span></div>
+        <span class="k">if</span> <span class="n">sd</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined in dimension 2 and 3.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_simplex</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on simplices.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="n">sd</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for 1 &lt;= order &lt; dim. &quot;</span>
+                             <span class="s2">&quot;The order is defined as the embedded sub-degree, with 1 for lowest-order case.&quot;</span><span class="p">)</span>
+
+        <span class="n">dual</span> <span class="o">=</span> <span class="n">MardalTaiWintherDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">MardalTaiWintherSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+        <span class="n">formdegree</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
 
 </pre></div>
 
@@ -181,7 +220,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" >Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT.mardal_tai_winther</a></li> 
       </ul>

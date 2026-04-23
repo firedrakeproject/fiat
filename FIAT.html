@@ -5,11 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>FIAT package &#8212; FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</title>
+    <title>FIAT package &#8212; FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/classic.css?v=2bf1fcf8" />
     
-    <script src="_static/documentation_options.js?v=822c9cfc"></script>
+    <script src="_static/documentation_options.js?v=18367b28"></script>
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
@@ -34,7 +34,7 @@
         <li class="right" >
           <a href="releases/v1.6.0.html" title="Changes in version 1.6.0"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT package</a></li> 
       </ul>
     </div>  
@@ -3551,23 +3551,38 @@ barycenter. This reduces to Powell-Sabin on the triangle, and Alfeld on the inte
 <section id="module-FIAT.mardal_tai_winther">
 <span id="fiat-mardal-tai-winther-module"></span><h2>FIAT.mardal_tai_winther module<a class="headerlink" href="#module-FIAT.mardal_tai_winther" title="Link to this heading">¶</a></h2>
 <p>Implementation of the Mardal-Tai-Winther finite elements.</p>
-<dl class="py function">
-<dt class="sig sig-object py" id="FIAT.mardal_tai_winther.DivergenceDubinerMoments">
-<span class="sig-prename descclassname"><span class="pre">FIAT.mardal_tai_winther.</span></span><span class="sig-name descname"><span class="pre">DivergenceDubinerMoments</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_deg</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comp_deg</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/mardal_tai_winther.html#DivergenceDubinerMoments"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.mardal_tai_winther.DivergenceDubinerMoments" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.mardal_tai_winther.MardalTaiWinther">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.mardal_tai_winther.</span></span><span class="sig-name descname"><span class="pre">MardalTaiWinther</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/mardal_tai_winther.html#MardalTaiWinther"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.mardal_tai_winther.MardalTaiWinther" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.mardal_tai_winther.</span></span><span class="sig-name descname"><span class="pre">MardalTaiWinther</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/mardal_tai_winther.html#MardalTaiWinther"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.mardal_tai_winther.MardalTaiWinther" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.finite_element.CiarletElement" title="FIAT.finite_element.CiarletElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">CiarletElement</span></code></a></p>
 <p>The definition of the Mardal-Tai-Winther element.</p>
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="FIAT.mardal_tai_winther.MardalTaiWintherDual">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.mardal_tai_winther.</span></span><span class="sig-name descname"><span class="pre">MardalTaiWintherDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/mardal_tai_winther.html#MardalTaiWintherDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.mardal_tai_winther.MardalTaiWintherDual" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">FIAT.mardal_tai_winther.</span></span><span class="sig-name descname"><span class="pre">MardalTaiWintherDual</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_scheme</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/mardal_tai_winther.html#MardalTaiWintherDual"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.mardal_tai_winther.MardalTaiWintherDual" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 <p>Degrees of freedom for Mardal-Tai-Winther elements.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.mardal_tai_winther.MardalTaiWintherSpace">
+<span class="sig-prename descclassname"><span class="pre">FIAT.mardal_tai_winther.</span></span><span class="sig-name descname"><span class="pre">MardalTaiWintherSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/mardal_tai_winther.html#MardalTaiWintherSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.mardal_tai_winther.MardalTaiWintherSpace" title="Link to this definition">¶</a></dt>
+<dd><p>Construct the MTW space BDM(order) + curl(B [P1]^d).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.mardal_tai_winther.curl">
+<span class="sig-prename descclassname"><span class="pre">FIAT.mardal_tai_winther.</span></span><span class="sig-name descname"><span class="pre">curl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tabulation</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/mardal_tai_winther.html#curl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.mardal_tai_winther.curl" title="Link to this definition">¶</a></dt>
+<dd><p>Compute the curl of a vector (the skew-symmetric part of the gradient) or the rot of scalar in 2D.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>tabulation</strong> – a dictionary with at least the first order tabulation.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a numpy.ndarray with the curl.</p>
+</dd>
+</dl>
 </dd></dl>
 
 </section>
@@ -6206,10 +6221,11 @@ vertex values and gradients and second normals at edge midpoints.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.wuxu.WuXuH3NCSpace">
-<span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuH3NCSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuH3NCSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuH3NCSpace" title="Link to this definition">¶</a></dt>
-<dd><p>Constructs a basis for the the Wu Xu H^3 nonconforming space
-P(T) = P_3(T) + b_T P_1(T),
-where b_T is the standard cubic bubble.</p>
+<span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuH3NCSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">robust</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuH3NCSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuH3NCSpace" title="Link to this definition">¶</a></dt>
+<dd><p>Constructs a basis for the the Wu Xu H^3 nonconforming spaces</p>
+<p>P^{(3,1)}(T) = P_3(T) + b_T P_1(T), if robust = False</p>
+<p>P^{(3,2)}(T) = P_3(T) + b_T P_1(T) + b_T^2 P_1(T), if robust = True</p>
+<p>where b_T is the standard cubic bubble.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -6225,14 +6241,6 @@ where b_T is the standard cubic bubble.</p>
 <dd><p>Bases: <a class="reference internal" href="#FIAT.dual_set.DualSet" title="FIAT.dual_set.DualSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">DualSet</span></code></a></p>
 <p>Dual basis for WuXu H3 nonconforming element consisting of
 vertex values and gradients and first and second normals at edge midpoints.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="FIAT.wuxu.WuXuRobustH3NCSpace">
-<span class="sig-prename descclassname"><span class="pre">FIAT.wuxu.</span></span><span class="sig-name descname"><span class="pre">WuXuRobustH3NCSpace</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/wuxu.html#WuXuRobustH3NCSpace"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.wuxu.WuXuRobustH3NCSpace" title="Link to this definition">¶</a></dt>
-<dd><p>Constructs a basis for the the Wu Xu H^3 nonconforming space
-P^{(3,2)}(T) = P_3(T) + b_T P_1(T) + b_T^2 P_1(T),
-where b_T is the standard cubic bubble.</p>
 </dd></dl>
 
 </section>
@@ -6832,9 +6840,10 @@ Simplices in one, two, and three dimensions are supported.</p>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.mardal_tai_winther">FIAT.mardal_tai_winther module</a><ul>
-<li><a class="reference internal" href="#FIAT.mardal_tai_winther.DivergenceDubinerMoments"><code class="docutils literal notranslate"><span class="pre">DivergenceDubinerMoments()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.mardal_tai_winther.MardalTaiWinther"><code class="docutils literal notranslate"><span class="pre">MardalTaiWinther</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.mardal_tai_winther.MardalTaiWintherDual"><code class="docutils literal notranslate"><span class="pre">MardalTaiWintherDual</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.mardal_tai_winther.MardalTaiWintherSpace"><code class="docutils literal notranslate"><span class="pre">MardalTaiWintherSpace()</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.mardal_tai_winther.curl"><code class="docutils literal notranslate"><span class="pre">curl()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.mixed">FIAT.mixed module</a><ul>
@@ -7205,7 +7214,6 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.wuxu.WuXuH3NCSpace"><code class="docutils literal notranslate"><span class="pre">WuXuH3NCSpace()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.wuxu.WuXuRobustH3NC"><code class="docutils literal notranslate"><span class="pre">WuXuRobustH3NC</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.wuxu.WuXuRobustH3NCDualSet"><code class="docutils literal notranslate"><span class="pre">WuXuRobustH3NCDualSet</span></code></a></li>
-<li><a class="reference internal" href="#FIAT.wuxu.WuXuRobustH3NCSpace"><code class="docutils literal notranslate"><span class="pre">WuXuRobustH3NCSpace()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-FIAT.xg_quad_data">FIAT.xg_quad_data module</a></li>
@@ -7261,7 +7269,7 @@ Simplices in one, two, and three dimensions are supported.</p>
         <li class="right" >
           <a href="releases/v1.6.0.html" title="Changes in version 1.6.0"
              >previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2025.11.0.dev0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="index.html">FInite element Automatic Tabulator (FIAT) 2026.5.0.dev0 documentation</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">FIAT package</a></li> 
       </ul>
     </div>
