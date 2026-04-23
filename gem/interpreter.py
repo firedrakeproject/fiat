@@ -286,6 +286,54 @@ def _evaluate_indexed(e, self):
     return Result(val[idx], val.fids + fids)
 
 
+@_evaluate.register(gem.FlexiblyIndexed)
+def _evaluate_flexiblyindexed(e, self):
+    val = self(e.children[0])
+
+    all_fids = val.fids + e.free_indices
+
+    idx = []
+
+    # Collect existing free indices
+    for fid in val.fids:
+        shape = tuple(fid.extent if f is fid else 1 for f in all_fids)
+        fidx_array = numpy.arange(fid.extent).reshape(shape)
+        idx.append(fidx_array)
+
+    # Compute a flat index for each dim from dim2idxs
+    for dim, (offset, idxs) in zip(e.children[0].shape, e.dim2idxs):
+        if isinstance(offset, gem.Node):
+            offset_result = self(offset)
+            assert not offset_result.tshape
+            offset_val = offset_result[()]
+        else:
+            offset_val = offset
+        
+        dim_flat_idx_components = []
+        for i, s in idxs:
+            # Index i may be one of: Index, VariableIndex, int
+            if isinstance(i, gem.Index):
+                # Free index contributes an array index given by the extent
+                shape = tuple(i.extent if f is i else 1 for f in all_fids)
+                i_vals = numpy.arange(i.extent).reshape(shape) * s
+                dim_flat_idx_components.append(i_vals)
+            elif isinstance(i, gem.VariableIndex):
+                # Variable index gives a single integer index 
+                # obtained by evaluating its inner expression
+                result, = self(i.expression)
+                assert not result.tshape
+                dim_flat_idx_components.append(result[()]*s)
+            else:
+                # Fixed index is just an integer so use that
+                dim_flat_idx_components.append(i*s)
+
+        # From dim_flat_idx_components compute the flat index into dim
+        dim_idx_array = offset_val + sum(flat_index_component for flat_index_component in dim_flat_idx_components)
+        idx.append(dim_idx_array)
+
+    return Result(val[idx], all_fids)
+
+
 @_evaluate.register(gem.ComponentTensor)
 def _evaluate_componenttensor(e, self):
     """Component tensors map free indices to shape."""

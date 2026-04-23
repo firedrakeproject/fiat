@@ -91,8 +91,7 @@ class Node(NodeBase, metaclass=NodeMeta):
         key: int | Index | VariableIndex | slice | EllipsisType | list | numpy.ndarray |
             tuple[int | Index | VariableIndex | slice | EllipsisType, ...],
     ) -> ComponentTensor | Indexed | ListTensor:
-        """A generalised interface for indexing a Gem.Node"""
-        # Normalize to tuple for inspection
+        """A generalised interface for indexing GEM tensors"""
         if not isinstance(key, tuple):
             key = (key,)
 
@@ -120,30 +119,11 @@ class Node(NodeBase, metaclass=NodeMeta):
             )
 
         # Slice indexing -> delegate to view()
-        # NOTE: view() produces a ComponentTensor with a FlexiblyIndexed Node that gem's evaluator cannot evaluate
-        # if any(isinstance(k, slice) for k in key):
-        #     # view expects one slice for each axis/dim of the tensor
-        #     if len(key) != len(self.shape):
-        #         raise IndexError("Expects the number of slices to match the gem.Node tensor rank")
-        #     return view(self, *key)
-
-        # Slice indexing -> build ListTensor of Indexed nodes
         if any(isinstance(k, slice) for k in key):
+            # view expects one slice for each axis/dim of the tensor
             if len(key) != len(self.shape):
-                raise IndexError("Expects one key per dimension.")
-            # Unpack slices into ranges
-            ranges = [
-                range(
-                    k.start if k.start is not None else 0,
-                    k.stop if k.stop is not None else s,
-                    k.step if k.step is not None else 1
-                ) for k, s in zip(key, self.shape)
-            ]
-            # Extract tensor indices from the cartesian product of ranges
-            components = numpy.array(
-                [Indexed(self, idx) for idx in itertools.product(*ranges)],
-                dtype=object).reshape([len(r) for r in ranges])
-            return as_gem(components)
+                raise IndexError("Expects the number of slices to match the gem.Node tensor rank")
+            return view(self, *key)
 
         # Point indexing
         return Indexed(self, key)
