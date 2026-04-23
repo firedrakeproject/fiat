@@ -37,7 +37,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Variable', 'Sum', 'Product', 'Division', 'FloorDiv', 'Remainder', 'Power',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
-           'Index', 'VariableIndex', 'Indexed', 'ComponentTensor',
+           'Index', 'VariableIndex', 'ListIndex', 'Indexed', 'ComponentTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
@@ -45,7 +45,6 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
 
 
 uint_type = numpy.dtype(numpy.uintc)
-
 
 class NodeMeta(type):
     """Metaclass of GEM nodes.
@@ -88,24 +87,14 @@ class Node(NodeBase, metaclass=NodeMeta):
 
     def __getitem__(
         self,
-        key: int | Index | VariableIndex | slice | EllipsisType | list | numpy.ndarray |
-            tuple[int | Index | VariableIndex | slice | EllipsisType, ...],
-    ) -> ComponentTensor | Indexed | ListTensor:
+        key: IndexT | tuple[IndexT, ...],
+    ) -> ComponentTensor | Indexed:
         """A generalised interface for indexing GEM tensors"""
         if not isinstance(key, tuple):
             key = (key,)
-
-        # Support a list or array of integer indices
-        if any(isinstance(k, (list, numpy.ndarray)) for k in key):
-            pos = next(i for i, k in enumerate(key) if isinstance(k, (list, numpy.ndarray)))
-            components = numpy.array(
-                [Indexed(self, key[:pos] + (int(i),) + key[pos + 1:]) for i in key[pos]],
-                dtype=object
-            )
-            return as_gem(components)
-
+        
         # Expand ellipsis -> fill in remaining dimensions with slice(None)
-        if Ellipsis in key:
+        if any(k is Ellipsis for k in key):
             if key.count(Ellipsis) > 1:
                 raise NotImplementedError("Multiple ellipses are not supported.")
             ellipsis_pos = key.index(Ellipsis)
@@ -118,12 +107,28 @@ class Node(NodeBase, metaclass=NodeMeta):
                 + key[ellipsis_pos + 1:]
             )
 
+        has_slice = any(isinstance(k, slice) for k in key)
+        has_array = any(isinstance(k, (numpy.ndarray, list)) for k in key)
+
+        if has_slice and has_array:
+            raise NotImplementedError("Mixed slice and array indexing is not supported.")
+
         # Slice indexing -> delegate to view()
-        if any(isinstance(k, slice) for k in key):
+        if has_slice:
             # view expects one slice for each axis/dim of the tensor
             if len(key) != len(self.shape):
                 raise IndexError("Expects the number of slices to match the gem.Node tensor rank")
             return view(self, *key)
+
+        # Support a list or array of integer indices
+        # Old approach: build a ListTensor out of Indexed nodes, one for each element of the permutation
+        if has_array:
+            pos = next(i for i, k in enumerate(key) if isinstance(k, (numpy.ndarray, list)))
+            arr = numpy.asarray(key[pos])
+            list_index = ListIndex(arr)
+            new_key = key[:pos] + (list_index,) + key[pos+1:]
+            indexed = Indexed(self, new_key)
+            return ComponentTensor(indexed, (list_index.free_index,)) # convert free index back to shape
 
         # Point indexing
         return Indexed(self, key)
@@ -718,6 +723,38 @@ class VariableIndex(IndexBase):
     def __reduce__(self):
         return type(self), (self.expression,)
 
+class ListIndex(IndexBase):
+    """A lookup index in the form of an index array"""
+    
+    __slots__ = ('index_array', 'free_index',)
+
+    def __init__(self, index_array):
+        assert isinstance(index_array, numpy.ndarray)
+        assert numpy.issubdtype(index_array.dtype, numpy.integer)
+        self.index_array = index_array
+        self.free_index = Index(extent=len(self.index_array))
+    
+    def __eq__(self, other):
+        if type(self) is not type(other):
+            return False
+        return numpy.array_equal(self.index_array, other.index_array)
+    
+    def __ne__(self, other):
+        return not self.__eq__(other)
+    
+    def __hash__(self):
+        return hash((type(self), self.index_array.tobytes()))
+    
+    def __str__(self):
+        return str(self.index_array)
+
+    def __repr__(self):
+        return "%r(%s)" % (type(self), self.index_array)
+    
+    def __reduce__(self):
+        return type(self), (self.index_array, )
+
+IndexT = int | Index | VariableIndex | ListIndex | slice | EllipsisType | list | numpy.ndarray 
 
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')
@@ -734,6 +771,9 @@ class Indexed(Scalar):
             assert isinstance(index, IndexBase)
             if isinstance(index, Index):
                 index.set_extent(extent)
+            elif isinstance(index, ListIndex):
+                if numpy.any(index.index_array < 0) or numpy.any(index.index_array >= extent):
+                    raise IndexError("Invalid index in ListIndex")
             elif isinstance(index, int) and not (0 <= index < extent):
                 raise IndexError("Invalid literal index")
 
@@ -781,6 +821,8 @@ class Indexed(Scalar):
                 new_indices.append(i)
             elif isinstance(i, VariableIndex):
                 new_indices.extend(i.expression.free_indices)
+            elif isinstance(i, ListIndex):
+                new_indices.append(i.free_index)
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
         return self
@@ -793,6 +835,8 @@ class Indexed(Scalar):
                 free_indices.append(i)
             elif isinstance(i, VariableIndex):
                 free_indices.extend(i.expression.free_indices)
+            elif isinstance(i, ListIndex):
+                free_indices.append(i.free_index)
         return tuple(free_indices)
 
 

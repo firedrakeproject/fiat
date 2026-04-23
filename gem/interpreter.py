@@ -263,27 +263,41 @@ def _evaluate_conditional(e, self):
 def _evaluate_indexed(e, self):
     """Indexing maps shape to free indices"""
     val = self(e.children[0])
-    fids = tuple(i for i in e.multiindex if isinstance(i, gem.Index))
+    fids = tuple(
+        i if isinstance(i, gem.Index) else i.free_index
+        for i in e.multiindex
+        if isinstance(i, (gem.Index, gem.ListIndex))
+    )
+    all_fids = val.fids + fids
 
     idx = []
     # First pick up all the existing free indices
-    for _ in val.fids:
-        idx.append(slice(None))
+    for fid in val.fids:
+        # idx.append(slice(None))
+        shape = tuple(fid.extent if f is fid else 1 for f in all_fids)
+        idx.append(numpy.arange(fid.extent).reshape(shape))
+
     # Now grab the shape axes
     for i in e.multiindex:
         if isinstance(i, gem.Index):
             # Free index, want entire extent
-            idx.append(slice(None))
+            # idx.append(slice(None))
+            shape = tuple(i.extent if f is i else 1 for f in all_fids)
+            idx.append(numpy.arange(i.extent).reshape(shape))
         elif isinstance(i, gem.VariableIndex):
             # Variable index, evaluate inner expression
             result, = self(i.expression)
             assert not result.tshape
             idx.append(result[()])
+        elif isinstance(i, gem.ListIndex):
+            # ListIndex, use the index array
+            shape = tuple(i.free_index.extent if f is i.free_index else 1 for f in all_fids)
+            idx.append(i.index_array.reshape(shape))
         else:
             # Fixed index, just pick that value
             idx.append(i)
     assert len(idx) == len(val.tshape)
-    return Result(val[idx], val.fids + fids)
+    return Result(val[idx], all_fids)
 
 
 @_evaluate.register(gem.FlexiblyIndexed)

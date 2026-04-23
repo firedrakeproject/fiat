@@ -1428,7 +1428,6 @@ class TensorProductCell(Cell):
             have shape ``(npoints, d+1)``. If factor i is a hypercube of dimension d,
             this will have shape ``(npoints, 2*d)``.
         """
-        import gem
 
         if isinstance(points, numpy.ndarray) and len(points) == 0:
             return points
@@ -1439,19 +1438,13 @@ class TensorProductCell(Cell):
         result = numpy.empty(len(self.cells), dtype=object)
         for k, (factor, s) in enumerate(zip(self.cells, point_slices)):
             result[k] = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
-
+        
         # Flatten the array
         # NOTE: cannot construct the flat array directly since we may not know upfront the total number
-        # of barycentric coordinates (e.g., in a simplex: d+1, in a hypercube: 2*d)
+        # of barycentric coordinates (e.g., in a simplex it is d+1, in a hypercube it is 2*d)
         flat_result = numpy.array([bary[j] for bary in result for j in range(bary.shape[0])])
 
-        if isinstance(points, numpy.ndarray):
-            return flat_result
-        elif isinstance(points, gem.Node):
-            return gem.as_gem(flat_result)
-        else:
-            raise ValueError(f"Expected a numpy.ndarray or gem.Node, got {type(points)}")
-
+        return flat_result
 
 class Hypercube(Cell):
     """Abstract class for a reference hypercube"""
