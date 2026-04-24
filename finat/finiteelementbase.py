@@ -143,7 +143,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         '''A tuple of GEM :class:`Index` of the correct extents to loop over
         the basis functions of this element.'''
 
-        return tuple(gem.Index(extent=d) for d in self.index_shape)
+        return tuple(gem.Index(extent=d, name="basis") for d in self.index_shape)
 
     def get_value_indices(self):
         '''A tuple of GEM :class:`~gem.Index` of the correct extents to loop over

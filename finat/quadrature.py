@@ -64,7 +64,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
         point_set = GaussLegendrePointSet(fiat_rule.get_points())
     else:
         fiat_rule = fiat_scheme(ref_el, degree, scheme)
-        point_set = PointSet(fiat_rule.get_points())
+        point_set = PointSet(fiat_rule.get_points(), index_names=["quad"])
 
     return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 

@@ -11,6 +11,10 @@ from itertools import chain, groupby
 
 from gem.node import traversal, collect_refcount
 from gem import gem, impero as imp, optimise, scheduling
+from gem.gem_to_gpu import to_mlir
+
+import os
+import numpy as np
 
 
 # ImperoC is named tuple for C code generation.
@@ -90,6 +94,14 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
     # Determine declarations
     declare, indices = place_declarations(tree, temporaries, get_indices)
+
+    if "FIREDRAKE_USE_GPU" in os.environ:
+        print("Generating MLIR string")
+        insns = to_mlir(assignments)
+        with open("mykernel.mlir", "w") as f:
+            f.write(insns)
+        print("Written to mykernel.mlir")
+        exit(0)
 
     # Prepare ImperoC (Impero AST + other data for code generation)
     return ImperoC(tree, temporaries, declare, indices)
