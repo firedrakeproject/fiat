@@ -23,7 +23,6 @@ from operator import attrgetter
 from numbers import Integral, Number
 
 from types import EllipsisType
-import itertools
 
 import numpy
 from numpy import asarray
@@ -45,6 +44,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
 
 
 uint_type = numpy.dtype(numpy.uintc)
+
 
 class NodeMeta(type):
     """Metaclass of GEM nodes.
@@ -92,7 +92,7 @@ class Node(NodeBase, metaclass=NodeMeta):
         """A generalised interface for indexing GEM tensors"""
         if not isinstance(key, tuple):
             key = (key,)
-        
+
         # Expand ellipsis -> fill in remaining dimensions with slice(None)
         if any(k is Ellipsis for k in key):
             if key.count(Ellipsis) > 1:
@@ -128,7 +128,7 @@ class Node(NodeBase, metaclass=NodeMeta):
             list_index = ListIndex(arr)
             new_key = key[:pos] + (list_index,) + key[pos+1:]
             indexed = Indexed(self, new_key)
-            return ComponentTensor(indexed, (list_index.free_index,)) # convert free index back to shape
+            return ComponentTensor(indexed, (list_index.free_index,))  # convert free index back to shape
 
         # Point indexing
         return Indexed(self, key)
@@ -723,9 +723,10 @@ class VariableIndex(IndexBase):
     def __reduce__(self):
         return type(self), (self.expression,)
 
+
 class ListIndex(IndexBase):
     """A lookup index in the form of an index array"""
-    
+
     __slots__ = ('index_array', 'free_index',)
 
     def __init__(self, index_array):
@@ -733,28 +734,30 @@ class ListIndex(IndexBase):
         assert numpy.issubdtype(index_array.dtype, numpy.integer)
         self.index_array = index_array
         self.free_index = Index(extent=len(self.index_array))
-    
+
     def __eq__(self, other):
         if type(self) is not type(other):
             return False
         return numpy.array_equal(self.index_array, other.index_array)
-    
+
     def __ne__(self, other):
         return not self.__eq__(other)
-    
+
     def __hash__(self):
         return hash((type(self), self.index_array.tobytes()))
-    
+
     def __str__(self):
         return str(self.index_array)
 
     def __repr__(self):
         return "%r(%s)" % (type(self), self.index_array)
-    
+
     def __reduce__(self):
         return type(self), (self.index_array, )
 
-IndexT = int | Index | VariableIndex | ListIndex | slice | EllipsisType | list | numpy.ndarray 
+
+IndexT = int | Index | VariableIndex | ListIndex | slice | EllipsisType | list | numpy.ndarray
+
 
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')

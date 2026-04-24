@@ -322,7 +322,7 @@ def _evaluate_flexiblyindexed(e, self):
             offset_val = offset_result[()]
         else:
             offset_val = offset
-        
+
         dim_flat_idx_components = []
         for i, s in idxs:
             # Index i may be one of: Index, VariableIndex, int
@@ -332,7 +332,7 @@ def _evaluate_flexiblyindexed(e, self):
                 i_vals = numpy.arange(i.extent).reshape(shape) * s
                 dim_flat_idx_components.append(i_vals)
             elif isinstance(i, gem.VariableIndex):
-                # Variable index gives a single integer index 
+                # Variable index gives a single integer index
                 # obtained by evaluating its inner expression
                 result, = self(i.expression)
                 assert not result.tshape
