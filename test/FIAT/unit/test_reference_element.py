@@ -460,6 +460,8 @@ def test_flatten_maintains_ufc_status(cell):
                           (triangle_x_interval, [0.25, 0.25, 0.5]),
                           (quadrilateral_x_interval, [0.25, 0.25, 0.5])])
 def test_tp_axis_bary_coords(cell, point, epsilon=1e-12):
+    """Test that barycentric coordinates computed on tensor product cells
+    are listed in factor order in the flattened array."""
     point = np.asarray(point)
     axis_bary_coords = cell.compute_axis_barycentric_coordinates(point)
 
@@ -489,6 +491,8 @@ def test_tp_axis_bary_coords(cell, point, epsilon=1e-12):
                           (hexahedron, [0.3, 0.4, 0.0]),
                           (hexahedron, [0.3, 0.4, 1.0]),])
 def test_hypercube_bary_coords_are_in_facet_order(cell, point, epsilon=1e-12):
+    """Test that the facet permutation is applied correctly on barycentric coordinates computed on Hypercubes
+    such that the following invariant holds: the i-th barycentric coordinate vanishes for a point on facet i."""
     point = np.asarray(point)
 
     facet_dim = cell.get_spatial_dimension() - 1
@@ -512,6 +516,7 @@ def test_hypercube_bary_coords_are_in_facet_order(cell, point, epsilon=1e-12):
                           (quadrilateral, [0.25, 0.5]),
                           (hexahedron, [0.25, 0.5, 0.25]),])
 def test_bary_coords_gem(cell, point):
+    """Test the GEM expression for barycentric coordinates produces the expected numeric output."""
     import gem
     from gem.interpreter import evaluate
 
