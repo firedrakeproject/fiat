@@ -1438,13 +1438,14 @@ class TensorProductCell(Cell):
         result = numpy.empty(len(self.cells), dtype=object)
         for k, (factor, s) in enumerate(zip(self.cells, point_slices)):
             result[k] = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
-        
+
         # Flatten the array
-        # NOTE: cannot construct the flat array directly since we may not know upfront the total number
+        # We cannot construct the flat array directly since we may not know upfront the total number
         # of barycentric coordinates (e.g., in a simplex it is d+1, in a hypercube it is 2*d)
         flat_result = numpy.array([bary[j] for bary in result for j in range(bary.shape[0])])
 
         return flat_result
+
 
 class Hypercube(Cell):
     """Abstract class for a reference hypercube"""
@@ -1903,8 +1904,12 @@ def compute_unflattening_map(topology_dict):
 
 def compute_facet_permutation(unflattening_map, product):
     """
-    Return a permutation mapping each hypercube facet to the index of its
-    vanishing barycentric coordinate in the axis-structured barycentric array.
+    Returns a permutation mapping each facet of a `~.Hypercube` to the index of the
+    barycentric coordinate that vanishes on it.
+
+    The order of barycentric coordinates returned by `compute_axis_barycentric_coordinates`
+    is determined by axis structure, not by facet numbering. Reordering them by this permutation
+    yields the invariant: the i-th barycentric coordinate vanishes on the i-th facet.
     """
     # First compute axis offsets into the flattened barycentric coordinate array.
     axis_offsets = []
