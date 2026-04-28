@@ -39,7 +39,10 @@ class TensorProductElement(FiniteElementBase):
             raise ValueError("TensorProductElement got an unexpected keyword argument '%s'" % keywords[0])
         cell = kwargs.get("cell")
 
-        family = "TensorProductElement"
+        try:
+            family, = {e.family() for e in elements}
+        except ValueError:
+            family = "TensorProductElement"
 
         if cell is None:
             # Define cell as the product of each elements cell
