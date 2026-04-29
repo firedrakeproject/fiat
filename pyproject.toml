@@ -35,6 +35,9 @@ doc = [
 ]
 test = ["pytest"]
 
+[project.entry-points.'xdsl.universe']
+gem = 'gem.universe:GEM_UNIVERSE'
+
 [tool.setuptools]
 packages = ["FIAT", "finat", "finat.ufl", "gem"]
 
