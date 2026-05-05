@@ -126,8 +126,8 @@ class Node(NodeBase, metaclass=NodeMeta):
             arr_pos = next(i for i, k in enumerate(key) if isinstance(k, (numpy.ndarray, list)))
             list_index = ListIndex(key[arr_pos])
             new_key = key[:arr_pos] + (list_index,) + key[arr_pos+1:]
-            indexed = Indexed(self, new_key) # A[i] scalar
-            retval = ComponentTensor(indexed, (list_index,)) # CT(A[i], i) -> A[index_array[i]]
+            indexed = Indexed(self, new_key) # A[perm[i]] is a scalar
+            retval = ComponentTensor(indexed, (list_index.free_index,)) # CT(A[perm[i]], i) -> A[perm]
             return retval
 
         # Point indexing
@@ -723,27 +723,30 @@ class VariableIndex(IndexBase):
     def __reduce__(self):
         return type(self), (self.expression,)
 
-class ListIndex(Index):
-    """ListIndex is a free index representing array indexing such that tensor[list_index] is tensor[index_array[list_index]]
-    where index_array is the integer index array and list_index is a free index ranging over 0,1..., len(index_array)"""
+class ListIndex(IndexBase):
+    """
+    Option 1:  tensor[list_index] is tensor[index_array[list_index]] free index ranging over 0,1..., len(index_array)
+    
+    Option 2: tensor[list_index] is tensor[list_index.index_array[list_index.free_index]]
+    """
 
-    __slots__ = Index.__slots__ + ('index_array',)
+    __slots__ = ('index_array', 'free_index')
 
     def __init__(self, index_array, name=None):
         index_array = numpy.asarray(index_array)
         assert numpy.issubdtype(index_array.dtype, numpy.integer)
+        
+        # Wraps a free index together with the index array
         self.index_array = index_array
-        super().__init__(name=name, extent=len(index_array))
+        self.free_index = Index(extent=len(index_array), name=name)
+
+        # super().__init__(name=name, extent=len(index_array))
 
     def __str__(self):
-        if self.name is None:
-            return f"{self.index_array.tolist()}[i_{self.count}]"
-        return f"{self.index_array.tolist()}[{self.name}]"
+        return f"{self.index_array.tolist()}[i_{self.free_index}]"
 
     def __repr__(self):
-        if self.name is None:
-            return f"ListIndex({self.index_array.tolist()}, {self.count})"
-        return f"ListIndex({self.index_array.tolist()}, {self.name})"
+        return f"ListIndex({self.index_array.tolist()}, {self.free_index})"
     
     # def __eq__(self, other):
     #     if type(self) is not type(other):
@@ -778,9 +781,6 @@ class Indexed(Scalar):
             assert isinstance(index, IndexBase)
             if isinstance(index, Index):
                 index.set_extent(extent)
-            # elif isinstance(index, ListIndex):
-            #     if numpy.any(index.index_array < 0) or numpy.any(index.index_array >= extent):
-            #         raise IndexError("Invalid index in ListIndex")
             elif isinstance(index, int) and not (0 <= index < extent):
                 raise IndexError("Invalid literal index")
 
@@ -795,7 +795,7 @@ class Indexed(Scalar):
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         # This pattern corresponds to an index replacement rule jj -> ii applied to
         # the innermost multiindex kk to produce ll.
-        if isinstance(aggregate, ComponentTensor) and not any(isinstance(i, ListIndex) for i in aggregate.multiindex):
+        if isinstance(aggregate, ComponentTensor):
             B, = aggregate.children
             jj = aggregate.multiindex
             ii = multiindex
@@ -829,7 +829,7 @@ class Indexed(Scalar):
             elif isinstance(i, VariableIndex):
                 new_indices.extend(i.expression.free_indices)
             elif isinstance(i, ListIndex):
-                new_indices.append(i)
+                new_indices.append(i.free_index)
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
         return self
@@ -961,15 +961,13 @@ class ComponentTensor(Node):
         shape = tuple(index.extent for index in multiindex)
         assert all(s >= 0 for s in shape)
 
-        # Zero folding
+        # Zero foldingc
         if isinstance(expression, Zero):
             return Zero(shape, dtype=expression.dtype)
 
         # Index folding
         if isinstance(expression, Indexed):
-            # NOTE: The folding rule CT(A[i], i) -> A is correct for when i is an Index as it ranges over every position in A
-            # but is not right when i is a ListIndex since A[i] means element A[index_array[i]]
-            if multiindex == expression.multiindex and not any(isinstance(i, ListIndex) for i in multiindex):
+            if multiindex == expression.multiindex:
                 return expression.children[0]
 
         self = super(ComponentTensor, cls).__new__(cls)

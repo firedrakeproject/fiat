@@ -262,16 +262,25 @@ def _evaluate_conditional(e, self):
 @_evaluate.register(gem.Indexed)
 def _evaluate_indexed(e, self):
     """Indexing maps shape to free indices"""
-    val = self(e.children[0])
+    val = self(e.children[0]) # tensor being indexed
+    # fids = tuple(i for i in e.multiindex if isinstance(i, (gem.Index, gem.ListIndex))) # free indices in the multiindex
     fids = tuple(
-        i if isinstance(i, gem.Index) else i.free_index
+        i.free_index if isinstance(i, gem.ListIndex) else i
         for i in e.multiindex
         if isinstance(i, (gem.Index, gem.ListIndex))
     )
+
+
     all_fids = val.fids + fids
 
     idx = []
-    # First pick up all the existing free indices
+
+    # idx has one entry per axis but val.arr is a single array with shape (*val.fids extents, *tensor_shape)
+    # and the inner loop consumes the tensor_shape axes one by ones through indexing.
+    # When val.arr is indexed with idx as val[idx], NumPy broadcasts each entry of idx to operate
+    # on all axes simultaneously so we need to reshape each entry of idx appropriately.
+
+    # First pick up all the free indices that's already part of the tensor
     for fid in val.fids:
         # idx.append(slice(None))
         shape = tuple(fid.extent if f is fid else 1 for f in all_fids)
@@ -279,7 +288,11 @@ def _evaluate_indexed(e, self):
 
     # Now grab the shape axes
     for i in e.multiindex:
-        if isinstance(i, gem.Index):
+        if isinstance(i, gem.ListIndex):
+            # ListIndex, use the index array
+            shape = tuple(i.free_index.extent if f is i.free_index else 1 for f in all_fids)
+            idx.append(i.index_array.reshape(shape))
+        elif isinstance(i, gem.Index):
             # Free index, want entire extent
             # idx.append(slice(None))
             shape = tuple(i.extent if f is i else 1 for f in all_fids)
@@ -287,12 +300,8 @@ def _evaluate_indexed(e, self):
         elif isinstance(i, gem.VariableIndex):
             # Variable index, evaluate inner expression
             result, = self(i.expression)
-            assert not result.tshape
+            assert not result.tshape # int
             idx.append(result[()])
-        elif isinstance(i, gem.ListIndex):
-            # ListIndex, use the index array
-            shape = tuple(i.free_index.extent if f is i.free_index else 1 for f in all_fids)
-            idx.append(i.index_array.reshape(shape))
         else:
             # Fixed index, just pick that value
             idx.append(i)
