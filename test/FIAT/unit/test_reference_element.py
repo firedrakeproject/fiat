@@ -459,11 +459,11 @@ def test_flatten_maintains_ufc_status(cell):
                          [(interval_x_interval, [0.25, 0.6]),
                           (triangle_x_interval, [0.25, 0.25, 0.5]),
                           (quadrilateral_x_interval, [0.25, 0.25, 0.5])])
-def test_tp_axis_bary_coords(cell, point, epsilon=1e-12):
+def test_tp_factor_bary_coords(cell, point, epsilon=1e-12):
     """Test that barycentric coordinates computed on tensor product cells
     are listed in factor order in the flattened array."""
     point = np.asarray(point)
-    axis_bary_coords = cell.compute_axis_barycentric_coordinates(point)
+    axis_bary_coords = cell.compute_factor_barycentric_coordinates(point)
 
     assert type(axis_bary_coords) is np.ndarray
 
@@ -527,7 +527,11 @@ def test_bary_coords_gem(cell, point):
     bindings = {coords: point}
 
     bary_gem = cell.compute_barycentric_coordinates(coords)
-    results, = evaluate((gem.as_gem(bary_gem),), bindings=bindings)
+    # breakpoint()
+
+    # If bary_gem is a numpy array convert to a GEM Node using before evaluating
+    # results, = evaluate((gem.as_gem(bary_gem),), bindings=bindings)
+    results, = evaluate((bary_gem,), bindings=bindings)
     results = results.arr
 
     bary_numpy = cell.compute_barycentric_coordinates(point)

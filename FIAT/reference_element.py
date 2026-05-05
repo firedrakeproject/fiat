@@ -1411,7 +1411,7 @@ class TensorProductCell(Cell):
     def is_macrocell(self):
         return any(c.is_macrocell() for c in self.cells)
 
-    def compute_axis_barycentric_coordinates(self, points, entity=None, rescale=False):
+    def compute_factor_barycentric_coordinates(self, points, entity=None, rescale=False):
         """Compute barycentric coordinates on each axis (factor) of a tensor-product cell.
 
         Parameters
@@ -1428,6 +1428,7 @@ class TensorProductCell(Cell):
             have shape ``(npoints, d+1)``. If factor i is a hypercube of dimension d,
             this will have shape ``(npoints, 2*d)``.
         """
+        import gem
 
         if isinstance(points, numpy.ndarray) and len(points) == 0:
             return points
@@ -1435,15 +1436,18 @@ class TensorProductCell(Cell):
         axis_dims = [c.get_spatial_dimension() for c in self.cells]
         point_slices = TensorProductCell._split_slices(axis_dims)
 
-        result = numpy.empty(len(self.cells), dtype=object)
-        for k, (factor, s) in enumerate(zip(self.cells, point_slices)):
-            result[k] = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
+        result = []
+        for factor, s in zip(self.cells, point_slices):
+            result.append(factor.compute_barycentric_coordinates(points[..., s], entity, rescale))
 
         # Flatten the array
         # We cannot construct the flat array directly since we may not know upfront the total number
         # of barycentric coordinates (e.g., in a simplex it is d+1, in a hypercube it is 2*d)
         flat_result = numpy.array([bary[j] for bary in result for j in range(bary.shape[0])])
 
+        if isinstance(points, gem.Node):
+            return gem.as_gem(flat_result) # returns a ListTensor wrapping the scalar GEM expr. of bary coords.
+        
         return flat_result
 
 
@@ -1580,9 +1584,9 @@ class Hypercube(Cell):
         if isinstance(points, numpy.ndarray) and len(points) == 0:
             return points
 
-        tp_bary_coords = self.product.compute_axis_barycentric_coordinates(points, entity, rescale)
-
-        return tp_bary_coords[self.facet_perm]
+        tp_bary_coords = self.product.compute_factor_barycentric_coordinates(points, entity, rescale)
+        
+        return tp_bary_coords[self.facet_perm] # A[[1, 3, 5, 4]]
 
 
 class UFCHypercube(Hypercube):
@@ -1907,7 +1911,7 @@ def compute_facet_permutation(unflattening_map, product):
     Returns a permutation mapping each facet of a `~.Hypercube` to the index of the
     barycentric coordinate that vanishes on it.
 
-    The order of barycentric coordinates returned by `compute_axis_barycentric_coordinates`
+    The order of barycentric coordinates returned by `compute_factor_barycentric_coordinates`
     is determined by axis structure, not by facet numbering. Reordering them by this permutation
     yields the invariant: the i-th barycentric coordinate vanishes on the i-th facet.
     """
