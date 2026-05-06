@@ -61,6 +61,6 @@ class CubicHermite(finite_element.CiarletElement):
         if variant is None:
             variant = "gll"
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
-        dual = CubicHermiteDualSet(ref_el, degree)
+        dual = CubicHermiteDualSet(ref_el, degree, variant=variant)
 
         super().__init__(poly_set, dual, degree)
