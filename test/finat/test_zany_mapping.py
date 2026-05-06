@@ -14,7 +14,7 @@ def make_unisolvent_points(element, interior=False):
     top = ref_complex.get_topology()
     pts = []
     if interior:
-        dim = ref_complex.get_spatial_dimension()
+        dim = ref_complex.get_topological_dimension()
         for entity in top[dim]:
             pts.extend(ref_complex.make_points(dim, entity, degree+dim+1, variant="gll"))
     else:
@@ -33,12 +33,13 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     ref_element = finat_element._element
     ref_cell = ref_element.get_reference_element()
     phys_cell = phys_element.get_reference_element()
-    sd = ref_cell.get_spatial_dimension()
 
     shape = ref_element.value_shape()
+    sd = ref_cell.get_spatial_dimension()
     ref_pts = make_unisolvent_points(ref_element, interior=True)
     ref_vals = ref_element.tabulate(0, ref_pts)[(0,)*sd]
 
+    sd = phys_cell.get_spatial_dimension()
     phys_pts = make_unisolvent_points(phys_element, interior=True)
     phys_vals = phys_element.tabulate(0, phys_pts)[(0,)*sd]
 
@@ -51,16 +52,31 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
                                                           phys_cell.vertices)
         K = []
         if "covariant" in mapping:
-            K.append(np.linalg.inv(J).T)
+            if J.shape[0] == J.shape[1]:
+                JinvT = np.linalg.inv(J).T
+            else:
+                JinvT = J @ np.linalg.inv(J.T @ J)
+            K.append(JinvT)
         if "contravariant" in mapping:
-            K.append(J / np.linalg.det(J))
+            if J.shape[0] == J.shape[1]:
+                detJ = np.linalg.det(J)
+            else:
+                detJ = np.linalg.det(J.T @ J)**0.5
+            K.append(J / detJ)
 
         if len(shape) == 2:
             piola_map = lambda x: K[0] @ x @ K[-1].T
         else:
             piola_map = lambda x: K[0] @ x
 
-        ref_vals_piola = np.zeros(ref_vals.shape)
+        shp = list(ref_vals.shape)
+        if J.shape[0] != J.shape[1]:
+            if len(shape) == 2:
+                shp[1:-1] = [K[i].shape[0] for i in (0, -1)]
+            elif len(shape) == 1:
+                shp[1:-1] = [K[i].shape[0] for i in (0,)]
+
+        ref_vals_piola = np.zeros(shp)
         for i in range(ref_vals.shape[0]):
             for k in range(ref_vals.shape[-1]):
                 ref_vals_piola[i, ..., k] = piola_map(ref_vals[i, ..., k])
@@ -175,6 +191,16 @@ zany_piola_elements = {
     *((3, e) for e in zany_piola_elements[3]),
 ])
 def test_piola(ref_to_phys, element, dimension):
+    check_zany_mapping(element, ref_to_phys[dimension])
+
+
+@pytest.mark.parametrize("element", [
+    finat.MardalTaiWinther,
+    finat.JohnsonMercier,
+    finat.Morley,
+])
+def test_piola_manifold(ref_to_phys, element):
+    dimension = 2.5
     check_zany_mapping(element, ref_to_phys[dimension])
 
 

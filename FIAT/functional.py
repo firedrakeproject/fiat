@@ -361,7 +361,7 @@ class IntegralMomentOfNormalDerivative(IntegralMomentOfDerivative):
     def __init__(self, ref_el, facet_no, Q_face, f_at_qpts):
         n = ref_el.compute_normal(facet_no)
         # map points onto facet
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         Q = quadrature.FacetQuadratureRule(ref_el, sd-1, facet_no, Q_face, avg=True)
         super().__init__(ref_el, Q, f_at_qpts, n, nm="IntegralMomentOfNormalDerivative")
 

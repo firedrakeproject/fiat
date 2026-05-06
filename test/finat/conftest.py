@@ -20,7 +20,12 @@ class MyMapping(PhysicalGeometry):
         return np.ones((len(self.ref_cell.vertices),))
 
     def detJ_at(self, point):
-        return gem.Literal(np.linalg.det(self.A))
+        shape = self.A.shape
+        if shape[0] == shape[1]:
+            detA = np.linalg.det(self.A)
+        else:
+            detA = np.linalg.det(self.A.T @ self.A)**0.5
+        return gem.Literal(detA)
 
     def jacobian_at(self, point):
         return gem.Literal(self.A)
@@ -32,14 +37,14 @@ class MyMapping(PhysicalGeometry):
                         for i in sorted(top[1])]))
 
     def reference_normals(self):
-        sd = self.ref_cell.get_spatial_dimension()
+        sd = self.phys_cell.get_topological_dimension()
         top = self.ref_cell.get_topology()
         return gem.Literal(
             np.asarray([self.ref_cell.compute_normal(i)
                         for i in sorted(top[sd-1])]))
 
     def physical_normals(self):
-        sd = self.phys_cell.get_spatial_dimension()
+        sd = self.phys_cell.get_topological_dimension()
         top = self.phys_cell.get_topology()
         return gem.Literal(
             np.asarray([self.phys_cell.compute_normal(i)
@@ -108,18 +113,19 @@ def ref_el():
 
 @pytest.fixture
 def phys_el():
-    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
+    K = {dim: FIAT.ufc_simplex(int(dim)) for dim in (2, 2.5, 3)}
     K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
     K[3].vertices = ((0, 0, 0),
                      (1., 0.1, -0.37),
                      (0.01, 0.987, -.23),
                      (-0.1, -0.2, 1.38))
+    K[2.5].vertices = K[3].vertices[:-1]
     return K
 
 
 @pytest.fixture
 def ref_to_phys(ref_el, phys_el):
-    return {dim: MyMapping(ref_el[dim], phys_el[dim]) for dim in ref_el}
+    return {dim: MyMapping(ref_el[int(dim)], phys_el[dim]) for dim in phys_el}
 
 
 @pytest.fixture

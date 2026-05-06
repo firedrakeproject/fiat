@@ -17,7 +17,7 @@ class MardalTaiWinther(PhysicallyMappedElement, FiatElement):
         super().__init__(FIAT.MardalTaiWinther(cell, order=order))
 
     def basis_transformation(self, coordinate_mapping):
-        sd = self.cell.get_spatial_dimension()
+        sd = self.cell.get_topological_dimension()
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)
         detJ = coordinate_mapping.detJ_at(bary)
