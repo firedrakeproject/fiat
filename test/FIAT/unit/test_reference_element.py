@@ -456,12 +456,50 @@ def test_flatten_maintains_ufc_status(cell):
 
 
 @pytest.mark.parametrize(('cell', 'point'),
+                          [(interval, [0.0]),   # on facet 0
+                          (interval, [1.0]),])  # on facet 1
+def test_bary_coords_order_on_1d_simplex(cell, point, epsilon=1e-12):
+    facet_id = [fid for fid, pts in cell.point_entity_ids([point])[0].items() if len(pts) > 0][0]
+
+    # The default ordering of barycentric coords. is vertex ordering
+    # On a 1D interval: facets are vertices so they follow the vertex ordering
+    # But bary_coords[i] vanishes on the facet not containing i. In this case, this happens to be facet 1-i.
+    bary_default = cell.compute_barycentric_coordinates(point, facet_ordering=False)
+    assert np.isclose(bary_default[1 - facet_id], 0.0, atol=epsilon)
+    assert not np.isclose(bary_default[facet_id], 0.0, atol=epsilon)
+
+    # Reverting the ordering of vertices inside `compute_barycentric_coordinates` gives us the facet ordering
+    # i.e, bary_coords[i] vanishes on the facet not containing i which happens to be facet i.
+    bary_ordered = cell.compute_barycentric_coordinates(point, facet_ordering=True)
+    assert np.isclose(bary_ordered[facet_id], 0.0, atol=epsilon)
+
+
+@pytest.mark.parametrize(('cell', 'point'),
+                         [(triangle, [0.5, 0.5]),              # on facet 0
+                          (triangle, [0.0, 0.5]),              # on facet 1
+                          (triangle, [0.5, 0.0]),              # on facet 2
+                          (tetrahedron, [1/3, 1/3, 1/3]),      # on facet 0
+                          (tetrahedron, [0.0, 0.25, 0.25]),    # on facet 1
+                          (tetrahedron, [0.25, 0.0, 0.25]),    # on facet 2
+                          (tetrahedron, [0.25, 0.25, 0.0]),])  # on facet 3
+def test_bary_coords_order_on_simplicies(cell, point, epsilon=1e-12):
+    sd = cell.get_spatial_dimension()
+    facet_id = [fid for fid, pts in cell.point_entity_ids([point])[sd-1].items() if len(pts) > 0][0]
+
+    # The default ordering of barycentric coords. is vertex ordering
+    # In triangles and tetrahedrons, facets are ordered by the vertex they include
+    # so: bary_coords[i] vanishes on facet not containing vertex i which is facet i
+    bary = cell.compute_barycentric_coordinates(point, facet_ordering=False)
+    assert np.isclose(bary[facet_id], 0.0, atol=epsilon)
+
+
+@pytest.mark.parametrize(('cell', 'point'),
                          [(interval_x_interval, [0.25, 0.6]),
                           (triangle_x_interval, [0.25, 0.25, 0.5]),
                           (quadrilateral_x_interval, [0.25, 0.25, 0.5])])
 def test_tp_factor_bary_coords(cell, point, epsilon=1e-12):
     """Test that barycentric coordinates computed on tensor product cells
-    are listed in factor order in the flattened array."""
+    are listed in factor order."""
     point = np.asarray(point)
     axis_bary_coords = cell.compute_factor_barycentric_coordinates(point)
 
@@ -473,7 +511,10 @@ def test_tp_factor_bary_coords(cell, point, epsilon=1e-12):
         sd = factor.get_spatial_dimension()
         coords_k = point[offset: offset + sd]
         offset += sd
-        expected = factor.compute_barycentric_coordinates(coords_k)
+        if factor is interval:
+            expected = factor.compute_barycentric_coordinates(coords_k, facet_ordering=True)
+        else:
+            expected = factor.compute_barycentric_coordinates(coords_k)
         n_bary = len(expected)
         assert np.allclose(axis_bary_coords[bary_offset: bary_offset + n_bary], expected, atol=epsilon)
         bary_offset += n_bary
