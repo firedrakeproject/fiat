@@ -120,6 +120,9 @@ def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
     child, = node.children
 
+    # When node is Indexed(CT(A[j], (j,)), (i,)) with j and i as Index the below rule promotes the substitution j -> i
+    # so that A[j] becomes A[i] which eliminates the CT. This is wrong for when j a free index of ListIndex since A[j] is A[index_array[j]];
+    # hence doing the subsitution effectively gets rid of index_array.
     if isinstance(child, ComponentTensor):
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
@@ -144,13 +147,6 @@ def replace_indices_indexed(node, self, subst):
                 sub = child.array[slices]
                 child = Literal(sub, dtype=child.dtype) if isinstance(child, Constant) else ListTensor(sub)
                 multiindex = tuple(i for i in multiindex if not isinstance(i, Integral))
-
-            elif isinstance(child, ListTensor) and len(multiindex) == 1 and isinstance(multiindex[0], ListIndex):
-                # ListIndex into a ListTensor: apply the permutation at compile time
-                # by reordering the ListTensor elements, eliminating the free index.
-                list_index = multiindex[0]
-                child = ListTensor(child.array[list_index.index_array])
-                multiindex = (list_index.free_index,)
 
         if multiindex == node.multiindex and child == node.children[0]:
             return node
