@@ -1908,12 +1908,42 @@ def compute_unflattening_map(topology_dict):
 
 def compute_facet_permutation(unflattening_map, product):
     """
-    Returns a permutation mapping each facet of a `~.Hypercube` to the index of the
+    Returns a permutation mapping each facet of a Hypercube to the index of the
     barycentric coordinate that vanishes on it.
 
-    The order of barycentric coordinates returned by `compute_factor_barycentric_coordinates`
-    is determined by axis structure, not by facet numbering. Reordering them by this permutation
-    yields the invariant: the i-th barycentric coordinate vanishes on the i-th facet.
+    Let's take the example of a quad in 2D. Calling `compute_factor_barycentric_coordinates` returns
+    the barycentric coordinates on each of its 2 axes:
+
+    axis 0 (x): lambda_x_1, lambda_x_2
+    axis 1 (y): lambda_y_1, lambda_y_2
+
+    as a flat array bary_coords = [lambda_x_1, lambda_x_2, lambda_y_1, lambda_y_2]
+
+    A quad has 4 facets which are numbered in UFC order as:
+
+             facet 3
+            ┌───────┐
+            │       │
+    facet 0 │       │  facet 1
+            │       │
+            │       │
+            └───────┘
+             facet 2
+
+    Since each axis is a UFCInterval (a simplex),  with vertices at P1 = (0,) and P2 = (1,) its barycentric coordinates
+    are lambda_1 = 1 - t (vanishes at P2) and lambda_2 = t (vanishes at P1). This applies the rule for barycentric coordinates 
+    on simplicies which is that lambda_i vanishes on the facet opposite vertex i.
+    
+    Therefore:
+
+    - lambda_x_1 vanishes on facet 1 (x=1), lambda_x_2 vanishes on facet 0 (x=0)
+    - lambda_y_1 vanishes on facet 3 (y=1), lambda_y_2 vanishes on facet 2 (y=0)
+
+    The permutation computed in this function reorders the array of barycentric coordinates such that:
+
+    bary_coords[perm] = [lambda_x_2, lambda_x_1, lambda_y_2, lambda_y_1]
+
+    where the i-th entry corresponds to the barycentric coordinate vanishing on facet i.
     """
     # First compute axis offsets into the flattened barycentric coordinate array.
     axis_offsets = []
