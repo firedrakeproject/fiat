@@ -613,11 +613,11 @@ class SimplicialComplex(Cell):
         spatial dimension."""
         return self.get_spatial_dimension()
 
-    def compute_barycentric_coordinates(self, points, entity=None, rescale=False):
+    def compute_barycentric_coordinates(self, points, entity=None, rescale=False, facet_ordering=False):
         """Returns the barycentric coordinates of a list of points on the complex."""
 
-        if isinstance(points, numpy.ndarray) and len(points) == 0:
-            return points
+        # if isinstance(points, numpy.ndarray) and len(points) == 0:
+        #     return points
 
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
@@ -626,25 +626,31 @@ class SimplicialComplex(Cell):
         sd = self.get_spatial_dimension()
 
         # get a subcell containing the entity and the restriction indices of the entity
-        indices = slice(None)
+        # indices = slice(None)
+        indices = list(range(sd+1))
         subcomplex = top[entity_dim][entity_id]
         if entity_dim != sd:
             cell_id = self.connectivity[(entity_dim, sd)][entity_id][0]
             indices = [i for i, v in enumerate(top[sd][cell_id]) if v in subcomplex]
             subcomplex = top[sd][cell_id]
 
+        if facet_ordering:
+            indices = indices[::-1]
+        
         cell_verts = self.get_vertices_of_subcomplex(subcomplex)
         ref_verts = numpy.eye(sd + 1)
         A, b = make_affine_mapping(cell_verts, ref_verts)
+
         A, b = A[indices], b[indices]
         if rescale:
             # rescale barycentric coordinates by the height wrt. to the facet
             h = 1 / numpy.linalg.norm(A, axis=1)
             b *= h
             A *= h[:, None]
+
         # out = numpy.dot(points, A.T)
         out = points @ A.T
-
+        
         # return numpy.add(out, b)
         return out + b
 
@@ -1430,24 +1436,30 @@ class TensorProductCell(Cell):
         """
         import gem
 
-        if isinstance(points, numpy.ndarray) and len(points) == 0:
-            return points
+        # if isinstance(points, numpy.ndarray) and len(points) == 0:
+        #     return points
 
         axis_dims = [c.get_spatial_dimension() for c in self.cells]
         point_slices = TensorProductCell._split_slices(axis_dims)
 
         result = []
         for factor, s in zip(self.cells, point_slices):
-            result.append(factor.compute_barycentric_coordinates(points[..., s], entity, rescale))
-
-        # Flatten the array
-        # We cannot construct the flat array directly since we may not know upfront the total number
-        # of barycentric coordinates (e.g., in a simplex it is d+1, in a hypercube it is 2*d)
-        flat_result = numpy.array([bary[j] for bary in result for j in range(bary.shape[0])])
+            factor_sd = factor.get_spatial_dimension()
+            if factor_sd == 1:
+                factor_bary_coords = factor.compute_barycentric_coordinates(points[..., s], entity, rescale, facet_ordering=True)
+            else:
+                factor_bary_coords = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
+            result.append(factor_bary_coords)
 
         if isinstance(points, gem.Node):
-            return gem.as_gem(flat_result) # returns a ListTensor wrapping the scalar GEM expr. of bary coords.
-        
+            # Flatten the array
+            # We cannot construct the flat array directly since we may not know upfront the total number
+            # of barycentric coordinates (e.g., in a simplex it is d+1, in a hypercube it is 2*d)
+            flat_result = numpy.array([bary[j] for bary in result for j in range(bary.shape[0])])
+            # returns a ListTensor wrapping the scalar GEM expr. of bary coords.
+            flat_result = gem.as_gem(flat_result)
+        else:
+           flat_result = numpy.concatenate(result)
         return flat_result
 
 
@@ -1467,7 +1479,7 @@ class Hypercube(Cell):
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
 
-        self.facet_perm = compute_facet_permutation(self.unflattening_map, self.product)
+        # self.facet_perm = compute_facet_permutation(self.unflattening_map, self.product)
 
     def get_dimension(self):
         """Returns the subelement dimension of the cell.  Same as the
@@ -1586,7 +1598,8 @@ class Hypercube(Cell):
 
         tp_bary_coords = self.product.compute_factor_barycentric_coordinates(points, entity, rescale)
         
-        return tp_bary_coords[self.facet_perm] # A[[1, 3, 5, 4]]
+        # return tp_bary_coords[self.facet_perm]
+        return tp_bary_coords
 
 
 class UFCHypercube(Hypercube):
