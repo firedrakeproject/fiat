@@ -102,7 +102,12 @@ def _replace_indices_atomic(i, self, subst):
         return i if new_expr == i.expression else VariableIndex(new_expr)
     else:
         substitute = dict(subst)
-        return substitute.get(i, i)
+        if isinstance(i, ListIndex) and i.free_index in substitute:
+            replacement = substitute[i.free_index]
+            if isinstance(replacement, int):
+                return int(i.index_array[replacement]) 
+            return ListIndex(i.index_array, free_index=substitute[i.free_index])
+        return substitute.get(i,i)
 
 
 @replace_indices.register(Delta)
