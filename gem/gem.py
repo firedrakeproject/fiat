@@ -730,23 +730,27 @@ class ListIndex(IndexBase):
     Option 2: tensor[list_index] is tensor[list_index.index_array[list_index.free_index]]
     """
 
-    __slots__ = ('index_array', 'free_index')
+    __slots__ = ('index_array', 'free_index', 'name')
 
-    def __init__(self, index_array, name=None):
+    def __init__(self, index_array, name=None, free_index=None):
         index_array = numpy.asarray(index_array)
         assert numpy.issubdtype(index_array.dtype, numpy.integer)
-        
         # Wraps a free index together with the index array
         self.index_array = index_array
-        self.free_index = Index(extent=len(index_array), name=name)
-
-        # super().__init__(name=name, extent=len(index_array))
+        if free_index is not None:
+            self.free_index = free_index
+        else:
+            self.free_index = Index(extent=len(index_array), name=name)
 
     def __str__(self):
-        return f"{self.index_array.tolist()}[i_{self.free_index}]"
+        if self.free_index.name:
+            return f"{self.index_array.tolist()}[i_{self.free_index.name}]"
+        return f"{self.index_array.tolist()}[i_{self.free_index.count}]"
 
     def __repr__(self):
-        return f"ListIndex({self.index_array.tolist()}, {self.free_index})"
+        if self.free_index.name:
+            return f"ListIndex({self.index_array.tolist()}, Index({self.free_index.name}))"
+        return f"ListIndex({self.index_array.tolist()}, Index({self.free_index.count}))"
     
     # def __eq__(self, other):
     #     if type(self) is not type(other):
@@ -804,9 +808,16 @@ class Indexed(Scalar):
                 kk = B.multiindex
                 ff = C.free_indices
                 if not any((j in ff) for j in jj):
-                    # Only replace indices that are not present in C
+                    # Only replace indices in kk that are in jj
                     rep = dict(zip(jj, ii))
-                    ll = tuple(rep.get(k, k) for k in kk)
+                    def _replace(k):
+                        if isinstance(k, ListIndex) and k.free_index in rep:
+                            replacement = rep[k.free_index]
+                            if isinstance(replacement, int):
+                                return int(k.index_array[replacement]) 
+                            return ListIndex(k.index_array, free_index=rep[k.free_index])
+                        return rep.get(k,k)
+                    ll = tuple(_replace(k) for k in kk)
                     aggregate = C
                     multiindex = ll
 
