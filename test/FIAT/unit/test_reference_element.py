@@ -459,7 +459,9 @@ def test_flatten_maintains_ufc_status(cell):
                           [(interval, [0.0]),   # on facet 0
                           (interval, [1.0]),])  # on facet 1
 def test_bary_coords_order_on_1d_simplex(cell, point, epsilon=1e-12):
-    facet_id = [fid for fid, pts in cell.point_entity_ids([point])[0].items() if len(pts) > 0][0]
+    facet_hits = [fid for fid, pts in cell.point_entity_ids([point])[0].items() if len(pts) > 0]
+    assert len(facet_hits) == 1 # lies on one facet
+    facet_id = facet_hits[0]
 
     # The default ordering of barycentric coords. is vertex ordering
     # On a 1D interval: facets are vertices so they follow the vertex ordering
@@ -484,7 +486,9 @@ def test_bary_coords_order_on_1d_simplex(cell, point, epsilon=1e-12):
                           (tetrahedron, [0.25, 0.25, 0.0]),])  # on facet 3
 def test_bary_coords_order_on_simplicies(cell, point, epsilon=1e-12):
     sd = cell.get_spatial_dimension()
-    facet_id = [fid for fid, pts in cell.point_entity_ids([point])[sd-1].items() if len(pts) > 0][0]
+    facet_hits = [fid for fid, pts in cell.point_entity_ids([point])[sd-1].items() if len(pts) > 0][0]
+    assert len(facet_hits) == 1 # lies on one facet
+    facet_id = facet_hits[0]
 
     # The default ordering of barycentric coords. is vertex ordering
     # In triangles and tetrahedrons, facets are ordered by the vertex they include
@@ -497,9 +501,8 @@ def test_bary_coords_order_on_simplicies(cell, point, epsilon=1e-12):
                          [(interval_x_interval, [0.25, 0.6]),
                           (triangle_x_interval, [0.25, 0.25, 0.5]),
                           (quadrilateral_x_interval, [0.25, 0.25, 0.5])])
-def test_tp_factor_bary_coords(cell, point, epsilon=1e-12):
-    """Test that barycentric coordinates computed on tensor product cells
-    are listed in factor order."""
+def test_tp_bary_coords_are_in_factor_order(cell, point, epsilon=1e-12):
+    """Test that barycentric coordinates computed on tensor product cells are listed in factor order."""
     point = np.asarray(point)
     axis_bary_coords = cell.compute_factor_barycentric_coordinates(point)
 
@@ -521,6 +524,47 @@ def test_tp_factor_bary_coords(cell, point, epsilon=1e-12):
 
 
 @pytest.mark.parametrize(('cell', 'point'),
+                         [(interval_x_interval, [0.0, 0.5]),
+                          (interval_x_interval, [1.0, 0.5]),
+                          (interval_x_interval, [0.5, 0.0]),
+                          (interval_x_interval, [0.5, 1.0]),
+                          (triangle_x_interval, [0.0, 0.5, 0.5]),
+                          (triangle_x_interval, [0.5, 0.0, 0.5]),
+                          (triangle_x_interval, [0.25, 0.25, 0.0]),
+                          (triangle_x_interval, [0.25, 0.25, 1.0]),
+                          (quadrilateral_x_interval, [0.0, 0.5, 0.5]),
+                          (quadrilateral_x_interval, [1.0, 0.5, 0.5]),
+                          (quadrilateral_x_interval, [0.5, 0.0, 0.5]),
+                          (quadrilateral_x_interval, [0.5, 1.0, 0.5]),
+                          (quadrilateral_x_interval, [0.5, 0.5, 0.0]),
+                          (quadrilateral_x_interval, [0.5, 0.5, 1.0]),])
+def test_tp_bary_coords_are_in_facet_order(cell, point, epsilon=1e-12):
+    """Test that barycentric coordinates computed on tensor product cells are listed in facet order."""
+    point = np.asarray(point)
+    bary_coords = cell.compute_factor_barycentric_coordinates(point)
+
+    sd = cell.get_spatial_dimension()
+    top = cell.get_topology()
+
+    # facets are entities where the sum of the dimension tuple is sd - 1
+    ordered_facets = [(dim, entity) for dim in sorted(top) for entity in sorted(top[dim])
+                      if sum(dim) == sd - 1]
+    
+    point_entity_ids = cell.point_entity_ids([point])
+    facet_hits = [i for i, (dim, entity) in enumerate(ordered_facets)
+                  if len(point_entity_ids[dim][entity]) > 0]
+    
+    assert len(facet_hits) == 1 # lies on one facet
+
+    facet_id = facet_hits[0]
+    assert np.isclose(bary_coords[facet_id], 0.0, atol=epsilon)
+
+    mask = np.ones(len(bary_coords), dtype=bool)
+    mask[facet_id] = False
+    assert np.all(bary_coords[mask] > epsilon)
+
+
+@pytest.mark.parametrize(('cell', 'point'),
                          [(quadrilateral, [0.0, 0.3]),
                           (quadrilateral, [1.0, 0.3]),
                           (quadrilateral, [0.3, 0.0]),
@@ -532,14 +576,13 @@ def test_tp_factor_bary_coords(cell, point, epsilon=1e-12):
                           (hexahedron, [0.3, 0.4, 0.0]),
                           (hexahedron, [0.3, 0.4, 1.0]),])
 def test_hypercube_bary_coords_are_in_facet_order(cell, point, epsilon=1e-12):
-    """Test that the facet permutation is applied correctly on barycentric coordinates computed on Hypercubes
-    such that the following invariant holds: the i-th barycentric coordinate vanishes for a point on facet i."""
+    """Test that the barycentric coordinates computed on hypercubes are listed in facet order."""
     point = np.asarray(point)
 
     facet_dim = cell.get_spatial_dimension() - 1
     point_entity_ids = cell.point_entity_ids([point])
     facet_hits = [fid for fid, pts in point_entity_ids[facet_dim].items() if len(pts) > 0]
-    assert len(facet_hits) == 1
+    assert len(facet_hits) == 1 # lies on one facet
 
     facet_id = facet_hits[0]
     bary_coords = cell.compute_barycentric_coordinates(point)
@@ -568,10 +611,10 @@ def test_bary_coords_gem(cell, point):
     bindings = {coords: point}
 
     bary_gem = cell.compute_barycentric_coordinates(coords)
-    # breakpoint()
 
     # If bary_gem is a numpy array convert to a GEM Node using before evaluating
     # results, = evaluate((gem.as_gem(bary_gem),), bindings=bindings)
+
     results, = evaluate((bary_gem,), bindings=bindings)
     results = results.arr
 

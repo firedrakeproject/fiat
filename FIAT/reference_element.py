@@ -616,30 +616,40 @@ class SimplicialComplex(Cell):
     def compute_barycentric_coordinates(self, points, entity=None, rescale=False, facet_ordering=False):
         """Returns the barycentric coordinates of a list of points on the complex."""
 
-        # if isinstance(points, numpy.ndarray) and len(points) == 0:
-        #     return points
-
         if entity is None:
             entity = (self.get_spatial_dimension(), 0)
+
         entity_dim, entity_id = entity
         top = self.get_topology()
         sd = self.get_spatial_dimension()
 
-        # get a subcell containing the entity and the restriction indices of the entity
         # indices = slice(None)
         indices = list(range(sd+1))
-        subcomplex = top[entity_dim][entity_id]
+        global_indices = top[entity_dim][entity_id]  # indices of all vertices that form the sub-entity
+        subcomplex = global_indices
+        
         if entity_dim != sd:
+            # get a sub-cell containing the sub-entity
             cell_id = self.connectivity[(entity_dim, sd)][entity_id][0]
+
+            # restrict indices to the chosen sub-cell
             indices = [i for i, v in enumerate(top[sd][cell_id]) if v in subcomplex]
+
+            # get the indices of all vertices that form the sub-cell
             subcomplex = top[sd][cell_id]
 
         if facet_ordering:
-            indices = indices[::-1]
+            # Permute indices in facet order
+            # i.e., for each vertex in turn, get the position of the facet that excludes it
+            facet_ids = self.connectivity[(entity_dim, entity_dim-1)][entity_id]
+            facets = [top[entity_dim-1][f] for f in facet_ids] # facet as a tuple of vertex indices that form it
+
+            perm = [facets.index(tuple(sorted(set(global_indices) - {v}))) for v in global_indices]
+            indices = [indices[p] for p in perm]
         
-        cell_verts = self.get_vertices_of_subcomplex(subcomplex)
-        ref_verts = numpy.eye(sd + 1)
-        A, b = make_affine_mapping(cell_verts, ref_verts)
+        cell_verts = self.get_vertices_of_subcomplex(subcomplex) # get vertex coordinates of the sub-cell
+        ref_verts = numpy.eye(sd + 1) # get vertex coordinates of the standard reference cell
+        A, b = make_affine_mapping(cell_verts, ref_verts) 
 
         A, b = A[indices], b[indices]
         if rescale:
@@ -1436,18 +1446,24 @@ class TensorProductCell(Cell):
         """
         import gem
 
-        # if isinstance(points, numpy.ndarray) and len(points) == 0:
-        #     return points
 
         axis_dims = [c.get_spatial_dimension() for c in self.cells]
         point_slices = TensorProductCell._split_slices(axis_dims)
 
+        # NOTE: entity is a tuple key of the tensor product cell's topology. It should be decomposed into per-factor sub-entities
+        # before being passed to factor.compute_barycentric_coordinates
+        if entity is not None:
+            raise NotImplementedError("Tensor-product sub-entity decomposition is not implemented yet.")
+        
         result = []
         for factor, s in zip(self.cells, point_slices):
             factor_sd = factor.get_spatial_dimension()
             if factor_sd == 1:
                 factor_bary_coords = factor.compute_barycentric_coordinates(points[..., s], entity, rescale, facet_ordering=True)
             else:
+                # For higher dimensional simplicies: vertex ordering is already guaranteed.
+                # NOTE: But what if we want to compute barycentric coordinates on a sub-entity and still want facet ordering?
+                # Then we need to pass facet_ordering=True even when factor_sd > 1
                 factor_bary_coords = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
             result.append(factor_bary_coords)
 
@@ -1460,6 +1476,7 @@ class TensorProductCell(Cell):
             flat_result = gem.as_gem(flat_result)
         else:
            flat_result = numpy.concatenate(result)
+
         return flat_result
 
 
