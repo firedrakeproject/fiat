@@ -1444,9 +1444,6 @@ class TensorProductCell(Cell):
             have shape ``(npoints, d+1)``. If factor i is a hypercube of dimension d,
             this will have shape ``(npoints, 2*d)``.
         """
-        import gem
-
-
         axis_dims = [c.get_spatial_dimension() for c in self.cells]
         point_slices = TensorProductCell._split_slices(axis_dims)
 
@@ -1467,15 +1464,7 @@ class TensorProductCell(Cell):
                 factor_bary_coords = factor.compute_barycentric_coordinates(points[..., s], entity, rescale)
             result.append(factor_bary_coords)
 
-        if isinstance(points, gem.Node):
-            # Flatten the array
-            # We cannot construct the flat array directly since we may not know upfront the total number
-            # of barycentric coordinates (e.g., in a simplex it is d+1, in a hypercube it is 2*d)
-            flat_result = numpy.array([bary[j] for bary in result for j in range(bary.shape[0])])
-            # returns a ListTensor wrapping the scalar GEM expr. of bary coords.
-            flat_result = gem.as_gem(flat_result)
-        else:
-           flat_result = numpy.concatenate(result)
+        flat_result = numpy.concatenate(result)
 
         return flat_result
 
