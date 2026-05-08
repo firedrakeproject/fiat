@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """GEM is the intermediate language of TSFC for describing
 tensor-valued mathematical expressions and tensor operations.
 It is similar to Einstein's notation.
@@ -18,11 +16,9 @@ indices.
 
 from abc import ABCMeta
 from itertools import chain, repeat
-from functools import partial, reduce
+from functools import reduce
 from operator import attrgetter
 from numbers import Integral, Number
-
-from types import EllipsisType
 
 import numpy
 from numpy import asarray
@@ -36,11 +32,11 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Variable', 'Sum', 'Product', 'Division', 'FloorDiv', 'Remainder', 'Power',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
-           'Index', 'VariableIndex', 'ListIndex', 'Indexed', 'ComponentTensor',
+           'Index', 'VariableIndex', 'Indexed', 'ComponentTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
-           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
+           'Inverse', 'Solve', 'extract_type', 'uint_type']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -85,56 +81,12 @@ class Node(NodeBase, metaclass=NodeMeta):
             self.children = other.children
         return result
 
-    def __getitem__(
-        self,
-        key: IndexT | tuple[IndexT, ...],
-    ) -> ComponentTensor | Indexed:
-        """A generalised interface for indexing GEM tensors"""
-        if not isinstance(key, tuple):
-            key = (key,)
-
-        # Expand ellipsis -> fill in remaining dimensions with slice(None)
-        if any(k is Ellipsis for k in key):
-            if key.count(Ellipsis) > 1:
-                raise NotImplementedError("Multiple ellipses are not supported.")
-            ellipsis_pos = key.index(Ellipsis)
-            remaining_dims = len(self.shape) - (len(key) - 1)
-            if remaining_dims < 0:
-                raise IndexError("Too many indices provided.")
-            key = (
-                key[:ellipsis_pos]
-                + (slice(None), ) * remaining_dims
-                + key[ellipsis_pos + 1:]
-            )
-
-        has_slice = any(isinstance(k, slice) for k in key)
-        has_array = any(isinstance(k, (numpy.ndarray, list)) for k in key)
-
-        if has_slice and has_array:
-            raise NotImplementedError("Mixed slice and array indexing is not supported.")
-
-        # Slice indexing -> delegate to view()
-        if has_slice:
-            # view expects one slice for each axis/dim of the tensor
-            if len(key) != len(self.shape):
-                raise IndexError("Expects the number of slices to match the gem.Node tensor rank")
-            return view(self, *key)
-
-        # Support a list or array of integer indices
-        # Previously, built a ListTensor out of Indexed nodes, one for each element of the permutation
-        if has_array:
-            arr_pos = next(i for i, k in enumerate(key) if isinstance(k, (numpy.ndarray, list)))
-            list_index = ListIndex(key[arr_pos])
-            new_key = key[:arr_pos] + (list_index,) + key[arr_pos+1:]
-            indexed = Indexed(self, new_key) # A[perm[i]] is a scalar
-            retval = ComponentTensor(indexed, (list_index.free_index,)) # CT(A[perm[i]], i) -> A[perm]
-            return retval
-
-        # Point indexing
-        return Indexed(self, key)
-
-    def __neg__(self):
-        return componentwise(Product, minus, self)
+    def __getitem__(self, indices):
+        try:
+            indices = tuple(indices)
+        except TypeError:
+            indices = (indices, )
+        return Indexed(self, indices)
 
     def __add__(self, other):
         return componentwise(Sum, self, as_gem(other))
@@ -143,7 +95,9 @@ class Node(NodeBase, metaclass=NodeMeta):
         return as_gem(other).__add__(self)
 
     def __sub__(self, other):
-        return componentwise(Sum, self, -as_gem(other))
+        return componentwise(
+            Sum, self,
+            componentwise(Product, Literal(-1), as_gem(other)))
 
     def __rsub__(self, other):
         return as_gem(other).__sub__(self)
@@ -162,7 +116,6 @@ class Node(NodeBase, metaclass=NodeMeta):
             raise ValueError("Both objects must have shape for matmul")
         elif self.shape[-1] != other.shape[0]:
             raise ValueError(f"Mismatching shapes {self.shape} and {other.shape} in matmul")
-
         *i, k = indices(len(self.shape))
         _, *j = indices(len(other.shape))
         expr = Product(Indexed(self, (*i, k)), Indexed(other, (k, *j)))
@@ -170,24 +123,6 @@ class Node(NodeBase, metaclass=NodeMeta):
 
     def __rmatmul__(self, other):
         return as_gem(other).__matmul__(self)
-
-    def __abs__(self):
-        return componentwise(partial(MathFunction, "abs"), self)
-
-    def __pow__(self, other):
-        return componentwise(Power, self, as_gem(other))
-
-    def __lt__(self, other):
-        return componentwise(partial(Comparison, "<"), self, as_gem(other))
-
-    def __gt__(self, other):
-        return componentwise(partial(Comparison, ">"), self, as_gem(other))
-
-    def __le__(self, other):
-        return componentwise(partial(Comparison, "<="), self, as_gem(other))
-
-    def __ge__(self, other):
-        return componentwise(partial(Comparison, ">="), self, as_gem(other))
 
     @property
     def T(self):
@@ -337,6 +272,7 @@ class Literal(Constant):
     __back__ = ('dtype',)
 
     def __new__(cls, array, dtype=None):
+        array = asarray(array)
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -370,9 +306,6 @@ class Literal(Constant):
     @property
     def shape(self):
         return self.array.shape
-
-    def __bool__(self):
-        return bool(self.value)
 
 
 class Variable(Terminal):
@@ -620,8 +553,8 @@ class LogicalOr(Scalar):
         self.children = a, b
 
 
-class Conditional(Scalar):
-    __slots__ = ('children',)
+class Conditional(Node):
+    __slots__ = ('children', 'shape')
 
     def __new__(cls, condition, then, else_):
         assert not condition.shape
@@ -634,6 +567,7 @@ class Conditional(Scalar):
 
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
+        self.shape = then.shape
         self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
@@ -723,52 +657,6 @@ class VariableIndex(IndexBase):
     def __reduce__(self):
         return type(self), (self.expression,)
 
-class ListIndex(IndexBase):
-    """
-    Option 1:  tensor[list_index] is tensor[index_array[list_index]] free index ranging over 0,1..., len(index_array)
-    
-    Option 2: tensor[list_index] is tensor[list_index.index_array[list_index.free_index]]
-    """
-
-    __slots__ = ('index_array', 'free_index', 'name')
-
-    def __init__(self, index_array, name=None, free_index=None):
-        index_array = numpy.asarray(index_array)
-        assert numpy.issubdtype(index_array.dtype, numpy.integer)
-        # Wraps a free index together with the index array
-        self.index_array = index_array
-        if free_index is not None:
-            self.free_index = free_index
-        else:
-            self.free_index = Index(extent=len(index_array), name=name)
-
-    def __str__(self):
-        if self.free_index.name:
-            return f"{self.index_array.tolist()}[i_{self.free_index.name}]"
-        return f"{self.index_array.tolist()}[i_{self.free_index.count}]"
-
-    def __repr__(self):
-        if self.free_index.name:
-            return f"ListIndex({self.index_array.tolist()}, Index({self.free_index.name}))"
-        return f"ListIndex({self.index_array.tolist()}, Index({self.free_index.count}))"
-    
-    # def __eq__(self, other):
-    #     if type(self) is not type(other):
-    #         return False
-    #     return numpy.array_equal(self.index_array, other.index_array)
-
-    # def __ne__(self, other):
-    #     return not self.__eq__(other)
-
-    # def __hash__(self):
-    #     return hash((type(self), self.index_array.tobytes()))
-
-    # def __reduce__(self):
-    #     return type(self), (self.index_array, )
-
-
-IndexT = int | Index | VariableIndex | ListIndex | slice | EllipsisType | list | numpy.ndarray
-
 
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')
@@ -808,16 +696,9 @@ class Indexed(Scalar):
                 kk = B.multiindex
                 ff = C.free_indices
                 if not any((j in ff) for j in jj):
-                    # Only replace indices in kk that are in jj
+                    # Only replace indices that are not present in C
                     rep = dict(zip(jj, ii))
-                    def _replace(k):
-                        if isinstance(k, ListIndex) and k.free_index in rep:
-                            replacement = rep[k.free_index]
-                            if isinstance(replacement, int):
-                                return int(k.index_array[replacement]) 
-                            return ListIndex(k.index_array, free_index=rep[k.free_index])
-                        return rep.get(k,k)
-                    ll = tuple(_replace(k) for k in kk)
+                    ll = tuple(rep.get(k, k) for k in kk)
                     aggregate = C
                     multiindex = ll
 
@@ -839,8 +720,6 @@ class Indexed(Scalar):
                 new_indices.append(i)
             elif isinstance(i, VariableIndex):
                 new_indices.extend(i.expression.free_indices)
-            elif isinstance(i, ListIndex):
-                new_indices.append(i.free_index)
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
         return self
@@ -853,8 +732,6 @@ class Indexed(Scalar):
                 free_indices.append(i)
             elif isinstance(i, VariableIndex):
                 free_indices.extend(i.expression.free_indices)
-            elif isinstance(i, ListIndex):
-                free_indices.append(i.free_index)
         return tuple(free_indices)
 
 
@@ -972,7 +849,7 @@ class ComponentTensor(Node):
         shape = tuple(index.extent for index in multiindex)
         assert all(s >= 0 for s in shape)
 
-        # Zero foldingc
+        # Zero folding
         if isinstance(expression, Zero):
             return Zero(shape, dtype=expression.dtype)
 
@@ -1392,7 +1269,6 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
-minus = Literal(-1)
 
 
 # Syntax sugar
@@ -1450,14 +1326,6 @@ def as_gem(expr):
         return expr
     elif isinstance(expr, Number):
         return Literal(expr)
-    elif isinstance(expr, (bool, numpy.bool)):
-        return Literal(bool(expr))
-    elif isinstance(expr, numpy.ndarray):
-        if expr.dtype == object:
-            expr = numpy.vectorize(as_gem)(expr)
-            return ListTensor(expr)
-        else:
-            return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
 
@@ -1492,31 +1360,3 @@ def as_gem_uint(expr):
 def extract_type(expressions, klass):
     """Collects objects of type klass in expressions."""
     return tuple(node for node in traversal(expressions) if isinstance(node, klass))
-
-
-def Piecewise(*args):
-    """Represents a piecewise function.
-
-    Parameters
-    ----------
-    *args
-        Each argument is a 2-tuple defining an expression and condition.
-
-    Returns
-    -------
-    Node
-        A nested Conditional.
-
-    """
-    expr = None
-    pieces = []
-    for v, c in args:
-        if isinstance(c, (bool, numpy.bool, Literal)) and c:
-            expr = as_gem(v)
-            break
-        pieces.append((as_gem(v), as_gem(c)))
-    if expr is None:
-        expr = Literal(float("nan"))
-    for v, c in reversed(pieces):
-        expr = Conditional(c, v, expr)
-    return expr

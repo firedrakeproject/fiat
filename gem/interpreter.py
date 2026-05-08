@@ -262,99 +262,28 @@ def _evaluate_conditional(e, self):
 @_evaluate.register(gem.Indexed)
 def _evaluate_indexed(e, self):
     """Indexing maps shape to free indices"""
-    val = self(e.children[0]) # tensor being indexed
-    # fids = tuple(i for i in e.multiindex if isinstance(i, (gem.Index, gem.ListIndex))) # free indices in the multiindex
-    fids = tuple(
-        i.free_index if isinstance(i, gem.ListIndex) else i
-        for i in e.multiindex
-        if isinstance(i, (gem.Index, gem.ListIndex))
-    )
-
-
-    all_fids = val.fids + fids
+    val = self(e.children[0])
+    fids = tuple(i for i in e.multiindex if isinstance(i, gem.Index))
 
     idx = []
-
-    # idx has one entry per axis but val.arr is a single array with shape (*val.fids extents, *tensor_shape)
-    # and the inner loop consumes the tensor_shape axes one by ones through indexing.
-    # When val.arr is indexed with idx as val[idx], NumPy broadcasts each entry of idx to operate
-    # on all axes simultaneously so we need to reshape each entry of idx appropriately.
-
-    # First pick up all the free indices that's already part of the tensor
-    for fid in val.fids:
-        # idx.append(slice(None))
-        shape = tuple(fid.extent if f is fid else 1 for f in all_fids)
-        idx.append(numpy.arange(fid.extent).reshape(shape))
-
+    # First pick up all the existing free indices
+    for _ in val.fids:
+        idx.append(slice(None))
     # Now grab the shape axes
     for i in e.multiindex:
-        if isinstance(i, gem.ListIndex):
-            # ListIndex, use the index array
-            shape = tuple(i.free_index.extent if f is i.free_index else 1 for f in all_fids)
-            idx.append(i.index_array.reshape(shape))
-        elif isinstance(i, gem.Index):
+        if isinstance(i, gem.Index):
             # Free index, want entire extent
-            # idx.append(slice(None))
-            shape = tuple(i.extent if f is i else 1 for f in all_fids)
-            idx.append(numpy.arange(i.extent).reshape(shape))
+            idx.append(slice(None))
         elif isinstance(i, gem.VariableIndex):
             # Variable index, evaluate inner expression
             result, = self(i.expression)
-            assert not result.tshape # int
+            assert not result.tshape
             idx.append(result[()])
         else:
             # Fixed index, just pick that value
             idx.append(i)
     assert len(idx) == len(val.tshape)
-    return Result(val[idx], all_fids)
-
-
-@_evaluate.register(gem.FlexiblyIndexed)
-def _evaluate_flexiblyindexed(e, self):
-    val = self(e.children[0])
-
-    all_fids = val.fids + e.free_indices
-
-    idx = []
-
-    # Collect existing free indices
-    for fid in val.fids:
-        shape = tuple(fid.extent if f is fid else 1 for f in all_fids)
-        fidx_array = numpy.arange(fid.extent).reshape(shape)
-        idx.append(fidx_array)
-
-    # Compute a flat index for each dim from dim2idxs
-    for dim, (offset, idxs) in zip(e.children[0].shape, e.dim2idxs):
-        if isinstance(offset, gem.Node):
-            offset_result = self(offset)
-            assert not offset_result.tshape
-            offset_val = offset_result[()]
-        else:
-            offset_val = offset
-
-        dim_flat_idx_components = []
-        for i, s in idxs:
-            # Index i may be one of: Index, VariableIndex, int
-            if isinstance(i, gem.Index):
-                # Free index contributes an array index given by the extent
-                shape = tuple(i.extent if f is i else 1 for f in all_fids)
-                i_vals = numpy.arange(i.extent).reshape(shape) * s
-                dim_flat_idx_components.append(i_vals)
-            elif isinstance(i, gem.VariableIndex):
-                # Variable index gives a single integer index
-                # obtained by evaluating its inner expression
-                result, = self(i.expression)
-                assert not result.tshape
-                dim_flat_idx_components.append(result[()]*s)
-            else:
-                # Fixed index is just an integer so use that
-                dim_flat_idx_components.append(i*s)
-
-        # From dim_flat_idx_components compute the flat index into dim
-        dim_idx_array = offset_val + sum(flat_index_component for flat_index_component in dim_flat_idx_components)
-        idx.append(dim_idx_array)
-
-    return Result(val[idx], all_fids)
+    return Result(val[idx], val.fids + fids)
 
 
 @_evaluate.register(gem.ComponentTensor)
