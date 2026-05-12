@@ -62,7 +62,10 @@ class ArnoldWintherNCDual(dual_set.DualSet):
 class ArnoldWintherNC(finite_element.CiarletElement):
     """The definition of the nonconforming Arnold-Winther element.
     """
+    DEFAULT_DEGREE = 2
+
     def __init__(self, ref_el, degree=2):
+        degree = self._parse_degree(degree)
         if ref_el.shape != TRIANGLE:
             raise ValueError(f"{type(self).__name__} only defined on triangles")
         Ps = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)
@@ -123,7 +126,10 @@ class ArnoldWintherDual(dual_set.DualSet):
 class ArnoldWinther(finite_element.CiarletElement):
     """The definition of the conforming Arnold-Winther element.
     """
+    DEFAULT_DEGREE = 3
+
     def __init__(self, ref_el, degree=3):
+        degree = self._parse_degree(degree)
         if ref_el.shape != TRIANGLE:
             raise ValueError(f"{type(self).__name__} only defined on triangles")
         Ps = polynomial_set.ONSymTensorPolynomialSet(ref_el, degree)

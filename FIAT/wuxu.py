@@ -155,7 +155,10 @@ class WuXuH3NCDualSet(dual_set.DualSet):
 
 class WuXuRobustH3NC(finite_element.CiarletElement):
     """The Wu-Xu robust H3 nonconforming finite element"""
+    DEFAULT_DEGREE = 7
+
     def __init__(self, ref_el, degree=7):
+        degree = self._parse_degree(degree)
         poly_set = WuXuH3NCSpace(ref_el, robust=True)
         assert degree == poly_set.degree
         dual = WuXuRobustH3NCDualSet(ref_el, degree)
@@ -164,7 +167,10 @@ class WuXuRobustH3NC(finite_element.CiarletElement):
 
 class WuXuH3NC(finite_element.CiarletElement):
     """The Wu-Xu H3 nonconforming finite element"""
+    DEFAULT_DEGREE = 4
+
     def __init__(self, ref_el, degree=4):
+        degree = self._parse_degree(degree)
         poly_set = WuXuH3NCSpace(ref_el)
         assert degree == poly_set.degree
         dual = WuXuH3NCDualSet(ref_el, degree)

@@ -27,9 +27,12 @@ class GaussRadauDualSet(dual_set.DualSet):
 
 class GaussRadau(finite_element.CiarletElement):
     """1D discontinuous element with nodes at the Gauss-Radau points."""
+    DEFAULT_DEGREE = 0
+
     def __init__(self, ref_el, degree):
         if ref_el.shape != LINE:
             raise ValueError("Gauss-Radau elements are only defined in one dimension.")
+        degree = self._parse_degree(degree)
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = GaussRadauDualSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form

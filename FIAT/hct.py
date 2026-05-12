@@ -80,7 +80,10 @@ class HsiehCloughTocher(finite_element.CiarletElement):
     super-smooth C^1 space from Groselj and Knez (2022) on a barycentric split,
     although there the basis functions are positive on an incenter split.
     """
+    DEFAULT_DEGREE = 3
+
     def __init__(self, ref_el, degree=3, reduced=False, quad_scheme=None):
+        degree = self._parse_degree(degree)
         ref_complex = macro.AlfeldSplit(ref_el)
         dual = HCTDualSet(ref_complex, degree, reduced=reduced, quad_scheme=quad_scheme)
         poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=degree-1, variant="bubble")

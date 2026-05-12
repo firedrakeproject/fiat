@@ -49,6 +49,7 @@ def _replace_numbers_with_symbols(polynomials):
 
 
 class Serendipity(FiniteElement):
+    DEFAULT_DEGREE = 1
 
     def __new__(cls, ref_el, degree):
         dim = ref_el.get_spatial_dimension()
@@ -61,7 +62,7 @@ class Serendipity(FiniteElement):
             return self
 
     def __init__(self, ref_el, degree):
-
+        degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         flat_topology = flat_el.get_topology()
