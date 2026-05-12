@@ -139,11 +139,14 @@ def project(f, U, Q):
     a polynomial set U.  Numerical integration is performed by
     quadrature rule Q.
     """
+    sd = Q.ref_el.get_spatial_dimension()
     pts = Q.get_points()
     wts = Q.get_weights()
-    f_at_qps = [f(x) for x in pts]
-    U_at_qps = U.tabulate(pts)
-    coeffs = numpy.array([sum(wts * f_at_qps * phi) for phi in U_at_qps])
+    U_at_qps = U.tabulate(pts)[(0,)*sd]
+    f_at_qps = numpy.reshape(f(pts), (-1, *U_at_qps.shape[1:]))
+    duals = numpy.multiply(U_at_qps, wts)
+    coeffs = numpy.tensordot(f_at_qps, duals,
+                             axes=(range(1, duals.ndim),)*2)
     return coeffs
 
 
