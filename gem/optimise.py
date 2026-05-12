@@ -13,7 +13,7 @@ from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
-                     Index, VariableIndex, Indexed, FlexiblyIndexed,
+                     Index, VariableIndex, ListIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
                      partial_indexed, one)
 
@@ -102,7 +102,14 @@ def _replace_indices_atomic(i, self, subst):
         return i if new_expr == i.expression else VariableIndex(new_expr)
     else:
         substitute = dict(subst)
-        return substitute.get(i, i)
+        def _replace(i):
+            if isinstance(i, ListIndex) and i.free_index in substitute:
+                replacement = substitute[i.free_index]
+                if isinstance(replacement, int):
+                    return int(i.index_array[replacement]) 
+                return ListIndex(i.index_array, free_index=substitute[i.free_index])
+            return substitute.get(i,i)
+        return _replace(i)
 
 
 @replace_indices.register(Delta)
@@ -120,6 +127,9 @@ def replace_indices_indexed(node, self, subst):
     multiindex = tuple(_replace_indices_atomic(i, self, subst) for i in node.multiindex)
     child, = node.children
 
+    # When node is Indexed(CT(A[j], (j,)), (i,)) with j and i as Index the below rule promotes the substitution j -> i
+    # so that A[j] becomes A[i] which eliminates the CT. This is wrong for when j a free index of ListIndex since A[j] is A[index_array[j]];
+    # hence doing the subsitution effectively gets rid of index_array.
     if isinstance(child, ComponentTensor):
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
