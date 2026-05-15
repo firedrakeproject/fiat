@@ -35,9 +35,11 @@ class TensorProductElement(FiniteElementBase):
             raise ValueError("Cannot create TensorProductElement from empty list.")
 
         keywords = list(kwargs.keys())
-        if keywords and keywords != ["cell"]:
+        if keywords and not (keywords == ["cell"] or keywords == ["cell", "triple"]):
             raise ValueError("TensorProductElement got an unexpected keyword argument '%s'" % keywords[0])
         cell = kwargs.get("cell")
+        if "triple" in keywords:
+            self._triple = kwargs.get("triple")
 
         family = "TensorProductElement"
 
@@ -107,6 +109,8 @@ class TensorProductElement(FiniteElementBase):
     def reconstruct(self, **kwargs):
         """Doc."""
         cell = kwargs.pop("cell", self.cell)
+        if hasattr(self, "_triple"):
+            return TensorProductElement(*[e.reconstruct(**kwargs) for e in self.factor_elements], cell=cell, triple=self._triple)
         return TensorProductElement(*[e.reconstruct(**kwargs) for e in self.factor_elements], cell=cell)
 
     def variant(self):

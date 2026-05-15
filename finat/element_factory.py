@@ -310,13 +310,13 @@ def convert_tensorproductelement(element, **kwargs):
 @convert.register(finat.ufl.HDivElement)
 def convert_hdivelement(element, **kwargs):
     finat_elem, deps = _create_element(element._element, **kwargs)
-    return finat.HDivElement(finat_elem), deps
+    return finat.HDivElement(finat_elem, transform=element._transform), deps
 
 
 @convert.register(finat.ufl.HCurlElement)
 def convert_hcurlelement(element, **kwargs):
     finat_elem, deps = _create_element(element._element, **kwargs)
-    return finat.HCurlElement(finat_elem), deps
+    return finat.HCurlElement(finat_elem, transform=element._transform), deps
 
 
 @convert.register(finat.ufl.WithMapping)
