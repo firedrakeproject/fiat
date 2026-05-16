@@ -78,7 +78,15 @@ class FiniteElementBase(metaclass=ABCMeta):
         return self._entity_closure_dofs
 
     def is_dg(self):
-        return self.entity_dofs() == self.entity_closure_dofs()
+        edofs = self.entity_dofs()
+        to_int = lambda x: sum(x) if isinstance(x, tuple) else x
+        sd = to_int(max(edofs))
+        for dim in edofs:
+            if to_int(dim) == sd:
+                continue
+            if any(len(edofs[dim][e]) > 0 for e in edofs[dim]):
+                return False
+        return True
 
     @cached_property
     def _entity_support_dofs(self):
