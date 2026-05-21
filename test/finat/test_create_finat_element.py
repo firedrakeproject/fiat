@@ -1,5 +1,6 @@
 import pytest
 
+import numpy
 import ufl
 import finat.ufl
 import finat
@@ -81,13 +82,33 @@ def test_interval_variant_default(family, expected_cls):
 @pytest.mark.parametrize(('family', 'variant', 'expected_cls'),
                          [('P', 'equispaced', finat.Lagrange),
                           ('P', 'spectral', finat.GaussLobattoLegendre),
+                          ('P', 'integral', finat.IntegratedLegendre),
                           ('DP', 'equispaced', finat.DiscontinuousLagrange),
                           ('DP', 'spectral', finat.GaussLegendre),
+                          ('DP', 'integral', finat.Legendre),
                           ('DP L2', 'equispaced', finat.DiscontinuousLagrange),
-                          ('DP L2', 'spectral', finat.GaussLegendre)])
+                          ('DP L2', 'spectral', finat.GaussLegendre),
+                          ('DP L2', 'integral', finat.Legendre),
+                          ])
 def test_interval_variant(family, variant, expected_cls):
     ufl_element = finat.ufl.FiniteElement(family, ufl.interval, 3, variant=variant)
-    assert isinstance(create_element(ufl_element), expected_cls)
+    fe = create_element(ufl_element)
+    assert isinstance(fe, expected_cls)
+    assert fe.is_dg() == (family in {'DP', 'DP L2'})
+
+
+@pytest.mark.parametrize('family', ('P', 'DP'))
+@pytest.mark.parametrize('variant', ('integral',))
+@pytest.mark.parametrize('quad_scheme', ('default', 'KMV'))
+def test_interval_quad_scheme(family, variant, quad_scheme):
+    ufl_element = finat.ufl.FiniteElement(family, ufl.interval, 3, variant=variant, quad_scheme=quad_scheme)
+    fe = create_element(ufl_element)
+    Q, ps = fe.dual_basis
+    points = numpy.sort(ps.points, axis=0)
+    if family == 'P' and quad_scheme == 'default':
+        points = points[1:-1]
+    rule = finat.quadrature.make_quadrature(fe.cell, 2*fe.degree, scheme=quad_scheme or "default")
+    assert numpy.allclose(points, rule.point_set.points)
 
 
 @pytest.mark.parametrize('cell', [ufl.triangle, ufl.tetrahedron])
