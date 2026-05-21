@@ -78,6 +78,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         return self._entity_closure_dofs
 
     def is_dg(self):
+        '''Return whether this element is fully discontinuous.'''
         edofs = self.entity_dofs()
         to_int = lambda x: sum(x) if isinstance(x, tuple) else x
         sd = to_int(max(edofs))
