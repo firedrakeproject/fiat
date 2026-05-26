@@ -8,7 +8,6 @@
 
 import numpy
 from FIAT import reference_element, expansions, polynomial_set
-from FIAT.functional import index_iterator
 
 
 def get_lagrange_points(nodes):
@@ -26,22 +25,24 @@ def barycentric_interpolation(nodes, wts, dmat, pts, order=0):
     https://doi.org/10.1137/S0036144502417715 Eq. (4.2) & (9.4)
     """
     if pts.dtype == object:
-        from sympy import simplify
-        sp_simplify = numpy.vectorize(simplify)
+        # Do not use barycentric interpolation at unknown points
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        phis = [wi * numpy.prod(phi[:i], axis=0) * numpy.prod(phi[i+1:], axis=0) for i, wi in enumerate(wts)]
+        phi = numpy.asarray(phis)
     else:
-        sp_simplify = lambda x: x
-    phi = numpy.add.outer(-nodes, pts.flatten())
-    with numpy.errstate(divide='ignore', invalid='ignore'):
-        numpy.reciprocal(phi, out=phi)
-        numpy.multiply(phi, wts[:, None], out=phi)
-        numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
-    phi[phi != phi] = 1.0
-    phi = phi.reshape(-1, *pts.shape[:-1])
+        # Use the second barycentric interpolation formula
+        phi = numpy.add.outer(-nodes, pts.flatten())
+        with numpy.errstate(divide='ignore', invalid='ignore'):
+            numpy.reciprocal(phi, out=phi)
+            numpy.multiply(phi, wts[:, None], out=phi)
+            numpy.multiply(1.0 / numpy.sum(phi, axis=0), phi, out=phi)
+        # Replace nan with one
+        phi[phi != phi] = 1.0
 
-    phi = sp_simplify(phi)
+    phi = phi.reshape(-1, *pts.shape[:-1])
     results = {(0,): phi}
     for r in range(1, order+1):
-        phi = sp_simplify(numpy.dot(dmat, phi))
+        phi = numpy.dot(dmat, phi)
         results[(r,)] = phi
     return results
 
@@ -94,33 +95,28 @@ class LagrangeLineExpansionSet(expansions.LineExpansionSet):
 
 class LagrangePolynomialSet(polynomial_set.PolynomialSet):
 
-    def __init__(self, ref_el, pts, shape=tuple()):
+    def __init__(self, ref_el, pts, shape=()):
         if ref_el.get_shape() != reference_element.LINE:
             raise ValueError("Invalid reference element type.")
 
         expansion_set = LagrangeLineExpansionSet(ref_el, pts)
         degree = expansion_set.degree
-        if shape == tuple():
-            num_components = 1
-        else:
-            flat_shape = numpy.ravel(shape)
-            num_components = numpy.prod(flat_shape)
+        num_components = numpy.prod(shape, dtype=int)
         num_exp_functions = expansion_set.get_num_members(degree)
         num_members = num_components * num_exp_functions
         embedded_degree = degree
 
         # set up coefficients
-        if shape == tuple():
+        if shape == ():
             coeffs = numpy.eye(num_members, dtype="d")
         else:
             coeffs_shape = (num_members, *shape, num_exp_functions)
             coeffs = numpy.zeros(coeffs_shape, "d")
-            # use functional's index_iterator function
-            cur_bf = 0
-            for idx in index_iterator(shape):
-                for exp_bf in range(num_exp_functions):
-                    cur_idx = (cur_bf, *idx, exp_bf)
-                    coeffs[cur_idx] = 1.0
-                    cur_bf += 1
+            cur = 0
+            exp_bf = range(num_exp_functions)
+            for idx in numpy.ndindex(shape):
+                cur_bf = range(cur, cur+num_exp_functions)
+                coeffs[(cur_bf, *idx, exp_bf)] = 1.0
+                cur += num_exp_functions
 
         super().__init__(ref_el, degree, embedded_degree, expansion_set, coeffs)

@@ -22,7 +22,7 @@ import warnings
 from numpy import asarray
 
 from ufl.cell import Cell, TensorProductCell
-from ufl.sobolevspace import H1, H2, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
+from ufl.sobolevspace import H1, H2, H3, L2, HCurl, HDiv, HDivDiv, HCurlDiv, HEin, HInf
 from ufl.utils.formatting import istr
 
 # List of valid elements
@@ -106,16 +106,20 @@ register_element("Gopalakrishnan-Lederer-Schoberl 2nd kind", "GLS2", 2, HCurlDiv
 
 register_element("Nonconforming Arnold-Winther", "AWnc", 2, HDiv, "double contravariant Piola", (2, 2), ("triangle",))
 register_element("Conforming Arnold-Winther", "AWc", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
-register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle"))
+register_element("Hu-Zhang", "HZ", 2, HDiv, "double contravariant Piola", (3, None), ("triangle",))
 
 # Zany elements
 register_element("Bernardi-Raugel", "BR", 1, H1, "contravariant Piola", (1, None), simplices[1:])
 register_element("Bernardi-Raugel Bubble", "BRB", 1, H1, "contravariant Piola", (None, None), simplices[1:])
-register_element("Mardal-Tai-Winther", "MTW", 1, H1, "contravariant Piola", (3, 3), ("triangle",))
+register_element("Mardal-Tai-Winther", "MTW", 1, H1, "contravariant Piola", (1, 2), ("triangle", "tetrahedron"))
 register_element("Hermite", "HER", 0, H1, "custom", (3, 3), simplices)
 register_element("Argyris", "ARG", 0, H2, "custom", (5, None), ("triangle",))
 register_element("Bell", "BELL", 0, H2, "custom", (5, 5), ("triangle",))
-register_element("Morley", "MOR", 0, H2, "custom", (2, 2), ("triangle",))
+register_element("Morley", "MOR", 0, H2, "custom", (2, 2), simplices[1:])
+register_element("Nonconforming Wu-Xu", "WXnc", 0, H3, "custom", (4, 4), ("triangle",))
+register_element("Nonconforming Robust Wu-Xu", "WXncr", 0, H3, "custom", (7, 7), ("triangle",))
+register_element("Bramble-Zlamal C2", "BZ-C2", 0, H3, "custom", (9, None), ("triangle",))
+
 
 # Macro elements
 register_element("QuadraticPowellSabin6", "PS6", 0, H2, "custom", (2, 2), ("triangle",))
@@ -123,6 +127,8 @@ register_element("QuadraticPowellSabin12", "PS12", 0, H2, "custom", (2, 2), ("tr
 register_element("Hsieh-Clough-Tocher", "HCT", 0, H2, "custom", (3, None), ("triangle",))
 register_element("Reduced-Hsieh-Clough-Tocher", "HCT-red", 0, H2, "custom", (3, 3), ("triangle",))
 register_element("Johnson-Mercier", "JM", 2, HDiv, "double contravariant Piola", (1, 1), simplices[1:])
+register_element("Walkington", "WALK", 0, H2, "custom", (5, 5), ("tetrahedron",))
+register_element("Alfeld C2", "ALF-C2", 0, H3, "custom", (5, None), ("triangle",))
 
 register_element("Arnold-Qin", "AQ", 1, H1, "identity", (2, 2), ("triangle",))
 register_element("Reduced-Arnold-Qin", "AQ-red", 1, H1, "contravariant Piola", (2, 2), ("triangle",))
@@ -156,7 +162,7 @@ register_alias("Lobatto",
 register_alias("Lob",
                lambda family, dim, order, degree: ("Gauss-Lobatto-Legendre", order))
 
-register_element("Bernstein", None, 0, H1, "identity", (1, None), simplices)
+register_element("Bernstein", None, 0, H1, "identity", (1, None), any_cell)
 
 
 # Let Nedelec H(div) elements be aliases to BDMs/RTs
@@ -179,8 +185,8 @@ register_alias("DGT",
                lambda family, dim, order, degree: ("HDiv Trace", order))
 
 # New elements introduced for the periodic table 2014
-register_element("Q", None, 0, H1, "identity", (1, None), cubes)
-register_element("DQ", None, 0, L2, "identity", (0, None), cubes)
+register_element("Q", None, 0, H1, "identity", (1, None), cubes[1:])
+register_element("DQ", None, 0, L2, "identity", (0, None), cubes[1:])
 register_element("RTCE", None, 1, HCurl, "covariant Piola", (1, None), ("quadrilateral",))
 register_element("RTCF", None, 1, HDiv, "contravariant Piola", (1, None), ("quadrilateral",))
 register_element("NCE", None, 1, HCurl, "covariant Piola", (1, None), ("hexahedron",))
@@ -221,7 +227,7 @@ register_alias("N2F", lambda family, dim, order,
 
 # discontinuous elements using l2 pullbacks
 register_element("DPC L2", None, 0, L2, "L2 Piola", (1, None), cubes)
-register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes)
+register_element("DQ L2", None, 0, L2, "L2 Piola", (0, None), cubes[1:])
 register_element("Gauss-Legendre L2", "GL L2", 0, L2, "L2 Piola", (0, None),
                  ("interval",))
 register_element("Discontinuous Lagrange L2", "DG L2", 0, L2, "L2 Piola", (0, None),
@@ -392,9 +398,9 @@ def canonical_element_description(family, cell, order, form_degree):
     """
     # Get domain dimensions
     if cell is not None:
-        tdim = cell.topological_dimension()
+        tdim = cell.topological_dimension
         if isinstance(cell, Cell):
-            cellname = cell.cellname()
+            cellname = cell.cellname
         else:
             cellname = None
     else:
@@ -428,11 +434,11 @@ def canonical_element_description(family, cell, order, form_degree):
             family = "Q"
         elif family == "Discontinuous Lagrange":
             if order >= 1:
-                warnings.warn("Discontinuous Lagrange element requested on %s, creating DQ element." % cell.cellname())
+                warnings.warn("Discontinuous Lagrange element requested on %s, creating DQ element." % cell.cellname)
             family = "DQ"
         elif family == "Discontinuous Lagrange L2":
             if order >= 1:
-                warnings.warn(f"Discontinuous Lagrange L2 element requested on {cell.cellname()}, "
+                warnings.warn(f"Discontinuous Lagrange L2 element requested on {cell.cellname}, "
                               "creating DQ L2 element.")
             family = "DQ L2"
 
@@ -467,6 +473,17 @@ def canonical_element_description(family, cell, order, form_degree):
         raise ValueError(f"Invalid value rank {value_rank}.")
 
     embedded_degree = order
-    if any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
+    if family == "Kong-Mulder-Veldhuizen":
+        if order == 1:
+            bump = 0
+        elif tdim == 2 and order < 5:
+            bump = 1
+        else:
+            bump = 2
+        embedded_degree += bump
+    elif family == "Mardal-Tai-Winther":
+        embedded_degree = tdim + 1
+    elif any(bubble in family for bubble in ("Guzman-Neilan", "Bernardi-Raugel")):
         embedded_degree = tdim
+
     return family, short_name, order, reference_value_shape, sobolev_space, mapping, embedded_degree

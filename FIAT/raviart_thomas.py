@@ -6,10 +6,10 @@
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
 from FIAT import (expansions, polynomial_set, dual_set,
-                  finite_element, functional)
+                  finite_element, functional, macro)
 import numpy
 from itertools import chain
-from FIAT.check_format_variant import check_format_variant
+from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.quadrature import FacetQuadratureRule
 
@@ -58,7 +58,7 @@ class RTDualSet(dual_set.DualSet):
     evaluation of normals on facets of codimension 1 and internal
     moments against polynomials"""
 
-    def __init__(self, ref_el, degree, variant, interpolant_deg):
+    def __init__(self, ref_el, degree, variant, interpolant_deg, quad_scheme):
         nodes = []
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
@@ -71,17 +71,16 @@ class RTDualSet(dual_set.DualSet):
                 entity_ids[dim][entity] = []
 
         if variant == "integral":
-            facet = ref_el.get_facet_element()
+            facet = ref_el.construct_subelement(sd-1)
             # Facet nodes are \int_F v\cdot n p ds where p \in P_q
             q = degree - 1
-            Q_ref = create_quadrature(facet, interpolant_deg + q)
+            Q_ref = parse_quadrature_scheme(facet, interpolant_deg + q, quad_scheme)
             Pq = polynomial_set.ONPolynomialSet(facet, q if sd > 1 else 0)
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref, avg=True)
+                n = ref_el.compute_scaled_normal(f)
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -89,14 +88,18 @@ class RTDualSet(dual_set.DualSet):
 
             # internal nodes. These are \int_T v \cdot p dx where p \in P_{q-1}^d
             if q > 0:
-                cur = len(nodes)
-                Q = create_quadrature(ref_el, interpolant_deg + q - 1)
-                Pqm1 = polynomial_set.ONPolynomialSet(ref_el, q - 1)
-                Pqm1_at_qpts = Pqm1.tabulate(Q.get_points())[(0,) * sd]
-                nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
-                             for d in range(sd)
-                             for phi in Pqm1_at_qpts)
-                entity_ids[sd][0] = list(range(cur, len(nodes)))
+                cell = ref_el.construct_subelement(sd)
+                Q_ref = parse_quadrature_scheme(cell, interpolant_deg + q - 1, quad_scheme)
+                Pqm1 = polynomial_set.ONPolynomialSet(cell, q - 1)
+                Pqm1_at_qpts = Pqm1.tabulate(Q_ref.get_points())[(0,) * sd]
+
+                for entity in top[sd]:
+                    Q = FacetQuadratureRule(ref_el, sd, entity, Q_ref)
+                    cur = len(nodes)
+                    nodes.extend(functional.IntegralMoment(ref_el, Q, phi, (d,), (sd,))
+                                 for d in range(sd)
+                                 for phi in Pqm1_at_qpts)
+                    entity_ids[sd][entity] = list(range(cur, len(nodes)))
 
         elif variant == "point":
             # codimension 1 facets
@@ -139,11 +142,16 @@ class RaviartThomas(finite_element.CiarletElement):
     interpolation.
     """
 
-    def __init__(self, ref_el, degree, variant=None):
+    def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        splitting, variant, interpolant_deg = check_format_variant(variant, degree)
+        if splitting is not None:
+            ref_el = splitting(ref_el)
 
-        variant, interpolant_deg = check_format_variant(variant, degree)
-
-        poly_set = RTSpace(ref_el, degree)
-        dual = RTDualSet(ref_el, degree, variant, interpolant_deg)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = RTSpace(ref_el, degree)
+        dual = RTDualSet(ref_el, degree, variant, interpolant_deg, quad_scheme)
         formdegree = ref_el.get_spatial_dimension() - 1  # (n-1)-form
         super().__init__(poly_set, dual, degree, formdegree, mapping="contravariant piola")

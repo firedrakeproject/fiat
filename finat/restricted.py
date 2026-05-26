@@ -7,11 +7,49 @@ from FIAT.polynomial_set import mis
 import finat
 from finat.fiat_elements import FiatElement
 from finat.physically_mapped import PhysicallyMappedElement
-from finat.piola_mapped import PiolaMappedElement
 
 
 # Sentinel for when restricted element is empty
 null_element = object()
+
+
+class RestrictedPhysicallyMappedElement(PhysicallyMappedElement, FiatElement):
+    """A restricted PhysicallyMappedElement.
+
+    :arg element: the finat.FiatElement to be restricted.
+    :arg indices: the indices of the degrees of freedom to be kept.
+    """
+    def __init__(self, element, indices):
+        super().__init__(element._element)
+        # First sanitise the restriction indices
+        # Some finat elements, e.g. Bell, are the restriction of a FIAT element.
+        # Therefore, we need to compose the restrictions.
+        edofs = element.entity_dofs()
+        free_indices = set(chain.from_iterable(edofs[d][e] for d in edofs for e in edofs[d]))
+        indices = [i for i in indices if i in free_indices]
+        self.restriction_indices = indices
+
+        # Restrict the entity_dofs dict
+        rdofs = {d: {e: [indices.index(i) for i in edofs[d][e] if i in indices]
+                     for e in edofs[d]} for d in edofs}
+        self.restriction_entity_dofs = rdofs
+
+        # Grab the basis transformation matrix from the parent element
+        if isinstance(element, PhysicallyMappedElement):
+            self.full_basis_transformation = element.basis_transformation
+        else:
+            self.full_basis_transformation = None
+
+    def basis_transformation(self, coordinate_mapping):
+        if self.full_basis_transformation is None:
+            raise NotImplementedError("basis_transformation not implemented.")
+        return self.full_basis_transformation(coordinate_mapping)
+
+    def space_dimension(self):
+        return len(self.restriction_indices)
+
+    def entity_dofs(self):
+        return self.restriction_entity_dofs
 
 
 @singledispatch
@@ -33,24 +71,22 @@ def restrict(element, domain, take_closure):
 @restrict.register(FiatElement)
 def restrict_fiat(element, domain, take_closure):
     try:
-        return FiatElement(FIAT.RestrictedElement(element._element,
-                           restriction_domain=domain, take_closure=take_closure))
+        re = FIAT.RestrictedElement(element._element,
+                                    restriction_domain=domain,
+                                    take_closure=take_closure)
     except ValueError:
         return null_element
 
+    if element.space_dimension() == re.space_dimension():
+        # FIAT.RestrictedElement wipes out entity_permutations.
+        # In case the restriction is trivial we return the original element
+        # to avoid reconstructing the space with an undesired permutation.
+        return element
 
-@restrict.register(PiolaMappedElement)
-def restrict_piola_bubble(element, domain, take_closure):
-    try:
-        return PiolaMappedElement(FIAT.RestrictedElement(element._element,
-                                  restriction_domain=domain, take_closure=take_closure))
-    except ValueError:
-        return null_element
+    if isinstance(element, PhysicallyMappedElement) and not (domain == "interior" and not take_closure):
+        return RestrictedPhysicallyMappedElement(element, re._indices)
 
-
-@restrict.register(PhysicallyMappedElement)
-def restrict_physically_mapped(element, domain, take_closure):
-    raise NotImplementedError("Can't restrict Physically Mapped things")
+    return FiatElement(re)
 
 
 @restrict.register(finat.FlattenedDimensions)
@@ -131,6 +167,8 @@ def r_to_codim(restriction, dim):
         return 0
     elif restriction == "facet":
         return 1
+    elif restriction == "ridge":
+        return 2
     elif restriction == "face":
         return dim - 2
     elif restriction == "edge":
@@ -147,6 +185,8 @@ def codim_to_r(codim, dim):
         return "interior"
     elif codim == 1:
         return "facet"
+    elif codim == 2:
+        return "ridge"
     elif d == 0:
         return "vertex"
     elif d == 1:

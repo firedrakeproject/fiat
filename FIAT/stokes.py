@@ -71,13 +71,13 @@ def bubble_duals(ref_el, dim, degree):
     Q, phis = make_dual_bubbles(facet, degree)
     if dim == sd-1:
         phis[0] = 1.0
+
     return Q, phis
 
 
 def map_duals(ref_el, dim, entity, Q_ref, Phis):
-    Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-    phis = (1 / Q.jacobian_determinant()) * Phis
-    return Q, phis
+    Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
+    return Q, Phis
 
 
 def generate_vector_moments(ref_el, dim, entity, Q_ref, Phis):
@@ -87,12 +87,16 @@ def generate_vector_moments(ref_el, dim, entity, Q_ref, Phis):
     if dim == sd - 1:
         t = ref_el.compute_tangents(dim, entity)
         n = numpy.dot([[0, 1], [-1, 0]], *t) if sd == 2 else numpy.cross(*t)
-        comps = numpy.array((n, *t))
+        if sd == 3:
+            nxt = [numpy.cross(n, ti) for ti in t]
+            comps = numpy.array((n, *nxt))
+        else:
+            comps = numpy.array((n, *t))
         # comps /= numpy.linalg.norm(comps, axis=1)[:, None]
         for phi in phis:
             start += 1
             for comp in comps:
-                yield FrobeniusIntegralMoment(ref_el, Q, comp[:, None] * phi[None, :])
+                yield FrobeniusIntegralMoment(ref_el, Q, numpy.outer(comp, phi))
 
     shp = (sd,)
     comps = list(numpy.ndindex(shp))
@@ -260,7 +264,7 @@ class StokesDual(dual_set.DualSet):
                         mid_edge, = numpy.asarray(ref_el.make_points(dim-1, e, dim))
                         s = mid_face - mid_edge
                         Q, phis = map_duals(ref_el, dim-1, e, Q_edge, phis_edge[:degree-5+1])
-                        nodes.extend(IntegralMomentOfDerivative(ref_el, s, Q, phi, comp=comp, shp=shp)
+                        nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, s, comp=comp, shp=shp)
                                      for phi in phis for comp in comps)
 
                 # Rest of the facet moments
@@ -469,8 +473,8 @@ if __name__ == "__main__":
     import sys
     numpy.set_printoptions(threshold=sys.maxsize)
 
-    dim = 2
-    degree = 8
+    dim = 3
+    degree = dim
     ref_el = FIAT.reference_element.symmetric_simplex(dim)
     # fe = Stokes(ref_el, degree)
     fe = MacroStokes(ref_el, degree)

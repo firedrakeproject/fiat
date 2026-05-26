@@ -15,8 +15,8 @@ indices.
 """
 
 from abc import ABCMeta
-from itertools import chain
-from functools import reduce
+from itertools import chain, repeat
+from functools import partial, reduce
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -36,7 +36,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
-           'Inverse', 'Solve', 'extract_type', 'uint_type']
+           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -88,6 +88,9 @@ class Node(NodeBase, metaclass=NodeMeta):
             indices = (indices, )
         return Indexed(self, indices)
 
+    def __neg__(self):
+        return componentwise(Product, minus, self)
+
     def __add__(self, other):
         return componentwise(Sum, self, as_gem(other))
 
@@ -95,9 +98,7 @@ class Node(NodeBase, metaclass=NodeMeta):
         return as_gem(other).__add__(self)
 
     def __sub__(self, other):
-        return componentwise(
-            Sum, self,
-            componentwise(Product, Literal(-1), as_gem(other)))
+        return componentwise(Sum, self, -as_gem(other))
 
     def __rsub__(self, other):
         return as_gem(other).__sub__(self)
@@ -123,6 +124,24 @@ class Node(NodeBase, metaclass=NodeMeta):
 
     def __rmatmul__(self, other):
         return as_gem(other).__matmul__(self)
+
+    def __abs__(self):
+        return componentwise(partial(MathFunction, "abs"), self)
+
+    def __pow__(self, other):
+        return componentwise(Power, self, as_gem(other))
+
+    def __lt__(self, other):
+        return componentwise(partial(Comparison, "<"), self, as_gem(other))
+
+    def __gt__(self, other):
+        return componentwise(partial(Comparison, ">"), self, as_gem(other))
+
+    def __le__(self, other):
+        return componentwise(partial(Comparison, "<="), self, as_gem(other))
+
+    def __ge__(self, other):
+        return componentwise(partial(Comparison, ">="), self, as_gem(other))
 
     @property
     def T(self):
@@ -272,7 +291,6 @@ class Literal(Constant):
     __back__ = ('dtype',)
 
     def __new__(cls, array, dtype=None):
-        array = asarray(array)
         return super(Literal, cls).__new__(cls)
 
     def __init__(self, array, dtype=None):
@@ -293,7 +311,7 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
-        return tuple(self.array.flat) == tuple(other.array.flat)
+        return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
         return hash((type(self), self.shape, tuple(self.array.flat)))
@@ -306,6 +324,9 @@ class Literal(Constant):
     @property
     def shape(self):
         return self.array.shape
+
+    def __bool__(self):
+        return bool(self.value)
 
 
 class Variable(Terminal):
@@ -553,8 +574,8 @@ class LogicalOr(Scalar):
         self.children = a, b
 
 
-class Conditional(Node):
-    __slots__ = ('children', 'shape')
+class Conditional(Scalar):
+    __slots__ = ('children',)
 
     def __new__(cls, condition, then, else_):
         assert not condition.shape
@@ -567,7 +588,6 @@ class Conditional(Node):
 
         self = super(Conditional, cls).__new__(cls)
         self.children = condition, then, else_
-        self.shape = then.shape
         self.dtype = Node.inherit_dtype_from_children((then, else_))
         return self
 
@@ -684,31 +704,30 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
-        # Simplify Literal and ListTensor
-        if isinstance(aggregate, (Constant, ListTensor)):
-            if all(isinstance(i, int) for i in multiindex):
-                # All indices fixed
-                sub = aggregate.array[multiindex]
-                return Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else sub
-            elif any(isinstance(i, int) for i in multiindex) and all(isinstance(i, (int, Index)) for i in multiindex):
-                # Some indices fixed
-                slices = tuple(i if isinstance(i, int) else slice(None) for i in multiindex)
-                sub = aggregate.array[slices]
-                sub = Literal(sub, dtype=aggregate.dtype) if isinstance(aggregate, Constant) else ListTensor(sub)
-                return Indexed(sub, tuple(i for i in multiindex if not isinstance(i, int)))
-
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
+        # This pattern corresponds to an index replacement rule jj -> ii applied to
+        # the innermost multiindex kk to produce ll.
         if isinstance(aggregate, ComponentTensor):
             B, = aggregate.children
             jj = aggregate.multiindex
+            ii = multiindex
             if isinstance(B, Indexed):
                 C, = B.children
                 kk = B.multiindex
-                if all(j in kk for j in jj):
-                    ii = tuple(multiindex)
+                ff = C.free_indices
+                if not any((j in ff) for j in jj):
+                    # Only replace indices that are not present in C
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
-                    return Indexed(C, ll)
+                    aggregate = C
+                    multiindex = ll
+
+        # All indices fixed
+        if all(isinstance(i, Integral) for i in multiindex):
+            if isinstance(aggregate, Constant):
+                return Literal(aggregate.array[multiindex], dtype=aggregate.dtype)
+            elif isinstance(aggregate, ListTensor):
+                return aggregate.array[multiindex]
 
         self = super(Indexed, cls).__new__(cls)
         self.children = (aggregate,)
@@ -895,6 +914,11 @@ class IndexSum(Scalar):
         if not multiindex:
             return summand
 
+        # Flatten nested sums
+        if isinstance(summand, IndexSum):
+            A, = summand.children
+            return IndexSum(A, summand.multiindex + multiindex)
+
         self = super(IndexSum, cls).__new__(cls)
         self.children = (summand,)
         self.multiindex = multiindex
@@ -919,19 +943,42 @@ class ListTensor(Node):
         child_shape = e0.shape
         assert all(elem.shape == child_shape for elem in array.flat)
 
-        # Index folding
-        if child_shape == array.shape:
-            if all(isinstance(elem, Indexed) for elem in array.flat):
-                if all(elem.children == e0.children for elem in array.flat[1:]):
-                    if all(elem.multiindex == idx for elem, idx in zip(array.flat, numpy.ndindex(array.shape))):
-                        return e0.children[0]
+        # Simplify [tensor[multiindex, j] for j in range(n)] -> partial_indexed(tensor, multiindex)
+        if all(isinstance(elem, Indexed) for elem in array.flat):
+            tensor = e0.children[0]
+            if all(elem.children[0] == tensor for elem in array.flat[1:]):
+                # Extract maximal subset of leading indices that is common over all array entries
+                multiindex = tuple(e0.multiindex)
+                for elem in array.flat[1:]:
+                    while elem.multiindex[:len(multiindex)] != multiindex:
+                        multiindex = multiindex[:-1]
+                    if len(multiindex) == 0:
+                        break
+                index_shape = tuple(i.extent if isinstance(i, Index) else 1 for i in multiindex)
+                if index_shape + array.shape + child_shape == tensor.shape:
+                    if all(elem.multiindex[len(multiindex):] == idx for idx, elem in numpy.ndenumerate(array)):
+                        return partial_indexed(tensor, multiindex)
+
+        # Simplify [tensor[j, ...] for j in range(n)] -> tensor
+        if all(isinstance(elem, ComponentTensor) and isinstance(elem.children[0], Indexed)
+               for elem in array.flat):
+            tensor = e0.children[0].children[0]
+            if array.shape + child_shape == tensor.shape:
+                if all(elem.children[0].children[0] == tensor for elem in array.flat[1:]):
+                    if all(elem.children[0].multiindex == idx + elem.multiindex
+                           for idx, elem in numpy.ndenumerate(array)):
+                        return tensor
+
+        # Flatten nested ListTensors
+        if all(isinstance(elem, ListTensor) for elem in array.flat):
+            return ListTensor(asarray([elem.array for elem in array.flat]).reshape(array.shape + child_shape))
 
         if child_shape:
             # Destroy structure
             direct_array = numpy.empty(array.shape + child_shape, dtype=object)
-            for alpha in numpy.ndindex(array.shape):
+            for alpha, elem in numpy.ndenumerate(array):
                 for beta in numpy.ndindex(child_shape):
-                    direct_array[alpha + beta] = Indexed(array[alpha], beta)
+                    direct_array[alpha + beta] = Indexed(elem, beta)
             array = direct_array
 
         # Constant folding
@@ -1004,7 +1051,7 @@ class Delta(Scalar, Terminal):
     def __new__(cls, i, j, dtype=None):
         if isinstance(i, tuple) and isinstance(j, tuple):
             # Handle multiindices
-            return Product(*map(Delta, i, j))
+            return Product(*map(Delta, i, j, repeat(dtype)))
         assert isinstance(i, IndexBase)
         assert isinstance(j, IndexBase)
 
@@ -1016,25 +1063,17 @@ class Delta(Scalar, Terminal):
         if isinstance(i, Integral) and isinstance(j, Integral):
             return one if i == j else Zero()
 
-        if isinstance(i, Integral):
-            return Indexed(Literal(numpy.eye(j.extent)[i]), (j,))
-
-        if isinstance(j, Integral):
-            return Indexed(Literal(numpy.eye(i.extent)[j]), (i,))
-
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
         # Set up free indices
-        free_indices = []
-        for index in (i, j):
-            if isinstance(index, Index):
-                free_indices.append(index)
-            elif isinstance(index, VariableIndex):
-                raise NotImplementedError("Can not make Delta with VariableIndex")
+        free_indices = [index for index in (i, j) if isinstance(index, Index)]
         self.free_indices = tuple(unique(free_indices))
         self._dtype = dtype
         return self
+
+    def reconstruct(self, *args):
+        return Delta(*args, dtype=self.dtype)
 
 
 class Inverse(Node):
@@ -1250,6 +1289,7 @@ def view(expression, *slices):
 
 # Static one object for quicker constant folding
 one = Literal(1)
+minus = Literal(-1)
 
 
 # Syntax sugar
@@ -1307,6 +1347,14 @@ def as_gem(expr):
         return expr
     elif isinstance(expr, Number):
         return Literal(expr)
+    elif isinstance(expr, (bool, numpy.bool)):
+        return Literal(bool(expr))
+    elif isinstance(expr, numpy.ndarray):
+        if expr.dtype == object:
+            expr = numpy.vectorize(as_gem)(expr)
+            return ListTensor(expr)
+        else:
+            return Literal(expr)
     else:
         raise ValueError("Do not know how to convert %r to GEM" % expr)
 
@@ -1341,3 +1389,31 @@ def as_gem_uint(expr):
 def extract_type(expressions, klass):
     """Collects objects of type klass in expressions."""
     return tuple(node for node in traversal(expressions) if isinstance(node, klass))
+
+
+def Piecewise(*args):
+    """Represents a piecewise function.
+
+    Parameters
+    ----------
+    *args
+        Each argument is a 2-tuple defining an expression and condition.
+
+    Returns
+    -------
+    Node
+        A nested Conditional.
+
+    """
+    expr = None
+    pieces = []
+    for v, c in args:
+        if isinstance(c, (bool, numpy.bool, Literal)) and c:
+            expr = as_gem(v)
+            break
+        pieces.append((as_gem(v), as_gem(c)))
+    if expr is None:
+        expr = Literal(float("nan"))
+    for v, c in reversed(pieces):
+        expr = Conditional(c, v, expr)
+    return expr

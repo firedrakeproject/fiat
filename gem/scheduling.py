@@ -117,10 +117,6 @@ def handle(ops, push, decref, node):
     elif isinstance(node, gem.Zero):  # should rarely happen
         assert not node.shape
     elif isinstance(node, (gem.Indexed, gem.FlexiblyIndexed)):
-        if node.indirect_children:
-            # Do not inline;
-            # Index expression can be involved if it contains VariableIndex.
-            ops.append(impero.Evaluate(node))
         for child in itertools.chain(node.children, node.indirect_children):
             decref(child)
     elif isinstance(node, gem.IndexSum):
