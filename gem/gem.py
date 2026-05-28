@@ -350,9 +350,8 @@ class SparseLiteral(Constant):
             Array of shape (nnz,) containing the values of the nonzero entries.
         shape : tuple[int, ...]
             Shape of the sparse tensor.
-        dtype : 
-            _description_, by default None
-
+        dtype : np.dtype, optional
+            Data type of the values. If None, will be determined from the values.
         """
         indices = asarray(indices)
         values = asarray(values)
