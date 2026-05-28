@@ -28,7 +28,7 @@ from gem.node import Node as NodeBase, traversal
 from FIAT.orientation_utils import Orientation as FIATOrientation
 
 
-__all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
+__all__ = ['Node', 'Identity', 'Literal', 'SparseLiteral', 'Zero', 'Failure',
            'Variable', 'Sum', 'Product', 'Division', 'FloorDiv', 'Remainder', 'Power',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
@@ -324,6 +324,84 @@ class Literal(Constant):
     @property
     def shape(self):
         return self.array.shape
+
+    def __bool__(self):
+        return bool(self.value)
+
+
+class SparseLiteral(Constant):
+    """Sparse tensor-valued constant"""
+
+    __slots__ = ('indices', 'values', 'shape')
+    __front__ = ('indices', 'values', 'shape')
+    __back__ = ('dtype',)
+
+    def __new__(cls, indices, values, shape=None, dtype=None):
+        return super(SparseLiteral, cls).__new__(cls)
+
+    def __init__(self, indices, values, shape, dtype=None):
+        """Initialise a sparse literal in COO format.
+
+        Parameters
+        ----------
+        indices : np.ndarray
+            Array of shape (nnz, rank) containing the indices of the nonzero entries.
+        values : np.ndarray
+            Array of shape (nnz,) containing the values of the nonzero entries.
+        shape : tuple[int, ...]
+            Shape of the sparse tensor.
+        dtype : 
+            _description_, by default None
+
+        """
+        indices = asarray(indices)
+        values = asarray(values)
+
+        if len(indices) != len(values):
+            raise ValueError("SparseLiteral indices and values have different nnz")
+        if len(shape) != indices.shape[1]:
+            raise ValueError("SparseLiteral shape rank does not match index rank")
+
+        if dtype is None:
+            # Assume float or complex
+            try:
+                values = values.astype(float, casting="safe")
+            except TypeError:
+                values = values.astype(complex)
+        else:
+            values = values.astype(dtype)
+
+        self.indices = indices
+        self.values = values
+        self.shape = shape
+        self._dtype = values.dtype
+
+    def is_equal(self, other):
+        if type(self) is not type(other):
+            return False
+        if self.shape != other.shape:
+            return False
+        return (numpy.array_equal(self.indices, other.indices) and
+                numpy.array_equal(self.values, other.values))
+
+    def get_hash(self):
+        return hash((type(self), self.shape,
+                     tuple(map(tuple, self.indices)),
+                     tuple(self.values.flat)))
+
+    @property
+    def array(self):
+        array = numpy.zeros(self.shape, dtype=self.dtype)
+        if len(self.indices):
+            array[tuple(self.indices.T)] = self.values
+        return array
+
+    @property
+    def value(self):
+        assert self.shape == ()
+        if len(self.values):
+            return self.values.dtype.type(self.values[0])
+        return self.dtype.type(0)
 
     def __bool__(self):
         return bool(self.value)
