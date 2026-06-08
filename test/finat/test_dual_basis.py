@@ -28,6 +28,7 @@ def test_collapse_repeated_points(dim):
     assert len(points) == len(numpy.unique(numpy.round(points, decimals=7), axis=0))
     assert len(points) == expected
 
+
 @pytest.mark.parametrize("element,dim,order,expected", [
     (finat.Lagrange, 2, 1, ((0, 0),)),
     (finat.Lagrange, 3, 1, ((0, 0, 0),)),
@@ -43,3 +44,48 @@ def test_dual_basis_derivative_multiindices(element, dim, order, expected):
     cell = ufc_simplex(dim)
     fe = element(cell, order)
     assert fe._dual_basis_derivative_multiindices == expected
+
+
+def test_value_dual_basis_shape():
+    cell = ufc_simplex(2)
+    fe = finat.Lagrange(cell, 1)
+
+    Q, points = fe._dual_basis
+    assert Q.shape == (3, 3)
+    assert points.shape == (3, 2)
+
+    Q, point_set = fe.dual_basis
+    assert Q.shape == (3,)
+    assert point_set.points.shape == (3, 2)
+
+
+def test_derivative_dual_basis_shape():
+    cell = ufc_simplex(2)
+    fe = finat.Hermite(cell, 3)
+
+    Q, points = fe._dual_basis
+    alphas = fe._dual_basis_derivative_multiindices
+    assert Q.shape == (10, 4, 3)
+    assert points.shape == (4, 2)
+    assert Q.array[0, 0, 0] == 1
+    assert Q.array[1, 0, alphas.index((1, 0))] == 1
+    assert Q.array[2, 0, alphas.index((0, 1))] == 1
+
+    Q, point_set = fe.dual_basis
+    assert Q.shape == (10, 3)
+    assert point_set.points.shape == (4, 2)
+
+
+def test_divergence_dual_basis_shape():
+    cell = ufc_simplex(2)
+    fe = finat.AlfeldSorokina(cell, 2)
+
+    Q, points = fe._dual_basis
+    alphas = fe._dual_basis_derivative_multiindices
+    assert Q.shape == (fe.space_dimension(), len(points), 3, 2)
+    assert Q.array[0, 0, alphas.index((1, 0)), 0] == 1
+    assert Q.array[0, 0, alphas.index((0, 1)), 1] == 1
+
+    Q, point_set = fe.dual_basis
+    assert Q.shape == (fe.space_dimension(), 3, 2)
+    assert point_set.points.shape == points.shape

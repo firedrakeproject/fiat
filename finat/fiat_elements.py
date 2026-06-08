@@ -158,7 +158,7 @@ class FiatElement(FiniteElementBase):
         vals = gem.optimise.remove_componenttensors(vals)
         result = dict(zip(result.keys(), vals))
         return result
-    
+
     @cached_property
     def _dual_basis_derivative_multiindices(self) -> tuple:
         # Returns a sorted tuple of multiindices that appear in the dual basis.
@@ -190,7 +190,8 @@ class FiatElement(FiniteElementBase):
         # point one by one, but most of the redundancy comes from
         # multiple functionals using the same quadrature rule.
         for dual in fiat_dual_basis:
-            pts = dual.get_point_dict().keys()
+            pts = set(dual.get_point_dict().keys())
+            pts.update(dual.deriv_dict.keys())
             pts = tuple(sorted(pts))  # need this for determinism
             if pts not in seen:
                 # k are indices into Q (see below) for the seen points
@@ -223,16 +224,32 @@ class FiatElement(FiniteElementBase):
         # Columns (k) are unique points to evaluate.
         # Higher indices (*cmp) are tensor indices of the weights when weights
         # are tensor valued.
+        derivative_multiindices = self._dual_basis_derivative_multiindices
+        has_derivatives = len(derivative_multiindices) > 1
+        alpha_indices = {alpha: i for i, alpha in enumerate(derivative_multiindices)}
+        zero = (0,) * self.cell.get_spatial_dimension()
+
         Q = {}
         for i, dual in enumerate(fiat_dual_basis):
             point_dict = dual.get_point_dict()
-            pts = tuple(sorted(point_dict.keys()))
+            deriv_dict = dual.deriv_dict
+            pts = set(point_dict.keys())
+            pts.update(deriv_dict.keys())
+            pts = tuple(sorted(pts))
             kstart, kend = seen[pts]
             for p, k in zip(pts, unique_indices[kstart:kend]):
-                for weight, cmp in point_dict[p]:
-                    Q[(i, k, *cmp)] = weight
-        if all(len(set(key)) == 1 and np.isclose(weight, 1) and len(key) == 2
-               for key, weight in Q.items()):
+                for weight, cmp in point_dict.get(p, ()):
+                    if has_derivatives:
+                        idx = (i, k, alpha_indices[zero], *cmp)
+                    else:
+                        idx = (i, k, *cmp)
+                    Q[idx] = Q.get(idx, 0.0) + weight
+                for weight, alpha, cmp in deriv_dict.get(p, ()):
+                    idx = (i, k, alpha_indices[tuple(alpha)], *cmp)
+                    Q[idx] = Q.get(idx, 0.0) + weight
+        if (not has_derivatives
+                and all(len(set(key)) == 1 and np.isclose(weight, 1) and len(key) == 2
+                        for key, weight in Q.items())):
             # Identity matrix Q can be expressed symbolically
             extents = tuple(map(max, zip(*Q.keys())))
             js = tuple(gem.Index(extent=e+1) for e in extents)
@@ -245,7 +262,10 @@ class FiatElement(FiniteElementBase):
             # significantly by building Q in a COO format rather than DOK (i.e.
             # storing coords and associated data in (nonzeros, entries) shaped
             # numpy arrays) to take advantage of numpy multiindexing
-            if len(Q) == 1:
+            if has_derivatives:
+                Qshape = (len(fiat_dual_basis), len(allpts),
+                          len(derivative_multiindices), *self.value_shape)
+            elif len(Q) == 1:
                 Qshape = tuple(s + 1 for s in tuple(Q)[0])
             else:
                 Qshape = tuple(s + 1 for s in map(max, *Q))
