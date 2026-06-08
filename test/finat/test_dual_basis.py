@@ -27,3 +27,19 @@ def test_collapse_repeated_points(dim):
 
     assert len(points) == len(numpy.unique(numpy.round(points, decimals=7), axis=0))
     assert len(points) == expected
+
+@pytest.mark.parametrize("element,dim,order,expected", [
+    (finat.Lagrange, 2, 1, ((0, 0),)),
+    (finat.Lagrange, 3, 1, ((0, 0, 0),)),
+    (finat.Hermite, 2, 3, ((0, 0), (0, 1), (1, 0))),
+    (finat.Hermite, 3, 3, ((0, 0, 0), (0, 0, 1), (0, 1, 0), (1, 0, 0))),
+    (finat.Argyris, 2, 5, ((0, 0), (0, 1), (1, 0), (0, 2), (1, 1), (2, 0))),
+    (finat.Bell, 2, 5, ((0, 0), (0, 1), (1, 0), (0, 2), (1, 1), (2, 0))),
+    (finat.ReducedHsiehCloughTocher, 2, 3, ((0, 0), (0, 1), (1, 0))),
+    (finat.Morley, 2, 2, ((0, 0), (0, 1), (1, 0))),
+    (finat.RaviartThomas, 2, 1, ((0, 0),))
+])
+def test_dual_basis_derivative_multiindices(element, dim, order, expected):
+    cell = ufc_simplex(dim)
+    fe = element(cell, order)
+    assert fe._dual_basis_derivative_multiindices == expected

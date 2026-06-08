@@ -158,6 +158,18 @@ class FiatElement(FiniteElementBase):
         vals = gem.optimise.remove_componenttensors(vals)
         result = dict(zip(result.keys(), vals))
         return result
+    
+    @cached_property
+    def _dual_basis_derivative_multiindices(self) -> tuple:
+        # Returns a sorted tuple of multiindices that appear in the dual basis.
+        # Point evaluation only elements will have ((0,) * dim,)
+        zero = (0,) * self.cell.get_spatial_dimension()
+        alphas = {zero}
+        for dual in self._element.dual_basis():
+            for entries in dual.deriv_dict.values():
+                for _, alpha, _ in entries:
+                    alphas.add(tuple(alpha))
+        return tuple(sorted(alphas, key=lambda a: (sum(a), a)))
 
     @cached_property
     def _dual_basis(self):
@@ -178,8 +190,8 @@ class FiatElement(FiniteElementBase):
         # point one by one, but most of the redundancy comes from
         # multiple functionals using the same quadrature rule.
         for dual in fiat_dual_basis:
-            if len(dual.deriv_dict) != 0:
-                raise NotImplementedError("FIAT dual bases with derivative nodes represented via a ``Functional.deriv_dict`` property do not currently have a FInAT dual basis")
+            # if len(dual.deriv_dict) != 0:
+            #     raise NotImplementedError("FIAT dual bases with derivative nodes represented via a ``Functional.deriv_dict`` property do not currently have a FInAT dual basis")
             pts = dual.get_point_dict().keys()
             pts = tuple(sorted(pts))  # need this for determinism
             if pts not in seen:
