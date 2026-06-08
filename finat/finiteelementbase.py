@@ -264,7 +264,14 @@ class FiniteElementBase(metaclass=ABCMeta):
         Q, x = self.dual_basis
         Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
 
-        expr = fn(x)
+        alphas = self._dual_basis_derivative_multiindices
+        if len(alphas) == 1:
+            # No derivatives in the dual basis
+            expr = fn(x)
+        else:
+            expr = gem.ListTensor([
+                fn(x) if sum(alpha) == 0 else fn(x, alpha) for alpha in alphas
+            ])
         # Apply targeted sum factorisation and delta elimination to
         # the expression
         sum_indices, factors = delta_elimination(*traverse_product(expr))
