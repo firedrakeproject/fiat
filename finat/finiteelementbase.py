@@ -180,6 +180,10 @@ class FiniteElementBase(metaclass=ABCMeta):
            provides physical geometry callbacks (may be None).
         '''
 
+    @cached_property
+    def _dual_basis_derivative_multiindices(self) -> tuple:
+        return ((0,) * self.cell.get_spatial_dimension(),)
+
     @property
     def dual_basis(self):
         '''Return a dual evaluation gem weight tensor Q and point set x to dual
@@ -249,7 +253,8 @@ class FiniteElementBase(metaclass=ABCMeta):
         :class:`TensorFiniteElement`.
 
         :param fn: Callable representing the function to dual evaluate.
-                   Callable should take in an :class:`AbstractPointSet` and
+                   Callable should take in: an :class:`AbstractPointSet` and
+                   an optional tuple of derivative multiindices. It should 
                    return a GEM expression for evaluation of the function at
                    those points.
         :param coordinate_mapping: a
