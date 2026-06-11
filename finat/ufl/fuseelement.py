@@ -19,7 +19,7 @@ class FuseElement(FiniteElementBase):
         if not cell:
             cell = self.triple.cell.to_ufl()
 
-        degree = self.triple.degree()
+        degree = self.triple.degree
         self.sobolev_space = self.triple.spaces[1]#.to_ufl()
         super(FuseElement, self).__init__("IT", cell, degree, None, triple.get_value_shape())
 
