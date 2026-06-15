@@ -17,9 +17,15 @@ from finat.ufl.finiteelementbase import FiniteElementBase
 class EnrichedElementBase(FiniteElementBase):
     """The vector sum of several finite element spaces."""
 
-    def __init__(self, *elements):
+    def __init__(self, *elements, **kwargs):
         """Doc."""
         self._elements = elements
+
+        keywords = list(kwargs.keys())
+        if keywords and not keywords == ["triple"]:
+            raise ValueError("EnrichedElement got an unexpected keyword argument '%s'" % keywords[0])
+        if "triple" in keywords:
+            self._triple = kwargs.get("triple")
 
         cell = elements[0].cell
         if not all(e.cell == cell for e in elements[1:]):
@@ -87,6 +93,8 @@ class EnrichedElementBase(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
+        if hasattr(self, "_triple"):
+            return type(self)(*[e.reconstruct(**kwargs) for e in self._elements], triple=self._triple)
         return type(self)(*[e.reconstruct(**kwargs) for e in self._elements])
 
     @property
