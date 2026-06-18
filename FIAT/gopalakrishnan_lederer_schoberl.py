@@ -1,4 +1,4 @@
-from FIAT import finite_element, dual_set, polynomial_set, expansions
+from FIAT import finite_element, dual_set, polynomial_set, expansions, macro
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
 from FIAT.functional import TensorBidirectionalIntegralMoment as BidirectionalMoment
 from FIAT.quadrature import FacetQuadratureRule
@@ -26,13 +26,11 @@ class GLSDual(dual_set.DualSet):
 
             for entity in sorted(top[dim]):
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                Jdet = Q.jacobian_determinant()
+                Q = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
                 for f in ref_el.get_connectivity()[(dim, sd-1)][entity]:
                     normal = ref_el.compute_scaled_normal(f)
                     tangents = ref_el.compute_tangents(sd-1, f)
-                    n = normal / Jdet
-                    nodes.extend(BidirectionalMoment(ref_el, t, n, Q, phi)
+                    nodes.extend(BidirectionalMoment(ref_el, t, normal, Q, phi)
                                  for phi in phis for t in tangents)
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
@@ -62,7 +60,11 @@ class GopalakrishnanLedererSchoberlSecondKind(finite_element.CiarletElement):
         if splitting is not None:
             ref_el = splitting(ref_el)
 
-        poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = polynomial_set.TracelessTensorPolynomialSet(ref_el, degree)
         dual = GLSDual(ref_el, degree, quad_scheme=quad_scheme)
         sd = ref_el.get_spatial_dimension()
         formdegree = (1, sd-1)

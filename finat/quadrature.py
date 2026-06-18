@@ -9,7 +9,8 @@ from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
 from FIAT.reference_element import LINE, QUADRILATERAL, TENSORPRODUCT
 from gem.utils import safe_repr
 
-from finat.point_set import GaussLegendrePointSet, KMVPointSet, PointSet, TensorPointSet
+from finat.point_set import (GaussLegendrePointSet, GaussLobattoLegendrePointSet,
+                             KMVPointSet, PointSet, TensorPointSet)
 
 
 def make_quadrature(ref_el, degree, scheme="default"):
@@ -17,7 +18,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
     Generate quadrature rule for given reference element
     that will integrate an polynomial of order 'degree' exactly.
 
-    For low-degree (<=6) polynomials on triangles and tetrahedra, this
+    For low-degree polynomials on triangles (<=50) and tetrahedra (<=15), this
     uses hard-coded rules, otherwise it falls back to a collapsed
     Gauss scheme on simplices.  On tensor-product cells, it is a
     tensor-product quadrature rule of the subcells.
@@ -25,6 +26,10 @@ def make_quadrature(ref_el, degree, scheme="default"):
     :arg ref_el: The FIAT cell to create the quadrature for.
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
+    :kwarg scheme: The quadrature scheme, can be choosen from ["default", "canonical", "KMV"]
+        "default" -> hard-coded scheme for low degree and collapsed Gauss scheme for high degree,
+        "canonical" -> collapsed Gauss scheme,
+        "KMV" -> spectral lumped scheme for low degree (<=6 on triangles, <=3 on tetrahedra).
     """
     if ref_el.get_shape() == TENSORPRODUCT:
         try:
@@ -43,7 +48,13 @@ def make_quadrature(ref_el, degree, scheme="default"):
     if degree < 0:
         raise ValueError("Need positive degree, not %d" % degree)
 
-    if ref_el.get_shape() == LINE and not ref_el.is_macrocell():
+    if scheme.lower() in {"kmv", "lump"}:
+        fiat_rule = fiat_scheme(ref_el, degree, "KMV")
+        if ref_el.get_shape() == LINE:
+            point_set = GaussLobattoLegendrePointSet(fiat_rule.get_points())
+        else:
+            point_set = KMVPointSet(fiat_rule.get_points())
+    elif ref_el.get_shape() == LINE and not ref_el.is_macrocell():
         # FIAT uses Gauss-Legendre line quadature, however, since we
         # symbolically label it as such, we wish not to risk attaching
         # the wrong label in case FIAT changes.  So we explicitly ask
@@ -53,10 +64,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
         point_set = GaussLegendrePointSet(fiat_rule.get_points())
     else:
         fiat_rule = fiat_scheme(ref_el, degree, scheme)
-        if scheme.lower() == "kmv":
-            point_set = KMVPointSet(fiat_rule.get_points())
-        else:
-            point_set = PointSet(fiat_rule.get_points())
+        point_set = PointSet(fiat_rule.get_points())
 
     return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
 

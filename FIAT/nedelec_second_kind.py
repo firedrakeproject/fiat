@@ -7,6 +7,7 @@
 
 import numpy
 
+from FIAT import macro
 from FIAT.finite_element import CiarletElement
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import ONPolynomialSet
@@ -200,8 +201,13 @@ class NedelecSecondKind(CiarletElement):
 
         # Get dimension
         d = ref_el.get_spatial_dimension()
+
         # Construct polynomial basis for d-vector fields
-        Ps = ONPolynomialSet(ref_el, degree, (d, ))
+        if ref_el.is_macrocell():
+            base_element = type(self)(ref_el.get_parent(), degree)
+            poly_set = macro.MacroPolynomialSet(ref_el, base_element)
+        else:
+            poly_set = ONPolynomialSet(ref_el, degree, (d, ))
 
         # Construct dual space
         Ls = NedelecSecondKindDual(ref_el, degree, variant, interpolant_deg, quad_scheme)
@@ -213,4 +219,4 @@ class NedelecSecondKind(CiarletElement):
         mapping = "covariant piola"
 
         # Call init of super-class
-        super().__init__(Ps, Ls, degree, formdegree, mapping=mapping)
+        super().__init__(poly_set, Ls, degree, formdegree, mapping=mapping)

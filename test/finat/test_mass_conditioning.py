@@ -4,20 +4,24 @@ import pytest
 from gem.interpreter import evaluate
 
 
-@pytest.mark.parametrize("element, degree, variant", [
-    (finat.Hermite, 3, None),
-    (finat.QuadraticPowellSabin6, 2, None),
-    (finat.QuadraticPowellSabin12, 2, None),
-    (finat.ReducedHsiehCloughTocher, 3, None),
-    (finat.HsiehCloughTocher, 3, None),
-    (finat.HsiehCloughTocher, 4, None),
-    (finat.Bell, 5, None),
-    (finat.Argyris, 5, "point"),
-    (finat.Argyris, 5, None),
-    (finat.Argyris, 6, None),
+@pytest.mark.parametrize("sd,element,degree,variant", [
+    (2, finat.Hermite, 3, None),
+    (2, finat.QuadraticPowellSabin6, 2, None),
+    (2, finat.QuadraticPowellSabin12, 2, None),
+    (2, finat.ReducedHsiehCloughTocher, 3, None),
+    (2, finat.HsiehCloughTocher, 3, None),
+    (2, finat.HsiehCloughTocher, 4, None),
+    (2, finat.Bell, 5, None),
+    (2, finat.Argyris, 5, "point"),
+    (2, finat.Argyris, 5, None),
+    (2, finat.Argyris, 6, None),
+    (2, finat.WuXuH3NC, 4, None),
+    (2, finat.WuXuRobustH3NC, 7, None),
+    (2, finat.BrambleZlamalC2, 9, None),
+    (2, finat.AlfeldC2, 5, None),
+    (3, finat.Walkington, 5, None),
 ])
-def test_mass_scaling(scaled_ref_to_phys, element, degree, variant):
-    sd = 2
+def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):
     ref_cell = scaled_ref_to_phys[sd][0].ref_cell
     if variant is not None:
         ref_element = element(ref_cell, degree, variant=variant)

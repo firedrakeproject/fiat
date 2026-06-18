@@ -16,7 +16,7 @@ from FIAT.check_format_variant import check_format_variant, parse_quadrature_sch
 from FIAT.P0 import P0
 
 
-def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None):
+def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None, scale="orthonormal"):
     """Tabulate the L2-duals of the hierarchical C0 basis."""
     dim = ref_el.get_spatial_dimension()
     if dim == 0:
@@ -25,7 +25,7 @@ def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme
     if interpolant_deg is None:
         interpolant_deg = degree
     Q = parse_quadrature_scheme(ref_el, degree + interpolant_deg, quad_scheme)
-    B = make_bubbles(ref_el, degree, codim=codim, scale="orthonormal")
+    B = make_bubbles(ref_el, degree, codim=codim, scale=scale)
     P_at_qpts = B.expansion_set.tabulate(degree, Q.get_points())
     M = numpy.dot(numpy.multiply(P_at_qpts, Q.get_weights()), P_at_qpts.T)
     phis = numpy.linalg.solve(M, P_at_qpts)
@@ -47,13 +47,10 @@ class LegendreDual(dual_set.DualSet):
         ref_facet = ref_el.construct_subelement(dim)
         poly_set = ONPolynomialSet(ref_facet, degree, scale="L2 piola")
         Q_ref = parse_quadrature_scheme(ref_facet, degree + interpolant_deg, quad_scheme)
-        Phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
+        phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
         for entity in sorted(top[dim]):
             cur = len(nodes)
-            Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-            # phis must transform like a d-form to undo the measure transformation
-            scale = 1 / Q_facet.jacobian_determinant()
-            phis = scale * Phis
+            Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
             nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
             entity_ids[dim][entity].extend(range(cur, len(nodes)))
 
@@ -93,13 +90,10 @@ class IntegratedLegendreDual(dual_set.DualSet):
             if degree <= dim:
                 continue
             ref_facet = symmetric_simplex(dim)
-            Q_ref, Phis = make_dual_bubbles(ref_facet, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
+            Q_ref, phis = make_dual_bubbles(ref_facet, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
             for entity in sorted(top[dim]):
                 cur = len(nodes)
-                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref)
-                # phis must transform like a d-form to undo the measure transformation
-                scale = 1 / Q_facet.jacobian_determinant()
-                phis = scale * Phis
+                Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)
                 nodes.extend(functional.IntegralMoment(ref_el, Q_facet, phi) for phi in phis)
                 entity_ids[dim][entity].extend(range(cur, len(nodes)))
 

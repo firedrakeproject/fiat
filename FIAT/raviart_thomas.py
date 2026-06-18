@@ -79,9 +79,8 @@ class RTDualSet(dual_set.DualSet):
             Pq_at_qpts = Pq.tabulate(Q_ref.get_points())[(0,)*(sd - 1)]
             for f in top[sd - 1]:
                 cur = len(nodes)
-                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref)
-                Jdet = Q.jacobian_determinant()
-                n = ref_el.compute_scaled_normal(f) / Jdet
+                Q = FacetQuadratureRule(ref_el, sd-1, f, Q_ref, avg=True)
+                n = ref_el.compute_scaled_normal(f)
                 phis = n[None, :, None] * Pq_at_qpts[:, None, :]
                 nodes.extend(functional.FrobeniusIntegralMoment(ref_el, Q, phi)
                              for phi in phis)
@@ -149,7 +148,7 @@ class RaviartThomas(finite_element.CiarletElement):
             ref_el = splitting(ref_el)
 
         if ref_el.is_macrocell():
-            base_element = RaviartThomas(ref_el.get_parent(), degree)
+            base_element = type(self)(ref_el.get_parent(), degree)
             poly_set = macro.MacroPolynomialSet(ref_el, base_element)
         else:
             poly_set = RTSpace(ref_el, degree)

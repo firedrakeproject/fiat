@@ -41,7 +41,10 @@ class TensorProductElement(FiniteElementBase):
         if "triple" in keywords:
             self._triple = kwargs.get("triple")
 
-        family = "TensorProductElement"
+        try:
+            family, = {e.family() for e in elements}
+        except ValueError:
+            family = "TensorProductElement"
 
         if cell is None:
             # Define cell as the product of each elements cell

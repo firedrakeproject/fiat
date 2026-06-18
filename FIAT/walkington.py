@@ -1,0 +1,134 @@
+# Copyright (C) 2025 Pablo D. Brubeck
+#
+# This file is part of FIAT (https://www.fenicsproject.org)
+#
+# SPDX-License-Identifier:    LGPL-3.0-or-later
+
+# This is not quite Walkington, but is 65-dofs and includes 20 extra constraint
+# functionals.  The first 45 basis functions are the reference element
+# bfs, but the extra 20 are used in the transformation theory.
+
+from FIAT import finite_element, polynomial_set, macro
+from FIAT.dual_set import DualSet
+from FIAT.expansions import polynomial_dimension
+from FIAT.functional import (
+    PointEvaluation, PointDerivative,
+    IntegralMomentOfDerivative,
+)
+from FIAT.reference_element import TETRAHEDRON
+from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
+from FIAT.quadrature_schemes import create_quadrature
+from FIAT.jacobi import eval_jacobi
+import numpy
+
+
+class WalkingtonDualSet(DualSet):
+    def __init__(self, ref_el, degree):
+        top = ref_el.get_topology()
+        sd = ref_el.get_spatial_dimension()
+        entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        nodes = []
+
+        # Vertex dofs: second order jet
+        for v in sorted(top[0]):
+            cur = len(nodes)
+            x, = ref_el.make_points(0, v, degree)
+            nodes.append(PointEvaluation(ref_el, x))
+
+            # first and second derivatives
+            nodes.extend(PointDerivative(ref_el, x, alpha)
+                         for i in (1, 2) for alpha in polynomial_set.mis(sd, i))
+            entity_ids[0][v].extend(range(cur, len(nodes)))
+
+        # Face dofs: moments or normal derivative
+        ref_face = ref_el.construct_subelement(2)
+        Q_face = create_quadrature(ref_face, degree-1)
+        f_at_qpts = numpy.ones(Q_face.get_weights().shape)
+        for face in sorted(top[2]):
+            cur = len(nodes)
+            Q = FacetQuadratureRule(ref_el, 2, face, Q_face, avg=True)
+            n = ref_el.compute_normal(face)
+            nodes.append(IntegralMomentOfDerivative(ref_el, Q, f_at_qpts, n))
+            entity_ids[2][face].extend(range(cur, len(nodes)))
+
+        # Interior dof: point evaluation at barycenter
+        for entity in top[sd]:
+            cur = len(nodes)
+            x, = ref_el.make_points(sd, entity, sd+1)
+            nodes.append(PointEvaluation(ref_el, x))
+            entity_ids[sd][entity].extend(range(cur, len(nodes)))
+
+        # Constraint dofs
+        # Face-edge constraint: normal derivative along edge is cubic
+        edges = ref_el.get_connectivity()[(2, 1)]
+        ref_edge = ref_el.construct_subelement(1)
+        Q_edge = create_quadrature(ref_edge, 2*(degree-1))
+        x = ref_edge.compute_barycentric_coordinates(Q_edge.get_points())
+        leg4_at_qpts = eval_jacobi(0, 0, 4, x[:, 1] - x[:, 0])
+        # Face constraint: normal derivative is cubic
+        Q_face, phi = face_constraint(ref_face)
+
+        extra_entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
+        extra_nodes = []
+
+        for face in sorted(top[2]):
+            cur = len(nodes)
+            thats = ref_el.compute_tangents(sd-1, face)
+            nface = -numpy.cross(*thats)
+            nface /= numpy.linalg.norm(nface)
+
+            for e in sorted(edges[face]):
+                Q = FacetQuadratureRule(ref_el, 1, e, Q_edge, avg=True)
+                te = ref_el.compute_edge_tangent(e)
+                nfe = numpy.cross(te, nface)
+                nfe /= numpy.linalg.norm(nfe)
+                nodes.append(IntegralMomentOfDerivative(ref_el, Q, leg4_at_qpts, nfe))
+
+            Q = FacetQuadratureRule(ref_el, 2, face, Q_face, avg=True)
+            nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, nface, t) for t in thats)
+            entity_ids[2][face].extend(range(cur, len(nodes)))
+
+            cur = len(extra_nodes)
+            extra_nodes.extend(IntegralMomentOfDerivative(ref_el, Q, phi, thats[i], thats[j])
+                               for i in range(2) for j in range(i, 2))
+            extra_entity_ids[2][face].extend(range(cur, len(extra_nodes)))
+
+        self.nodal_completion = DualSet(extra_nodes, ref_el, extra_entity_ids)
+        super().__init__(nodes, ref_el, entity_ids)
+
+
+class Walkington(finite_element.CiarletElement):
+    """The Walkington C1 macroelement."""
+
+    def __init__(self, ref_el, degree=5):
+        if ref_el.get_shape() != TETRAHEDRON:
+            raise ValueError(f"{type(self).__name__} only defined on tetrahedron")
+        if degree != 5:
+            raise ValueError(f"{type(self).__name__} only defined for degree=5.")
+
+        dual = WalkingtonDualSet(ref_el, degree)
+        ref_complex = macro.AlfeldSplit(ref_el)
+        poly_set = macro.CkPolynomialSet(ref_complex, degree, order=1, vorder=4, variant="bubble")
+        super().__init__(poly_set, dual, degree)
+
+
+def face_constraint(ref_face):
+    k = 3
+    sd = ref_face.get_spatial_dimension()
+    Q = create_quadrature(ref_face, 2*k)
+    dimPkm1 = polynomial_dimension(ref_face, k-1)
+
+    pts = list(Q.get_points()[:3])
+    pts.append(Q.get_points()[-1])
+    P = polynomial_set.ONPolynomialSet(ref_face, k)
+    Pk = P.tabulate(pts)[(0,)*sd][dimPkm1:]
+    c = numpy.linalg.solve(Pk.T, [0, 0, 0, 1])
+    Pk = P.tabulate(Q.get_points())[(0,)*sd][dimPkm1:]
+    phi = numpy.dot(c, Pk)
+
+    supp = abs(phi) > 1E-12
+    pts = Q.get_points()[supp]
+    wts = Q.get_weights()[supp]
+    Q = QuadratureRule(ref_face, pts, wts)
+    phi = phi[supp]
+    return Q, phi

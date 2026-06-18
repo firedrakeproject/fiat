@@ -58,7 +58,7 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
     :kwarg scheme: The quadrature scheme, can be choosen from ["default", "canonical", "KMV"]
         "default" -> hard-coded scheme for low degree and collapsed Gauss scheme for high degree,
         "canonical" -> collapsed Gauss scheme,
-        "KMV" -> spectral lumped scheme for low degree (<=5 on triangles, <=3 on tetrahedra).
+        "KMV" -> spectral lumped scheme for low degree (<=6 on triangles, <=3 on tetrahedra).
     :kwarg entity: A tuple of entity dimension and entity id specifying the
         integration domain. If not provided, the domain is the entire cell.
     """

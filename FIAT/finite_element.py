@@ -15,7 +15,6 @@ import warnings
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import PolynomialSet
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.macro import MacroPolynomialSet
 
 
 class FiniteElement(object):
@@ -94,7 +93,7 @@ class FiniteElement(object):
 
     def space_dimension(self):
         """Return the dimension of the finite element space."""
-        return len(self.dual_basis())
+        return len(self.get_dual_set())
 
     def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to given order of
@@ -134,11 +133,6 @@ class CiarletElement(FiniteElement):
         ref_el = dual.get_reference_element()
         ref_complex = ref_complex or poly_set.get_reference_element()
         super().__init__(ref_el, dual, order, formdegree, mapping, ref_complex)
-
-        # Tile the poly_set
-        if ref_complex.is_macrocell() and len(poly_set) > len(dual):
-            base_element = type(self)(ref_el, order)
-            poly_set = MacroPolynomialSet(ref_complex, base_element)
 
         if len(poly_set) != len(dual):
             raise ValueError(f"Dimension of function space is {len(poly_set)}, but got {len(dual)} nodes.")
