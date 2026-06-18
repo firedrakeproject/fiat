@@ -39,9 +39,10 @@ class HDivElement(FiniteElementBase):
     """A div-conforming version of an outer product element, assuming this makes mathematical sense."""
     __slots__ = ("_element", )
 
-    def __init__(self, element):
+    def __init__(self, element, transform=None):
         """Doc."""
         self._element = element
+        self._transform = transform
 
         family = "TensorProductElement"
         cell = element.cell
@@ -97,9 +98,10 @@ class HCurlElement(FiniteElementBase):
     """A curl-conforming version of an outer product element, assuming this makes mathematical sense."""
     __slots__ = ("_element",)
 
-    def __init__(self, element):
+    def __init__(self, element, transform=None):
         """Doc."""
         self._element = element
+        self._transform = transform
 
         family = "TensorProductElement"
         cell = element.cell

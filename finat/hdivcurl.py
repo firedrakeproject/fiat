@@ -66,7 +66,6 @@ class WrapperElementBase(FiniteElementBase):
             v = gem.partial_indexed(table, beta)
             u = gem.ListTensor(self.transform(v))
             return gem.ComponentTensor(gem.Indexed(u, zeta), beta + zeta)
-
         return {alpha: promote(table)
                 for alpha, table in core_eval.items()}
 
@@ -86,6 +85,7 @@ class WrapperElementBase(FiniteElementBase):
         # Index out the basis indices from wrapee's Q, to get
         # something of wrappee.value_shape, then promote to new shape
         # with the same transform as done for basis evaluation
+        breakpoint()
         Q = gem.ListTensor(self.transform(gem.partial_indexed(Q, beta)))
         # Finally wrap up Q in shape again (now with some extra
         # value_shape indices)
@@ -95,7 +95,7 @@ class WrapperElementBase(FiniteElementBase):
 class HDivElement(WrapperElementBase):
     """H(div) wrapper element for tensor product elements."""
 
-    def __init__(self, wrappee):
+    def __init__(self, wrappee, transform=None):
         assert isinstance(wrappee, TensorProductElement)
         if any(fe.formdegree is None for fe in wrappee.factors):
             raise ValueError("Form degree of subelement is None, cannot H(div)!")
@@ -104,7 +104,8 @@ class HDivElement(WrapperElementBase):
         if formdegree != wrappee.cell.get_spatial_dimension() - 1:
             raise ValueError("H(div) requires (n-1)-form element!")
 
-        transform = select_hdiv_transformer(wrappee)
+        if transform is None:
+            transform = select_hdiv_transformer(wrappee)
         super().__init__(wrappee, transform)
 
     @property
@@ -123,7 +124,7 @@ class HDivElement(WrapperElementBase):
 class HCurlElement(WrapperElementBase):
     """H(curl) wrapper element for tensor product elements."""
 
-    def __init__(self, wrappee):
+    def __init__(self, wrappee, transform=None):
         assert isinstance(wrappee, TensorProductElement)
         if any(fe.formdegree is None for fe in wrappee.factors):
             raise ValueError("Form degree of subelement is None, cannot H(curl)!")
@@ -132,7 +133,8 @@ class HCurlElement(WrapperElementBase):
         if formdegree != 1:
             raise ValueError("H(curl) requires 1-form element!")
 
-        transform = select_hcurl_transformer(wrappee)
+        if transform is None:
+            transform = select_hcurl_transformer(wrappee)
         super().__init__(wrappee, transform)
 
     @property

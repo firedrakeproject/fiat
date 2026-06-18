@@ -8,7 +8,8 @@ from .fiat_elements import (Bernstein, Bubble, BrezziDouglasFortinMarini,       
                             Lagrange, Real, Serendipity,                                     # noqa: F401
                             TrimmedSerendipityCurl, TrimmedSerendipityDiv,                   # noqa: F401
                             TrimmedSerendipityEdge, TrimmedSerendipityFace,                  # noqa: F401
-                            Nedelec, NedelecSecondKind, RaviartThomas, Regge)                # noqa: F401
+                            Nedelec, NedelecSecondKind, RaviartThomas, Regge,                # noqa: F401
+                            FuseElement)                                                     # noqa: F401
 from .spectral import (GaussLobattoLegendre, GaussLegendre, KongMulderVeldhuizen,            # noqa: F401
                        Legendre, IntegratedLegendre,                                         # noqa: F401
                        FDMLagrange, FDMQuadrature, FDMDiscontinuousLagrange,                 # noqa: F401

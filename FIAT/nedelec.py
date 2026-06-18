@@ -22,7 +22,7 @@ def NedelecSpace2D(ref_el, degree):
         raise Exception("NedelecSpace2D requires 2d reference element")
 
     k = degree - 1
-    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, (sd,))
+    vec_Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, (sd,), scale="orthonormal")
 
     dimPkp1 = expansions.polynomial_dimension(ref_el, k + 1)
     dimPk = expansions.polynomial_dimension(ref_el, k)
@@ -32,7 +32,7 @@ def NedelecSpace2D(ref_el, degree):
                                   for i in range(sd))))
     vec_Pk_from_Pkp1 = vec_Pkp1.take(vec_Pk_indices)
 
-    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1)
+    Pkp1 = polynomial_set.ONPolynomialSet(ref_el, k + 1, scale="orthonormal")
     PkH = Pkp1.take(list(range(dimPkm1, dimPk)))
 
     Q = create_quadrature(ref_el, 2 * (k + 1))
