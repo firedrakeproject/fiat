@@ -274,16 +274,14 @@ class FiniteElementBase(AbstractFiniteElement):
             raise ValueError(f"Unsupported mapping: {self.mapping()}")
 
 
-def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...]) -> AbstractCell:
+def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], use_fuse: bool = False) -> AbstractCell:
     import os
-    try:
-        import fuse
-    except ModuleNotFoundError:
-        fuse = None
-    if isinstance(cell, str) and bool(os.getenv("FIREDRAKE_USE_FUSE", 0)):
-        if fuse:
-            return fuse.constructCellComplex(cell)
-        else:
-            raise ModuleNotFoundError("FIREDRAKE_USE_FUSE is active but fuse is not installed")
+    if use_fuse:
+        try:
+            import fuse
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError("Cannot create FUSE cell without FUSE")
+    if isinstance(cell, str) and use_fuse:
+        return fuse.constructCellComplex(cell)
     else:
         return as_cell_ufl(cell)
