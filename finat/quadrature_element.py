@@ -172,7 +172,8 @@ class QuadratureElement(FiniteElementBase):
         # matrices, evaluation points are just the quadrature points.
         Q = gem.Delta(ps.indices, multiindex)
         Q = gem.ComponentTensor(Q, multiindex)
-        return Q, ps
+        zero = (0,) * self.cell.get_spatial_dimension()
+        return {zero: Q}, {zero: ps}
 
     @property
     def mapping(self):
