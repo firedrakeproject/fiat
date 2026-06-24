@@ -186,9 +186,14 @@ def convert_finiteelement(element, **kwargs):
     if make_finat_element is None:
         if element.cell.cellname == "quadrilateral":
             # Handle quadrilateral short names like RTCF and RTCE.
+            quadrilateral_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["use_fuse"]),
+                                                      finat.ufl.as_cell("interval", kwargs["use_fuse"]))
             element = element.reconstruct(cell=quadrilateral_tpc)
         elif element.cell.cellname == "hexahedron":
             # Handle hexahedron short names like NCF and NCE.
+            hexahedron_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["use_fuse"]),
+                                                   finat.ufl.as_cell("interval", kwargs["use_fuse"]),
+                                                   finat.ufl.as_cell("interval", kwargs["use_fuse"]))
             element = element.reconstruct(cell=hexahedron_tpc)
         else:
             raise ValueError("%s is supported, but handled incorrectly" %
@@ -343,13 +348,10 @@ def convert_fuse_element(element, **kwargs):
         return finat.FlattenedDimensions(finat_elem), deps
     return finat.fiat_elements.FuseElement(element.triple), set()
 
-
-hexahedron_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval"), finat.ufl.as_cell("interval"), finat.ufl.as_cell("interval"))
-quadrilateral_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval"), finat.ufl.as_cell("interval"))
 _cache = weakref.WeakKeyDictionary()
 
 
-def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None):
+def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None, use_fuse=False):
     """Create a FInAT element (suitable for tabulating with) given a UFL element.
 
     :arg ufl_element: The UFL element to create a FInAT element from.
@@ -360,7 +362,8 @@ def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=
     finat_element, deps = _create_element(ufl_element,
                                           shape_innermost=shape_innermost,
                                           shift_axes=shift_axes,
-                                          restriction=restriction)
+                                          restriction=restriction,
+                                          use_fuse=use_fuse)
     return finat_element
 
 

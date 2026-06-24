@@ -275,13 +275,11 @@ class FiniteElementBase(AbstractFiniteElement):
 
 
 def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], use_fuse: bool = False) -> AbstractCell:
-    import os
-    if use_fuse:
+    if isinstance(cell, str) and use_fuse:
         try:
             import fuse
         except ModuleNotFoundError:
             raise ModuleNotFoundError("Cannot create FUSE cell without FUSE")
-    if isinstance(cell, str) and use_fuse:
         return fuse.constructCellComplex(cell)
     else:
         return as_cell_ufl(cell)
