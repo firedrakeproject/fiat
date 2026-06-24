@@ -20,4 +20,6 @@ def test_create_from_quadrature(cell):
 
     Q1, ps1 = fe1.dual_basis
     Q2, ps2 = fe2.dual_basis
-    assert ps1.almost_equal(ps2)
+    assert Q1.keys() == Q2.keys() == ps1.keys() == ps2.keys()
+    alpha, = ps1
+    assert ps1[alpha].almost_equal(ps2[alpha])

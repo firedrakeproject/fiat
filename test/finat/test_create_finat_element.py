@@ -100,11 +100,12 @@ def test_quad_scheme(cell, family, degree, quad_scheme):
     ufl_element = finat.ufl.FiniteElement(family, cell, degree, variant="integral", quad_scheme=quad_scheme)
     fe = create_element(ufl_element)
     Q, ps = fe.dual_basis
+    zero = (0,) * fe.cell.get_spatial_dimension()
     assert fe.space_dimension() == fe.cell.get_spatial_dimension() + 1
     if quad_scheme in {'KMV(1)', 'default'}:
-        assert len(ps.points) == fe.space_dimension()
+        assert len(ps[zero].points) == fe.space_dimension()
     else:
-        assert len(ps.points) > fe.space_dimension()
+        assert len(ps[zero].points) > fe.space_dimension()
 
 
 def test_triangle_variant_spectral():

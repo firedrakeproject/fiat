@@ -12,7 +12,8 @@ def test_collapse_repeated_points(dim):
     cell = ufc_simplex(dim)
     CR = finat.CrouzeixRaviart(cell, 1, variant="integral", quad_scheme="powell-sabin,KMV(2)")
     Q, ps = CR.dual_basis
-    points = ps.points
+    zero = (0,) * dim
+    points = ps[zero].points
 
     expected = 74 if dim == 3 else 12
     assert len(points) == len(numpy.unique(numpy.round(points, decimals=7), axis=0))
@@ -23,7 +24,7 @@ def test_collapse_repeated_points(dim):
     F = finat.RestrictedElement(CG, "ridge")
     fe = finat.NodalEnrichedElement([F, CR])
     Q, ps = fe.dual_basis
-    points = ps.points
+    points = ps[zero].points
 
     assert len(points) == len(numpy.unique(numpy.round(points, decimals=7), axis=0))
     assert len(points) == expected
@@ -43,4 +44,6 @@ def test_collapse_repeated_points(dim):
 def test_dual_basis_derivative_multiindices(element, dim, order, expected):
     cell = ufc_simplex(dim)
     fe = element(cell, order)
-    assert fe._dual_basis_derivative_multiindices == expected
+    Q, x = fe.dual_basis
+    assert tuple(Q) == expected
+    assert Q.keys() == x.keys()
