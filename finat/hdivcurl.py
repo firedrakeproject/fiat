@@ -80,16 +80,19 @@ class WrapperElementBase(FiniteElementBase):
 
     @property
     def dual_basis(self):
-        Q, x = self.wrappee.dual_basis
+        Qs, xs = self.wrappee.dual_basis
         beta = self.get_indices()
         zeta = self.get_value_indices()
-        # Index out the basis indices from wrapee's Q, to get
-        # something of wrappee.value_shape, then promote to new shape
-        # with the same transform as done for basis evaluation
-        Q = gem.ListTensor(self.transform(gem.partial_indexed(Q, beta)))
-        # Finally wrap up Q in shape again (now with some extra
-        # value_shape indices)
-        return gem.ComponentTensor(Q[zeta], beta + zeta), x
+        result = {}
+        for alpha, Q in Qs.items():
+            # Index out the basis indices from wrapee's Q, to get
+            # something of wrappee.value_shape, then promote to new shape
+            # with the same transform as done for basis evaluation.
+            Q = gem.ListTensor(self.transform(gem.partial_indexed(Q, beta)))
+            # Finally wrap up Q in shape again (now with some extra
+            # value_shape indices).
+            result[alpha] = gem.ComponentTensor(Q[zeta], beta + zeta)
+        return result, xs
 
 
 class HDivElement(WrapperElementBase):
