@@ -272,8 +272,17 @@ class FiatElement(FiniteElementBase):
             Qdense = np.zeros(Qshape, dtype=np.float64)
             for idx, value in Q.items():
                 Qdense[idx] = value
-            Q = gem.Literal(Qdense)
-        return Q, np.asarray(allpts)
+            if has_derivatives:
+                Q = {
+                    alpha: gem.Literal(Qdense[:, :, alpha_indices[alpha], ...])
+                    for alpha in derivative_multiindices
+                }
+            else:
+                Q = gem.Literal(Qdense)
+        if not has_derivatives:
+            Q = {zero: Q}
+        points = np.asarray(allpts)
+        return Q, {alpha: points for alpha in Q}
 
     @property
     def dual_basis(self):
@@ -282,13 +291,19 @@ class FiatElement(FiniteElementBase):
         # expensive numerical extraction is done once per element
         # instance, but the point set must be created every time we
         # build the dual.
-        Q, pts = self._dual_basis
-        x = PointSet(pts)
-        assert len(x.indices) == 1
-        assert Q.shape[1] == x.indices[0].extent
-        i, *js = gem.indices(len(Q.shape) - 1)
-        Q = gem.ComponentTensor(gem.Indexed(Q, (i, *x.indices, *js)), (i, *js))
-        return Q, x
+        Qs, point_sets = self._dual_basis
+        result_Qs = {}
+        xs = {}
+        for alpha, Q in Qs.items():
+            x = PointSet(point_sets[alpha])
+            assert len(x.indices) == 1
+            assert Q.shape[1] == x.indices[0].extent
+            i, *js = gem.indices(len(Q.shape) - 1)
+            result_Qs[alpha] = gem.ComponentTensor(
+                gem.Indexed(Q, (i, *x.indices, *js)), (i, *js)
+            )
+            xs[alpha] = x
+        return result_Qs, xs
 
     @property
     def mapping(self):

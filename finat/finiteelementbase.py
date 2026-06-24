@@ -180,17 +180,13 @@ class FiniteElementBase(metaclass=ABCMeta):
            provides physical geometry callbacks (may be None).
         '''
 
-    @cached_property
-    def _dual_basis_derivative_multiindices(self) -> tuple:
-        return ((0,) * self.cell.get_spatial_dimension(),)
-
     @property
     def dual_basis(self):
-        '''Return a dual evaluation gem weight tensor Q and point set x to dual
-        evaluate a function fn at.
+        '''Return dictionaries of dual weights and points keyed by derivative.
 
-        The general dual evaluation is then Q * fn(x) (the contraction of Q
-        with fn(x) along the the indices of x and any shape introduced by fn).
+        For each derivative multiindex ``alpha``, ``Q[alpha]`` is contracted
+        with the derivative of the function evaluated at ``x[alpha]``.  The
+        complete dual evaluation is the sum of these partial contractions.
 
         If the dual weights are scalar then Q, for a general scalar FIAT
         element, is a matrix with dimensions
@@ -235,12 +231,6 @@ class FiniteElementBase(metaclass=ABCMeta):
             labelling confusion when performing the dual evaluation
             contraction.
 
-        .. note::
-
-            FIAT element dual bases are built from their ``Functional.pt_dict``
-            properties. Therefore any FIAT dual bases with derivative nodes
-            represented via a ``Functional.deriv_dict`` property does not
-            currently have a FInAT dual basis.
         '''
         raise NotImplementedError(
             f"Dual basis not defined for element {type(self).__name__}"
@@ -266,35 +256,41 @@ class FiniteElementBase(metaclass=ABCMeta):
                   ``dual_evaluation_gem_expression`` (alongside any argument
                   multiindices already encoded within ``fn``)
         '''
-        Q, x = self.dual_basis
-        Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
+        Qs, xs = self.dual_basis
+        if Qs.keys() != xs.keys():
+            raise ValueError("Dual weights and points have different derivative keys")
 
-        alphas = self._dual_basis_derivative_multiindices
-        if len(alphas) == 1:
-            # No derivatives in the dual basis
-            expr = fn(x)
-        else:
-            expr = gem.ListTensor([
-                fn(x) if sum(alpha) == 0 else fn(x, alpha) for alpha in alphas
-            ])
-        # Apply targeted sum factorisation and delta elimination to
-        # the expression
-        sum_indices, factors = delta_elimination(*traverse_product(expr))
-        expr = sum_factorise(sum_indices, factors)
-        # NOTE: any shape indices in the expression are because the
-        # expression is tensor valued.
-        assert expr.shape == Q.shape[len(Q.shape)-len(expr.shape):]
-        shape_indices = gem.indices(len(expr.shape))
-        basis_indices = gem.indices(len(Q.shape) - len(expr.shape))
-        Qi = Q[basis_indices + shape_indices]
-        expri = expr[shape_indices]
-        evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
-        # Now we want to factorise over the new contraction with x,
-        # ignoring any shape indices to avoid hitting the sum-
-        # factorisation index limit (this is a bit of a hack).
-        # Really need to do a more targeted job here.
-        evaluation = gem.optimise.contraction(evaluation, shape_indices)
-        return evaluation, basis_indices
+        evaluations = []
+        basis_indices = None
+        for alpha, Q in Qs.items():
+            Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
+            x = xs[alpha]
+            expr = fn(x) if sum(alpha) == 0 else fn(x, alpha)
+            sum_indices, factors = delta_elimination(*traverse_product(expr))
+            expr = sum_factorise(sum_indices, factors)
+            assert expr.shape == Q.shape[len(Q.shape)-len(expr.shape):]
+            shape_indices = gem.indices(len(expr.shape))
+            block_basis_indices = gem.indices(len(Q.shape) - len(expr.shape))
+            Qi = Q[block_basis_indices + shape_indices]
+            expri = expr[shape_indices]
+            evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
+            evaluation = gem.optimise.contraction(evaluation, shape_indices)
+
+            if basis_indices is None:
+                basis_indices = block_basis_indices
+            else:
+                assert tuple(i.extent for i in block_basis_indices) == tuple(
+                    i.extent for i in basis_indices
+                )
+                evaluation = gem.Indexed(
+                    gem.ComponentTensor(evaluation, block_basis_indices),
+                    basis_indices,
+                )
+            evaluations.append(evaluation)
+
+        if not evaluations:
+            raise ValueError("Dual basis contains no evaluation blocks")
+        return gem.Sum(*evaluations), basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):
         """Transforms reference dual evaluation into physical dual evaluation.
@@ -318,12 +314,15 @@ class FiniteElementBase(metaclass=ABCMeta):
         '''Whether this element's dual basis consists only of point
         evaluation functionals.'''
         try:
-            Q, ps = self.dual_basis
+            Qs, _ = self.dual_basis
         except NotImplementedError:
+            return False
+        zero = (0,) * self.cell.get_spatial_dimension()
+        if Qs.keys() != {zero}:
             return False
         # Check whether the weight matrix is a product of identity matrices
         # A pointwise dual basis has gem.Delta as the only terminal node
-        children = [Q]
+        children = [Qs[zero]]
         while children:
             nodes = []
             for c in children:
