@@ -242,7 +242,7 @@ def restrict_tpe(element, domain, take_closure):
         if all(f is not null_element for f in new_factors):
             elements.append(finat.TensorProductElement(new_factors))
     if elements:
-        return finat.EnrichedElement(elements)
+        return finat.EnrichedElement(elements, is_nodal_enriched=True)
     else:
         return null_element
 
