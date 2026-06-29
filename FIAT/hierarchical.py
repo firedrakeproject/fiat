@@ -62,7 +62,7 @@ class Legendre(finite_element.CiarletElement):
     def __new__(cls, ref_el, degree, variant=None):
         if degree == 0:
             splitting, variant, interpolant_deg = check_format_variant(variant, degree)
-            if splitting is None and interpolant_deg == 0:
+            if splitting is None and not ref_el.is_macrocell() and interpolant_deg == 0:
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
                 return P0(ref_el)
         return super().__new__(cls)

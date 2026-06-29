@@ -92,7 +92,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     dX = pad_jacobian(Jinv, pad_dim)
 
     phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
-    results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
+    results = [numpy.zeros((num_members,) + (len(dX[0]),)*k + phi0.shape[1:], dtype=phi0.dtype)
                for k in range(order+1)]
 
     phi, dphi, ddphi = results + [None] * (2-order)
@@ -283,7 +283,7 @@ class ExpansionSet(object):
         base_ref_el = reference_element.default_simplex(sd)
         base_verts = base_ref_el.get_vertices()
 
-        self.affine_mappings = [reference_element.make_affine_mapping(
+        self.affine_mappings = [get_affine_mapping(
                                 ref_el.get_vertices_of_subcomplex(top[sd][cell]),
                                 base_verts) for cell in top[sd]]
         if scale is None:
@@ -343,6 +343,9 @@ class ExpansionSet(object):
 
         # Pack linearly independent components into a dictionary
         result = {(0,) * sd: numpy.asarray(phi[0])}
+        if sd == 0:
+            return result
+
         for r in range(1, len(phi)):
             vr = numpy.transpose(phi[r], tuple(range(1, r+1)) + (0, r+1))
             for indices in numpy.ndindex(vr.shape[:r]):
@@ -376,6 +379,9 @@ class ExpansionSet(object):
         if not self.ref_el.is_macrocell():
             return phis[0]
 
+        if self.ref_el.is_trace():
+            phis = trace_tabulation(self.ref_el, cell_point_map, order, pts, phis)
+
         if pts.dtype == object:
             # If binning is undefined, scale by the characteristic function of each subcell
             Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique)
@@ -384,13 +390,14 @@ class ExpansionSet(object):
                     phi[alpha] *= Xi[cell]
         elif not unique:
             # If binning is not unique, divide by the multiplicity of each point
-            mult = numpy.zeros(pts.shape[:-1])
+            mult = numpy.zeros(pts.shape[:-1], dtype=int)
             for cell, ipts in cell_point_map.items():
                 mult[ipts] += 1
-            for cell, ipts in cell_point_map.items():
-                phi = phis[cell]
-                for alpha in phi:
-                    phi[alpha] /= mult[None, ipts]
+            if (mult != 1).any():
+                for cell, ipts in cell_point_map.items():
+                    phi = phis[cell]
+                    for alpha in phi:
+                        phi[alpha] /= mult[None, ipts]
 
         # Insert subcell tabulations into the corresponding submatrices
         idx = lambda *args: args if args[-1] is Ellipsis else numpy.ix_(*args)
@@ -399,6 +406,9 @@ class ExpansionSet(object):
         result = {}
         base_phi = tuple(phis.values())[0]
         for alpha in base_phi:
+            if isinstance(base_phi[alpha], Exception):
+                result[alpha] = base_phi[alpha]
+                continue
             dtype = base_phi[alpha].dtype
             result[alpha] = numpy.zeros((num_phis, *pts.shape[:-1]), dtype=dtype)
             for cell in cell_point_map:
@@ -519,8 +529,7 @@ class ExpansionSet(object):
     def tabulate(self, n, pts):
         if len(pts) == 0:
             return numpy.array([])
-        sd = self.ref_el.get_spatial_dimension()
-        return self._tabulate(n, pts)[(0,) * sd]
+        return tuple(self._tabulate(n, pts).values())[0]
 
     def tabulate_derivatives(self, n, pts):
         from FIAT.polynomial_set import mis
@@ -563,6 +572,9 @@ class PointExpansionSet(ExpansionSet):
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a dict of tabulations such that
         tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
+        if self.ref_el.is_macrocell():
+            return super()._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
+
         assert n == 0 and order == 0
         return {(): numpy.ones((1, len(pts)))}
 
@@ -613,13 +625,32 @@ class TetrahedronExpansionSet(ExpansionSet):
         super().__init__(ref_el, **kwargs)
 
 
+def get_affine_mapping(xs, ys):
+    """Constructs (A,b) such that x --> A * x + b is the affine
+    mapping from the simplex defined by xs to the simplex defined by ys.
+    Uses least-squares when the simplex dimension does not match the spatial
+    dimension.
+    """
+    X = numpy.asarray(xs)
+    Y = numpy.asarray(ys)
+    DX = X[1:] - X[:1]
+    DY = Y[1:] - Y[:1]
+    if DX.shape[0] == DX.shape[1]:
+        AT = numpy.linalg.solve(DX, DY)
+    else:
+        AT, *_ = numpy.linalg.lstsq(DX, DY)
+    b = Y[0] - numpy.dot(X[0], AT)
+    return AT.T, b
+
+
 def polynomial_dimension(ref_el, n, continuity=None):
     """Returns the dimension of the space of polynomials of degree no
     greater than n on the reference complex."""
-    if ref_el.get_shape() == reference_element.POINT:
+    if ref_el.shape == reference_element.POINT:
         if n > 0:
             raise ValueError("Only degree zero polynomials supported on point elements.")
-        return 1
+        # Ignore continuity on a vertex-only complex
+        continuity = None
     top = ref_el.get_topology()
 
     if isinstance(continuity, dict):
@@ -706,7 +737,10 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
         return {cell: Ellipsis for cell in sorted(top[sd])}
 
     # The distance to the nearest cell is equal to the distance to the parent cell
-    best = ref_el.get_parent().distance_to_point_l1(pts, rescale=True)
+    parent = ref_el
+    while parent.get_parent() is not None:
+        parent = parent.get_parent()
+    best = parent.distance_to_point_l1(pts, rescale=True)
     tol = best + tol
 
     cell_point_map = {}
@@ -766,3 +800,29 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
         mult = sum(masks)
         masks = [m / mult for m in masks]
     return masks
+
+
+def trace_tabulation(ref_el, cell_point_map, order, pts, phis):
+    """Lift trace tabulations into the cells and raise TraceError on invalid tabulations."""
+    from FIAT.polynomial_set import mis
+    from FIAT.hdiv_trace import TraceError
+    parent = ref_el.get_parent()
+    tdim = ref_el.get_spatial_dimension()
+    gdim = parent.get_spatial_dimension()
+    for cell in phis:
+        # Lift facet keys to cell keys
+        phi = phis[cell][(0,) * tdim]
+        # Raise TraceError on gradient tabulations
+        msg = "Gradients on trace elements are not well-defined."
+        phis[cell] = {alpha: phi if sum(alpha) == 0 else TraceError(msg)
+                      for i in range(order+1)
+                      for alpha in mis(gdim, i)}
+
+    if sum(len(cell_point_map[cell]) for cell in cell_point_map) < len(pts):
+        # Raise TraceError when interior points fail to be binned on facets
+        for cell in parent.topology[gdim]:
+            msg = "The HDivTrace element can only be tabulated on facets."
+            phis[cell] = {alpha: TraceError(msg)
+                          for i in range(order+1)
+                          for alpha in mis(gdim, i)}
+    return phis
