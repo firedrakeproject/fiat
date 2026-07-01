@@ -344,6 +344,10 @@ def convert_restrictedelement(element, **kwargs):
 def convert_fuse_element(element, **kwargs):
     if element.triple.flat:
         new_elem = element.triple.unflatten()
+        if hasattr(new_elem, "base_element"):
+            # If element is wrapped, exclude the wrapping from this creation
+            # it is handled elsewhere in the converter.
+            new_elem = new_elem.base_element
         finat_elem, deps = _create_element(new_elem.to_ufl(), **kwargs)
         return finat.FlattenedDimensions(finat_elem), deps
     return finat.fiat_elements.FuseElement(element.triple), set()
