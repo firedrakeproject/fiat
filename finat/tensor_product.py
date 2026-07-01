@@ -168,19 +168,25 @@ class TensorProductElement(FiniteElementBase):
 
     @property
     def dual_basis(self):
-        # Outer product the dual bases of the factors
-        qs, pss = zip(*(factor.dual_basis for factor in self.factors))
-        ps = TensorPointSet(pss)
-        # Naming as _merge_evaluations above
-        alphas = [factor.get_indices() for factor in self.factors]
-        zetas = [factor.get_value_indices() for factor in self.factors]
-        Q = gem.ComponentTensor(
-            # Index the factors by basis function and component so that we can reshape
-            # into index-shape followed by value-shape
-            gem.Product(*(q[alpha + zeta] for q, alpha, zeta in zip(qs, alphas, zetas))),
-            tuple(chain(*alphas, *zetas))
-        )
-        return Q, ps
+        # Outer product matching derivative blocks of the factor dual bases.
+        Qdicts, psdicts = zip(*(factor.dual_basis for factor in self.factors))
+        basis_indices = [factor.get_indices() for factor in self.factors]
+        value_indices = [factor.get_value_indices() for factor in self.factors]
+        Qs = {}
+        pss = {}
+        for factor_alphas in product(*(Qdict.keys() for Qdict in Qdicts)):
+            alpha = tuple(chain.from_iterable(factor_alphas))
+            qs = [Qdict[a] for Qdict, a in zip(Qdicts, factor_alphas)]
+            points = [psdict[a] for psdict, a in zip(psdicts, factor_alphas)]
+            Qs[alpha] = gem.ComponentTensor(
+                # Index the factors by basis function and component so that
+                # we can reshape into index-shape followed by value-shape.
+                gem.Product(*(q[beta + zeta] for q, beta, zeta
+                              in zip(qs, basis_indices, value_indices))),
+                tuple(chain(*basis_indices, *value_indices))
+            )
+            pss[alpha] = TensorPointSet(points)
+        return Qs, pss
 
     @cached_property
     def mapping(self):

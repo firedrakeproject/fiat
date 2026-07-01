@@ -151,7 +151,7 @@ class TensorFiniteElement(FiniteElementBase):
     @property
     def dual_basis(self):
         base = self.base_element
-        Q, points = base.dual_basis
+        Qs, points = base.dual_basis
 
         # Suppose the tensor element has shape (2, 4)
         # These identity matrices may have difference sizes depending the shapes
@@ -167,23 +167,13 @@ class TensorFiniteElement(FiniteElementBase):
         else:
             index_ordering = scalar_i + tensor_i + tensor_vi + scalar_vi
 
-        Qi = Q[scalar_i + scalar_vi]
-        tQ = gem.ComponentTensor(Qi*deltas, index_ordering)
-        return tQ, points
+        tQs = {}
+        for alpha, Q in Qs.items():
+            Qi = Q[scalar_i + scalar_vi]
+            tQs[alpha] = gem.ComponentTensor(Qi*deltas, index_ordering)
+        return tQs, points
 
     def dual_evaluation(self, fn, coordinate_mapping=None):
-        tQ, x = self.dual_basis
-        tQ = self._base_element.dual_transformation(tQ, coordinate_mapping)
-
-        expr = fn(x)
-        # Apply targeted sum factorisation and delta elimination to
-        # the expression
-        sum_indices, factors = delta_elimination(*traverse_product(expr))
-        expr = sum_factorise(sum_indices, factors)
-        # NOTE: any shape indices in the expression are because the
-        # expression is tensor valued.
-        assert expr.shape == self.value_shape
-
         scalar_i = self.base_element.get_indices()
         scalar_vi = self.base_element.get_value_indices()
         tensor_i = tuple(gem.Index(extent=d) for d in self._shape)
@@ -194,14 +184,28 @@ class TensorFiniteElement(FiniteElementBase):
         else:
             index_ordering = scalar_i + tensor_i + tensor_vi + scalar_vi
 
-        tQi = tQ[index_ordering]
-        expri = expr[tensor_i + scalar_vi]
-        evaluation = gem.IndexSum(tQi * expri, x.indices + scalar_vi + tensor_i)
-        # This doesn't work perfectly, the resulting code doesn't have
-        # a minimal memory footprint, although the operation count
-        # does appear to be minimal.
-        evaluation = gem.optimise.contraction(evaluation)
-        return evaluation, scalar_i + tensor_vi
+        tQs, xs = self.dual_basis
+        evaluations = []
+        for alpha, tQ in tQs.items():
+            tQ = self._base_element.dual_transformation(tQ, coordinate_mapping)
+            x = xs[alpha]
+            expr = fn(x) if sum(alpha) == 0 else fn(x, alpha)
+            # Apply targeted sum factorisation and delta elimination to
+            # the expression.
+            sum_indices, factors = delta_elimination(*traverse_product(expr))
+            expr = sum_factorise(sum_indices, factors)
+            assert expr.shape == self.value_shape
+
+            tQi = tQ[index_ordering]
+            expri = expr[tensor_i + scalar_vi]
+            evaluation = gem.IndexSum(
+                tQi * expri, x.indices + scalar_vi + tensor_i
+            )
+            # This doesn't work perfectly, the resulting code doesn't have
+            # a minimal memory footprint, although the operation count
+            # does appear to be minimal.
+            evaluations.append(gem.optimise.contraction(evaluation))
+        return gem.Sum(*evaluations), scalar_i + tensor_vi
 
     @property
     def mapping(self):
