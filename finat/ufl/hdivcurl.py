@@ -69,7 +69,7 @@ class HDivElement(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
-        return HDivElement(self._element.reconstruct(**kwargs))
+        return HDivElement(self._element.reconstruct(**kwargs), transform=self._transform)
 
     def variant(self):
         """Doc."""
@@ -129,7 +129,7 @@ class HCurlElement(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
-        return HCurlElement(self._element.reconstruct(**kwargs))
+        return HCurlElement(self._element.reconstruct(**kwargs), transform=self._transform)
 
     def variant(self):
         """Doc."""
