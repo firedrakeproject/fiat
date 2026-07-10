@@ -62,6 +62,55 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
+def _product_derivative_term(factor: object,
+                             operand: numpy.ndarray,
+                             factor_axes: tuple[int, ...],
+                             rank: int) -> numpy.ndarray:
+    """Return one Leibniz term in an ordered derivative tensor."""
+    factor = numpy.asarray(factor)
+    factor_rank = len(factor_axes)
+    operand_rank = rank - factor_rank
+    factor_index = (slice(None),) * factor_rank + (None,) * operand_rank + (Ellipsis,)
+    operand_index = (None,) * factor_rank + (Ellipsis,)
+    product = factor[factor_index] * operand[operand_index]
+
+    if rank:
+        dim = factor.shape[0] if operand_rank == 0 else operand.shape[0]
+        factor_source = {axis: source for source, axis in enumerate(factor_axes)}
+        operand_axes = tuple(axis for axis in range(rank) if axis not in factor_axes)
+        operand_source = {axis: factor_rank + source
+                          for source, axis in enumerate(operand_axes)}
+        permutation = tuple((factor_source | operand_source)[axis]
+                            for axis in range(rank))
+        product = product.transpose(permutation + tuple(range(rank, product.ndim)))
+        product = product.reshape((dim,) * rank + operand.shape[operand_rank:])
+
+    return product
+
+
+def _product_derivative(factor: object,
+                        dfactor: object | None,
+                        ddfactor: object | None,
+                        operands: list[numpy.ndarray],
+                        rank: int) -> numpy.ndarray:
+    """Differentiate a recurrence factor times a basis derivative tensor."""
+    # The Dubiner recurrence factors are linear or quadratic, so higher
+    # factor derivatives vanish and the Leibniz sum stops at order two.
+    result = _product_derivative_term(factor, operands[rank], (), rank)
+
+    if dfactor is not None and rank >= 1:
+        for axis in range(rank):
+            result += _product_derivative_term(dfactor, operands[rank-1], (axis,), rank)
+
+    if ddfactor is not None and rank >= 2:
+        for axis0 in range(rank):
+            for axis1 in range(axis0 + 1, rank):
+                result += _product_derivative_term(ddfactor, operands[rank-2],
+                                                   (axis0, axis1), rank)
+
+    return result
+
+
 def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     """Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).
 
@@ -77,8 +126,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     :returns: A tuple with tabulations of the expansion set and its derivatives.
     """
-    if order > 2:
-        raise ValueError("Higher order derivatives not supported")
     if variant not in [None, "bubble", "dual"]:
         raise ValueError(f"Invalid variant {variant}")
     if variant == "bubble":
@@ -95,7 +142,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
                for k in range(order+1)]
 
-    phi, dphi, ddphi = results + [None] * (2-order)
+    phi = results[0]
     phi[0] = scale
     if dim == 0 or n == 0:
         return results
@@ -127,14 +174,12 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
             fcur = a * fa - b * fb
             phi[inext] = fcur * phi[icur]
-            if dphi is not None:
+            if order:
                 dfcur = a * dfa - b * dfb
-                dphi[inext] = phi[icur] * dfcur
-                dphi[inext] += fcur * dphi[icur]
-                if ddphi is not None:
-                    ddphi[inext] = outer(dphi[icur], dfcur)
-                    ddphi[inext] += outer(dfcur, dphi[icur])
-                    ddphi[inext] += fcur * ddphi[icur]
+                cur = [result[icur] for result in results]
+                for rank in range(1, order+1):
+                    results[rank][inext] = _product_derivative(fcur, dfcur, None,
+                                                               cur, rank)
 
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
@@ -145,26 +190,17 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
                 fprev = -c * fc
                 phi[inext] = fcur * phi[icur]
                 phi[inext] += fprev * phi[iprev]
-                if dphi is None:
-                    continue
 
                 dfcur = a * dfa - b * dfb
                 dfprev = -c * dfc
-                dphi[inext] = phi[icur] * dfcur
-                dphi[inext] += phi[iprev] * dfprev
-                dphi[inext] += fcur * dphi[icur]
-                dphi[inext] += fprev * dphi[iprev]
-                if ddphi is None:
-                    continue
-
                 ddfprev = -c * ddfc
-                ddphi[inext] = phi[iprev] * ddfprev
-                ddphi[inext] += outer(dphi[icur], dfcur)
-                ddphi[inext] += outer(dfcur, dphi[icur])
-                ddphi[inext] += outer(dphi[iprev], dfprev)
-                ddphi[inext] += outer(dfprev, dphi[iprev])
-                ddphi[inext] += fcur * ddphi[icur]
-                ddphi[inext] += fprev * ddphi[iprev]
+                cur = [result[icur] for result in results]
+                prev = [result[iprev] for result in results]
+                for rank in range(1, order+1):
+                    results[rank][inext] = _product_derivative(fcur, dfcur, None,
+                                                               cur, rank)
+                    results[rank][inext] += _product_derivative(fprev, dfprev, ddfprev,
+                                                                prev, rank)
 
         # normalize
         d = codim + 1
@@ -291,7 +327,7 @@ class ExpansionSet(object):
         self.scale = scale
         self.variant = variant
         self.continuity = "C0" if variant == "bubble" else None
-        self.recurrence_order = 2
+        self.recurrence_order = math.inf
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
 
@@ -353,7 +389,7 @@ class ExpansionSet(object):
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))
 
-        # Only use dmats if tabulate failed
+        # Use dmats only for derivatives above the configured recurrence order.
         for i in range(len(phi), order + 1):
             dmats = self.get_dmats(n, cell=cell)
             for alpha in mis(sd, i):
