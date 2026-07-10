@@ -343,6 +343,9 @@ class ExpansionSet(object):
 
         # Pack linearly independent components into a dictionary
         result = {(0,) * sd: numpy.asarray(phi[0])}
+        if sd == 0:
+            return result
+
         for r in range(1, len(phi)):
             vr = numpy.transpose(phi[r], tuple(range(1, r+1)) + (0, r+1))
             for indices in numpy.ndindex(vr.shape[:r]):
@@ -569,6 +572,9 @@ class PointExpansionSet(ExpansionSet):
     def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Returns a dict of tabulations such that
         tabulations[alpha][i, j] = D^alpha phi_i(pts[j])."""
+        if self.ref_el.is_macrocell():
+            return super()._tabulate_on_cell(n, pts, order=order, cell=cell, direction=direction)
+
         assert n == 0 and order == 0
         return {(): numpy.ones((1, len(pts)))}
 
