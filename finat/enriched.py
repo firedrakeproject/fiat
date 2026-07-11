@@ -8,7 +8,7 @@ import numpy
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.hdivcurl import HCurlElement, HDivElement
+from finat.hdivcurl import HCurlElement, HDivElement, HDivTraceElement
 
 
 class EnrichedElement(FiniteElementBase):
@@ -247,4 +247,11 @@ def is_orthogonal(A, B):
         Amap = A.transform(gem.Literal(numpy.ones(A.wrappee.value_shape)))
         Bmap = B.transform(gem.Literal(numpy.ones(B.wrappee.value_shape)))
         return sum(a * b for a, b in zip(Amap, Bmap)) == gem.Literal(0.0)
+    elif isinstance(A, HDivTraceElement) and isinstance(B, HDivTraceElement):
+        A_ids = A.entity_dofs()
+        B_ids = B.entity_dofs()
+        A_support = set((dim, entity) for dim in A_ids for entity in A_ids[dim] if A_ids[dim][entity])
+        B_support = set((dim, entity) for dim in A_ids for entity in B_ids[dim] if B_ids[dim][entity])
+        return (len(A_support & B_support) == 0)
+
     return False
