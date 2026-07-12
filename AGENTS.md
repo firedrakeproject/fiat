@@ -52,6 +52,38 @@ Agents modifying FIAT code must follow these fundamental development principles:
 
 ---
 
+## Pattern Matching and Mathematical Reasoning
+
+When designing or debugging FIAT, FInAT, and GEM changes, use the existing codebase as a library of
+mathematical patterns rather than starting from ad hoc special cases:
+
+* Match new element constructions against the nearest existing family with the same structural
+  decomposition. Tensor-product, restricted, physically mapped, and enriched elements usually share
+  a factorization pattern that should be reused explicitly.
+* When a feature seems to require a special case, test whether the same mathematics already appears in
+  another element family or mapping path. The right answer is often a more general basis
+  transformation, not a new branch.
+* Separate reference-space reasoning from physical-space reasoning. In FIAT and FInAT, derive basis
+  transformations from the element map and continuity requirements first, then encode that structure
+  in GEM expressions.
+* Treat tensor-product spaces as tensor-product mathematics. Look for Kronecker-style factorization
+  in basis matrices, coordinate mappings, and dual evaluations before introducing custom assembly
+  logic.
+* For extruded or vertically constant factors, identify the dimension that is geometrically active
+  and the dimension that is algebraically passive. The passive factor should usually contribute a
+  simple constant, identity, or lower-dimensional pullback rather than a new geometric rule.
+* Debug by matching the failing object against a known neighboring case: compare the cell, element
+  family, mapping type, continuity class, and tensor structure before changing code.
+* In GEM, inspect whether an expression should factor, broadcast, or propagate a coordinate mapping.
+  If the expression is not matching the expected shape, the bug is often in the way indices or
+  subexpressions are assembled, not in the downstream optimizer.
+* Use the mathematical continuity target as a design constraint. For finite elements, ask what
+  inter-element continuity the space must satisfy, then derive the local basis and transformation
+  rules from that requirement.
+* Prefer proofs by structure over proofs by example. A construction is correct when the pullback,
+  restriction, and tensor-product algebra agree with the element's continuity and approximation
+  properties, not when one or two test cases happen to pass.
+
 ## Style and Conventions
 
 When writing Python code for FIAT, maintain the ecosystem's structural and stylistic integrity:
