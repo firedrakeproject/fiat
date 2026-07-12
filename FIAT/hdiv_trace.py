@@ -60,6 +60,9 @@ class TraceSimplicialComplex(SimplicialComplex):
     def construct_subelement(self, dim):
         return self._parent_simplex.construct_subelement(dim)
 
+    def construct_subcomplex(self, dim):
+        return self._parent_simplex.construct_subcomplex(dim)
+
     def get_parent(self):
         return self._parent_simplex
 
