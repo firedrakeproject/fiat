@@ -2,6 +2,7 @@ from FIAT.hdivcurl import Hdiv, Hcurl
 from FIAT.reference_element import LINE
 
 import gem
+import numpy
 from gem.utils import cached_property
 from finat.finiteelementbase import FiniteElementBase
 from finat.tensor_product import TensorProductElement
@@ -58,7 +59,7 @@ class WrapperElementBase(FiniteElementBase):
     def value_shape(self):
         return (self.cell.get_spatial_dimension(),)
 
-    def _transform_evaluation(self, core_eval):
+    def _transform_evaluation(self, core_eval, entity=None):
         beta = self.get_indices()
         zeta = self.get_value_indices()
 
@@ -72,11 +73,11 @@ class WrapperElementBase(FiniteElementBase):
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         core_eval = self.wrappee.basis_evaluation(order, ps, entity)
-        return self._transform_evaluation(core_eval)
+        return self._transform_evaluation(core_eval, entity)
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         core_eval = self.wrappee.point_evaluation(order, refcoords, entity)
-        return self._transform_evaluation(core_eval)
+        return self._transform_evaluation(core_eval, entity)
 
     @property
     def dual_basis(self):
@@ -90,6 +91,59 @@ class WrapperElementBase(FiniteElementBase):
         # Finally wrap up Q in shape again (now with some extra
         # value_shape indices)
         return gem.ComponentTensor(Q[zeta], beta + zeta), x
+
+
+class HDivTraceElement(WrapperElementBase):
+    """HDiv Trace wrapper element for tensor product elements."""
+
+    def __init__(self, wrappee):
+        assert isinstance(wrappee, TensorProductElement)
+        if any(fe.formdegree is None for fe in wrappee.factors):
+            raise ValueError("Form degree of subelement is None, cannot HDiv Trace!")
+
+        formdegree = sum(fe.formdegree for fe in wrappee.factors)
+        if formdegree != wrappee.cell.get_spatial_dimension() - 1:
+            raise ValueError("HDiv Trace requires (n-1)-form element!")
+
+        self.support_dim = tuple(fe.formdegree for fe in wrappee.factors)
+
+        super().__init__(wrappee, None)
+
+    def _transform_evaluation(self, core_eval, entity):
+        if entity is None:
+            entity = (self.cell.get_dimension(), 0)
+        entity_dim, entity_id = entity
+
+        if entity_dim == self.support_dim or sum(entity_dim) != sum(self.support_dim):
+            return core_eval
+
+        def zero_failure(expr):
+            if isinstance(expr, gem.Failure):
+                return gem.Literal(numpy.zeros(expr.shape, expr.dtype))
+            return expr.reconstruct(*map(zero_failure, expr.children))
+
+        # Create a zero tabulation with the same tensor-product structure
+        return {alpha: zero_failure(table) for alpha, table in core_eval.items()}
+
+    @property
+    def formdegree(self):
+        return self.wrappee.formdegree
+
+    @property
+    def value_shape(self):
+        return self.wrappee.value_shape
+
+    @cached_property
+    def fiat_equivalent(self):
+        return self.wrappee.fiat_equivalent
+
+    @property
+    def mapping(self):
+        return self.wrappee.mapping
+
+    @property
+    def dual_basis(self):
+        return self.wrappee.dual_basis
 
 
 class HDivElement(WrapperElementBase):
