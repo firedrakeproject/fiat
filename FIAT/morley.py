@@ -19,7 +19,7 @@ class MorleyDualSet(dual_set.DualSet):
 
     def __init__(self, ref_el, degree):
         top = ref_el.get_topology()
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
         nodes = []
 

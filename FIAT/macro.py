@@ -30,15 +30,18 @@ def xy_to_bary(verts, pts, result=None):
     verts = numpy.asarray(verts)
     pts = numpy.asarray(pts)
     npts = pts.shape[0]
-    sdim = verts.shape[1]
+    nverts = verts.shape[0]
 
-    mat = numpy.vstack((verts.T, numpy.ones((1, sdim+1))))
+    A = numpy.vstack((verts.T, numpy.ones((1, nverts))))
     b = numpy.vstack((pts.T, numpy.ones((1, npts))))
-    foo = numpy.linalg.solve(mat, b)
-    if result is None:
-        return numpy.copy(foo.T)
+    if A.shape[0] == A.shape[1]:
+        bary = numpy.linalg.solve(A, b)
     else:
-        result[:, :] = foo[:, :].T
+        bary, *_ = numpy.linalg.lstsq(A, b)
+    if result is None:
+        result = bary.T.copy()
+    else:
+        numpy.copyto(result, bary.T)
     return result
 
 
@@ -129,7 +132,7 @@ class SplitSimplicialComplex(SimplicialComplex):
         self._child_to_parent = child_to_parent
         self._parent_to_children = parent_to_children
 
-        sd = parent.get_spatial_dimension()
+        sd = parent.get_topological_dimension()
         inv_top = invert_cell_topology(topology)
 
         # dict mapping cells to their boundary facets for each dimension,
@@ -186,7 +189,7 @@ class SplitSimplicialComplex(SimplicialComplex):
         return self.get_parent().construct_subelement(dimension)
 
     def get_facet_element(self):
-        dimension = self.get_spatial_dimension()
+        dimension = self.get_topological_dimension()
         return self.construct_subelement(dimension - 1)
 
     def is_macrocell(self):
@@ -256,7 +259,7 @@ class PowellSabinSplit(SplitSimplicialComplex):
     """
     def __init__(self, ref_el, dimension=1):
         self.split_dimension = dimension
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         top = ref_el.get_topology()
         connectivity = ref_el.get_connectivity()
         new_verts = list(ref_el.get_vertices())
@@ -293,7 +296,7 @@ class PowellSabinSplit(SplitSimplicialComplex):
         """Constructs the reference subcomplex of the parent complex
         specified by subcomplex dimension.
         """
-        if dimension == self.get_dimension():
+        if dimension == self.get_topological_dimension():
             return self
         parent = self.get_parent_complex()
         subcomplex = parent.construct_subcomplex(dimension)
@@ -316,7 +319,7 @@ class AlfeldSplit(PowellSabinSplit):
             return ref_el._split_cache.setdefault(cls, self)
 
     def __init__(self, ref_el):
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         super().__init__(ref_el, dimension=sd)
 
 
@@ -332,7 +335,7 @@ class WorseyFarinSplit(PowellSabinSplit):
             return ref_el._split_cache.setdefault(cls, self)
 
     def __init__(self, ref_el):
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         super().__init__(ref_el, dimension=sd-1)
 
 
@@ -389,7 +392,7 @@ class MacroQuadratureRule(QuadratureRule):
     :returns: A quadrature rule on the sub entities of the simplicial complex.
     """
     def __init__(self, ref_el, Q_ref, parent_facets=None):
-        parent_dim = Q_ref.ref_el.get_spatial_dimension()
+        parent_dim = Q_ref.ref_el.get_topological_dimension()
         if parent_facets is not None:
             parent_to_children = ref_el.get_parent_to_children()
             facets = []
@@ -409,7 +412,7 @@ class MacroQuadratureRule(QuadratureRule):
 
         # Collapse repeated points if any of them lie on facets
         atol = 1E-10
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         top = ref_el.get_topology()
         for cell in top[sd]:
             bary = ref_el.compute_barycentric_coordinates(pts, entity=(sd, cell))
@@ -450,7 +453,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         if not isinstance(order, (int, dict)):
             raise TypeError(f"'order' must be either an int or dict, not {type(order).__name__}")
 
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         if isinstance(order, int):
             order = {sd-1: dict.fromkeys(ref_el.get_interior_facets(sd-1), order)}
         if vorder is not None:
@@ -524,10 +527,17 @@ def hdiv_conforming_coefficients(U, order=0):
     ref_el = U.get_reference_element()
     coeffs = U.get_coeffs()
     shape = U.get_shape()
+
+    sd = ref_el.get_topological_dimension()
+    if sd != ref_el.get_spatial_dimension():
+        parent = ref_el.get_parent() or ref_el
+        thats = parent.compute_tangents(sd, 0)
+        mapping = "double contravariant piola" if len(shape) == 2 else "contravariant piola"
+        coeffs = pullback(coeffs, mapping, J=thats.T)
+        shape = coeffs.shape[1:-1]
+
     expansion_set = U.get_expansion_set()
     k = 1 if expansion_set.continuity == "C0" else 0
-
-    sd = ref_el.get_spatial_dimension()
     facet_el = ref_el.construct_subelement(sd-1)
 
     phi_deg = 0 if sd == 1 else degree - k
@@ -565,7 +575,7 @@ class HDivPolynomialSet(polynomial_set.PolynomialSet):
     :kwarg scale: The scale for the underlying ExpansionSet.
     """
     def __init__(self, ref_el, degree, order=0, **kwargs):
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
         U = polynomial_set.ONPolynomialSet(ref_el, degree, shape=(sd,), **kwargs)
         coeffs = hdiv_conforming_coefficients(U, order=order)
         super().__init__(ref_el, degree, degree, U.expansion_set, coeffs)
@@ -613,9 +623,15 @@ def pullback(phi, mapping, J=None, Jinv=None, Jdet=None):
     if J is None:
         J = numpy.linalg.pinv(Jinv)
     if Jinv is None:
-        Jinv = numpy.linalg.pinv(J)
+        if J.shape[0] == J.shape[1]:
+            Jinv = numpy.linalg.inv(J)
+        else:
+            Jinv = numpy.linalg.pinv(J)
     if Jdet is None:
-        Jdet = numpy.linalg.det(J)
+        if J.shape[0] == J.shape[1]:
+            Jdet = numpy.linalg.det(J)
+        else:
+            Jdet = numpy.linalg.det(J.T @ J)**0.5
     F1 = Jinv.T
     F2 = J / Jdet
 
@@ -643,7 +659,7 @@ class MacroPolynomialSet(polynomial_set.PolynomialSet):
     """
     def __init__(self, ref_el, element):
         top = ref_el.get_topology()
-        sd = ref_el.get_spatial_dimension()
+        sd = ref_el.get_topological_dimension()
 
         mapping, = set(element.mapping())
         base_ref_el = element.get_reference_element()

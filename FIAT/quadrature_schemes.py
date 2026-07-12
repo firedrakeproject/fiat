@@ -69,7 +69,7 @@ def create_quadrature(ref_el, degree, scheme="default", entity=None):
         return FacetQuadratureRule(ref_el, dimension, entity_id, Q_ref)
 
     if ref_el.is_macrocell():
-        dimension = ref_el.get_dimension()
+        dimension = ref_el.get_topological_dimension()
         sub_el = ref_el.construct_subelement(dimension)
         Q_ref = create_quadrature(sub_el, degree, scheme=scheme)
         return MacroQuadratureRule(ref_el, Q_ref)
@@ -119,7 +119,7 @@ def _fiat_scheme(ref_el, degree):
 def _kmv_lump_scheme(ref_el, degree):
     """Specialized quadrature schemes for P < 6 for KMV simplical elements."""
 
-    sd = ref_el.get_spatial_dimension()
+    sd = ref_el.get_topological_dimension()
     if sd == 1:
         num_points = degree + 1
         return GaussLobattoLegendreQuadratureLineRule(ref_el, num_points)
@@ -334,7 +334,7 @@ def xg_scheme(ref_el, degree):
         Mathematics with Applications, vol. 59, no. 2, pp. 663-676, 2010.
         http://dx.doi.org/10.1016/j.camwa.2009.10.027
     """
-    dim = ref_el.get_spatial_dimension()
+    dim = ref_el.get_topological_dimension()
     if dim == 2:
         from FIAT.xg_quad_data import triangle_table as table
     elif dim == 3:

@@ -190,7 +190,7 @@ class CiarletElement(FiniteElement):
                      default cell-wise tabulation is performed.
         """
         if entity is None:
-            entity = (self.ref_el.get_spatial_dimension(), 0)
+            entity = (self.ref_el.get_topological_dimension(), 0)
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)

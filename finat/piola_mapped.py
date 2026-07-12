@@ -10,8 +10,8 @@ from itertools import chain
 def piola_inverse(fiat_cell, J, detJ):
     """Return the basis transformation of evaluation at a point.
     This simply inverts the Piola transform inv(J / detJ) = adj(J)."""
-    sd = fiat_cell.get_spatial_dimension()
-    Jnp = numpy.array([[J[i, j] for j in range(sd)] for i in range(sd)])
+    gdim, tdim = J.shape
+    Jnp = numpy.array([[J[i, j] for j in range(tdim)] for i in range(gdim)])
     return adjugate(Jnp)
 
 
@@ -27,7 +27,7 @@ def normal_tangential_edge_transform(fiat_cell, J, detJ, f):
     alpha = Jn @ Jt
     beta = Jt @ Jt
     # Compute the last row of inv([[1, 0], [alpha/detJ, beta/detJ]])
-    return (-1 * alpha / beta, detJ / beta)
+    return (-alpha / beta, detJ / beta)
 
 
 def normal_tangential_face_transform(fiat_cell, J, detJ, f):
@@ -65,7 +65,7 @@ def normal_tangential_transform(fiat_cell, J, detJ, f):
         Bnt is the numpy.ndarray of normal-tangential coefficients, and
         Btt is the tangential-tangential coefficient.
     """
-    if fiat_cell.get_spatial_dimension() == 2:
+    if fiat_cell.get_topological_dimension() == 2:
         return normal_tangential_edge_transform(fiat_cell, J, detJ, f)
     else:
         return normal_tangential_face_transform(fiat_cell, J, detJ, f)
@@ -81,7 +81,7 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
 
         # On each facet we expect the normal dof followed by the tangential ones
         # The tangential dofs should be numbered last, and are constrained to be zero
-        sd = self.cell.get_spatial_dimension()
+        sd = self.cell.get_topological_dimension()
         reduced_dofs = deepcopy(self._element.entity_dofs())
         reduced_dim = 0
         cur = reduced_dofs[sd-1][0][0]
@@ -99,7 +99,7 @@ class PiolaBubbleElement(PhysicallyMappedElement, FiatElement):
         return self._space_dimension
 
     def basis_transformation(self, coordinate_mapping):
-        sd = self.cell.get_spatial_dimension()
+        sd = self.cell.get_topological_dimension()
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)
         detJ = coordinate_mapping.detJ_at(bary)

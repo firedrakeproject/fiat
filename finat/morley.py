@@ -9,8 +9,8 @@ from finat.physically_mapped import identity, PhysicallyMappedElement
 
 
 def morley_transform(cell, J, detJ, face):
-    adjugate = lambda A: ListTensor([[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]])
-    sd = cell.get_spatial_dimension()
+    adjugate = lambda A: ListTensor([[A[1, 1], -A[1, 0]], [-A[0, 1], A[0, 0]]])
+    sd = cell.get_topological_dimension()
     thats = cell.compute_tangents(sd-1, face)
     nhat = numpy.cross(*thats)
     ahat = numpy.linalg.norm(nhat)
@@ -38,7 +38,7 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
         super().__init__(FIAT.Morley(cell, degree=degree))
 
     def basis_transformation(self, coordinate_mapping):
-        sd = self.cell.get_spatial_dimension()
+        sd = self.cell.get_topological_dimension()
         top = self.cell.get_topology()
         # Jacobians at barycenter
         bary, = self.cell.make_points(sd, 0, sd+1)

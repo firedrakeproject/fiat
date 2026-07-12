@@ -218,6 +218,10 @@ class Cell:
         and each value is a dictionary mapping."""
         return self.topology
 
+    def get_topological_dimension(self):
+        """Returns the topological dimension of the element."""
+        return max(self.topology)
+
     def get_connectivity(self):
         """Returns a dictionary encoding the connectivity of the element.
 
@@ -399,8 +403,8 @@ class SimplicialComplex(Cell):
     def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
 
-        t = self.get_topology()
-        sd = self.get_spatial_dimension()
+        top = self.get_topology()
+        sd = self.get_topological_dimension()
 
         # To handle simplicial complex case:
         # Find a subcell of which facet_i is on the boundary
@@ -409,28 +413,22 @@ class SimplicialComplex(Cell):
         if cell is None:
             cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
                         if facet_i in facets)
-        verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]))
+
         # Interval case
-        if self.get_shape() == LINE:
-            v_i = t[1][cell].index(t[0][facet_i][0])
+        if sd == 1:
+            verts = numpy.array(self.get_vertices_of_subcomplex(top[sd][cell]))
+            v_i = top[sd][cell].index(top[sd-1][facet_i][0])
             n = verts[v_i] - verts[[1, 0][v_i]]
             return n / numpy.linalg.norm(n)
 
-        # vectors from vertex 0 to each other vertex.
-        vert_vecs_from_v0 = verts[1:, :] - verts[:1, :]
-
-        (u, s, _) = numpy.linalg.svd(vert_vecs_from_v0)
+        # Orthogonalize the set of vectors that span the cell
+        cell_span = self.compute_tangents(sd, cell)
+        (_, s, vt) = numpy.linalg.svd(cell_span)
         rank = len([si for si in s if si > 1.e-10])
-
-        # this is the set of vectors that span the simplex
-        spanu = u[:, :rank]
-
-        vert_coords_of_facet = \
-            self.get_vertices_of_subcomplex(t[sd-1][facet_i])
+        cell_space = numpy.transpose(vt[:rank, :])
 
         # now I find everything normal to the facet.
-        vcf = numpy.asarray(vert_coords_of_facet)
-        facet_span = vcf[1:, :] - vcf[:1, :]
+        facet_span = self.compute_tangents(sd-1, facet_i)
         (_, sf, vft) = numpy.linalg.svd(facet_span)
 
         # now get the null space from vft
@@ -438,24 +436,22 @@ class SimplicialComplex(Cell):
         facet_normal_space = numpy.transpose(vft[rankfacet:, :])
 
         # now, I have to compute the intersection of
-        # facet_span with facet_normal_space
-        foo = linalg_subspace_intersection(facet_normal_space, spanu)
-
-        num_cols = foo.shape[1]
-
-        if num_cols != 1:
-            raise Exception("barf in normal computation")
+        # cell_space with facet_normal_space
+        normal = linalg_subspace_intersection(facet_normal_space, cell_space)
+        if normal.shape[1] != 1:
+            raise RuntimeError(f"Found a normal space of dimension {normal.shape[1]}")
 
         # now need to get the correct sign
         # get a vector in the direction
-        nfoo = foo[:, 0]
+        normal = normal.flatten()
 
         # what is the vertex not in the facet?
-        verts_set = set(t[sd][cell])
-        verts_facet = set(t[sd - 1][facet_i])
-        verts_diff = verts_set.difference(verts_facet)
+        verts_set = set(top[sd][cell])
+        verts_facet = set(top[sd - 1][facet_i])
+        verts_diff = verts_set - verts_facet
         if len(verts_diff) != 1:
-            raise Exception("barf in normal computation: getting sign")
+            raise ValueError(f"Facet {facet_i} is not contained by the cell {cell}. "
+                             "Unable to compute sign of outward-facing normal.")
         vert_off = verts_diff.pop()
         vert_on = verts_facet.pop()
 
@@ -463,10 +459,9 @@ class SimplicialComplex(Cell):
         v_to_facet = numpy.array(self.vertices[vert_on]) \
             - numpy.array(self.vertices[vert_off])
 
-        if numpy.dot(v_to_facet, nfoo) > 0.0:
-            return nfoo
-        else:
-            return -nfoo
+        if numpy.dot(v_to_facet, normal) < 0.0:
+            normal *= -1
+        return normal
 
     def compute_tangents(self, dim, i):
         """Computes tangents in any dimension based on differences
@@ -540,7 +535,7 @@ class SimplicialComplex(Cell):
     def volume(self):
         """Computes the volume of the simplicial complex in the appropriate
         dimensional measure."""
-        sd = self.get_spatial_dimension()
+        sd = self.get_topological_dimension()
         return sum(self.volume_of_subcomplex(sd, k)
                    for k in self.topology[sd])
 
@@ -551,8 +546,12 @@ class SimplicialComplex(Cell):
     def compute_scaled_normal(self, facet_i):
         """Returns the unit normal to facet_i of scaled by the
         volume of that facet."""
-        dim = self.get_spatial_dimension()
-        if dim == 2:
+        dim = self.get_topological_dimension()
+        if self.get_spatial_dimension() == 3 and dim == 2:
+            R = numpy.cross(*self.compute_tangents(dim, 0))
+            R *= -1/numpy.linalg.norm(R)
+            return numpy.cross(R, *self.compute_tangents(dim-1, facet_i))
+        elif dim == 2:
             n, = self.compute_tangents(dim-1, facet_i)
             n[0], n[1] = n[1], -n[0]
             return n
@@ -575,7 +574,7 @@ class SimplicialComplex(Cell):
         :arg entity: entity number (integer)
         """
         topology = self.get_topology()
-        celldim = self.get_spatial_dimension()
+        celldim = self.get_topological_dimension()
         codim = celldim - dim
         if dim == 0:
             # Special case vertices.
@@ -587,7 +586,7 @@ class SimplicialComplex(Cell):
             return lambda x: x
         else:
             subcell = self.construct_subelement(dim)
-            subdim = subcell.get_spatial_dimension()
+            subdim = subcell.get_topological_dimension()
             assert subdim == celldim - codim
 
             # Entity vertices in entity space.
@@ -618,10 +617,10 @@ class SimplicialComplex(Cell):
         if len(points) == 0:
             return points
         if entity is None:
-            entity = (self.get_spatial_dimension(), 0)
+            entity = (self.get_topological_dimension(), 0)
         entity_dim, entity_id = entity
         top = self.get_topology()
-        sd = self.get_spatial_dimension()
+        sd = self.get_topological_dimension()
 
         # get a subcell containing the entity and the restriction indices of the entity
         indices = slice(None)
@@ -922,7 +921,7 @@ class Simplex(SimplicialComplex):
         return make_cell_orientation_reflection_map_simplex(self.get_dimension())
 
     def get_facet_element(self):
-        dimension = self.get_spatial_dimension()
+        dimension = self.get_topological_dimension()
         return self.construct_subelement(dimension - 1)
 
 
@@ -1033,7 +1032,11 @@ class UFCTriangle(UFCSimplex):
     def compute_normal(self, i):
         "UFC consistent normal"
         t = self.compute_tangents(1, i)[0]
-        n = numpy.array((t[1], -t[0]))
+        if self.get_spatial_dimension() == 2:
+            n = numpy.array((t[1], -t[0]))
+        else:
+            R = -numpy.cross(*self.compute_tangents(2, 0))
+            n = numpy.cross(R, t)
         return n / numpy.linalg.norm(n)
 
 
@@ -1609,38 +1612,20 @@ class UFCHexahedron(UFCHypercube):
 
 def make_affine_mapping(xs, ys):
     """Constructs (A,b) such that x --> A * x + b is the affine
-    mapping from the simplex defined by xs to the simplex defined by ys."""
-
-    dim_x = len(xs[0])
-    dim_y = len(ys[0])
-
-    if len(xs) != len(ys):
-        raise Exception("")
-
-    # find A in R^{dim_y,dim_x}, b in R^{dim_y} such that
-    # A xs[i] + b = ys[i] for all i
-
-    mat = numpy.zeros((dim_x * dim_y + dim_y, dim_x * dim_y + dim_y), "d")
-    rhs = numpy.zeros((dim_x * dim_y + dim_y,), "d")
-
-    # loop over points
-    for i in range(len(xs)):
-        # loop over components of each A * point + b
-        for j in range(dim_y):
-            row_cur = i * dim_y + j
-            col_start = dim_x * j
-            col_finish = col_start + dim_x
-            mat[row_cur, col_start:col_finish] = numpy.array(xs[i])
-            rhs[row_cur] = ys[i][j]
-            # need to get terms related to b
-            mat[row_cur, dim_y * dim_x + j] = 1.0
-
-    sol = numpy.linalg.solve(mat, rhs)
-
-    A = numpy.reshape(sol[:dim_x * dim_y], (dim_y, dim_x))
-    b = sol[dim_x * dim_y:]
-
-    return A, b
+    mapping from the simplex defined by xs to the simplex defined by ys.
+    Uses least-squares when the simplex dimension does not match the spatial
+    dimension.
+    """
+    X = numpy.asarray(xs)
+    Y = numpy.asarray(ys)
+    DX = X[1:] - X[:1]
+    DY = Y[1:] - Y[:1]
+    if DX.shape[0] == DX.shape[1]:
+        AT = numpy.linalg.solve(DX, DY)
+    else:
+        AT, *_ = numpy.linalg.lstsq(DX, DY)
+    b = Y[0] - numpy.dot(X[0], AT)
+    return AT.T, b
 
 
 def ufc_hypercube(spatial_dim):
