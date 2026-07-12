@@ -1,3 +1,5 @@
+from itertools import product
+
 import FIAT
 import finat
 import numpy as np
@@ -87,13 +89,20 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     if isinstance(finat_element, PhysicallyMappedElement):
         Mgem = finat_element.basis_transformation(ref_to_phys)
         M = evaluate([Mgem])[0].arr
-        ref_vals_zany = np.tensordot(M, ref_vals_piola, (-1, 0))
     else:
         M = np.eye(num_dofs, num_bfs)
-        ref_vals_zany = ref_vals_piola
+
+    check_transformed_values(M, ref_vals_piola, phys_vals, num_dofs)
+
+
+def check_transformed_values(M: np.ndarray, ref_vals: np.ndarray,
+                             phys_vals: np.ndarray, num_dofs: int) -> None:
+    """Compare a proposed basis transformation with the numerical one."""
+    ref_vals_zany = np.tensordot(M, ref_vals, (-1, 0))
 
     # Solve for the basis transformation and compare results
-    Phi = ref_vals_piola.reshape(num_bfs, -1)
+    num_bfs = ref_vals.shape[0]
+    Phi = ref_vals.reshape(num_bfs, -1)
     phi = phys_vals.reshape(num_bfs, -1)
     Vh, residual, *_ = np.linalg.lstsq(Phi.T, phi.T)
     Mh = Vh.T
@@ -117,6 +126,60 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     pp = pprint.PrettyPrinter(width=140, compact=True)
     assert np.allclose(residual, 0), pp.pformat((np.round(error, 8).tolist(), *inds))
     assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), pp.pformat((np.round(error, 8).tolist(), *inds))
+
+
+def make_tensor_product_points(element) -> list[tuple[float, ...]]:
+    factors = (element.A, element.B)
+    point_factors = [make_unisolvent_points(factor, interior=True)
+                     for factor in factors]
+    return [tuple(x for point in points for x in point)
+            for points in product(*point_factors)]
+
+
+def check_tensor_product_zany_mapping(factors, ref_to_phys) -> None:
+    ref_cells = ref_to_phys.ref_cell.cells
+    phys_cells = ref_to_phys.phys_cell.cells
+    ref_factors = [constructor(cell) for constructor, cell in zip(factors, ref_cells)]
+    phys_factors = [constructor(cell).fiat_equivalent
+                    for constructor, cell in zip(factors, phys_cells)]
+
+    finat_element = finat.TensorProductElement(ref_factors)
+    ref_element = finat_element.fiat_equivalent
+    phys_element = FIAT.TensorProductElement(*phys_factors)
+
+    ref_points = make_tensor_product_points(ref_element)
+    phys_points = make_tensor_product_points(phys_element)
+    ref_key = (0,) * ref_element.get_reference_element().get_spatial_dimension()
+    phys_key = (0,) * phys_element.get_reference_element().get_spatial_dimension()
+    ref_vals = ref_element.tabulate(0, ref_points)[ref_key]
+    phys_vals = phys_element.tabulate(0, phys_points)[phys_key]
+
+    Mgem = finat_element.basis_transformation(ref_to_phys)
+    M = evaluate([Mgem])[0].arr
+    check_transformed_values(M, ref_vals, phys_vals,
+                             finat_element.space_dimension())
+
+
+def hermite(cell) -> finat.Hermite:
+    return finat.Hermite(cell)
+
+
+def real(cell) -> finat.Real:
+    return finat.Real(cell, 0)
+
+
+def bell(cell) -> finat.Bell:
+    return finat.Bell(cell)
+
+
+@pytest.mark.parametrize("cell, factors", [
+    ("quadrilateral", (hermite, real)),
+    ("wedge", (hermite, real)),
+    ("quadrilateral", (hermite, hermite)),
+    ("wedge", (bell, hermite)),
+])
+def test_tensor_product(extruded_ref_to_phys, cell, factors) -> None:
+    check_tensor_product_zany_mapping(factors, extruded_ref_to_phys[cell])
 
 
 @pytest.mark.parametrize("element", [
