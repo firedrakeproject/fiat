@@ -1,5 +1,7 @@
+from collections.abc import Sequence
 from itertools import chain, product
 from operator import methodcaller
+from typing import Any
 
 import numpy
 
@@ -12,10 +14,21 @@ import gem
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
+from finat.physically_mapped import (NeedsCoordinateMappingElement,
+                                     PhysicalGeometry,
+                                     PhysicallyMappedElement,
+                                     determinant, identity, inverse)
 from finat.point_set import PointSingleton, PointSet, TensorPointSet
 
 
 class TensorProductElement(FiniteElementBase):
+
+    def __new__(cls, factors: Sequence[FiniteElementBase]) -> "TensorProductElement":
+        factors = tuple(factors)
+        if cls is TensorProductElement and any(
+                isinstance(fe, PhysicallyMappedElement) for fe in factors):
+            return super().__new__(TensorProductPhysicallyMappedElement)
+        return super().__new__(cls)
 
     def __init__(self, factors):
         super(TensorProductElement, self).__init__()
@@ -138,8 +151,10 @@ class TensorProductElement(FiniteElementBase):
 
         ps_factors = factor_point_set(self.cell, entity_dim, ps)
 
-        factor_results = [fe.basis_evaluation(order, ps_, e)
-                          for fe, ps_, e in zip(self.factors, ps_factors, entities)]
+        factor_mappings = self._factor_mappings(coordinate_mapping)
+        factor_results = [fe.basis_evaluation(order, ps_, e, coordinate_mapping=mapping)
+                          for fe, ps_, e, mapping
+                          in zip(self.factors, ps_factors, entities, factor_mappings)]
 
         return self._merge_evaluations(factor_results)
 
@@ -161,8 +176,10 @@ class TensorProductElement(FiniteElementBase):
             ))
 
         # Subelement results
-        factor_results = [fe.point_evaluation(order, p_, e)
-                          for fe, p_, e in zip(self.factors, point_factors, entities)]
+        factor_mappings = self._factor_mappings(coordinate_mapping)
+        factor_results = [fe.point_evaluation(order, p_, e, coordinate_mapping=mapping)
+                          for fe, p_, e, mapping
+                          in zip(self.factors, point_factors, entities, factor_mappings)]
 
         return self._merge_evaluations(factor_results)
 
@@ -191,6 +208,152 @@ class TensorProductElement(FiniteElementBase):
             return mappings[0]
         else:
             return None
+
+    def _factor_mappings(
+            self, coordinate_mapping: PhysicalGeometry | None
+    ) -> tuple[PhysicalGeometry | None, ...]:
+        if coordinate_mapping is None:
+            return (None,) * len(self.factors)
+        return tuple(TensorProductPhysicalGeometry(self, coordinate_mapping, i)
+                     if isinstance(fe, NeedsCoordinateMappingElement) else None
+                     for i, fe in enumerate(self.factors))
+
+
+class TensorProductPhysicallyMappedElement(TensorProductElement,
+                                           PhysicallyMappedElement):
+    """A tensor product with one or more physically mapped factors."""
+
+    def basis_transformation(self, coordinate_mapping: PhysicalGeometry) -> gem.Node:
+        matrices = []
+        for factor, mapping in zip(self.factors,
+                                   self._factor_mappings(coordinate_mapping)):
+            if isinstance(factor, PhysicallyMappedElement):
+                matrix = factor.basis_transformation(mapping).array
+            else:
+                matrix = identity(factor.space_dimension())
+            matrices.append(matrix)
+
+        result = matrices[0]
+        for matrix in matrices[1:]:
+            result = numpy.kron(result, matrix)
+        result = numpy.vectorize(gem.as_gem)(result)
+        return gem.ListTensor(result)
+
+
+class TensorProductPhysicalGeometry(PhysicalGeometry):
+    """Physical geometry restricted to one factor of a tensor product."""
+
+    def __init__(self, element: TensorProductElement,
+                 coordinate_mapping: PhysicalGeometry, factor: int) -> None:
+        self.element = element
+        self.coordinate_mapping = coordinate_mapping
+        self.factor = factor
+
+        cells = self.element.cell.cells
+        dimensions = [cell.get_spatial_dimension() for cell in cells]
+        self._column_slices = self.element.cell._split_slices(dimensions)
+
+        points = []
+        for cell in cells:
+            sd = cell.get_spatial_dimension()
+            point, = cell.make_points(sd, 0, sd + 1)
+            points.append(point)
+        self._points = points
+
+        J = self.coordinate_mapping.jacobian_at(self._embed_point(points[factor]))
+        physical_dimensions = list(dimensions)
+        # Extra ambient dimensions belong to the base manifold factor.
+        physical_dimensions[0] += J.shape[0] - sum(dimensions)
+        self._row_slices = self.element.cell._split_slices(physical_dimensions)
+
+    @property
+    def cell(self) -> Any:
+        return self.element.cell.cells[self.factor]
+
+    def _embed_point(self, point: Sequence[float]) -> tuple[float, ...]:
+        points = list(self._points)
+        points[self.factor] = point
+        return tuple(chain.from_iterable(points))
+
+    def cell_size(self) -> gem.Node:
+        sizes = gem.as_gem(self.coordinate_mapping.cell_size())
+        vertex_shape = tuple(len(cell.get_vertices())
+                             for cell in self.element.cell.cells)
+        indices = []
+        for vertex in range(vertex_shape[self.factor]):
+            multiindex = [0] * len(vertex_shape)
+            multiindex[self.factor] = vertex
+            if len(sizes.shape) == len(vertex_shape):
+                indices.append(tuple(multiindex))
+            else:
+                indices.append((numpy.ravel_multi_index(multiindex, vertex_shape),))
+        return gem.ListTensor([sizes[i] for i in indices])
+
+    def jacobian_at(self, point: Sequence[float]) -> gem.Node:
+        J = self.coordinate_mapping.jacobian_at(self._embed_point(point))
+        rows = range(*self._row_slices[self.factor].indices(J.shape[0]))
+        columns = range(*self._column_slices[self.factor].indices(J.shape[1]))
+        return gem.ListTensor([[J[i, j] for j in columns] for i in rows])
+
+    def detJ_at(self, point: Sequence[float]) -> gem.Node:
+        J = self.jacobian_at(point)
+        if J.shape[0] == J.shape[1]:
+            return determinant(J)
+        return gem.Power(determinant(J.T @ J), gem.Literal(0.5))
+
+    def reference_normals(self) -> gem.Node:
+        sd = self.cell.get_spatial_dimension()
+        return gem.Literal(numpy.asarray([
+            self.cell.compute_normal(i) for i in sorted(self.cell.get_topology()[sd-1])
+        ]))
+
+    def normalized_reference_edge_tangents(self) -> gem.Node:
+        return gem.Literal(numpy.asarray([
+            self.cell.compute_normalized_edge_tangent(i)
+            for i in sorted(self.cell.get_topology()[1])
+        ]))
+
+    def physical_tangents(self) -> gem.Node:
+        sd = self.cell.get_spatial_dimension()
+        point, = self.cell.make_points(sd, 0, sd + 1)
+        J = self.jacobian_at(point)
+        tangents = []
+        for edge in sorted(self.cell.get_topology()[1]):
+            tangent = J @ gem.Literal(self.cell.compute_edge_tangent(edge))
+            length = gem.Power(tangent @ tangent, gem.Literal(0.5))
+            tangents.append(tangent / length)
+        return gem.ListTensor(tangents)
+
+    def physical_normals(self) -> gem.Node:
+        sd = self.cell.get_spatial_dimension()
+        point, = self.cell.make_points(sd, 0, sd + 1)
+        J = self.jacobian_at(point)
+        gram_inv = inverse(J.T @ J)
+        normals = []
+        for face in sorted(self.cell.get_topology()[sd-1]):
+            normal = J @ (gram_inv @ gem.Literal(self.cell.compute_normal(face)))
+            length = gem.Power(normal @ normal, gem.Literal(0.5))
+            normals.append(normal / length)
+        return gem.ListTensor(normals)
+
+    def physical_edge_lengths(self) -> gem.Node:
+        sd = self.cell.get_spatial_dimension()
+        point, = self.cell.make_points(sd, 0, sd + 1)
+        J = self.jacobian_at(point)
+        lengths = []
+        for edge in sorted(self.cell.get_topology()[1]):
+            tangent = J @ gem.Literal(self.cell.compute_edge_tangent(edge))
+            lengths.append(gem.Power(tangent @ tangent, gem.Literal(0.5)))
+        return gem.ListTensor(lengths)
+
+    def physical_points(self, point_set: PointSet,
+                        entity: tuple[int, int] | None = None) -> gem.Node:
+        points = PointSet(numpy.asarray([self._embed_point(point)
+                                        for point in point_set.points]))
+        return self.coordinate_mapping.physical_points(points, entity=None)
+
+    def physical_vertices(self) -> gem.Node:
+        return self.physical_points(PointSet(numpy.asarray(self.cell.get_vertices())))
 
 
 def productise(factors, method):

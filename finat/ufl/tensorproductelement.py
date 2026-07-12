@@ -72,10 +72,13 @@ class TensorProductElement(FiniteElementBase):
 
     def mapping(self):
         """Doc."""
-        if all(e.mapping() == "identity" for e in self._factor_elements):
+        mappings = {e.mapping() for e in self._factor_elements}
+        if mappings == {"identity"}:
             return "identity"
-        elif all(e.mapping() == "L2 Piola" for e in self._factor_elements):
+        elif mappings == {"L2 Piola"}:
             return "L2 Piola"
+        elif mappings <= {"custom", "identity"}:
+            return "custom"
         else:
             return "undefined"
 

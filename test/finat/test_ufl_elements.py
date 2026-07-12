@@ -62,3 +62,16 @@ def test_symmetry(domain, family):
         symmetry = S.symmetry()
         assert isinstance(symmetry, dict)
         assert len(symmetry) == symmetry_size
+
+
+@pytest.mark.parametrize("families, cells, degrees", [
+    (("Hermite", "Real"), (ufl.interval, ufl.interval), (3, 0)),
+    (("Bell", "Hermite"), (ufl.triangle, ufl.interval), (5, 3)),
+])
+def test_tensor_product_custom_mapping(families, cells, degrees) -> None:
+    factors = [finat.ufl.FiniteElement(family, cell, degree)
+               for family, cell, degree in zip(families, cells, degrees)]
+    element = finat.ufl.TensorProductElement(*factors)
+
+    assert element.mapping() == "custom"
+    assert element.pullback is ufl.pullback.custom_pullback

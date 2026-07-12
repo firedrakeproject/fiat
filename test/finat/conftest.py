@@ -1,7 +1,10 @@
+from copy import deepcopy
+
 import pytest
 import FIAT
 import gem
 import numpy as np
+from FIAT.reference_element import TensorProductCell
 from finat.physically_mapped import PhysicalGeometry
 
 
@@ -126,6 +129,33 @@ def phys_el():
 @pytest.fixture
 def ref_to_phys(ref_el, phys_el):
     return {dim: MyMapping(ref_el[int(dim)], phys_el[dim]) for dim in phys_el}
+
+
+@pytest.fixture
+def extruded_ref_to_phys() -> dict[str, MyMapping]:
+    interval = FIAT.ufc_simplex(1)
+    triangle = FIAT.ufc_simplex(2)
+
+    physical_interval = deepcopy(interval)
+    physical_interval.vertices = ((0.2,), (1.7,))
+    physical_vertical = deepcopy(interval)
+    physical_vertical.vertices = ((-0.4,), (0.9,))
+    physical_triangle = deepcopy(triangle)
+    physical_triangle.vertices = ((0.1, -0.2),
+                                  (1.4, 0.1),
+                                  (-0.3, 1.6))
+
+    cells = {
+        "quadrilateral": (
+            TensorProductCell(interval, interval),
+            TensorProductCell(physical_interval, physical_vertical),
+        ),
+        "wedge": (
+            TensorProductCell(triangle, interval),
+            TensorProductCell(physical_triangle, physical_vertical),
+        ),
+    }
+    return {name: MyMapping(*pair) for name, pair in cells.items()}
 
 
 @pytest.fixture
