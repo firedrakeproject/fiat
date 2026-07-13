@@ -1,13 +1,10 @@
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from functools import reduce
-from operator import add
 
 import gem
 import numpy
 
 from finat.citations import cite
-from finat.functional import PhysicallyMappedFunctional
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -73,14 +70,11 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
     Concrete elements either implement :meth:`basis_transformation`
     entirely by hand, or derive it automatically by mixing in
     :class:`~finat.zany.ScalarPhysicallyMappedElement` or
-    :class:`~finat.zany.PiolaPhysicallyMappedElement`, which supply the
-    four hooks below and inherit the entity-by-entity assembly loop
-    implemented here.
+    :class:`~finat.zany.PiolaPhysicallyMappedElement`, which (via
+    :class:`~finat.zany.ZanyPhysicallyMappedElement`) supply the
+    entity-by-entity assembly loop of Kirby (2017) and
+    Brubeck & Kirby (2025).
     """
-
-    #: Numerical tolerance used throughout automatic basis transformation
-    #: to detect vanishing coefficients.
-    tol = 1e-12
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -88,109 +82,12 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         cite("Kirby2019zany")
         self.restriction_indices = None
 
+    @abstractmethod
     def basis_transformation(self, coordinate_mapping):
-        r"""Assemble the basis transformation :math:`M = V^T`.
+        """Transformation matrix for the basis functions.
 
-        Following the factorization :math:`V = E V^c D` of Kirby (2017)
-        and Brubeck & Kirby (2025), the matrix :math:`V` relating the
-        reference nodes to the push-forwards of the physical nodes is
-        assembled one topological entity at a time, in increasing
-        dimension, so that the completion of a node on an entity can
-        always be resolved against the already-assembled rows of
-        lower-dimensional entities.
-
-        On each entity, nodes that are already push-forward invariant
-        (:meth:`_invariant_dofs`) contribute an identity row for free,
-        since :math:`V` starts out as the identity.  The rest are
-        assembled by :meth:`_facet_dof_rows` (on a codimension-1
-        entity) or :meth:`_point_dof_rows` (elsewhere); these three
-        hooks, together with :meth:`_check_mapping`, encode the
-        mapping-specific (affine or Piola) part of the theory, and this
-        method contains no knowledge of which mapping is in play.
-
-        :arg coordinate_mapping: Object providing physical geometry.
-        """
-        fiat_element = self._element
-        self._check_mapping(fiat_element)
-
-        ref_el = fiat_element.get_reference_element()
-        sd = ref_el.get_spatial_dimension()
-        bary, = ref_el.make_points(sd, 0, sd + 1)
-        J = coordinate_mapping.jacobian_at(bary)
-
-        nodes = fiat_element.dual_basis()
-        V = identity(fiat_element.space_dimension())
-
-        processed = set()
-        entity_ids = fiat_element.entity_dofs()
-        for dim in sorted(entity_ids):
-            for entity in sorted(entity_ids[dim]):
-                group = {i: PhysicallyMappedFunctional.from_fiat(nodes[i])
-                         for i in entity_ids[dim][entity]}
-                invariant = self._invariant_dofs(group, dim, sd)
-                processed.update(invariant)
-                group = {i: ell for i, ell in group.items() if i not in invariant}
-                if not group:
-                    continue
-                if dim == sd - 1:
-                    self._facet_dof_rows(V, group, fiat_element, entity, J, processed)
-                else:
-                    self._point_dof_rows(V, group, fiat_element, J, processed)
-
-        _rescale_derivative_dofs(V, fiat_element, coordinate_mapping)
-        ndof = self.space_dimension()
-        return gem.ListTensor(V[:, :ndof].T)
-
-    def _check_mapping(self, fiat_element):
-        """Verify that this class knows how to transform this element's pullback.
-
-        :arg fiat_element: The FIAT element defined on the reference cell.
-        :raises NotImplementedError: If the pullback is not supported.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
-
-    def _invariant_dofs(self, group, dim, sd):
-        """Select the nodes of an entity that are already push-forward invariant.
-
-        :arg group: Dict mapping node index to :class:`PhysicallyMappedFunctional`
-            for the reference nodes associated with one entity.
-        :arg dim: Topological dimension of the entity.
-        :arg sd: Spatial dimension of the cell.
-        :returns: The subset of ``group`` keys whose row of :math:`V` is
-            the identity row.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
-
-    def _facet_dof_rows(self, V, group, fiat_element, entity, J, processed):
-        """Assemble the rows of V for the non-invariant nodes on a facet.
-
-        :arg V: Object array being assembled; rows are set in place.
-        :arg group: Dict mapping node index to :class:`PhysicallyMappedFunctional`
-            for the non-invariant reference nodes on this facet.
-        :arg fiat_element: The FIAT element defined on the reference cell.
-        :arg entity: The facet number.
-        :arg J: GEM expression for the cell Jacobian.
-        :arg processed: Indices of the already assembled rows of ``V``;
-            updated in place.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
-
-    def _point_dof_rows(self, V, group, fiat_element, J, processed):
-        """Assemble the rows of V for the non-invariant nodes away from a facet.
-
-        :arg V: Object array being assembled; rows are set in place.
-        :arg group: Dict mapping node index to :class:`PhysicallyMappedFunctional`
-            for the non-invariant reference nodes on this entity.
-        :arg fiat_element: The FIAT element defined on the reference cell.
-        :arg J: GEM expression for the cell Jacobian.
-        :arg processed: Indices of the already assembled rows of ``V``;
-            updated in place.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
+        :arg coordinate_mapping: Object providing physical geometry."""
+        pass
 
     def map_tabulation(self, ref_tabulation, coordinate_mapping):
         assert coordinate_mapping is not None
@@ -316,35 +213,6 @@ def identity(*shape):
     for multiindex in numpy.ndindex(V.shape):
         V[multiindex] = zero if V[multiindex] == 0 else one
     return V
-
-
-def _rescale_derivative_dofs(V, fiat_element, coordinate_mapping):
-    r"""Rescale derivative degrees of freedom by the cell size.
-
-    Each physical node of derivative order :math:`m` is redefined with a
-    factor :math:`h^{-m}`, where :math:`h` averages the cell size over
-    the vertices of its entity.  This is the FInAT convention keeping
-    the mass matrix well-conditioned; it is consistent across cells
-    because the scaling only depends on shared entities.
-
-    :arg V: Object array being assembled; columns are rescaled in place.
-    :arg fiat_element: The FIAT element defined on the reference cell.
-    :arg coordinate_mapping: Object providing the physical geometry as
-        GEM expressions.
-    """
-    # cell_size may be a GEM expression or a numpy array of numbers
-    h = coordinate_mapping.cell_size()
-    top = fiat_element.get_reference_element().get_topology()
-    nodes = fiat_element.dual_basis()
-    entity_ids = fiat_element.entity_dofs()
-    for dim in entity_ids:
-        for entity in entity_ids[dim]:
-            verts = top[dim][entity]
-            havg = reduce(add, (h[v] for v in verts)) / len(verts)
-            for i in entity_ids[dim][entity]:
-                order = nodes[i].max_deriv_order
-                if order > 0:
-                    V[:, i] = V[:, i] * havg**(-order)
 
 
 def determinant(A):

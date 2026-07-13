@@ -166,12 +166,15 @@ $V = E V^c D$ directly from a FIAT element's dual basis. The implementation must
 the theory factor by factor, not merely reproduce matrix entries:
 
 **Status (2026-07-13).** The symbolic dof lives in `finat/functional.py` as
-`finat.PhysicallyMappedFunctional`. The OOP structure is a template method: the
-entity-by-entity assembly loop is implemented once, as the concrete
-`PhysicallyMappedElement.basis_transformation` in `finat/physically_mapped.py`, calling
-four hooks (`_check_mapping`, `_invariant_dofs`, `_facet_dof_rows`, `_point_dof_rows`)
-that carry ALL mapping-specific knowledge — the loop itself contains no `if piola`
-anywhere. `finat/zany.py` supplies the two mixins implementing those hooks,
+`finat.PhysicallyMappedFunctional`. `finat/physically_mapped.py` stays fully generic:
+`PhysicallyMappedElement` is unchanged from before this project, still an abstract
+mixin with no knowledge of the zany theory, used as-is by hand-coded elements (AW,
+HCT, PowellSabin, Walkington, ...). All the automation lives in `finat/zany.py`, as a
+template method on `ZanyPhysicallyMappedElement(PhysicallyMappedElement)`: the
+entity-by-entity assembly loop is implemented once, in its concrete
+`basis_transformation`, calling four hooks (`_check_mapping`, `_invariant_dofs`,
+`_facet_dof_rows`, `_point_dof_rows`) that carry ALL mapping-specific knowledge — the
+loop itself contains no `if piola` anywhere. Two mixins implement those hooks,
 `ScalarPhysicallyMappedElement` (affine pullback: Morley, Hermite, Argyris, Bell) and
 `PiolaPhysicallyMappedElement` ((double) contravariant Piola: MTW, Johnson-Mercier,
 Guzman-Neilan), plus the pure math functions they call (`FacetFrame`,
@@ -179,12 +182,14 @@ Guzman-Neilan), plus the pure math functions they call (`FacetFrame`,
 these take plain arrays/GEM expressions, no `self`, so the mathematics stays readable
 independent of the class plumbing. Concrete elements (`finat.Morley`, etc.) are now
 just a citation plus a FIAT constructor call: mixing in the right base class is enough,
-`basis_transformation` is inherited. `ndof` truncation is no longer a parameter; the
-loop always slices by `self.space_dimension()`, which constrained elements (Bell, GN)
-already override. Tests: `test/finat/test_zany_automation.py`; `check_zany_mapping`
-lives in the finat conftest and is provided to test modules as a pytest fixture (pytest
-runs with `--import-mode=importlib`, so test modules cannot import from each other or
-from conftest).
+`basis_transformation` is inherited (MRO example: `Morley -> ScalarPhysicallyMappedElement
+-> ZanyPhysicallyMappedElement -> PhysicallyMappedElement -> ...`). `ndof` truncation is
+no longer a parameter; the loop always slices by `self.space_dimension()`, which
+constrained elements (Bell, GN) already override. Tests:
+`test/finat/test_zany_automation.py`; `check_zany_mapping` lives in the finat conftest
+and is provided to test modules as a pytest fixture (pytest runs with
+`--import-mode=importlib`, so test modules cannot import from each other or from
+conftest).
 
 **Framework design.** A dof is a symbolic `finat.PhysicallyMappedFunctional`:
 $\ell(f) = \sum_q w_q \langle D, \nabla^m f(x_q)\rangle$ with numeric points/weights
