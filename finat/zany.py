@@ -302,6 +302,10 @@ def _facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
         Indices of the already assembled rows; updated in place.
     tol :
         Tolerance for detecting zeros in the numeric coefficients.
+    avg :
+        If False, physical facet moments are plain integrals rather than
+        integral averages, and their columns are rescaled by the
+        physical facet measure.
 
     """
     frame = FacetFrame(fiat_element, entity, J)
@@ -418,6 +422,7 @@ def _piola_facet_rows(V: numpy.ndarray, group: dict,
         Indices of the already assembled rows; updated in place.
     tol :
         Tolerance for detecting zeros in the numeric coefficients.
+
     """
     ref_el = fiat_element.get_reference_element()
     sd = ref_el.get_spatial_dimension()
@@ -532,6 +537,7 @@ def _piola_point_rows(V: numpy.ndarray, group: dict, J: Node,
         Indices of the already assembled rows; updated in place.
     tol :
         Tolerance for detecting zeros in the numeric coefficients.
+
     """
     sd = J.shape[0]
     Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],

@@ -15,6 +15,13 @@ When assisting with contributions to FIAT and the Firedrake project, AI agents a
 * Any generated code must be executed locally to verify that it functions correctly.
 * AI tools must not be used to resolve issues that are labeled as 'good first issue'.
 
+### PR expectations
+
+* CI (`.github/workflows/test.yml`) checks `flake8` and `pydocstyle .` (both
+  configured in `setup.cfg`); run them locally and fix all findings before pushing.
+* Watch for `pydocstyle` D413 (blank line after the last numpydoc section) and D417
+  (every argument, including keyword arguments, needs a description) in new docstrings.
+
 ---
 
 ## FIAT's Role in the Architecture
