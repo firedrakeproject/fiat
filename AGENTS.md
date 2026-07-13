@@ -160,7 +160,8 @@ the theory factor by factor, not merely reproduce matrix entries:
 
 **Status (2026-07-13).** The framework lives in `finat/functional.py` (the symbolic
 `finat.Functional`) and `finat/zany.py` (`FacetFrame`, `zany_basis_transformation`).
-`finat.Morley` and `finat.Hermite` are reimplemented on it: `basis_transformation` is
+`finat.Morley`, `finat.Hermite`, `finat.Argyris` (both variants, degrees 5-7 tested,
+with the `avg` convention flag), and `finat.Bell` are reimplemented on it: `basis_transformation` is
 one call to `zany_basis_transformation(self._element, coordinate_mapping)`, working in
 2D and 3D through a single dimension-independent code path, verified by
 `check_zany_mapping` and matching the previous hand-coded matrices (including the
@@ -229,11 +230,32 @@ Key facts the framework rests on:
   (GEM overloads `+ - * / ** @` with `Zero`/constant folding; keep numpy object arrays
   on the left when scaling by a GEM scalar).
 
-Next steps: second and higher derivative orders (pullback = tensor powers of $J$;
-symmetric direction tensors in `Functional`) to cover Bell/Argyris vertex jets;
-facet-derivative completion rows coupling to jet dofs (the recursion already supports
-it once jets have rows); the extended-element path for reduced HCT/Bell; vector-valued
-components for Piola-mapped elements.
+Extensions beyond first order and Morley/Hermite:
+
+* `Functional` directions live in derivative multi-index space (`multiindices`, axis
+  order for $m=1$); `pullback` distributes them over a symmetric tensor (dividing by
+  multiplicities), contracts every slot with $J$ (`numpy.tensordot` on object arrays),
+  and collapses back. Point-jet groups are split per order; each order solves in its
+  own multi-index direction basis (Argyris/Bell vertex jets: gradient + Hessian).
+* Facet completions of Argyris edge moments couple to vertex jets and same-edge trace
+  moments; the existing row recursion handles both with no new code (trace moments are
+  order-0 and thus invariant; FIAT builds all these moments with
+  `FacetQuadratureRule(avg=True)`, i.e. measure-intrinsic, as the framework assumes).
+* `zany_basis_transformation(avg=False)` reproduces the legacy FInAT convention where
+  physical facet moments are plain integrals: their columns are divided by the
+  physical facet measure $\|C\| |\hat e| / \|\hat C\|$ (`FacetFrame.measure`).
+  Single-point facet dofs (Argyris "point" variant) are unaffected.
+* Bell is the extended-element pattern: FIAT.Bell is the 21-node quintic element with
+  the constraint functionals as extra edge nodes; `ndof=18` drops the constraint
+  *columns* of $V$ (their rows still contribute the $D$-matrix entries through the
+  completion recursion), and the FInAT element overrides `entity_dofs`.
+* Known convention change: the generic $h^{-m}$ conditioning scaling now also applies
+  to integral-variant Argyris edge moments, which the hand-written code left unscaled
+  (Morley scaled them; the legacy convention was inconsistent). Invisible when
+  `cell_size == 1`; flag in PR review.
+
+Next steps: the extended-element path for reduced HCT (macro polynomial spaces);
+vector-valued components for Piola-mapped elements.
 
 The implementation mirrors the theory factor by factor:
 

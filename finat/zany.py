@@ -105,6 +105,8 @@ class FacetFrame:
         normC = Power(reduce(add, (C[i] * C[i] for i in range(sd))),
                       Literal(0.5))
         self.normal_scale = normC / kappa
+        vol = ref_el.volume_of_subcomplex(sd - 1, entity)
+        self.measure = normC * (vol / numpy.linalg.norm(Chat))
 
     def reference_coefficients(self, direction: numpy.ndarray) -> numpy.ndarray:
         r"""Expand a numeric direction in the reference frame.
@@ -190,7 +192,8 @@ def _conditioning_scaling(V: numpy.ndarray, fiat_element: FiniteElement,
 
 def zany_basis_transformation(fiat_element: FiniteElement,
                               coordinate_mapping: PhysicalGeometry,
-                              tol: float = 1e-12) -> ListTensor:
+                              tol: float = 1e-12, avg: bool = True,
+                              ndof: int = None) -> ListTensor:
     r"""Compute the basis transformation matrix of a FIAT element.
 
     Parameters
@@ -201,6 +204,14 @@ def zany_basis_transformation(fiat_element: FiniteElement,
         Object providing the physical geometry as GEM expressions.
     tol :
         Tolerance for detecting zeros in the numeric coefficients.
+    avg :
+        If False, physical facet moments are plain integrals rather than
+        the measure-intrinsic integral averages of the reference nodes,
+        and their columns are rescaled by the physical facet measure.
+    ndof :
+        Optional number of physical degrees of freedom; trailing columns
+        are discarded, so that constrained elements can drop the basis
+        functions of their extended element.
 
     Returns
     -------
@@ -229,16 +240,18 @@ def zany_basis_transformation(fiat_element: FiniteElement,
             if not group:
                 continue
             if dim == sd - 1:
-                _facet_rows(V, group, fiat_element, entity, J, processed, tol)
+                _facet_rows(V, group, fiat_element, entity, J, processed,
+                            tol, avg)
             else:
                 _point_jet_rows(V, group, J, processed, tol)
 
     _conditioning_scaling(V, fiat_element, coordinate_mapping)
-    return ListTensor(V.T)
+    return ListTensor(V[:, :ndof].T)
 
 
 def _facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
-                entity: int, J: Node, processed: set, tol: float) -> None:
+                entity: int, J: Node, processed: set, tol: float,
+                avg: bool = True) -> None:
     r"""Assemble the rows of V for derivative nodes on a facet.
 
     Physical facet nodes take their normal component along the physical
@@ -279,6 +292,9 @@ def _facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
         # Expand the pulled-back node in the physical frame
         x = frame.decompose(ell.pullback(J).direction)
         c = x[0] * frame.normal_scale / a
+        if not avg and len(ell.points) > 1:
+            # the physical moment is a plain integral, not an average
+            c = c / frame.measure
         row = numpy.full(V.shape[1], Zero(), dtype=object)
         row[i] = c
         for k, that in enumerate(frame.tangents):
@@ -320,20 +336,25 @@ def _point_jet_rows(V: numpy.ndarray, group: dict, J: Node,
         Tolerance for detecting zeros in the numeric coefficients.
 
     """
-    directions = numpy.array([ell.direction for ell in group.values()])
-    if len(set(ell.points for ell in group.values())) > 1:
-        raise NotImplementedError("Group nodes at different points.")
-    if directions.shape[0] != directions.shape[1]:
-        raise NotImplementedError(
-            "Directions do not span the derivative jet.")
-
-    # coefficients of the direction basis expansion of each Cartesian axis
-    Dinv = numpy.linalg.inv(directions.T)
+    suborders = {}
     for i, ell in group.items():
-        Jd = ell.pullback(J).direction
-        for col, (j, ellj) in enumerate(group.items()):
-            s = _weight_ratio(ell.weights, ellj.weights, tol)
-            x = s * Dinv[col]
-            nz = numpy.flatnonzero(abs(x) > tol)
-            V[i, j] = reduce(add, (Jd[m] * x[m] for m in nz)) if len(nz) else Zero()
-        processed.add(i)
+        suborders.setdefault(ell.order, {})[i] = ell
+
+    for sub in suborders.values():
+        directions = numpy.array([ell.direction for ell in sub.values()])
+        if len(set(ell.points for ell in sub.values())) > 1:
+            raise NotImplementedError("Group nodes at different points.")
+        if directions.shape[0] != directions.shape[1]:
+            raise NotImplementedError(
+                "Directions do not span the derivative jet.")
+
+        # coefficients of the direction basis expansion of each multi-index
+        Dinv = numpy.linalg.inv(directions.T)
+        for i, ell in sub.items():
+            Jd = ell.pullback(J).direction
+            for col, (j, ellj) in enumerate(sub.items()):
+                s = _weight_ratio(ell.weights, ellj.weights, tol)
+                x = s * Dinv[col]
+                nz = numpy.flatnonzero(abs(x) > tol)
+                V[i, j] = reduce(add, (Jd[m] * x[m] for m in nz)) if len(nz) else Zero()
+            processed.add(i)

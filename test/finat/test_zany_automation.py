@@ -54,8 +54,8 @@ def test_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, element, dimensio
 
 
 def test_unsupported_nodes(ref_to_phys):
-    """Second derivative nodes are not handled yet."""
+    """Vector-valued nodes are not handled yet."""
     mapping = ref_to_phys[2]
-    element = FIAT.Bell(mapping.ref_cell)
+    element = FIAT.RaviartThomas(mapping.ref_cell, 1)
     with pytest.raises(NotImplementedError):
         zany_basis_transformation(element, mapping)

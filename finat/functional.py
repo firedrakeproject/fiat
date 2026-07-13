@@ -92,11 +92,11 @@ class Functional:
             points = tuple(node.pt_dict)
             weights = []
             for pt in points:
-                (w, comp), = node.pt_dict[pt]
-                if comp != tuple():
+                wc_list = node.pt_dict[pt]
+                if len(wc_list) != 1 or wc_list[0][1] != tuple():
                     raise NotImplementedError(
                         f"{type(node).__name__} has vector components.")
-                weights.append(w)
+                weights.append(wc_list[0][0])
             return cls(points, numpy.asarray(weights))
 
         sd = node.ref_el.get_spatial_dimension()

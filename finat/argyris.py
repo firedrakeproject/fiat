@@ -8,7 +8,9 @@ from gem import Literal, ListTensor, Zero
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
+from finat.physically_mapped import (identity, PhysicalGeometry,
+                                     PhysicallyMappedElement)
+from finat.zany import zany_basis_transformation
 
 
 def _jet_transform(J, order):
@@ -128,70 +130,21 @@ def _edge_transform(V, vorder, eorder, fiat_cell, coordinate_mapping, avg=False)
 
 
 class Argyris(PhysicallyMappedElement, ScalarFiatElement):
+    """The Argyris element.
+
+    The basis transformation is derived automatically from the FIAT
+    dual basis by :func:`finat.zany.zany_basis_transformation`.
+    """
     def __init__(self, cell, degree=5, variant=None, avg=False):
         cite("Argyris1968")
         if variant is None:
             variant = "integral"
         if variant == "point" and degree != 5:
             raise NotImplementedError("Degree must be 5 for 'point' variant of Argyris")
-        fiat_element = FIAT.Argyris(cell, degree, variant=variant)
         self.variant = variant
         self.avg = avg
-        super().__init__(fiat_element)
+        super().__init__(FIAT.Argyris(cell, degree, variant=variant))
 
-    def basis_transformation(self, coordinate_mapping):
-        sd = self.cell.get_spatial_dimension()
-        top = self.cell.get_topology()
-
-        V = identity(self.space_dimension())
-
-        vorder = 2
-        voffset = comb(sd + vorder, vorder)
-        eorder = self.degree - 5
-
-        _vertex_transform(V, vorder, self.cell, coordinate_mapping)
-        if self.variant == "integral":
-            _edge_transform(V, vorder, eorder, self.cell, coordinate_mapping, avg=self.avg)
-        else:
-            bary, = self.cell.make_points(sd, 0, sd+1)
-            J = coordinate_mapping.jacobian_at(bary)
-            detJ = coordinate_mapping.detJ_at(bary)
-            pel = coordinate_mapping.physical_edge_lengths()
-            for e in sorted(top[1]):
-                s = len(top[0]) * voffset + e * (eorder+1)
-                v0id, v1id = (v * voffset for v in top[1][e])
-                Bnn, Bnt, Jt = _normal_tangential_transform(self.cell, J, detJ, e)
-
-                # edge midpoint normal derivative
-                V[s, s] = Bnn * pel[e]
-
-                # vertex points
-                V[s, v1id] = 15/8 * Bnt
-                V[s, v0id] = -V[s, v1id]
-
-                # vertex derivatives
-                for i in range(sd):
-                    V[s, v1id+1+i] = -7/16 * Bnt * Jt[i]
-                    V[s, v0id+1+i] = V[s, v1id+1+i]
-
-                # second derivatives
-                tau = [Jt[0]*Jt[0], 2*Jt[0]*Jt[1], Jt[1]*Jt[1]]
-                for i in range(len(tau)):
-                    V[s, v1id+3+i] = 1/32 * Bnt * tau[i]
-                    V[s, v0id+3+i] = -V[s, v1id+3+i]
-
-        # Patch up conditioning
-        h = coordinate_mapping.cell_size()
-        for v in sorted(top[0]):
-            s = voffset*v + 1
-            V[:, s:s+sd] *= 1 / h[v]
-            V[:, s+sd:voffset*(v+1)] *= 1 / (h[v]*h[v])
-
-        if self.variant == "point":
-            eoffset = 2 * eorder + 1
-            for e in sorted(top[1]):
-                v0, v1 = top[1][e]
-                s = len(top[0]) * voffset + e * eoffset
-                V[:, s:s+eorder+1] *= 2 / (h[v0] + h[v1])
-
-        return ListTensor(V.T)
+    def basis_transformation(self, coordinate_mapping: PhysicalGeometry) -> ListTensor:
+        return zany_basis_transformation(self._element, coordinate_mapping,
+                                         avg=self.avg)
