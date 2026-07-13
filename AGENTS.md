@@ -254,8 +254,31 @@ Extensions beyond first order and Morley/Hermite:
   (Morley scaled them; the legacy convention was inconsistent). Invisible when
   `cell_size == 1`; flag in PR review.
 
-Next steps: the extended-element path for reduced HCT (macro polynomial spaces);
-vector-valued components for Piola-mapped elements.
+**Piola-mapped elements** (Aznaran, Kirby & Farrell 2022). `Functional` carries a
+value rank: component weight profiles (nq x sd^rank) parsed from `pt_dict` component
+tuples. Under contravariant Piola the roles of the scalar case are mirrored: the
+*scaled* facet normal is the cofactor image $K\hat n_s$, $K = \mathrm{adj}(J)^T$
+(exactly the physical `compute_scaled_normal`, cross product of mapped tangents), so
+pure normal moments are invariant, while scaled tangents map by $J$. `_piola_facet_rows`
+works with per-point *frame-coordinate profiles* (handles 3D MTW's point-varying
+RT-mapped tangential directions): the pulled-back profile is contracted per value slot
+with the mixing matrix $Y$; tangential profiles are matched within the facet group by a
+numeric pseudo-inverse; the residual normal profile is eliminated by per-point normal
+moments through the Vandermonde recursion (this is where e.g. tangential-to-normal
+couplings emerge). Key subtlety (in any dimension > 2): FIAT builds tangential value
+components on the **reciprocal basis** (`cross(n, t_k)`), which transforms in-plane
+contravariantly: absorb $S^{-1} = (\det\hat G_t/\det G_t)\hat G_t^{-1} G_t$
+(tangent Gram change) into $Y$'s tangential rows; in 2D $S = 1$, which hides the effect.
+Interior value moments are Piola-invariant by construction (scaled-normal components for
+JM; covariant Nedelec test fields for MTW order 2 cancel the contravariant trial
+exactly). Double contravariant (tensor) elements use the same code: one contraction per
+value slot. MTW (2D/3D) and Johnson-Mercier (2D/3D) are reimplemented this way, matching
+the deleted hand code to machine precision; RaviartThomas-type elements come out as pure
+identity (Piola-equivalent) automatically.
+
+Next steps: Guzman-Neilan (PiolaBubbleElement pattern: vertex point values map by $K$
+like a value point-group, facet bubbles + constraint columns); the extended-element path
+for reduced HCT (macro polynomial spaces); covariant elements.
 
 The implementation mirrors the theory factor by factor:
 

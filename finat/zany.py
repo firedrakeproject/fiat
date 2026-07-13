@@ -228,12 +228,34 @@ def zany_basis_transformation(fiat_element: FiniteElement,
     nodes = fiat_element.dual_basis()
     V = identity(fiat_element.space_dimension())
 
+    mappings = set(fiat_element.mapping())
+    piola = mappings in ({"contravariant piola"},
+                         {"double contravariant piola"})
+    if not piola and mappings != {"affine"}:
+        raise NotImplementedError(f"Cannot transform mappings {mappings}.")
+
     processed = set()
     entity_ids = fiat_element.entity_dofs()
     for dim in sorted(entity_ids):
         for entity in sorted(entity_ids[dim]):
             ells = {i: Functional.from_fiat(nodes[i])
                     for i in entity_ids[dim][entity]}
+            if piola:
+                # Interior moments are Piola invariant by construction
+                processed.update(i for i, ell in ells.items()
+                                 if ell.order == 0 and dim == sd)
+                group = {i: ell for i, ell in ells.items()
+                         if i not in processed}
+                if not group:
+                    continue
+                if dim == sd - 1 and all(ell.rank > 0 and ell.order == 0
+                                         for ell in group.values()):
+                    _piola_facet_rows(V, group, fiat_element, entity, J,
+                                      processed, tol)
+                else:
+                    raise NotImplementedError(
+                        "Cannot yet Piola-transform this node group.")
+                continue
             # Value functionals are push-forward invariant
             processed.update(i for i, ell in ells.items() if ell.order == 0)
             group = {i: ell for i, ell in ells.items() if ell.order > 0}
@@ -358,3 +380,128 @@ def _point_jet_rows(V: numpy.ndarray, group: dict, J: Node,
                 nz = numpy.flatnonzero(abs(x) > tol)
                 V[i, j] = reduce(add, (Jd[m] * x[m] for m in nz)) if len(nz) else Zero()
             processed.add(i)
+
+
+def _piola_facet_rows(V: numpy.ndarray, group: dict,
+                      fiat_element: FiniteElement, entity: int, J: Node,
+                      processed: set, tol: float) -> None:
+    r"""Assemble the rows of V for facet moments of Piola-mapped values.
+
+    This mirrors :func:`_facet_rows` with the roles of the normal and
+    tangential directions exchanged: under the contravariant Piola map
+    the scaled facet normal is the image of the reference one under the
+    cofactor matrix :math:`K = \operatorname{adj}(J)^T`, so pure normal
+    moments are invariant, while the scaled tangents map by :math:`J`.
+    Each node carries a per-point profile of frame coordinates, shared
+    by its physical counterpart; the pulled-back reference node mixes
+    the coordinates through the frame expansion of :math:`K\hat{t}_k`,
+    the tangential profiles are matched within the group, and the
+    residual normal profile is eliminated numerically through already
+    assembled rows of V.
+
+    Parameters
+    ----------
+    V :
+        Object array being assembled.
+    group :
+        Mapping from node index to symbolic Functional for the value
+        moments on this facet.
+    fiat_element :
+        The FIAT element.
+    entity :
+        The facet number.
+    J :
+        GEM expression for the cell Jacobian.
+    processed :
+        Indices of the already assembled rows; updated in place.
+    tol :
+        Tolerance for detecting zeros in the numeric coefficients.
+    """
+    ref_el = fiat_element.get_reference_element()
+    sd = ref_el.get_spatial_dimension()
+    that = ref_el.compute_tangents(sd - 1, entity)
+    nhat = ref_el.compute_scaled_normal(entity)
+    Ghat = numpy.column_stack([nhat, *that])
+    Ghatinv = numpy.linalg.inv(Ghat)
+
+    Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                      dtype=object)
+    K = adjugate(Jnp).T
+
+    # Reference frame coordinate profiles, shared with the physical nodes
+    coords = {}
+    for i, ell in group.items():
+        C = ell.weights.reshape(-1, *(sd,) * ell.rank)
+        for _ in range(ell.rank):
+            C = numpy.tensordot(C, Ghatinv, axes=(1, 1))
+        coords[i] = C.reshape(len(ell.points), -1)
+        # Pure normal moments are Piola invariant
+        if numpy.allclose(coords[i][:, 1:], 0, atol=tol):
+            processed.add(i)
+
+    group = {i: ell for i, ell in group.items() if i not in processed}
+    if not group:
+        return
+    rank, = {ell.rank for ell in group.values()}
+    points, = {ell.points for ell in group.values()}
+
+    # Frame coordinates of the mapped frame image of the reference frame:
+    # the normal is invariant and the pulled tangents are expanded by a
+    # symbolic solve in the mapped frame [K nhat | J that_k]
+    A = numpy.column_stack([K @ nhat, *(Jnp @ t for t in that)])
+    adjA = adjugate(A)
+    detA = determinant(A)
+    Y = numpy.full((sd, sd), Zero(), dtype=object)
+    Y[0, 0] = Literal(1.0)
+    for k, t in enumerate(that):
+        Y[:, k + 1] = (adjA @ (K @ t)) / detA
+
+    # Physical tangential components are built on the reciprocal basis
+    # (cross products of the frame), so they carry the in-plane
+    # contravariant transformation S = adj(G Ghat^{-1})^T of the change
+    # of tangent Gram matrices.  Absorb S^{-1} into the coordinate
+    # mixing so that the physical profiles keep the reference
+    # coordinates; in 2D the tangent plane is one-dimensional and S = 1.
+    G = numpy.array([[Jnp @ t1 @ (Jnp @ t2) for t2 in that] for t1 in that])
+    Ghat_t = that @ that.T
+    Sinv = (numpy.linalg.inv(Ghat_t) @ G) * \
+        (numpy.linalg.det(Ghat_t) / determinant(G))
+    Y[1:, :] = Sinv @ Y[1:, :]
+
+    # Numeric matching of the tangential coordinate profiles in the group
+    B = numpy.array([coords[j][:, 1:].ravel() for j in group])
+    Bpinv = numpy.linalg.pinv(B)
+    Bpinv[abs(Bpinv) < tol] = 0
+
+    # Numeric elimination of the normal profile: one pure normal moment
+    # per quadrature point, evaluated on the nodal basis
+    ndir = numpy.ones(())
+    for _ in range(rank):
+        ndir = numpy.multiply.outer(ndir, nhat)
+    T = fiat_element.tabulate(0, points)[(0,) * sd]
+    L = numpy.einsum("jcq,c->jq", T.reshape(T.shape[0], -1, len(points)),
+                     ndir.ravel())
+    L[abs(L) < tol] = 0
+
+    for i, ell in group.items():
+        # Pull back the coordinate profile, contracting each slot with Y
+        P = coords[i].reshape(-1, *(sd,) * rank)
+        for _ in range(rank):
+            P = numpy.tensordot(P, Y, axes=(1, 1))
+        P = P.reshape(len(points), -1)
+
+        row = numpy.full(V.shape[1], Zero(), dtype=object)
+        c = Bpinv.T @ P[:, 1:].ravel()
+        for cj, j in zip(c, group):
+            row[j] = cj
+        # Residual normal profile after removing the group contribution
+        residual = P[:, 0] - c @ numpy.array([coords[j][:, 0] for j in group])
+        for q in range(len(points)):
+            for m in numpy.flatnonzero(L[:, q]):
+                if m not in processed:
+                    raise NotImplementedError(
+                        f"Completion of node {i} couples to node {m}, "
+                        "which has not been transformed yet.")
+                row = row + V[m, :] * (residual[q] * L[m, q])
+        V[i, :] = row
+        processed.add(i)

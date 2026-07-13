@@ -55,11 +55,12 @@ class Functional:
     """
 
     def __init__(self, points: tuple, weights: numpy.ndarray,
-                 order: int = 0, direction=None):
+                 order: int = 0, direction=None, rank: int = 0):
         self.points = points
         self.weights = weights
         self.order = order
         self.direction = direction
+        self.rank = rank
 
     @classmethod
     def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12) -> "Functional":
@@ -90,14 +91,20 @@ class Functional:
 
         if not node.deriv_dict:
             points = tuple(node.pt_dict)
-            weights = []
-            for pt in points:
-                wc_list = node.pt_dict[pt]
-                if len(wc_list) != 1 or wc_list[0][1] != tuple():
-                    raise NotImplementedError(
-                        f"{type(node).__name__} has vector components.")
-                weights.append(wc_list[0][0])
-            return cls(points, numpy.asarray(weights))
+            comps = {comp for pt in points for w, comp in node.pt_dict[pt]}
+            rank = len(max(comps))
+            if rank == 0:
+                weights = numpy.asarray([w for pt in points
+                                         for w, comp in node.pt_dict[pt]])
+                return cls(points, weights)
+            # value weight profile: one row of component weights per point
+            sd = node.ref_el.get_spatial_dimension()
+            weights = numpy.zeros((len(points), sd**rank))
+            shape = (sd,) * rank
+            for q, pt in enumerate(points):
+                for w, comp in node.pt_dict[pt]:
+                    weights[q, numpy.ravel_multi_index(comp, shape)] += w
+            return cls(points, weights, rank=rank)
 
         sd = node.ref_el.get_spatial_dimension()
         order = node.max_deriv_order
@@ -195,6 +202,10 @@ class Functional:
         """
         sd = fiat_element.get_reference_element().get_spatial_dimension()
         tab = fiat_element.tabulate(self.order, self.points)
+        if self.rank > 0:
+            T = tab[(0,) * sd]
+            T = T.reshape(T.shape[0], -1, len(self.points))
+            return numpy.einsum("jcq,qc->j", T, self.weights)
         if self.order == 0:
             return tab[(0,) * sd] @ self.weights
         alphas = multiindices(sd, self.order)
