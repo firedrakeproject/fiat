@@ -7,19 +7,17 @@ are not preserved under push-forward, it constructs the matrix
 physical nodes, so that the physical basis functions are obtained as
 :math:`M F^*(\\hat\\Psi)` with :math:`M = V^T`.
 
-The construction follows the factorization :math:`V = E V^c D`:
-
-* each reference node is pulled back to the physical cell and expanded
-  by the chain rule in a frame adapted to its entity: the physical
-  direction appearing in the corresponding physical node (e.g. the
-  physical facet normal) completed with the push-forwards of the
-  reference tangents (the :math:`V^c` factor and the extraction
-  :math:`E`);
-* the completion functionals are derivatives along *mapped* reference
-  tangents, so they coincide with reference functionals whose expansion
-  in the element's own nodes is a purely numeric generalized Vandermonde
-  row (the :math:`D` factor), computed by dual evaluation instead of
-  hand-derived univariate exactness rules.
+Degrees of freedom are represented symbolically by
+:class:`finat.functional.Functional` and processed generically, without
+dispatching over FIAT functional types.  Each reference node is pulled
+back to the physical cell by the chain rule and expanded in the frame
+of the physical facet normal and the mapped reference tangents; the
+tangential components are derivatives along *mapped* reference tangents
+and therefore coincide with reference functionals, whose expansion in
+the element's own nodes is a purely numeric generalized Vandermonde
+row.  In the language of the theory, the frame expansion realizes
+:math:`E V^c` and the numeric elimination of the tangential completion
+realizes :math:`D`.
 """
 
 from functools import reduce
@@ -28,71 +26,50 @@ from operator import add
 import numpy
 
 from FIAT.finite_element import FiniteElement
-from FIAT.functional import (Functional, IntegralMoment,
-                             IntegralMomentOfDerivative,
-                             IntegralMomentOfNormalDerivative,
-                             PointEvaluation)
-from gem import Literal, ListTensor, Node, Power
+from gem import Literal, ListTensor, Node, Power, Zero
+from finat.functional import Functional
 from finat.physically_mapped import (PhysicalGeometry, adjugate,
                                      determinant, identity)
 
 
-def dual_evaluation_matrix(fiat_element: FiniteElement,
-                           functionals: list[Functional]) -> numpy.ndarray:
-    """Evaluate functionals against the nodal basis of a FIAT element.
-
-    This is the generalized Vandermonde computation providing the
-    numeric coefficients of the :math:`D` factor: the restriction of a
-    functional :math:`\\ell` to the polynomial space :math:`P` satisfies
-    :math:`\\pi \\ell = \\sum_j \\ell(\\psi_j)\\, \\pi n_j`.
+def generalized_cross(tangents) -> numpy.ndarray:
+    """Generalized cross product of d-1 vectors in d dimensions.
 
     Parameters
     ----------
-    fiat_element :
-        The FIAT element providing the nodal basis.
-    functionals :
-        Functionals to evaluate.
+    tangents :
+        A (d-1, d) array of vectors, with numeric or GEM entries.
 
     Returns
     -------
     numpy.ndarray
-        Matrix with entry (k, j) equal to the k-th functional applied
-        to the j-th nodal basis function.
+        The vector :math:`C` such that :math:`C \\cdot w =
+        \\det([t_1; \\dots; t_{d-1}; w])` for all :math:`w`; it is
+        orthogonal to every :math:`t_k`.
     """
-    poly_set = fiat_element.get_nodal_basis()
-    coeffs = poly_set.get_coeffs()
-    riesz = numpy.array([f.to_riesz(poly_set).flatten() for f in functionals])
-    return riesz @ coeffs.reshape(coeffs.shape[0], -1).T
+    A = numpy.asarray(tangents)
+    d = A.shape[1]
+    cols = numpy.ones(d, dtype=bool)
+    C = []
+    for i in range(d):
+        cols[i] = False
+        C.append((-1) ** (d - 1 + i) * determinant(A[:, cols]))
+        cols[i] = True
+    return numpy.asarray(C)
 
 
-def is_invariant(node: Functional) -> bool:
-    """Return whether a functional is preserved under push-forward.
+class FacetFrame:
+    """Normal/tangential frame of a facet and its push-forward.
 
-    Point evaluations and integral moments of the function value against
-    an intrinsically defined weight (constructed from the same
-    reference-facet quadrature rule on both cells) satisfy
-    :math:`F_*(n) = \\hat{n}`, so their rows of :math:`V` are identity.
-    """
-    return type(node) in {PointEvaluation, IntegralMoment}
-
-
-def _normal_tangential_frame(fiat_element: FiniteElement, entity: int,
-                             J: Node, detJ: Node) -> tuple:
-    """Chain-rule data for the facet normal/tangential frame.
-
-    The pullback of the reference normal-derivative direction expands in
-    the frame of the physical facet normal and the mapped reference
-    tangents,
-
-    .. math:: J\\hat{n} = a\\, n + \\sum_k b_k\\, J\\hat{t}_k.
-
-    Orthogonality of the physical normal to the mapped tangents and the
-    identical (tangent-based) normal convention on both cells reduce the
-    coefficients to Gram-matrix algebra:
-    :math:`a = \\det J \\sqrt{\\det\\hat{G}/\\det G}` and
-    :math:`b = G^{-1} T^T J\\hat{n}` with :math:`T = [J\\hat{t}_k]` and
-    Gram matrices :math:`G = T^T T`, :math:`\\hat{G}_{kl} = \\hat{t}_k
-    \\cdot \\hat{t}_l`.
+    The reference frame consists of the FIAT facet normal
+    :math:`\\hat{n}` and the scaled facet tangents :math:`\\hat{t}_k`;
+    the physical frame consists of the physical facet normal and the
+    mapped tangents :math:`J\\hat{t}_k`.  Because FIAT normals are
+    computed from the tangents by the same formula on the reference and
+    physical cells, the physical normal is :math:`\\kappa\\, C / \\|C\\|`
+    with :math:`C` the generalized cross product of the mapped tangents
+    and :math:`\\kappa` a cell-independent constant recovered from the
+    reference data.
 
     Parameters
     ----------
@@ -102,83 +79,66 @@ def _normal_tangential_frame(fiat_element: FiniteElement, entity: int,
         The facet number.
     J :
         GEM expression for the cell Jacobian.
-    detJ :
-        GEM expression for the Jacobian determinant.
-
-    Returns
-    -------
-    tuple
-        ``(a, b)`` with ``a`` the GEM coefficient of the physical
-        normal node and ``b`` the list of GEM coefficients of the
-        mapped tangential functionals.
     """
-    ref_el = fiat_element.get_reference_element()
-    sd = ref_el.get_spatial_dimension()
-    that = ref_el.compute_tangents(sd - 1, entity)
-    nhat = ref_el.compute_normal(entity)
 
-    Jn = J @ Literal(nhat)
-    Jt = [J @ Literal(t) for t in that]
-    G = numpy.array([[Jt[k] @ Jt[l] for l in range(sd - 1)]
-                     for k in range(sd - 1)], dtype=object)
-    detG = determinant(G)
-    adjG = adjugate(G)
-    Tn = [Jt[k] @ Jn for k in range(sd - 1)]
-    b = [reduce(add, (adjG[k, l] * Tn[l] for l in range(sd - 1))) / detG
-         for k in range(sd - 1)]
+    def __init__(self, fiat_element: FiniteElement, entity: int, J: Node):
+        ref_el = fiat_element.get_reference_element()
+        sd = ref_el.get_spatial_dimension()
+        self.tangents = ref_el.compute_tangents(sd - 1, entity)
+        self.normal = ref_el.compute_normal(entity)
 
-    Ghat = numpy.dot(that, that.T)
-    a = detJ * Literal(numpy.linalg.det(Ghat) ** 0.5) / Power(detG, Literal(0.5))
-    return a, b
+        Chat = generalized_cross(self.tangents)
+        kappa = self.normal @ Chat / numpy.linalg.norm(Chat)
 
+        self.mapped_tangents = [J @ Literal(t) for t in self.tangents]
+        C = generalized_cross([[Jt[i] for i in range(sd)]
+                               for Jt in self.mapped_tangents])
+        A = numpy.empty((sd, sd), dtype=object)
+        A[:, 0] = C
+        for k, Jt in enumerate(self.mapped_tangents):
+            A[:, k + 1] = [Jt[i] for i in range(sd)]
+        self._adjA = adjugate(A)
+        self._detA = determinant(A)
 
-def _facet_normal_moment_rows(V: numpy.ndarray, dofs: list,
-                              fiat_element: FiniteElement, entity: int,
-                              J: Node, detJ: Node, invariant: set,
-                              tol: float) -> None:
-    """Fill the rows of V for normal-derivative moments on a facet.
+        normC = Power(reduce(add, (C[i] * C[i] for i in range(sd))),
+                      Literal(0.5))
+        self.normal_scale = normC / kappa
 
-    Parameters
-    ----------
-    V :
-        Object array being assembled, with entry (i, j) relating
-        reference node i to the push-forward of physical node j.
-    dofs :
-        Indices of the normal-derivative moment nodes on this facet.
-    fiat_element :
-        The FIAT element.
-    entity :
-        The facet number.
-    J, detJ :
-        GEM expressions for the cell Jacobian and its determinant.
-    invariant :
-        Indices of the push-forward invariant nodes.
-    tol :
-        Tolerance for detecting zeros in the numeric completion
-        coefficients.
-    """
-    ref_el = fiat_element.get_reference_element()
-    sd = ref_el.get_spatial_dimension()
-    that = ref_el.compute_tangents(sd - 1, entity)
-    nodes = fiat_element.dual_basis()
+    def reference_coefficients(self, direction: numpy.ndarray) -> numpy.ndarray:
+        """Expand a numeric direction in the reference frame.
 
-    a, b = _normal_tangential_frame(fiat_element, entity, J, detJ)
+        Parameters
+        ----------
+        direction :
+            A numeric direction vector.
 
-    # Nodal completion: same integral moment rule, tangential directions.
-    completion = [IntegralMomentOfDerivative(ref_el, nodes[i].Q,
-                                             nodes[i].f_at_qpts, t)
-                  for i in dofs for t in that]
-    C = dual_evaluation_matrix(fiat_element, completion)
-    C[abs(C) < tol] = 0
+        Returns
+        -------
+        numpy.ndarray
+            Coefficients ``(a, b_1, ..., b_{d-1})`` such that the
+            direction equals :math:`a\\hat{n} + \\sum_k b_k \\hat{t}_k`.
+        """
+        A = numpy.column_stack([self.normal, *self.tangents])
+        return numpy.linalg.solve(A, direction)
 
-    for row, (i, bk) in zip(C, ((i, bk) for i in dofs for bk in b)):
-        V[i, i] = a
-        for j in numpy.flatnonzero(row):
-            if j not in invariant:
-                raise NotImplementedError(
-                    f"Completion of node {i} couples to node {j} of type "
-                    f"{type(nodes[j]).__name__}, which is not yet handled.")
-            V[i, j] = V[i, j] + Literal(row[j]) * bk
+    def decompose(self, direction: Node) -> list:
+        """Expand a GEM direction in the un-normalized physical frame.
+
+        Parameters
+        ----------
+        direction :
+            A GEM direction vector.
+
+        Returns
+        -------
+        list
+            GEM coefficients ``(x_0, x_1, ..., x_{d-1})`` such that the
+            direction equals :math:`x_0 C + \\sum_k x_k J\\hat{t}_k`.
+        """
+        sd = self._adjA.shape[0]
+        return [reduce(add, (self._adjA[m, i] * direction[i]
+                             for i in range(sd))) / self._detA
+                for m in range(sd)]
 
 
 def _conditioning_scaling(V: numpy.ndarray, fiat_element: FiniteElement,
@@ -227,8 +187,7 @@ def zany_basis_transformation(fiat_element: FiniteElement,
     coordinate_mapping :
         Object providing the physical geometry as GEM expressions.
     tol :
-        Tolerance for detecting zeros in the numeric completion
-        coefficients.
+        Tolerance for detecting zeros in the numeric coefficients.
 
     Returns
     -------
@@ -240,26 +199,54 @@ def zany_basis_transformation(fiat_element: FiniteElement,
     sd = ref_el.get_spatial_dimension()
     bary, = ref_el.make_points(sd, 0, sd + 1)
     J = coordinate_mapping.jacobian_at(bary)
-    detJ = coordinate_mapping.detJ_at(bary)
 
     nodes = fiat_element.dual_basis()
-    invariant = {i for i, node in enumerate(nodes) if is_invariant(node)}
-
     V = identity(fiat_element.space_dimension())
+
+    processed = set()
     entity_ids = fiat_element.entity_dofs()
-    for dim in entity_ids:
-        for entity in entity_ids[dim]:
-            dofs = [i for i in entity_ids[dim][entity] if i not in invariant]
-            if not dofs:
-                continue
-            if all(isinstance(nodes[i], IntegralMomentOfNormalDerivative)
-                   for i in dofs):
-                _facet_normal_moment_rows(V, dofs, fiat_element, entity,
-                                          J, detJ, invariant, tol)
-            else:
-                unhandled = {type(nodes[i]).__name__ for i in dofs}
-                raise NotImplementedError(
-                    f"Cannot yet transform nodes of type {unhandled}.")
+    for dim in sorted(entity_ids):
+        for entity in sorted(entity_ids[dim]):
+            frame = None
+            for i in entity_ids[dim][entity]:
+                ell = Functional.from_fiat(nodes[i])
+                if ell.order == 0:
+                    # Value functionals are push-forward invariant
+                    processed.add(i)
+                    continue
+                if dim != sd - 1:
+                    raise NotImplementedError(
+                        "Derivative nodes are only handled on facets.")
+                if frame is None:
+                    frame = FacetFrame(fiat_element, entity, J)
+
+                # Split the direction into normal and tangential parts
+                a, *beta = frame.reference_coefficients(ell.direction)
+                if abs(a) < tol:
+                    # Mapped tangential derivatives are invariant
+                    processed.add(i)
+                    continue
+
+                # Expand the pulled-back node in the physical frame
+                x = frame.decompose(ell.pullback(J).direction)
+                c = x[0] * frame.normal_scale / a
+                row = numpy.full(len(nodes), Zero(), dtype=object)
+                row[i] = c
+                # Eliminate the tangential completion functionals, which
+                # coincide with reference functionals with numeric
+                # coefficients on already transformed nodes
+                for k, that in enumerate(frame.tangents):
+                    r = x[k + 1] - c * beta[k]
+                    coefficients = ell.with_direction(that).evaluate(fiat_element)
+                    coefficients[abs(coefficients) < tol] = 0
+                    for j in numpy.flatnonzero(coefficients):
+                        if j not in processed:
+                            raise NotImplementedError(
+                                f"Completion of node {i} couples to node {j}, "
+                                "which has not been transformed yet.")
+                        row = row + V[j, :] * (r * coefficients[j])
+                V[i, :] = row
+                processed.add(i)
 
     _conditioning_scaling(V, fiat_element, coordinate_mapping)
     return ListTensor(V.T)

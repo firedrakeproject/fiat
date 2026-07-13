@@ -1,34 +1,57 @@
-import finat
+import FIAT
 import numpy as np
 import pytest
 
 from gem.interpreter import evaluate
+from finat.functional import Functional
 from finat.zany import zany_basis_transformation
 
 
-class AutoMorley(finat.Morley):
-    """Morley element with automatically derived basis transformation."""
-    def basis_transformation(self, coordinate_mapping):
-        return zany_basis_transformation(self._element, coordinate_mapping)
-
-
-auto_elements = {
-    AutoMorley: finat.Morley,
-}
-
-
-@pytest.mark.parametrize("element", auto_elements)
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_auto_transformation(check_zany_mapping, ref_to_phys, element, dimension):
-    check_zany_mapping(element, ref_to_phys[dimension])
+def test_functional_from_fiat(dimension):
+    """The symbolic Functional recovers order, weights and direction
+    numerically from the FIAT functional dictionaries."""
+    cell = FIAT.ufc_simplex(dimension)
+    element = FIAT.Morley(cell)
+    entity_ids = element.entity_dofs()
+    nodes = element.dual_basis()
+
+    for i in entity_ids[dimension - 2][0]:
+        ell = Functional.from_fiat(nodes[i])
+        assert ell.order == 0
+        assert ell.direction is None
+
+    for entity in entity_ids[dimension - 1]:
+        for i in entity_ids[dimension - 1][entity]:
+            ell = Functional.from_fiat(nodes[i])
+            assert ell.order == 1
+            normal = cell.compute_normal(entity)
+            cosine = ell.direction @ normal
+            assert np.isclose(abs(cosine), np.linalg.norm(normal))
 
 
-@pytest.mark.parametrize("element", auto_elements)
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_auto_matches_handcoded(scaled_ref_to_phys, element, dimension):
-    handcoded = auto_elements[element]
-    for mapping in scaled_ref_to_phys[dimension]:
-        cell = mapping.ref_cell
-        Ma = evaluate([element(cell).basis_transformation(mapping)])[0].arr
-        Mh = evaluate([handcoded(cell).basis_transformation(mapping)])[0].arr
-        assert np.allclose(Ma, Mh, atol=1e-14)
+def test_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, dimension):
+    """Derivative dofs are rescaled by cell size to the power of the
+    derivative order."""
+    scaled = scaled_ref_to_phys[dimension][-1]
+    # the same geometric mapping with unit cell size
+    unit = type(ref_to_phys[dimension])(scaled.ref_cell, scaled.phys_cell)
+    element = FIAT.Morley(scaled.ref_cell)
+
+    Ms = evaluate([zany_basis_transformation(element, scaled)])[0].arr
+    Mu = evaluate([zany_basis_transformation(element, unit)])[0].arr
+
+    h = scaled.cell_size()[0]
+    assert not np.isclose(h, 1)
+    orders = [node.max_deriv_order for node in element.dual_basis()]
+    expected = Mu * np.asarray([h**-order for order in orders])[:, None]
+    assert np.allclose(Ms, expected)
+
+
+def test_unsupported_nodes(ref_to_phys):
+    """Vertex derivative nodes are not handled yet."""
+    mapping = ref_to_phys[2]
+    element = FIAT.CubicHermite(mapping.ref_cell)
+    with pytest.raises(NotImplementedError):
+        zany_basis_transformation(element, mapping)
