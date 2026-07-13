@@ -1,4 +1,4 @@
-"""Automatic basis transformations for physically mapped elements.
+r"""Automatic basis transformations for physically mapped elements.
 
 This module automates the transformation theory of Kirby (2017) and
 Brubeck & Kirby (2025).  Given a FIAT element whose degrees of freedom
@@ -33,7 +33,7 @@ from finat.physically_mapped import (PhysicalGeometry, adjugate,
 
 
 def generalized_cross(tangents) -> numpy.ndarray:
-    """Generalized cross product of d-1 vectors in d dimensions.
+    r"""Generalized cross product of d-1 vectors in d dimensions.
 
     Parameters
     ----------
@@ -46,6 +46,7 @@ def generalized_cross(tangents) -> numpy.ndarray:
         The vector :math:`C` such that :math:`C \\cdot w =
         \\det([t_1; \\dots; t_{d-1}; w])` for all :math:`w`; it is
         orthogonal to every :math:`t_k`.
+
     """
     A = numpy.asarray(tangents)
     d = A.shape[1]
@@ -59,7 +60,7 @@ def generalized_cross(tangents) -> numpy.ndarray:
 
 
 class FacetFrame:
-    """Normal/tangential frame of a facet and its push-forward.
+    r"""Normal/tangential frame of a facet and its push-forward.
 
     The reference frame consists of the FIAT facet normal
     :math:`\\hat{n}` and the scaled facet tangents :math:`\\hat{t}_k`;
@@ -79,6 +80,7 @@ class FacetFrame:
         The facet number.
     J :
         GEM expression for the cell Jacobian.
+
     """
 
     def __init__(self, fiat_element: FiniteElement, entity: int, J: Node):
@@ -105,7 +107,7 @@ class FacetFrame:
         self.normal_scale = normC / kappa
 
     def reference_coefficients(self, direction: numpy.ndarray) -> numpy.ndarray:
-        """Expand a numeric direction in the reference frame.
+        r"""Expand a numeric direction in the reference frame.
 
         Parameters
         ----------
@@ -117,12 +119,13 @@ class FacetFrame:
         numpy.ndarray
             Coefficients ``(a, b_1, ..., b_{d-1})`` such that the
             direction equals :math:`a\\hat{n} + \\sum_k b_k \\hat{t}_k`.
+
         """
         A = numpy.column_stack([self.normal, *self.tangents])
         return numpy.linalg.solve(A, direction)
 
     def decompose(self, direction: Node) -> list:
-        """Expand a GEM direction in the un-normalized physical frame.
+        r"""Expand a GEM direction in the un-normalized physical frame.
 
         Parameters
         ----------
@@ -134,6 +137,7 @@ class FacetFrame:
         list
             GEM coefficients ``(x_0, x_1, ..., x_{d-1})`` such that the
             direction equals :math:`x_0 C + \\sum_k x_k J\\hat{t}_k`.
+
         """
         sd = self._adjA.shape[0]
         return [reduce(add, (self._adjA[m, i] * direction[i]
@@ -151,7 +155,7 @@ def _weight_ratio(wi: numpy.ndarray, wj: numpy.ndarray, tol: float) -> float:
 
 def _conditioning_scaling(V: numpy.ndarray, fiat_element: FiniteElement,
                           coordinate_mapping: PhysicalGeometry) -> None:
-    """Rescale derivative degrees of freedom by the cell size.
+    r"""Rescale derivative degrees of freedom by the cell size.
 
     Each physical node of derivative order :math:`m` is redefined with a
     factor :math:`h^{-m}`, where :math:`h` averages the cell size over
@@ -167,6 +171,7 @@ def _conditioning_scaling(V: numpy.ndarray, fiat_element: FiniteElement,
         The FIAT element.
     coordinate_mapping :
         Object providing the physical geometry as GEM expressions.
+
     """
     # cell_size may be a GEM expression or a numpy array of numbers
     h = coordinate_mapping.cell_size()
@@ -186,7 +191,7 @@ def _conditioning_scaling(V: numpy.ndarray, fiat_element: FiniteElement,
 def zany_basis_transformation(fiat_element: FiniteElement,
                               coordinate_mapping: PhysicalGeometry,
                               tol: float = 1e-12) -> ListTensor:
-    """Compute the basis transformation matrix of a FIAT element.
+    r"""Compute the basis transformation matrix of a FIAT element.
 
     Parameters
     ----------
@@ -202,6 +207,7 @@ def zany_basis_transformation(fiat_element: FiniteElement,
     gem.ListTensor
         The transformation :math:`M = V^T` mapping pulled-back reference
         basis functions to physical nodal basis functions.
+
     """
     ref_el = fiat_element.get_reference_element()
     sd = ref_el.get_spatial_dimension()
@@ -233,7 +239,7 @@ def zany_basis_transformation(fiat_element: FiniteElement,
 
 def _facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
                 entity: int, J: Node, processed: set, tol: float) -> None:
-    """Assemble the rows of V for derivative nodes on a facet.
+    r"""Assemble the rows of V for derivative nodes on a facet.
 
     Physical facet nodes take their normal component along the physical
     facet normal and their tangential components along the mapped
@@ -259,6 +265,7 @@ def _facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
         Indices of the already assembled rows; updated in place.
     tol :
         Tolerance for detecting zeros in the numeric coefficients.
+
     """
     frame = FacetFrame(fiat_element, entity, J)
     for i, ell in group.items():
@@ -290,7 +297,7 @@ def _facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
 
 def _point_jet_rows(V: numpy.ndarray, group: dict, J: Node,
                     processed: set, tol: float) -> None:
-    """Assemble the rows of V for derivative nodes away from facets.
+    r"""Assemble the rows of V for derivative nodes away from facets.
 
     Away from facets there is no geometric frame, and physical nodes
     keep the reference (Cartesian) directions, so the group must span
@@ -311,6 +318,7 @@ def _point_jet_rows(V: numpy.ndarray, group: dict, J: Node,
         Indices of the already assembled rows; updated in place.
     tol :
         Tolerance for detecting zeros in the numeric coefficients.
+
     """
     directions = numpy.array([ell.direction for ell in group.values()])
     if len(set(ell.points for ell in group.values())) > 1:

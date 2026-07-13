@@ -1,4 +1,4 @@
-"""Symbolic representation of degrees of freedom.
+r"""Symbolic representation of degrees of freedom.
 
 A :class:`Functional` represents a degree of freedom in the form
 
@@ -22,11 +22,19 @@ its points and weights: integral moments must be measure-intrinsic
 Brubeck & Kirby (2025).
 """
 
+from math import factorial, prod
+
 import numpy
 
 from FIAT.finite_element import FiniteElement
+from FIAT.polynomial_set import mis
 from FIAT.functional import Functional as FIATFunctional
-from gem import Literal, Node
+from gem import Node, Zero
+
+
+def multiindices(sd: int, order: int) -> list:
+    """Multi-indices of a given order, with axis ordering for order 1."""
+    return sorted(mis(sd, order), reverse=True)
 
 
 class Functional:
@@ -43,6 +51,7 @@ class Functional:
     direction :
         For ``order > 0``, the direction tensor of rank ``order``,
         either numeric or a GEM expression; ``None`` for ``order == 0``.
+
     """
 
     def __init__(self, points: tuple, weights: numpy.ndarray,
@@ -73,6 +82,7 @@ class Functional:
         -------
         Functional
             The symbolic representation of the FIAT functional.
+
         """
         if node.pt_dict and node.deriv_dict:
             raise NotImplementedError(
@@ -91,19 +101,17 @@ class Functional:
 
         sd = node.ref_el.get_spatial_dimension()
         order = node.max_deriv_order
-        if order != 1:
-            raise NotImplementedError(
-                f"{type(node).__name__} has derivative order {order}.")
+        alphas = multiindices(sd, order)
+        lookup = {alpha: k for k, alpha in enumerate(alphas)}
 
         points = tuple(node.deriv_dict)
-        W = numpy.zeros((len(points), sd))
+        W = numpy.zeros((len(points), len(alphas)))
         for q, pt in enumerate(points):
             for w, alpha, comp in node.deriv_dict[pt]:
                 if comp != tuple():
                     raise NotImplementedError(
                         f"{type(node).__name__} has vector components.")
-                k, = numpy.flatnonzero(alpha)
-                W[q, k] += w
+                W[q, lookup[tuple(alpha)]] += w
 
         # Factor the weights as a common direction times scalar weights
         u, s, vt = numpy.linalg.svd(W)
@@ -112,7 +120,7 @@ class Functional:
                 f"{type(node).__name__} has no common derivative direction.")
         direction = vt[0]
         weights = u[:, 0] * s[0]
-        return cls(points, weights, order=1, direction=direction)
+        return cls(points, weights, order=order, direction=direction)
 
     def with_direction(self, direction) -> "Functional":
         """Return the same functional with another direction tensor."""
@@ -120,7 +128,7 @@ class Functional:
                           order=self.order, direction=direction)
 
     def pullback(self, J: Node) -> "Functional":
-        """View this reference functional as acting on physical functions.
+        r"""View this reference functional as acting on physical functions.
 
         By the chain rule, reference derivatives of a pullback are
         physical derivatives contracted with the Jacobian, so the
@@ -138,17 +146,36 @@ class Functional:
             The functional with direction :math:`J \\otimes \\dots
             \\otimes J : D`, acting on physical derivatives at the
             images of the reference points.
+
         """
         if self.order == 0:
             return self
-        elif self.order == 1:
-            return self.with_direction(J @ Literal(self.direction))
-        else:
-            raise NotImplementedError(
-                f"Pullback of derivative order {self.order} not implemented.")
+        sd = J.shape[0]
+        alphas = multiindices(sd, self.order)
+        lookup = {alpha: k for k, alpha in enumerate(alphas)}
+
+        # Distribute the multi-index coefficients over a symmetric tensor
+        T = numpy.zeros((sd,) * self.order)
+        for index in numpy.ndindex(T.shape):
+            alpha = _index_alpha(index, sd)
+            scale = prod(map(factorial, alpha)) / factorial(self.order)
+            T[index] = self.direction[lookup[alpha]] * scale
+
+        # Contract each slot with the Jacobian
+        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                          dtype=object)
+        for _ in range(self.order):
+            T = numpy.tensordot(T, Jnp, axes=(0, 1))
+
+        # Collapse back onto multi-index coefficients
+        direction = numpy.full(len(alphas), Zero(), dtype=object)
+        for index in numpy.ndindex(T.shape):
+            k = lookup[_index_alpha(index, sd)]
+            direction[k] = direction[k] + T[index]
+        return self.with_direction(direction)
 
     def evaluate(self, fiat_element: FiniteElement) -> numpy.ndarray:
-        """Apply this functional to the nodal basis of a FIAT element.
+        r"""Apply this functional to the nodal basis of a FIAT element.
 
         This is the generalized Vandermonde computation: the restriction
         of a functional :math:`\\ell` to the polynomial space satisfies
@@ -164,14 +191,20 @@ class Functional:
         -------
         numpy.ndarray
             The vector of values of this functional on the nodal basis.
+
         """
         sd = fiat_element.get_reference_element().get_spatial_dimension()
         tab = fiat_element.tabulate(self.order, self.points)
-        row = 0
-        for index in numpy.ndindex((sd,) * self.order):
-            alpha = [0] * sd
-            for k in index:
-                alpha[k] += 1
-            coef = self.direction[index] if self.order else 1
-            row = row + coef * (tab[tuple(alpha)] @ self.weights)
-        return row
+        if self.order == 0:
+            return tab[(0,) * sd] @ self.weights
+        alphas = multiindices(sd, self.order)
+        return self.direction @ numpy.array([tab[alpha] @ self.weights
+                                             for alpha in alphas])
+
+
+def _index_alpha(index: tuple, sd: int) -> tuple:
+    """Convert a tensor index into a derivative multi-index."""
+    alpha = [0] * sd
+    for k in index:
+        alpha[k] += 1
+    return tuple(alpha)
