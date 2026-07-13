@@ -141,6 +141,14 @@ class FacetFrame:
                 for m in range(sd)]
 
 
+def _weight_ratio(wi: numpy.ndarray, wj: numpy.ndarray, tol: float) -> float:
+    """Return the scalar s with wi == s * wj, if it exists."""
+    s = wi @ wj / (wj @ wj)
+    if not numpy.allclose(wi, s * wj, atol=tol * numpy.linalg.norm(wi)):
+        raise NotImplementedError("Weights are not parallel.")
+    return s
+
+
 def _conditioning_scaling(V: numpy.ndarray, fiat_element: FiniteElement,
                           coordinate_mapping: PhysicalGeometry) -> None:
     """Rescale derivative degrees of freedom by the cell size.
@@ -207,46 +215,117 @@ def zany_basis_transformation(fiat_element: FiniteElement,
     entity_ids = fiat_element.entity_dofs()
     for dim in sorted(entity_ids):
         for entity in sorted(entity_ids[dim]):
-            frame = None
-            for i in entity_ids[dim][entity]:
-                ell = Functional.from_fiat(nodes[i])
-                if ell.order == 0:
-                    # Value functionals are push-forward invariant
-                    processed.add(i)
-                    continue
-                if dim != sd - 1:
-                    raise NotImplementedError(
-                        "Derivative nodes are only handled on facets.")
-                if frame is None:
-                    frame = FacetFrame(fiat_element, entity, J)
-
-                # Split the direction into normal and tangential parts
-                a, *beta = frame.reference_coefficients(ell.direction)
-                if abs(a) < tol:
-                    # Mapped tangential derivatives are invariant
-                    processed.add(i)
-                    continue
-
-                # Expand the pulled-back node in the physical frame
-                x = frame.decompose(ell.pullback(J).direction)
-                c = x[0] * frame.normal_scale / a
-                row = numpy.full(len(nodes), Zero(), dtype=object)
-                row[i] = c
-                # Eliminate the tangential completion functionals, which
-                # coincide with reference functionals with numeric
-                # coefficients on already transformed nodes
-                for k, that in enumerate(frame.tangents):
-                    r = x[k + 1] - c * beta[k]
-                    coefficients = ell.with_direction(that).evaluate(fiat_element)
-                    coefficients[abs(coefficients) < tol] = 0
-                    for j in numpy.flatnonzero(coefficients):
-                        if j not in processed:
-                            raise NotImplementedError(
-                                f"Completion of node {i} couples to node {j}, "
-                                "which has not been transformed yet.")
-                        row = row + V[j, :] * (r * coefficients[j])
-                V[i, :] = row
-                processed.add(i)
+            ells = {i: Functional.from_fiat(nodes[i])
+                    for i in entity_ids[dim][entity]}
+            # Value functionals are push-forward invariant
+            processed.update(i for i, ell in ells.items() if ell.order == 0)
+            group = {i: ell for i, ell in ells.items() if ell.order > 0}
+            if not group:
+                continue
+            if dim == sd - 1:
+                _facet_rows(V, group, fiat_element, entity, J, processed, tol)
+            else:
+                _point_jet_rows(V, group, J, processed, tol)
 
     _conditioning_scaling(V, fiat_element, coordinate_mapping)
     return ListTensor(V.T)
+
+
+def _facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
+                entity: int, J: Node, processed: set, tol: float) -> None:
+    """Assemble the rows of V for derivative nodes on a facet.
+
+    Physical facet nodes take their normal component along the physical
+    facet normal and their tangential components along the mapped
+    reference tangents.  The pulled-back reference node is expanded in
+    this frame, and the tangential remainders, being derivatives along
+    mapped reference tangents, coincide with reference functionals that
+    are eliminated numerically through already assembled rows of V.
+
+    Parameters
+    ----------
+    V :
+        Object array being assembled.
+    group :
+        Mapping from node index to symbolic Functional for the
+        derivative nodes on this facet.
+    fiat_element :
+        The FIAT element.
+    entity :
+        The facet number.
+    J :
+        GEM expression for the cell Jacobian.
+    processed :
+        Indices of the already assembled rows; updated in place.
+    tol :
+        Tolerance for detecting zeros in the numeric coefficients.
+    """
+    frame = FacetFrame(fiat_element, entity, J)
+    for i, ell in group.items():
+        # Split the direction into normal and tangential parts
+        a, *beta = frame.reference_coefficients(ell.direction)
+        if abs(a) < tol:
+            # Mapped tangential derivatives are invariant
+            processed.add(i)
+            continue
+
+        # Expand the pulled-back node in the physical frame
+        x = frame.decompose(ell.pullback(J).direction)
+        c = x[0] * frame.normal_scale / a
+        row = numpy.full(V.shape[1], Zero(), dtype=object)
+        row[i] = c
+        for k, that in enumerate(frame.tangents):
+            r = x[k + 1] - c * beta[k]
+            coefficients = ell.with_direction(that).evaluate(fiat_element)
+            coefficients[abs(coefficients) < tol] = 0
+            for j in numpy.flatnonzero(coefficients):
+                if j not in processed:
+                    raise NotImplementedError(
+                        f"Completion of node {i} couples to node {j}, "
+                        "which has not been transformed yet.")
+                row = row + V[j, :] * (r * coefficients[j])
+        V[i, :] = row
+        processed.add(i)
+
+
+def _point_jet_rows(V: numpy.ndarray, group: dict, J: Node,
+                    processed: set, tol: float) -> None:
+    """Assemble the rows of V for derivative nodes away from facets.
+
+    Away from facets there is no geometric frame, and physical nodes
+    keep the reference (Cartesian) directions, so the group must span
+    all directions and acts as its own completion: this is the
+    affine-interpolation equivalent case, and each pulled-back node is
+    expanded within the group.
+
+    Parameters
+    ----------
+    V :
+        Object array being assembled.
+    group :
+        Mapping from node index to symbolic Functional for the
+        derivative nodes on this entity.
+    J :
+        GEM expression for the cell Jacobian.
+    processed :
+        Indices of the already assembled rows; updated in place.
+    tol :
+        Tolerance for detecting zeros in the numeric coefficients.
+    """
+    directions = numpy.array([ell.direction for ell in group.values()])
+    if len(set(ell.points for ell in group.values())) > 1:
+        raise NotImplementedError("Group nodes at different points.")
+    if directions.shape[0] != directions.shape[1]:
+        raise NotImplementedError(
+            "Directions do not span the derivative jet.")
+
+    # coefficients of the direction basis expansion of each Cartesian axis
+    Dinv = numpy.linalg.inv(directions.T)
+    for i, ell in group.items():
+        Jd = ell.pullback(J).direction
+        for col, (j, ellj) in enumerate(group.items()):
+            s = _weight_ratio(ell.weights, ellj.weights, tol)
+            x = s * Dinv[col]
+            nz = numpy.flatnonzero(abs(x) > tol)
+            V[i, j] = reduce(add, (Jd[m] * x[m] for m in nz)) if len(nz) else Zero()
+        processed.add(i)

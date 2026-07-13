@@ -30,28 +30,32 @@ def test_functional_from_fiat(dimension):
             assert np.isclose(abs(cosine), np.linalg.norm(normal))
 
 
+auto_elements = [FIAT.Morley, FIAT.CubicHermite]
+
+
+@pytest.mark.parametrize("element", auto_elements)
 @pytest.mark.parametrize("dimension", [2, 3])
-def test_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, dimension):
+def test_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, element, dimension):
     """Derivative dofs are rescaled by cell size to the power of the
     derivative order."""
     scaled = scaled_ref_to_phys[dimension][-1]
     # the same geometric mapping with unit cell size
     unit = type(ref_to_phys[dimension])(scaled.ref_cell, scaled.phys_cell)
-    element = FIAT.Morley(scaled.ref_cell)
+    fiat_element = element(scaled.ref_cell)
 
-    Ms = evaluate([zany_basis_transformation(element, scaled)])[0].arr
-    Mu = evaluate([zany_basis_transformation(element, unit)])[0].arr
+    Ms = evaluate([zany_basis_transformation(fiat_element, scaled)])[0].arr
+    Mu = evaluate([zany_basis_transformation(fiat_element, unit)])[0].arr
 
     h = scaled.cell_size()[0]
     assert not np.isclose(h, 1)
-    orders = [node.max_deriv_order for node in element.dual_basis()]
+    orders = [node.max_deriv_order for node in fiat_element.dual_basis()]
     expected = Mu * np.asarray([h**-order for order in orders])[:, None]
     assert np.allclose(Ms, expected)
 
 
 def test_unsupported_nodes(ref_to_phys):
-    """Vertex derivative nodes are not handled yet."""
+    """Second derivative nodes are not handled yet."""
     mapping = ref_to_phys[2]
-    element = FIAT.CubicHermite(mapping.ref_cell)
+    element = FIAT.Bell(mapping.ref_cell)
     with pytest.raises(NotImplementedError):
         zany_basis_transformation(element, mapping)

@@ -160,12 +160,12 @@ the theory factor by factor, not merely reproduce matrix entries:
 
 **Status (2026-07-13).** The framework lives in `finat/functional.py` (the symbolic
 `finat.Functional`) and `finat/zany.py` (`FacetFrame`, `zany_basis_transformation`).
-`finat.Morley` is reimplemented on it: `basis_transformation` is one call to
-`zany_basis_transformation(self._element, coordinate_mapping)`, working in 2D and 3D
-through a single dimension-independent code path, verified by `check_zany_mapping`
-and matching the previous hand-coded matrices (including the $h$-scaling) to machine
-precision before that code was deleted. `morley_transform` moved verbatim to
-`finat/walkington.py`, its only remaining user. Tests:
+`finat.Morley` and `finat.Hermite` are reimplemented on it: `basis_transformation` is
+one call to `zany_basis_transformation(self._element, coordinate_mapping)`, working in
+2D and 3D through a single dimension-independent code path, verified by
+`check_zany_mapping` and matching the previous hand-coded matrices (including the
+$h$-scaling) to machine precision before that code was deleted. `morley_transform`
+moved verbatim to `finat/walkington.py`, its only remaining user. Tests:
 `test/finat/test_zany_automation.py`; `check_zany_mapping` lives in the finat conftest
 and is provided to test modules as a pytest fixture (pytest runs with
 `--import-mode=importlib`, so test modules cannot import from each other or from
@@ -197,6 +197,15 @@ The row of $V$ for a reference node $\hat\ell$ with direction $\hat d = a\hat n 
   already-assembled rows of $V$ (entities processed in increasing dimension), which
   will later let completions couple to vertex jets (Argyris/HCT) for free.
 
+Derivative nodes *away from facets* (`_point_jet_rows`, covering Hermite vertex
+gradients) have no geometric frame: FIAT keeps Cartesian directions on the physical
+cell, so the group of derivative nodes on the entity acts as its own completion — this
+is precisely affine-interpolation equivalence. The pulled-back direction $J\hat d_i$
+is expanded in the group's own (numeric) direction basis, with weight-ratio factors
+making the expansion invariant under the SVD scale/sign ambiguity of each node's
+recovered $(w, D)$ factorization. The group must span the derivative jet, share its
+points, and have pairwise-parallel weights; otherwise `NotImplementedError`.
+
 Key facts the framework rests on:
 
 * **FIAT normals are "UFC consistent":** computed from the tangents by the same formula
@@ -220,11 +229,11 @@ Key facts the framework rests on:
   (GEM overloads `+ - * / ** @` with `Zero`/constant folding; keep numpy object arrays
   on the left when scaling by a GEM scalar).
 
-Next steps: vertex-jet groups (order $\geq 2$ pullback = tensor powers of $J$;
-point-jet groups are their own completion) to cover Hermite/Bell/Argyris vertices;
-completion rows coupling to jet dofs (the recursion already supports it once jets have
-rows); the extended-element path for reduced HCT/Bell; vector-valued components for
-Piola-mapped elements.
+Next steps: second and higher derivative orders (pullback = tensor powers of $J$;
+symmetric direction tensors in `Functional`) to cover Bell/Argyris vertex jets;
+facet-derivative completion rows coupling to jet dofs (the recursion already supports
+it once jets have rows); the extended-element path for reduced HCT/Bell; vector-valued
+components for Piola-mapped elements.
 
 The implementation mirrors the theory factor by factor:
 
