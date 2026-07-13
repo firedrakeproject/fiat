@@ -1,8 +1,11 @@
+import pprint
+
 import pytest
 import FIAT
 import gem
 import numpy as np
-from finat.physically_mapped import PhysicalGeometry
+from gem.interpreter import evaluate
+from finat.physically_mapped import PhysicalGeometry, PhysicallyMappedElement
 
 
 class MyMapping(PhysicalGeometry):
@@ -126,3 +129,103 @@ def ref_to_phys(ref_el, phys_el):
 def scaled_ref_to_phys(ref_el):
     return {dim: [ScaledMapping(ref_el[dim], scaled_simplex(dim, 0.5**k)) for k in range(3)]
             for dim in ref_el}
+
+
+def make_unisolvent_points(element, interior=False):
+    degree = element.degree()
+    ref_complex = element.get_reference_complex()
+    top = ref_complex.get_topology()
+    pts = []
+    if interior:
+        dim = ref_complex.get_spatial_dimension()
+        for entity in top[dim]:
+            pts.extend(ref_complex.make_points(dim, entity, degree+dim+1, variant="gll"))
+    else:
+        for dim in top:
+            for entity in top[dim]:
+                pts.extend(ref_complex.make_points(dim, entity, degree, variant="gll"))
+    return pts
+
+
+def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
+    phys_cell = ref_to_phys.phys_cell
+    ref_cell = ref_to_phys.ref_cell
+    phys_element = element(phys_cell, *args, **kwargs).fiat_equivalent
+    finat_element = element(ref_cell, *args, **kwargs)
+
+    ref_element = finat_element._element
+    ref_cell = ref_element.get_reference_element()
+    phys_cell = phys_element.get_reference_element()
+    sd = ref_cell.get_spatial_dimension()
+
+    shape = ref_element.value_shape()
+    ref_pts = make_unisolvent_points(ref_element, interior=True)
+    ref_vals = ref_element.tabulate(0, ref_pts)[(0,)*sd]
+
+    phys_pts = make_unisolvent_points(phys_element, interior=True)
+    phys_vals = phys_element.tabulate(0, phys_pts)[(0,)*sd]
+
+    mapping = ref_element.mapping()[0]
+    if mapping == "affine":
+        ref_vals_piola = ref_vals
+    else:
+        # Piola map the reference elements
+        J, b = FIAT.reference_element.make_affine_mapping(ref_cell.vertices,
+                                                          phys_cell.vertices)
+        K = []
+        if "covariant" in mapping:
+            K.append(np.linalg.inv(J).T)
+        if "contravariant" in mapping:
+            K.append(J / np.linalg.det(J))
+
+        if len(shape) == 2:
+            piola_map = lambda x: K[0] @ x @ K[-1].T
+        else:
+            piola_map = lambda x: K[0] @ x
+
+        ref_vals_piola = np.zeros(ref_vals.shape)
+        for i in range(ref_vals.shape[0]):
+            for k in range(ref_vals.shape[-1]):
+                ref_vals_piola[i, ..., k] = piola_map(ref_vals[i, ..., k])
+
+    # Zany map the results
+    num_bfs = phys_element.space_dimension()
+    num_dofs = finat_element.space_dimension()
+    if isinstance(finat_element, PhysicallyMappedElement):
+        Mgem = finat_element.basis_transformation(ref_to_phys)
+        M = evaluate([Mgem])[0].arr
+        ref_vals_zany = np.tensordot(M, ref_vals_piola, (-1, 0))
+    else:
+        M = np.eye(num_dofs, num_bfs)
+        ref_vals_zany = ref_vals_piola
+
+    # Solve for the basis transformation and compare results
+    Phi = ref_vals_piola.reshape(num_bfs, -1)
+    phi = phys_vals.reshape(num_bfs, -1)
+    Vh, residual, *_ = np.linalg.lstsq(Phi.T, phi.T)
+    Mh = Vh.T
+    Mh = Mh[:num_dofs]
+    tol = 1E-10
+    Mh[abs(Mh) < tol] = 0
+    M[abs(M) < tol] = 0
+
+    delta = M.T - Mh.T
+    delta[abs(delta) < tol] = 0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        error = delta / Mh.T
+    error[error != error] = 0
+    error[delta == 0] = 0
+    error[abs(error) < tol] = 0
+
+    inds = tuple(map(np.unique, np.nonzero(error)))
+    error = error[np.ix_(*inds)]
+    error[error != 0] += 1
+
+    pp = pprint.PrettyPrinter(width=140, compact=True)
+    assert np.allclose(residual, 0), pp.pformat((np.round(error, 8).tolist(), *inds))
+    assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), pp.pformat((np.round(error, 8).tolist(), *inds))
+
+
+@pytest.fixture(name="check_zany_mapping")
+def check_zany_mapping_fixture():
+    return check_zany_mapping
