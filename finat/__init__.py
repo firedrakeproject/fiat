@@ -43,7 +43,7 @@ from .mixed import MixedElement                                    # noqa: F401
 from .nodal_enriched import NodalEnrichedElement                   # noqa: F401
 from .quadrature_element import QuadratureElement, make_quadrature_element  # noqa: F401
 from .restricted import RestrictedElement                          # noqa: F401
-from .functional import Functional                                 # noqa: F401
+from .functional import PhysicallyMappedFunctional                 # noqa: F401
 from .runtime_tabulated import RuntimeTabulated                    # noqa: F401
 from . import quadrature                                           # noqa: F401
 from . import cell_tools                                           # noqa: F401

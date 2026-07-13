@@ -1,6 +1,6 @@
 r"""Symbolic representation of degrees of freedom.
 
-A :class:`Functional` represents a degree of freedom in the form
+A :class:`PhysicallyMappedFunctional` represents a degree of freedom in the form
 
 .. math:: \\ell(f) = \\sum_q w_q \\langle D, \\nabla^m f(x_q) \\rangle,
 
@@ -37,7 +37,7 @@ def multiindices(sd: int, order: int) -> list:
     return sorted(mis(sd, order), reverse=True)
 
 
-class Functional:
+class PhysicallyMappedFunctional:
     """Symbolic degree of freedom with a single derivative direction.
 
     Parameters
@@ -63,8 +63,8 @@ class Functional:
         self.rank = rank
 
     @classmethod
-    def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12) -> "Functional":
-        """Construct a symbolic Functional from a FIAT functional.
+    def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12) -> "PhysicallyMappedFunctional":
+        """Construct a symbolic PhysicallyMappedFunctional from a FIAT functional.
 
         The construction only inspects the point and derivative
         dictionaries: the derivative order and the (common) direction of
@@ -81,7 +81,7 @@ class Functional:
 
         Returns
         -------
-        Functional
+        PhysicallyMappedFunctional
             The symbolic representation of the FIAT functional.
 
         """
@@ -129,12 +129,12 @@ class Functional:
         weights = u[:, 0] * s[0]
         return cls(points, weights, order=order, direction=direction)
 
-    def with_direction(self, direction) -> "Functional":
+    def with_direction(self, direction) -> "PhysicallyMappedFunctional":
         """Return the same functional with another direction tensor."""
         return type(self)(self.points, self.weights,
                           order=self.order, direction=direction)
 
-    def pullback(self, J: Node) -> "Functional":
+    def pullback(self, J: Node) -> "PhysicallyMappedFunctional":
         r"""View this reference functional as acting on physical functions.
 
         By the chain rule, reference derivatives of a pullback are
@@ -149,7 +149,7 @@ class Functional:
 
         Returns
         -------
-        Functional
+        PhysicallyMappedFunctional
             The functional with direction :math:`J \\otimes \\dots
             \\otimes J : D`, acting on physical derivatives at the
             images of the reference points.

@@ -1,23 +1,20 @@
 import FIAT
 from copy import deepcopy
 
-from gem import ListTensor
-
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import PhysicalGeometry, PhysicallyMappedElement
-from finat.zany import zany_basis_transformation
+from finat.zany import ScalarPhysicallyMappedElement
 
 
-class Bell(PhysicallyMappedElement, ScalarFiatElement):
+class Bell(ScalarPhysicallyMappedElement, ScalarFiatElement):
     """The Bell element.
 
     FIAT provides the extended element on the full quintic space, with
     the cubic normal derivative constraints appended as extra edge
     nodes; the transformation of the extended element is derived
-    automatically by :func:`finat.zany.zany_basis_transformation`, and
-    the constraint degrees of freedom are dropped from the physical
-    element.
+    automatically (see :class:`finat.zany.ScalarPhysicallyMappedElement`),
+    and the constraint degrees of freedom are dropped from the physical
+    element by overriding :meth:`space_dimension`.
     """
     def __init__(self, cell, degree=5):
         cite("Bell1969")
@@ -28,10 +25,6 @@ class Bell(PhysicallyMappedElement, ScalarFiatElement):
         for entity in reduced_dofs[sd-1]:
             reduced_dofs[sd-1][entity] = []
         self._entity_dofs = reduced_dofs
-
-    def basis_transformation(self, coordinate_mapping: PhysicalGeometry) -> ListTensor:
-        return zany_basis_transformation(self._element, coordinate_mapping,
-                                         ndof=self.space_dimension())
 
     # The extended FIAT element has 21 basis functions, but the Bell
     # element only keeps the 18 vertex degrees of freedom.

@@ -165,25 +165,32 @@ Goal: replace the hand-coded `basis_transformation` methods with a helper that d
 $V = E V^c D$ directly from a FIAT element's dual basis. The implementation must mirror
 the theory factor by factor, not merely reproduce matrix entries:
 
-**Status (2026-07-13).** The framework lives in `finat/functional.py` (the symbolic
-`finat.Functional`) and `finat/zany.py` (`FacetFrame`, `zany_basis_transformation`).
-`finat.Morley`, `finat.Hermite`, `finat.Argyris` (both variants, degrees 5-7 tested,
-with the `avg` convention flag), and `finat.Bell` are reimplemented on it: `basis_transformation` is
-one call to `zany_basis_transformation(self._element, coordinate_mapping)`, working in
-2D and 3D through a single dimension-independent code path, verified by
-`check_zany_mapping` and matching the previous hand-coded matrices (including the
-$h$-scaling) to machine precision before that code was deleted. `morley_transform`
-moved verbatim to `finat/walkington.py`, its only remaining user. Tests:
-`test/finat/test_zany_automation.py`; `check_zany_mapping` lives in the finat conftest
-and is provided to test modules as a pytest fixture (pytest runs with
-`--import-mode=importlib`, so test modules cannot import from each other or from
-conftest — recover classes from fixture instances via `type(...)` if needed).
+**Status (2026-07-13).** The symbolic dof lives in `finat/functional.py` as
+`finat.PhysicallyMappedFunctional`. The OOP structure is a template method: the
+entity-by-entity assembly loop is implemented once, as the concrete
+`PhysicallyMappedElement.basis_transformation` in `finat/physically_mapped.py`, calling
+four hooks (`_check_mapping`, `_invariant_dofs`, `_facet_dof_rows`, `_point_dof_rows`)
+that carry ALL mapping-specific knowledge — the loop itself contains no `if piola`
+anywhere. `finat/zany.py` supplies the two mixins implementing those hooks,
+`ScalarPhysicallyMappedElement` (affine pullback: Morley, Hermite, Argyris, Bell) and
+`PiolaPhysicallyMappedElement` ((double) contravariant Piola: MTW, Johnson-Mercier,
+Guzman-Neilan), plus the pure math functions they call (`FacetFrame`,
+`_scalar_facet_rows`, `_scalar_point_rows`, `_piola_facet_rows`, `_piola_point_rows`) —
+these take plain arrays/GEM expressions, no `self`, so the mathematics stays readable
+independent of the class plumbing. Concrete elements (`finat.Morley`, etc.) are now
+just a citation plus a FIAT constructor call: mixing in the right base class is enough,
+`basis_transformation` is inherited. `ndof` truncation is no longer a parameter; the
+loop always slices by `self.space_dimension()`, which constrained elements (Bell, GN)
+already override. Tests: `test/finat/test_zany_automation.py`; `check_zany_mapping`
+lives in the finat conftest and is provided to test modules as a pytest fixture (pytest
+runs with `--import-mode=importlib`, so test modules cannot import from each other or
+from conftest).
 
-**Framework design.** A dof is a symbolic `finat.Functional`:
+**Framework design.** A dof is a symbolic `finat.PhysicallyMappedFunctional`:
 $\ell(f) = \sum_q w_q \langle D, \nabla^m f(x_q)\rangle$ with numeric points/weights
 and a direction tensor $D$ that is numeric on the reference cell and GEM otherwise.
-There is *no dispatch over FIAT functional types*: `Functional.from_fiat` reads only
-`pt_dict`/`deriv_dict` and recovers the order and common direction numerically
+There is *no dispatch over FIAT functional types*: `PhysicallyMappedFunctional.from_fiat`
+reads only `pt_dict`/`deriv_dict` and recovers the order and common direction numerically
 (rank-one SVD of the derivative weights). Operations: covariant `pullback(J)`
 (contract direction slots with $J$), `with_direction`, and numeric `evaluate` against
 a nodal basis (the generalized Vandermonde realizing the $D$ factor of $V = E V^c D$).
@@ -200,12 +207,12 @@ The row of $V$ for a reference node $\hat\ell$ with direction $\hat d = a\hat n 
   invariant under that sign flip; a sign bug here flips exactly the edges where the SVD
   chose the opposite orientation).
 * the remainders multiply completion functionals along *mapped reference tangents*,
-  which coincide with reference functionals; `Functional.evaluate` gives their numeric
+  which coincide with reference functionals; `PhysicallyMappedFunctional.evaluate` gives their numeric
   expansion in the element's own nodes, and the row combination recurses through the
   already-assembled rows of $V$ (entities processed in increasing dimension), which
   will later let completions couple to vertex jets (Argyris/HCT) for free.
 
-Derivative nodes *away from facets* (`_point_jet_rows`, covering Hermite vertex
+Derivative nodes *away from facets* (`_scalar_point_rows`, covering Hermite vertex
 gradients) have no geometric frame: FIAT keeps Cartesian directions on the physical
 cell, so the group of derivative nodes on the entity acts as its own completion — this
 is precisely affine-interpolation equivalence. The pulled-back direction $J\hat d_i$
@@ -239,7 +246,7 @@ Key facts the framework rests on:
 
 Extensions beyond first order and Morley/Hermite:
 
-* `Functional` directions live in derivative multi-index space (`multiindices`, axis
+* `PhysicallyMappedFunctional` directions live in derivative multi-index space (`multiindices`, axis
   order for $m=1$); `pullback` distributes them over a symmetric tensor (dividing by
   multiplicities), contracts every slot with $J$ (`numpy.tensordot` on object arrays),
   and collapses back. Point-jet groups are split per order; each order solves in its
@@ -248,20 +255,22 @@ Extensions beyond first order and Morley/Hermite:
   moments; the existing row recursion handles both with no new code (trace moments are
   order-0 and thus invariant; FIAT builds all these moments with
   `FacetQuadratureRule(avg=True)`, i.e. measure-intrinsic, as the framework assumes).
-* `zany_basis_transformation(avg=False)` reproduces the legacy FInAT convention where
-  physical facet moments are plain integrals: their columns are divided by the
-  physical facet measure $\|C\| |\hat e| / \|\hat C\|$ (`FacetFrame.measure`).
-  Single-point facet dofs (Argyris "point" variant) are unaffected.
+* `ScalarPhysicallyMappedElement.avg = False` (an instance attribute Argyris sets from
+  its constructor kwarg) reproduces the legacy FInAT convention where physical facet
+  moments are plain integrals: their columns are divided by the physical facet measure
+  $\|C\| |\hat e| / \|\hat C\|$ (`FacetFrame.measure`). Single-point facet dofs
+  (Argyris "point" variant) are unaffected.
 * Bell is the extended-element pattern: FIAT.Bell is the 21-node quintic element with
-  the constraint functionals as extra edge nodes; `ndof=18` drops the constraint
-  *columns* of $V$ (their rows still contribute the $D$-matrix entries through the
-  completion recursion), and the FInAT element overrides `entity_dofs`.
+  the constraint functionals as extra edge nodes; overriding `space_dimension()` to 18
+  drops the constraint *columns* of $V$ at the end of the template method (their rows
+  still contribute the $D$-matrix entries through the completion recursion), and the
+  FInAT element overrides `entity_dofs`.
 * Known convention change: the generic $h^{-m}$ conditioning scaling now also applies
   to integral-variant Argyris edge moments, which the hand-written code left unscaled
   (Morley scaled them; the legacy convention was inconsistent). Invisible when
   `cell_size == 1`; flag in PR review.
 
-**Piola-mapped elements** (Aznaran, Kirby & Farrell 2022). `Functional` carries a
+**Piola-mapped elements** (Aznaran, Kirby & Farrell 2022). `PhysicallyMappedFunctional` carries a
 value rank: component weight profiles (nq x sd^rank) parsed from `pt_dict` component
 tuples. Under contravariant Piola the roles of the scalar case are mirrored: the
 *scaled* facet normal is the cofactor image $K\hat n_s$, $K = \mathrm{adj}(J)^T$
@@ -285,9 +294,13 @@ identity (Piola-equivalent) automatically.
 
 GuzmanNeilanFirstKindH1 (orders 0-2, 2D/3D) is also automatic: vertex/edge point
 values are value point-groups mapping by $K$ (`_piola_point_rows`, the mirror of
-`_point_jet_rows`), and the trailing tangential facet constraints are dropped with
-`ndof` (the Bell pattern); `PiolaBubbleElement.__init__` still provides the reduced
-`entity_dofs` bookkeeping. Its hand-derived vertex-facet coupling correction ("fix
+`_scalar_point_rows`), and the trailing tangential facet constraints are dropped since
+`PiolaBubbleElement.space_dimension()` already returns the reduced count (the Bell
+pattern, inherited rather than passed as a parameter); `PiolaBubbleElement.__init__`
+still provides the reduced `entity_dofs` bookkeeping. `GuzmanNeilanFirstKindH1` is
+`class GuzmanNeilanFirstKindH1(PiolaPhysicallyMappedElement, PiolaBubbleElement)`: MRO
+puts the automatic `basis_transformation` first, while `PiolaBubbleElement.__init__`
+(reached via `super()`) still sets up `self._element` and the reduced dof bookkeeping. Its hand-derived vertex-facet coupling correction ("fix
 discrepancy" in `finat/piola_mapped.py`) emerges automatically from the Vandermonde
 residual elimination, since the per-point normal moments evaluate against vertex basis
 functions of the extended element.

@@ -4,13 +4,12 @@ from itertools import chain
 
 import FIAT
 
-from gem import Literal, ListTensor, Zero
+from gem import Literal, Zero
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import (identity, PhysicalGeometry,
-                                     PhysicallyMappedElement)
-from finat.zany import zany_basis_transformation
+from finat.physically_mapped import identity
+from finat.zany import ScalarPhysicallyMappedElement
 
 
 def _jet_transform(J, order):
@@ -129,11 +128,11 @@ def _edge_transform(V, vorder, eorder, fiat_cell, coordinate_mapping, avg=False)
                 V[s, s + eorder] = -Bnt
 
 
-class Argyris(PhysicallyMappedElement, ScalarFiatElement):
+class Argyris(ScalarPhysicallyMappedElement, ScalarFiatElement):
     """The Argyris element.
 
     The basis transformation is derived automatically from the FIAT
-    dual basis by :func:`finat.zany.zany_basis_transformation`.
+    dual basis; see :class:`finat.zany.ScalarPhysicallyMappedElement`.
     """
     def __init__(self, cell, degree=5, variant=None, avg=False):
         cite("Argyris1968")
@@ -144,7 +143,3 @@ class Argyris(PhysicallyMappedElement, ScalarFiatElement):
         self.variant = variant
         self.avg = avg
         super().__init__(FIAT.Argyris(cell, degree, variant=variant))
-
-    def basis_transformation(self, coordinate_mapping: PhysicalGeometry) -> ListTensor:
-        return zany_basis_transformation(self._element, coordinate_mapping,
-                                         avg=self.avg)
