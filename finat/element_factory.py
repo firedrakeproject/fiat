@@ -352,6 +352,7 @@ def convert_fuse_element(element, **kwargs):
         return finat.FlattenedDimensions(finat_elem), deps
     return finat.fiat_elements.FuseElement(element.triple), set()
 
+
 _cache = weakref.WeakKeyDictionary()
 
 

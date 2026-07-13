@@ -49,7 +49,6 @@ class HDivElement(FiniteElementBase):
         degree = element.degree()
         quad_scheme = element.quadrature_scheme()
         reference_value_shape = (element.cell.topological_dimension,)
-
         # Skipping TensorProductElement constructor! Bad code smell, refactor to avoid this non-inheritance somehow.
         FiniteElementBase.__init__(self, family, cell, degree,
                                    quad_scheme, reference_value_shape)
