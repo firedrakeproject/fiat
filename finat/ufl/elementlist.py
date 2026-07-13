@@ -17,8 +17,6 @@ elements by calling the function register_element.
 # Modified by Matthew Scroggs, 2023
 # Modified by Pablo Brubeck, 2024
 
-import warnings
-
 from numpy import asarray
 
 from ufl.cell import Cell, TensorProductCell
@@ -429,13 +427,8 @@ def canonical_element_description(family, cell, order, form_degree):
         if family == "Lagrange":
             family = "Q"
         elif family == "Discontinuous Lagrange":
-            if order >= 1:
-                warnings.warn("Discontinuous Lagrange element requested on %s, creating DQ element." % cell.cellname)
             family = "DQ"
         elif family == "Discontinuous Lagrange L2":
-            if order >= 1:
-                warnings.warn(f"Discontinuous Lagrange L2 element requested on {cell.cellname}, "
-                              "creating DQ L2 element.")
             family = "DQ L2"
 
     # Validate cellname if a valid cell is specified
