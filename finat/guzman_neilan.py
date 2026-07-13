@@ -1,14 +1,27 @@
 import FIAT
+from gem import ListTensor
 
 from finat.citations import cite
+from finat.physically_mapped import PhysicalGeometry
 from finat.piola_mapped import PiolaBubbleElement
+from finat.zany import zany_basis_transformation
 
 
 class GuzmanNeilanFirstKindH1(PiolaBubbleElement):
-    """Pk^d enriched with Guzman-Neilan bubbles."""
+    """Pk^d enriched with Guzman-Neilan bubbles.
+
+    The basis transformation is derived automatically from the FIAT
+    dual basis by :func:`finat.zany.zany_basis_transformation`; the
+    trailing tangential facet constraints of the extended element are
+    dropped from the physical element.
+    """
     def __init__(self, cell, order=1, quad_scheme=None):
         cite("GuzmanNeilan2018")
         super().__init__(FIAT.GuzmanNeilanFirstKindH1(cell, order=order, quad_scheme=quad_scheme))
+
+    def basis_transformation(self, coordinate_mapping: PhysicalGeometry) -> ListTensor:
+        return zany_basis_transformation(self._element, coordinate_mapping,
+                                         ndof=self.space_dimension())
 
 
 class GuzmanNeilanSecondKindH1(PiolaBubbleElement):

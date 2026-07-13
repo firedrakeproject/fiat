@@ -276,9 +276,19 @@ value slot. MTW (2D/3D) and Johnson-Mercier (2D/3D) are reimplemented this way, 
 the deleted hand code to machine precision; RaviartThomas-type elements come out as pure
 identity (Piola-equivalent) automatically.
 
-Next steps: Guzman-Neilan (PiolaBubbleElement pattern: vertex point values map by $K$
-like a value point-group, facet bubbles + constraint columns); the extended-element path
-for reduced HCT (macro polynomial spaces); covariant elements.
+GuzmanNeilanFirstKindH1 (orders 0-2, 2D/3D) is also automatic: vertex/edge point
+values are value point-groups mapping by $K$ (`_piola_point_rows`, the mirror of
+`_point_jet_rows`), and the trailing tangential facet constraints are dropped with
+`ndof` (the Bell pattern); `PiolaBubbleElement.__init__` still provides the reduced
+`entity_dofs` bookkeeping. Its hand-derived vertex-facet coupling correction ("fix
+discrepancy" in `finat/piola_mapped.py`) emerges automatically from the Vandermonde
+residual elimination, since the per-point normal moments evaluate against vertex basis
+functions of the extended element.
+
+Next steps: remaining PiolaBubbleElement users (GN second kind, H1div: interior
+derivative moments need the divergence detJ rule), ArnoldWinther (vertex tensor values
++ higher facet moments), the extended-element path for reduced HCT (macro polynomial
+spaces); covariant elements.
 
 The implementation mirrors the theory factor by factor:
 

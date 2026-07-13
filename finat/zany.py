@@ -248,13 +248,15 @@ def zany_basis_transformation(fiat_element: FiniteElement,
                          if i not in processed}
                 if not group:
                     continue
-                if dim == sd - 1 and all(ell.rank > 0 and ell.order == 0
-                                         for ell in group.values()):
+                if any(ell.rank == 0 or ell.order > 0
+                       for ell in group.values()):
+                    raise NotImplementedError(
+                        "Cannot yet Piola-transform this node group.")
+                if dim == sd - 1:
                     _piola_facet_rows(V, group, fiat_element, entity, J,
                                       processed, tol)
                 else:
-                    raise NotImplementedError(
-                        "Cannot yet Piola-transform this node group.")
+                    _piola_point_rows(V, group, J, processed, tol)
                 continue
             # Value functionals are push-forward invariant
             processed.update(i for i, ell in ells.items() if ell.order == 0)
@@ -505,3 +507,54 @@ def _piola_facet_rows(V: numpy.ndarray, group: dict,
                 row = row + V[m, :] * (residual[q] * L[m, q])
         V[i, :] = row
         processed.add(i)
+
+
+def _piola_point_rows(V: numpy.ndarray, group: dict, J: Node,
+                      processed: set, tol: float) -> None:
+    r"""Assemble the rows of V for point values of Piola-mapped fields.
+
+    This mirrors :func:`_point_jet_rows`: away from facets, physical
+    point evaluations keep the reference (Cartesian) components, which
+    pull back through the cofactor matrix :math:`K = \mathrm{adj}(J)^T`
+    of the contravariant Piola map, so the group of components at each
+    point acts as its own completion.
+
+    Parameters
+    ----------
+    V :
+        Object array being assembled.
+    group :
+        Mapping from node index to symbolic Functional for the value
+        nodes on this entity.
+    J :
+        GEM expression for the cell Jacobian.
+    processed :
+        Indices of the already assembled rows; updated in place.
+    tol :
+        Tolerance for detecting zeros in the numeric coefficients.
+    """
+    sd = J.shape[0]
+    Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                      dtype=object)
+    K = adjugate(Jnp).T
+
+    subgroups = {}
+    for i, ell in group.items():
+        if len(ell.points) != 1 or ell.rank != 1:
+            raise NotImplementedError(
+                "Only single-point vector evaluations are handled.")
+        subgroups.setdefault(ell.points, {})[i] = ell
+
+    for sub in subgroups.values():
+        directions = numpy.array([ell.weights[0] for ell in sub.values()])
+        if directions.shape[0] != directions.shape[1]:
+            raise NotImplementedError(
+                "Directions do not span the vector components.")
+        Dinv = numpy.linalg.inv(directions.T)
+        for i, ell in sub.items():
+            Kd = K @ ell.weights[0]
+            for col, j in enumerate(sub):
+                x = Dinv[col]
+                nz = numpy.flatnonzero(abs(x) > tol)
+                V[i, j] = reduce(add, (Kd[m] * x[m] for m in nz)) if len(nz) else Zero()
+            processed.add(i)
