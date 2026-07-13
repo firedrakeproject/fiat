@@ -71,35 +71,167 @@ Agents modifying FIAT code must follow these fundamental development principles:
 
 ## Pattern Matching and Mathematical Reasoning
 
-When designing or debugging FIAT, FInAT, and GEM changes, use the existing codebase as a library of
-mathematical patterns rather than starting from ad hoc special cases:
+This section used to be a rough draft of aspirations. It is now grounded in the concrete
+experience of automating the Kirby (2017) / Aznaran-Kirby-Farrell (2022) / Brubeck & Kirby
+(2025) transformation theory (`finat/zany.py`, `finat/functional.py`) for Morley, Hermite,
+Argyris, Bell, Mardal-Tai-Winther, Johnson-Mercier, and Guzman-Neilan. The lessons below are
+about *how to design and debug this kind of code*, not just about this one project.
 
-* Match new element constructions against the nearest existing family with the same structural
-  decomposition. Tensor-product, restricted, physically mapped, and enriched elements usually share
-  a factorization pattern that should be reused explicitly.
-* When a feature seems to require a special case, test whether the same mathematics already appears in
-  another element family or mapping path. The right answer is often a more general basis
-  transformation, not a new branch.
-* Separate reference-space reasoning from physical-space reasoning. In FIAT and FInAT, derive basis
-  transformations from the element map and continuity requirements first, then encode that structure
-  in GEM expressions.
-* Treat tensor-product spaces as tensor-product mathematics. Look for Kronecker-style factorization
-  in basis matrices, coordinate mappings, and dual evaluations before introducing custom assembly
-  logic.
-* For extruded or vertically constant factors, identify the dimension that is geometrically active
-  and the dimension that is algebraically passive. The passive factor should usually contribute a
-  simple constant, identity, or lower-dimensional pullback rather than a new geometric rule.
-* Debug by matching the failing object against a known neighboring case: compare the cell, element
-  family, mapping type, continuity class, and tensor structure before changing code.
-* In GEM, inspect whether an expression should factor, broadcast, or propagate a coordinate mapping.
-  If the expression is not matching the expected shape, the bug is often in the way indices or
-  subexpressions are assembled, not in the downstream optimizer.
-* Use the mathematical continuity target as a design constraint. For finite elements, ask what
-  inter-element continuity the space must satisfy, then derive the local basis and transformation
-  rules from that requirement.
-* Prefer proofs by structure over proofs by example. A construction is correct when the pullback,
-  restriction, and tensor-product algebra agree with the element's continuity and approximation
-  properties, not when one or two test cases happen to pass.
+### Mathematical structures to recognize in FIAT/FInAT
+
+* **A degree of freedom is fully described by five numbers, not by its FIAT class.** Every
+  functional FIAT builds from `pt_dict`/`deriv_dict` reduces to (points, weights, derivative
+  order $m$, a direction tensor of rank $m$, a value rank for vector/tensor-valued dofs).
+  `IntegralMomentOfNormalDerivative`, `PointNormalDerivative`, `TensorBidirectionalIntegralMoment`,
+  etc. are just different ways of *constructing* the same five numbers. Recognizing this
+  collapses "N functional types to support" into "one shape to recover numerically"
+  (`finat.PhysicallyMappedFunctional.from_fiat`, `finat/functional.py`).
+* **Pullback is always "contract each tensor slot of the direction with a fixed matrix."**
+  Order-0 (values) are invariant (zero slots to contract). Order-$m$ derivatives contract $m$
+  slots with the Jacobian $J$ (the chain rule). Rank-$r$ Piola values contract $r$ slots with
+  the cofactor matrix $K = \operatorname{adj}(J)^T$. This is *the same operation* with a
+  different matrix, which is why the scalar and Piola code in `finat/zany.py` are mirror images
+  of each other (`_scalar_point_rows` / `_piola_point_rows`, `_scalar_facet_rows` /
+  `_piola_facet_rows`) rather than unrelated implementations.
+* **Frame decomposition is the one computational primitive underlying every non-affine
+  element.** Facet dofs (Morley/Argyris/Bell normal derivatives; MTW/JM/GN normal-tangential
+  moments) and vertex-jet completions (Hermite/Argyris/Bell gradients and Hessians) are all
+  solved the *same* way: split a direction/profile into an invariant part and a part that needs
+  completing, express the pulled-back quantity in the frame built from the mapped generators of
+  that split (`FacetFrame`, or the direction-basis inverse in `_scalar_point_rows`), and solve
+  symbolically via `adjugate`/`determinant`. Once this pattern is visible, "add a new element"
+  stops being "derive new math" and becomes "which invariant subspace, which frame."
+* **Constrained/extended elements are the same construction as a restriction.** Bell and
+  Guzman-Neilan are both "take the extended FIAT element with its constraint functionals as
+  extra dofs, transform the whole thing, then keep only the first $\nu$ columns." This is
+  Kirby (2017) §5's extended-element proposition, and in code it is nothing more than
+  `space_dimension()` returning a smaller count than the FIAT element's — no special-casing
+  needed in the transformation loop itself.
+
+### Confusing mathematical ideas, clarified
+
+* **The Jacobian direction is flipped between the papers and the code.** The papers define
+  $F$ from physical to reference space, so their $J$ is FInAT's Jacobian *inverse*.
+  `coordinate_mapping.jacobian_at(point)` returns $\partial x_{\text{phys}}/\partial
+  x_{\text{ref}}$ (see "FInAT implementation conventions" below); a paper's $J^{-T}$ is FInAT's
+  plain Jacobian, transposed. This is a constant source of "why does my formula look
+  transposed" confusion — check this convention flip before suspecting a sign or index bug.
+* **Components against a reciprocal/dual basis transform contragrediently — this is the single
+  subtlety that broke 3D and is not in any of the papers.** FIAT builds the tangential
+  component of 3D Piola-mapped dofs (MTW) using `cross(n, t_k)`, the *reciprocal* partner of
+  the tangent frame, not the tangent frame itself. A general fact from differential geometry:
+  if a frame transforms by a matrix $A$, components expressed against its *reciprocal* frame
+  transform by $A^{-T}$ (up to a determinant factor), not by $A$. Kirby (2017)/Aznaran-Kirby-
+  Farrell (2022) only work out the 2D case, where the tangent "plane" is 1-dimensional and this
+  correction $S^{-1}$ collapses to $1$ — silently hiding the effect. **Whenever a FIAT dual set
+  builds a direction via a cross product against the normal (a common way to get "the other
+  in-plane directions" in 3D), check whether its transformation law is contragredient before
+  assuming it matches the direct frame.**
+* **Numerically recovered invariants (SVD, pinv) are only defined up to a group action, and
+  formulas built from them must be invariant under that action.** `from_fiat`'s SVD recovers a
+  direction/weight pair $(\hat n, w)$ up to a joint sign flip ($\hat n \to -\hat n$, $w \to
+  -w$ leaves the functional unchanged). A formula like $r_k = a x_k + (1-c)\beta_k$ that
+  implicitly assumes a particular sign will be wrong on exactly the subset of entities where
+  SVD happened to pick the other sign — a bug that looks like it "mostly works" and is
+  otherwise very hard to localize. The fix, $r_k = x_k - c\beta_k$, is invariant under the
+  joint flip. **Always test the full topology of a non-degenerate, non-symmetric physical
+  cell** (see `test/finat/conftest.py::MyMapping`'s deliberately irregular vertex coordinates) —
+  a symmetric test cell can accidentally hide a sign bug that only shows up on a generic mesh.
+
+### Confusing GEM patterns, clarified
+
+* **Use operator overloading, not manual node construction.** `gem.Node` overloads
+  `+ - * / ** @` (via `as_gem`/`componentwise`) to work transparently across GEM nodes,
+  `gem.Literal`, and plain Python/numpy numbers, with automatic `Zero` folding. Write
+  `havg**(-m)`, never `gem.Power(havg, gem.Literal(-m))`: the operator form also works when
+  `havg` is a raw float (as in the test harness's `MyMapping.cell_size()`) whereas a manual
+  `gem.Power` call assumes GEM operands and will not always coerce correctly.
+* **Never call `numpy.linalg.inv`/`solve` on a GEM-valued matrix.** LAPACK cannot see inside
+  GEM expressions. Symbolic linear solves use `adjugate(A) / determinant(A)`
+  (`finat/physically_mapped.py`) — the symbolic Cramer's-rule equivalent — e.g. in
+  `FacetFrame.decompose` and `_piola_facet_rows`. Numeric `numpy.linalg` calls are only valid
+  when every entry is a plain number: reference-cell-only quantities
+  (`FacetFrame.reference_coefficients`) or purely numeric direction-basis inversions
+  (`_scalar_point_rows`, `_piola_point_rows`). Check which regime an array is in before
+  reaching for a numpy linear-algebra routine.
+* **Build sparse GEM-valued arrays with `numpy.full(shape, gem.Zero(), dtype=object)`**, never
+  `numpy.zeros(shape)` — plain `0` is not interchangeable with `gem.Zero()` when the array will
+  later be combined with GEM nodes via `+`.
+* **"Start from identity, mutate only the rows that need work" is not an optimization, it is
+  the mathematical content.** `V = identity(ndof)` (`finat/physically_mapped.py`) encodes
+  "these dofs are push-forward invariant" directly; the invariant-dof detection
+  (`_invariant_dofs`) simply chooses *not* to touch those rows, rather than writing `1`s
+  explicitly. Treat the untouched identity rows as the base case of the assembly recursion.
+* **Row/column convention, and where the one transpose happens.** Throughout assembly, row
+  index = reference node, column index = physical node — i.e. the code builds $V$, never $M$
+  directly. `ListTensor(V.T)` at the very end is the single place Kirby (2017) Theorem 3.1's
+  $M = V^T$ gets applied. If something looks transposed, check this convention before
+  suspecting a sign error.
+
+### Design strategies that generalize
+
+* **Design by duality, never by direct construction.** Do not try to write physical basis
+  functions directly (that requires inverting a Vandermonde system). Write the physical *node*
+  (a linear functional — point evaluation or moment, always computable), push it forward, and
+  solve for its expansion in the reference nodes. This is the master strategy behind the whole
+  framework and generalizes to any element whose nodes, not whose basis functions, are the
+  simple objects.
+* **Recover mathematical type from data, not from a class hierarchy.** `from_fiat` never asks
+  "is this an `IntegralMomentOfNormalDerivative`?"; it reads `pt_dict`/`deriv_dict` and derives
+  (order, direction, rank) numerically. This makes the framework forward-compatible with FIAT
+  functional classes that do not exist yet, as long as they reduce to the same numeric shape —
+  which essentially all "linear functional built from point/derivative data" dofs do. Prefer
+  this kind of structural recovery over adding another `isinstance`/type-tag branch whenever a
+  new functional needs support.
+* **Turn a mathematical case-split into a template method, not a conditional.** When a theorem
+  reads "for pullback type X do A, for pullback type Y do B" against an otherwise identical
+  algorithmic skeleton, encode the skeleton once (`ZanyPhysicallyMappedElement
+  .basis_transformation`) and the case-split as small, named hook methods on sibling mixins
+  (`ScalarPhysicallyMappedElement`, `PiolaPhysicallyMappedElement`). Keep the underlying linear
+  algebra as free functions taking plain arrays/GEM expressions with no `self`
+  (`FacetFrame`, `_scalar_facet_rows`, `_piola_facet_rows`, ...): the class layer should only
+  ever be a thin adapter from "element structure" to "which pure-math function to call," never
+  a place where new mathematics is derived. This also keeps the generic infrastructure
+  (`PhysicallyMappedElement` in `finat/physically_mapped.py`, used by hand-coded elements like
+  Arnold-Winther and HCT) free of any awareness of the theory-specific case-split.
+* **Validate one element at a time against an independently computed ground truth, not just
+  against the closed-form answer you derived.** `test/finat/test_zany_mapping.py
+  ::check_zany_mapping` tabulates the FIAT element on an actual physical cell and least-squares
+  fits the physical values against the pulled-back reference tabulation — a computation
+  completely independent of the symbolic derivation. Its assertion message pretty-prints the
+  (row, column) location of the relative error; read those indices first, they usually
+  localize the bug to one entity/dof-type combination before you write any new code.
+* **Generalize from one worked example, verify to machine precision, then extend — never
+  generalize speculatively ahead of a second concrete example.** The actual sequence that
+  worked: derive the mechanism on Morley alone, check it reproduces the deleted hand-coded
+  matrix bit-for-bit, *then* extend to Hermite, then Argyris/Bell, then the Piola family. Each
+  extension needed a genuinely new piece (interior invariance for Piola interior moments,
+  mixed-order jets for Bell/Argyris vertices, the reciprocal-basis correction for 3D) that a
+  premature generalization from Morley alone would not have anticipated.
+
+### Working with the human collaborator
+
+* **The literature is necessary but not sufficient — treat a stuck derivation as a cue to ask,
+  not to keep re-deriving.** Kirby (2017) and Aznaran-Kirby-Farrell (2022) work out 2D (or a
+  simplification that hides a 3D-only effect); none of the papers mention the reciprocal-basis
+  transformation law 3D Piola elements need. That fix came directly from the user's domain
+  expertise ("the papers do not consider the reciprocal basis that FIAT implements... Consider
+  this"), not from re-reading the papers harder. When a derivation matches every 2D case but
+  fails exactly where a paper's simplifying assumption would hide something, that is the moment
+  to ask what convention the *implementation* (not the paper) actually uses.
+* **Expect, and design for, architectural correction mid-project.** This project's real
+  trajectory was: prototype on Morley → generalize into a `Functional`/free-function design →
+  "don't extend further, make the computation generic first, get rid of the very specific
+  helpers" → extend to Argyris/Bell → extend to the Piola family → "refactor into
+  `Scalar`/`PiolaPhysicallyMappedElement` mixins so the `if piola` disappears from the loop" →
+  "move the method body into the Mixin" (keep the generic `PhysicallyMappedElement` free of
+  zany-specific knowledge). None of these were bug fixes; each was the human reshaping the
+  design once its true shape became visible. Treat working code as a draft the architecture
+  will still move under, and re-run the full verification (test suite, `flake8`, `pydocstyle`)
+  after every such reshaping, not only after functional changes.
+* **Keep this file's *why*, not just the *what*.** Git history has the diffs; this file exists
+  so the next session does not have to rediscover the reciprocal-basis subtlety, the
+  sign-invariance requirement, or the identity-row idiom by re-reading a diff from scratch.
 
 ## Transformation Theory (Kirby 2017; Brubeck & Kirby 2025)
 
@@ -351,7 +483,8 @@ The implementation mirrors the theory factor by factor:
   * `_normal_tangential_transform(cell, J, detJ, edge)`: returns $(B_{nn}, B_{nt}, Jt)$
     for an edge, expressing $B$ entries via $G^{TT}$ Gram data so only GEM-representable
     quantities appear (`detJ/beta`, `alpha/beta`); 3D variant for faces is
-    `morley_transform` in `finat/morley.py`.
+    `morley_transform` in `finat/walkington.py` (Morley itself is automated now; this
+    3D helper survives only as Walkington's dependency).
   * `_edge_transform(V, vorder, eorder, cell, mapping, avg)`: the Jacobi-moment edge rows
     for integral-variant Argyris/HCT, encoding the endpoint values
     $P_i^{(1,1)}(\pm 1)$ and the trace-moment coupling.
