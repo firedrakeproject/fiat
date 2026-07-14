@@ -7,14 +7,26 @@ A :class:`PhysicallyMappedFunctional` represents a degree of freedom in the form
 where the points :math:`x_q` and quadrature/moment weights :math:`w_q`
 are numeric, and the direction tensor :math:`D` (of rank equal to the
 derivative order :math:`m`) may be numeric, for functionals defined on
-the reference cell, or a GEM expression, for functionals carrying
-physical geometry.
+the reference cell, or a GEM expression carrying physical geometry.
 
 This representation is the foundation for automating the transformation
 theory of Kirby (2017): degrees of freedom of any FIAT element are
 converted to this common form directly from their point and derivative
 dictionaries, with the derivative direction recovered numerically, so
 that no dispatch over FIAT functional types is required.
+
+:meth:`PhysicallyMappedFunctional.evaluate` computes one row of
+:math:`B_{ij} = \\ell_i(\\hat\\psi_j)`, the generalized Vandermonde
+matrix of a physical node :math:`\\ell_i` against the reference nodal
+basis :math:`\\hat\\psi_j`, transplanted to physical space by the
+affine cell map :math:`x = J\\hat{x} + v_0`.  Physical derivatives of
+the transplanted basis are the tabulated reference ones, recombined by
+the chain rule, :math:`\\nabla_x^m(\\hat\\psi_j\\circ F) =
+(J^{-1})^{\\otimes m} : \\hat\\nabla^m\\hat\\psi_j`.  Since :math:`B`
+relates physical nodes to reference basis functions, the transformation
+matrix :math:`V = B^{-1}` still needs assembling from these rows; that
+inversion, exploiting the block structure of :math:`B` by topological
+entity, is done by the caller (:mod:`finat.zany`), not by this class.
 
 The physical counterpart of a reference functional is assumed to share
 its points and weights: integral moments must be measure-intrinsic
@@ -29,7 +41,8 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from FIAT.polynomial_set import mis
 from FIAT.functional import Functional as FIATFunctional
-from gem import Node, Zero
+from gem import Node
+from finat.physically_mapped import adjugate, determinant
 
 
 def multiindices(sd: int, order: int) -> list:
@@ -50,17 +63,25 @@ class PhysicallyMappedFunctional:
         The derivative order :math:`m`.
     direction :
         For ``order > 0``, the direction tensor of rank ``order``,
-        either numeric or a GEM expression; ``None`` for ``order == 0``.
+        either numeric (a reference-cell functional) or a GEM
+        expression (a physical functional); ``None`` for ``order == 0``.
+    rank :
+        Value rank, for vector- or tensor-valued point evaluations.
+    J :
+        GEM expression for the cell Jacobian, set once ``direction``
+        carries physical geometry; used by :meth:`evaluate` to convert
+        physical derivatives to reference ones by the chain rule.
 
     """
 
     def __init__(self, points: tuple, weights: numpy.ndarray,
-                 order: int = 0, direction=None, rank: int = 0):
+                 order: int = 0, direction=None, rank: int = 0, J: Node = None):
         self.points = points
         self.weights = weights
         self.order = order
         self.direction = direction
         self.rank = rank
+        self.J = J
 
     @classmethod
     def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12) -> "PhysicallyMappedFunctional":
@@ -129,65 +150,42 @@ class PhysicallyMappedFunctional:
         weights = u[:, 0] * s[0]
         return cls(points, weights, order=order, direction=direction)
 
-    def with_direction(self, direction) -> "PhysicallyMappedFunctional":
-        """Return the same functional with another direction tensor."""
-        return type(self)(self.points, self.weights,
-                          order=self.order, direction=direction)
-
-    def pullback(self, J: Node) -> "PhysicallyMappedFunctional":
-        r"""View this reference functional as acting on physical functions.
-
-        By the chain rule, reference derivatives of a pullback are
-        physical derivatives contracted with the Jacobian, so the
-        direction tensor maps covariantly: each slot is contracted
-        with :math:`J`.
+    def with_direction(self, direction, J: Node = None) -> "PhysicallyMappedFunctional":
+        """Return the same functional with another direction tensor.
 
         Parameters
         ----------
+        direction :
+            The new direction tensor.
         J :
-            GEM expression for the cell Jacobian.
-
-        Returns
-        -------
-        PhysicallyMappedFunctional
-            The functional with direction :math:`J \\otimes \\dots
-            \\otimes J : D`, acting on physical derivatives at the
-            images of the reference points.
+            GEM expression for the cell Jacobian, stored for use by
+            :meth:`evaluate` when ``direction`` carries physical
+            geometry.
 
         """
-        if self.order == 0:
-            return self
-        sd = J.shape[0]
-        alphas = multiindices(sd, self.order)
-        lookup = {alpha: k for k, alpha in enumerate(alphas)}
-
-        # Distribute the multi-index coefficients over a symmetric tensor
-        T = numpy.zeros((sd,) * self.order)
-        for index in numpy.ndindex(T.shape):
-            alpha = _index_alpha(index, sd)
-            scale = prod(map(factorial, alpha)) / factorial(self.order)
-            T[index] = self.direction[lookup[alpha]] * scale
-
-        # Contract each slot with the Jacobian
-        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                          dtype=object)
-        for _ in range(self.order):
-            T = numpy.tensordot(T, Jnp, axes=(0, 1))
-
-        # Collapse back onto multi-index coefficients
-        direction = numpy.full(len(alphas), Zero(), dtype=object)
-        for index in numpy.ndindex(T.shape):
-            k = lookup[_index_alpha(index, sd)]
-            direction[k] = direction[k] + T[index]
-        return self.with_direction(direction)
+        return type(self)(self.points, self.weights,
+                          order=self.order, direction=direction,
+                          rank=self.rank, J=J)
 
     def evaluate(self, fiat_element: FiniteElement) -> numpy.ndarray:
         r"""Apply this functional to the nodal basis of a FIAT element.
 
         This is the generalized Vandermonde computation: the restriction
         of a functional :math:`\\ell` to the polynomial space satisfies
-        :math:`\\pi \\ell = \\sum_j \\ell(\\psi_j)\\, \\pi n_j`.  Only
-        valid for functionals with numeric direction.
+        :math:`\\pi \\ell = \\sum_j \\ell(\\psi_j)\\, \\pi n_j`, i.e. a row
+        of :math:`B_{ij} = \\ell_i(\\hat\\psi_j)`.  When :attr:`direction`
+        carries physical geometry (:attr:`J` is set), the reference
+        nodal basis :math:`\\hat\\psi_j` is understood as transplanted to
+        physical space by the affine cell map, so its physical
+        derivative tensor is the tabulated reference one, recombined by
+        the chain rule, :math:`\\nabla_x^m(\\hat\\psi_j\\circ F) =
+        (J^{-1})^{\\otimes m} : \\hat\\nabla^m\\hat\\psi_j`.  Rather than
+        transforming :attr:`direction`, this recombination is applied to
+        the tabulation itself, and contracted against the weighted
+        direction tensor :math:`W_q = w_q D` at every point, unmodified.
+        Only the basis functions with a nonzero tabulated derivative at
+        these points are carried through the contraction: for a nodal
+        basis this is typically a small fraction of the full row.
 
         Parameters
         ----------
@@ -208,9 +206,55 @@ class PhysicallyMappedFunctional:
             return numpy.einsum("jcq,qc->j", T, self.weights)
         if self.order == 0:
             return tab[(0,) * sd] @ self.weights
-        alphas = multiindices(sd, self.order)
-        return self.direction @ numpy.array([tab[alpha] @ self.weights
-                                             for alpha in alphas])
+
+        order = self.order
+        shape = (sd,) * order
+        alphas = multiindices(sd, order)
+
+        # A nodal basis is mostly zero at any given handful of points:
+        # only contract the dofs with some nonzero tabulated derivative
+        # here, following the sparsity pattern of Walkington's V.
+        raw = numpy.array([tab[alpha] for alpha in alphas])  # (nalpha, ndof, npoints)
+        support = numpy.flatnonzero(numpy.any(raw, axis=(0, 2)))
+        result = numpy.zeros(raw.shape[1], dtype=object)
+        if len(support) == 0:
+            return result
+
+        # Full (uncompressed) reference derivative tensor, restricted to
+        # the support: tab[alpha] repeated at every index ordering of its
+        # multi-index, one per surviving basis function and point.
+        Tab = numpy.empty((len(support), len(self.points)) + shape)
+        for index in numpy.ndindex(shape):
+            alpha = _index_alpha(index, sd)
+            Tab[(..., *index)] = tab[alpha][support]
+
+        if self.J is not None:
+            Jnp = numpy.array([[self.J[i, k] for k in range(sd)] for i in range(sd)],
+                              dtype=object)
+            Jinv = adjugate(Jnp) / determinant(Jnp)
+            Tab = Tab.astype(object)
+            # Contract each tensor slot with J^{-1} in turn (chain rule).
+            # Contracting the axis right after the (support, npoints) prefix
+            # cycles a not-yet-contracted slot into that position each
+            # time, mirroring how the untransformed slots collapse in an
+            # unbatched symmetric-tensor contraction.
+            batch = Tab.ndim - order
+            for _ in range(order):
+                Tab = numpy.tensordot(Tab, Jinv, axes=(batch, 0))
+
+        # Full direction tensor (including the multiplicity of each
+        # multi-index), weighted at every point: W_q = w_q D.
+        lookup = {alpha: k for k, alpha in enumerate(alphas)}
+        D = numpy.empty(shape, dtype=object)
+        for index in numpy.ndindex(shape):
+            alpha = _index_alpha(index, sd)
+            scale = prod(map(factorial, alpha)) / factorial(order)
+            D[index] = self.direction[lookup[alpha]] * scale
+        W = numpy.tensordot(self.weights, D, axes=0)
+
+        result[support] = numpy.tensordot(Tab, W, axes=(tuple(range(1, order + 2)),
+                                                        tuple(range(order + 1))))
+        return result
 
 
 def _index_alpha(index: tuple, sd: int) -> tuple:

@@ -2,38 +2,42 @@ r"""Automatic basis transformations for physically mapped elements.
 
 This module automates the transformation theory of Kirby (2017) and
 Brubeck & Kirby (2025).  Given a FIAT element whose degrees of freedom
-are not preserved under push-forward, :class:`ZanyPhysicallyMappedElement`
-constructs the matrix :math:`V` relating the reference nodes to the
-push-forwards of the physical nodes, so that the physical basis
-functions are obtained as :math:`M F^*(\hat\Psi)` with :math:`M = V^T`.
+are not preserved under push-forward, each physical node's row of the
+generalized Vandermonde matrix :math:`B_{ij} = \ell_i(\hat\psi_j)` --
+its evaluation against the reference nodal basis, transplanted to
+physical space by the affine cell map :math:`x = J\hat{x} + v_0` -- is
+computed directly by
+:meth:`finat.functional.PhysicallyMappedFunctional.evaluate`, with no
+geometric frame required.  But :math:`B` relates physical nodes to
+reference basis functions, not to reference nodes, so the actual basis
+transformation :math:`V = B^{-1}` still has to be assembled: a
+physical node's row of :math:`B` is nonzero only on its own entity and
+on entities of strictly lower topological dimension, so entities are
+visited in increasing dimension and each one's small diagonal block of
+:math:`B` is inverted to eliminate the already-known contribution of
+the lower-dimensional ones.
 
 Degrees of freedom are represented symbolically by
 :class:`finat.functional.PhysicallyMappedFunctional` and processed
-generically, without dispatching over FIAT functional types.
-:class:`ZanyPhysicallyMappedElement` implements the entity-by-entity
-assembly loop once, calling four hooks that carry all mapping-specific
-knowledge; this module supplies the two mixins implementing them:
+generically, without dispatching over FIAT functional types.  Two
+mixins specialize :class:`ZanyPhysicallyMappedElement` to a pullback:
 
 * :class:`ScalarPhysicallyMappedElement`, for scalar elements with an
-  affine (identity) pullback -- Morley, Hermite, Argyris, Bell.  Each
-  reference node is pulled back to the physical cell by the chain rule
-  and expanded in the frame of the physical facet normal and the mapped
-  reference tangents (:class:`FacetFrame`); the tangential components
-  are derivatives along *mapped* reference tangents and therefore
-  coincide with reference functionals, whose expansion in the element's
-  own nodes is a purely numeric generalized Vandermonde row.
+  affine (identity) pullback -- Morley, Hermite, Argyris, Bell.  Every
+  reference node's own recipe (points, weights, a numeric direction
+  tensor) is reused for the physical node, with only the direction
+  replaced by its physical counterpart: unchanged (a fixed Cartesian
+  tensor) for vertex/interior derivative jets, or the cofactor image of
+  the reference facet normal for facet derivative dofs.  No geometric
+  frame is needed to build :math:`B`, only the block inversion above.
 
 * :class:`PiolaPhysicallyMappedElement`, for vector- or tensor-valued
   elements under the (double) contravariant Piola pullback --
-  Mardal-Tai-Winther, Johnson-Mercier, Guzman-Neilan.  The roles of the
-  normal and tangential directions are mirrored: the scaled facet
-  normal is the cofactor image of the reference one, so pure
-  normal-component moments are invariant, while scaled tangents map by
-  the Jacobian.
-
-In the language of the theory, the frame expansion in either mixin
-realizes :math:`E V^c`, and the numeric elimination of the tangential
-(respectively normal) completion realizes :math:`D`.
+  Mardal-Tai-Winther, Johnson-Mercier, Guzman-Neilan.  This retains the
+  entity-by-entity assembly loop of Kirby (2017) and Brubeck & Kirby
+  (2025): the scaled facet normal is the cofactor image of the
+  reference one, so pure normal-component moments are invariant, while
+  scaled tangents map by the Jacobian.
 """
 
 from functools import reduce
@@ -44,207 +48,25 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from gem import Literal, ListTensor, Node, Power, Zero
 from finat.functional import PhysicallyMappedFunctional
-from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity
-
-
-def generalized_cross(tangents) -> numpy.ndarray:
-    r"""Generalized cross product of d-1 vectors in d dimensions.
-
-    :arg tangents: A (d-1, d) array of vectors, with numeric or GEM entries.
-    :returns: The vector :math:`C` such that :math:`C \cdot w =
-        \det([t_1; \dots; t_{d-1}; w])` for all :math:`w`; it is
-        orthogonal to every :math:`t_k`.
-    """
-    A = numpy.asarray(tangents)
-    d = A.shape[1]
-    cols = numpy.ones(d, dtype=bool)
-    C = []
-    for i in range(d):
-        cols[i] = False
-        C.append((-1) ** (d - 1 + i) * determinant(A[:, cols]))
-        cols[i] = True
-    return numpy.asarray(C)
-
-
-class FacetFrame:
-    r"""Normal/tangential frame of a facet and its push-forward.
-
-    The reference frame consists of the FIAT facet normal
-    :math:`\hat{n}` and the scaled facet tangents :math:`\hat{t}_k`;
-    the physical frame consists of the physical facet normal and the
-    mapped tangents :math:`J\hat{t}_k`.  Because FIAT normals are
-    computed from the tangents by the same formula on the reference and
-    physical cells, the physical normal is :math:`\kappa\, C / \|C\|`
-    with :math:`C` the generalized cross product of the mapped tangents
-    and :math:`\kappa` a cell-independent constant recovered from the
-    reference data.
-
-    :arg fiat_element: The FIAT element, providing the reference cell.
-    :arg entity: The facet number.
-    :arg J: GEM expression for the cell Jacobian.
-    """
-
-    def __init__(self, fiat_element: FiniteElement, entity: int, J: Node):
-        ref_el = fiat_element.get_reference_element()
-        sd = ref_el.get_spatial_dimension()
-        self.tangents = ref_el.compute_tangents(sd - 1, entity)
-        self.normal = ref_el.compute_normal(entity)
-
-        Chat = generalized_cross(self.tangents)
-        kappa = self.normal @ Chat / numpy.linalg.norm(Chat)
-
-        self.mapped_tangents = [J @ Literal(t) for t in self.tangents]
-        C = generalized_cross([[Jt[i] for i in range(sd)]
-                               for Jt in self.mapped_tangents])
-        A = numpy.empty((sd, sd), dtype=object)
-        A[:, 0] = C
-        for k, Jt in enumerate(self.mapped_tangents):
-            A[:, k + 1] = [Jt[i] for i in range(sd)]
-        self._adjA = adjugate(A)
-        self._detA = determinant(A)
-
-        normC = Power(reduce(add, (C[i] * C[i] for i in range(sd))),
-                      Literal(0.5))
-        self.normal_scale = normC / kappa
-        vol = ref_el.volume_of_subcomplex(sd - 1, entity)
-        self.measure = normC * (vol / numpy.linalg.norm(Chat))
-
-    def reference_coefficients(self, direction: numpy.ndarray) -> numpy.ndarray:
-        r"""Expand a numeric direction in the reference frame.
-
-        :arg direction: A numeric direction vector.
-        :returns: Coefficients ``(a, b_1, ..., b_{d-1})`` such that the
-            direction equals :math:`a\hat{n} + \sum_k b_k \hat{t}_k`.
-        """
-        A = numpy.column_stack([self.normal, *self.tangents])
-        return numpy.linalg.solve(A, direction)
-
-    def decompose(self, direction: Node) -> list:
-        r"""Expand a GEM direction in the un-normalized physical frame.
-
-        :arg direction: A GEM direction vector.
-        :returns: GEM coefficients ``(x_0, x_1, ..., x_{d-1})`` such that
-            the direction equals :math:`x_0 C + \sum_k x_k J\hat{t}_k`.
-        """
-        sd = self._adjA.shape[0]
-        return [reduce(add, (self._adjA[m, i] * direction[i]
-                             for i in range(sd))) / self._detA
-                for m in range(sd)]
-
-
-def _weight_ratio(wi: numpy.ndarray, wj: numpy.ndarray, tol: float) -> float:
-    """Return the scalar s with wi == s * wj, if it exists."""
-    s = wi @ wj / (wj @ wj)
-    if not numpy.allclose(wi, s * wj, atol=tol * numpy.linalg.norm(wi)):
-        raise NotImplementedError("Weights are not parallel.")
-    return s
+from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity, inverse
 
 
 class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
-    r"""Mixin implementing the entity-by-entity assembly loop shared by
-    :class:`ScalarPhysicallyMappedElement` and
-    :class:`PiolaPhysicallyMappedElement`.
-
-    Following the factorization :math:`V = E V^c D` of Kirby (2017) and
-    Brubeck & Kirby (2025), the matrix :math:`V` relating the reference
-    nodes to the push-forwards of the physical nodes is assembled one
-    topological entity at a time, in increasing dimension, so that the
-    completion of a node on an entity can always be resolved against
-    the already-assembled rows of lower-dimensional entities.
-
-    On each entity, nodes that are already push-forward invariant
-    (:meth:`_invariant_dofs`) contribute an identity row for free,
-    since :math:`V` starts out as the identity.  The rest are assembled
-    by :meth:`_facet_dof_rows` (on a codimension-1 entity) or
-    :meth:`_point_dof_rows` (elsewhere); these hooks, together with
-    :meth:`_check_mapping`, encode the mapping-specific (affine or
-    Piola) part of the theory, and :meth:`basis_transformation` itself
-    contains no knowledge of which mapping is in play.
+    r"""Mixin holding what :class:`ScalarPhysicallyMappedElement` and
+    :class:`PiolaPhysicallyMappedElement` share: a numerical tolerance
+    and the requirement to validate the FIAT element's pullback before
+    deriving its basis transformation.
     """
 
     #: Numerical tolerance used throughout automatic basis transformation
     #: to detect vanishing coefficients.
     tol = 1e-12
 
-    def basis_transformation(self, coordinate_mapping) -> ListTensor:
-        fiat_element = self._element
-        self._check_mapping(fiat_element)
-
-        ref_el = fiat_element.get_reference_element()
-        sd = ref_el.get_spatial_dimension()
-        bary, = ref_el.make_points(sd, 0, sd + 1)
-        J = coordinate_mapping.jacobian_at(bary)
-
-        nodes = fiat_element.dual_basis()
-        V = identity(fiat_element.space_dimension())
-
-        processed = set()
-        entity_ids = fiat_element.entity_dofs()
-        for dim in sorted(entity_ids):
-            for entity in sorted(entity_ids[dim]):
-                group = {i: PhysicallyMappedFunctional.from_fiat(nodes[i])
-                         for i in entity_ids[dim][entity]}
-                invariant = self._invariant_dofs(group, dim, sd)
-                processed.update(invariant)
-                group = {i: ell for i, ell in group.items() if i not in invariant}
-                if not group:
-                    continue
-                if dim == sd - 1:
-                    self._facet_dof_rows(V, group, fiat_element, entity, J, processed)
-                else:
-                    self._point_dof_rows(V, group, fiat_element, J, processed)
-
-        _rescale_derivative_dofs(V, fiat_element, coordinate_mapping)
-        ndof = self.space_dimension()
-        return ListTensor(V[:, :ndof].T)
-
     def _check_mapping(self, fiat_element):
         """Verify that this class knows how to transform this element's pullback.
 
         :arg fiat_element: The FIAT element defined on the reference cell.
         :raises NotImplementedError: If the pullback is not supported.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
-
-    def _invariant_dofs(self, group, dim, sd):
-        """Select the nodes of an entity that are already push-forward invariant.
-
-        :arg group: Dict mapping node index to :class:`PhysicallyMappedFunctional`
-            for the reference nodes associated with one entity.
-        :arg dim: Topological dimension of the entity.
-        :arg sd: Spatial dimension of the cell.
-        :returns: The subset of ``group`` keys whose row of :math:`V` is
-            the identity row.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
-
-    def _facet_dof_rows(self, V, group, fiat_element, entity, J, processed):
-        """Assemble the rows of V for the non-invariant nodes on a facet.
-
-        :arg V: Object array being assembled; rows are set in place.
-        :arg group: Dict mapping node index to :class:`PhysicallyMappedFunctional`
-            for the non-invariant reference nodes on this facet.
-        :arg fiat_element: The FIAT element defined on the reference cell.
-        :arg entity: The facet number.
-        :arg J: GEM expression for the cell Jacobian.
-        :arg processed: Indices of the already assembled rows of ``V``;
-            updated in place.
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
-
-    def _point_dof_rows(self, V, group, fiat_element, J, processed):
-        """Assemble the rows of V for the non-invariant nodes away from a facet.
-
-        :arg V: Object array being assembled; rows are set in place.
-        :arg group: Dict mapping node index to :class:`PhysicallyMappedFunctional`
-            for the non-invariant reference nodes on this entity.
-        :arg fiat_element: The FIAT element defined on the reference cell.
-        :arg J: GEM expression for the cell Jacobian.
-        :arg processed: Indices of the already assembled rows of ``V``;
-            updated in place.
         """
         raise NotImplementedError(
             f"{type(self).__name__} does not implement automatic basis transformation.")
@@ -283,13 +105,29 @@ class ScalarPhysicallyMappedElement(ZanyPhysicallyMappedElement):
     r"""Mixin deriving the basis transformation for a scalar element
     with an affine (identity) pullback.
 
-    Push-forward invariance and completion follow directly from the
-    chain rule :math:`\nabla(\hat\psi\circ F) = J^T\hat\nabla\hat\psi
-    \circ F`: point values pull back unchanged; derivative nodes on a
-    facet are resolved in the normal/tangential frame of
-    :class:`FacetFrame`; derivative nodes elsewhere (vertex jets) have
-    no geometric frame to expand in and instead act as their own
-    completion group.
+    Every reference node is, by construction, either a value moment
+    (push-forward invariant) or a directional-derivative moment along
+    either a vertex/interior Cartesian axis (Hermite/Argyris/Bell
+    jets) or a facet normal (Morley/Argyris/Bell facet dofs); FIAT
+    never mixes the two within one functional.  The corresponding
+    physical node reuses the same points, weights, and derivative
+    order, with only the direction replaced by its physical
+    counterpart (:meth:`_physical_direction`): a Cartesian jet
+    direction is geometry-independent, while a facet normal direction
+    pushes forward by the cofactor matrix, the standard transformation
+    law for the normal of a hyperplane under an affine map.  Evaluating
+    that physical node against the *full* reference nodal basis (no
+    geometric frame needed) gives a row of :math:`B_{ij} =
+    \ell_i(\hat\psi_j)`, the generalized Vandermonde matrix; but
+    :math:`V = B^{-1}` is what relates the reference nodes to the
+    push-forward of the physical ones, so :math:`B` still needs
+    inverting.  By construction, a physical node's row of :math:`B` is
+    nonzero only on its own entity and on entities of strictly lower
+    topological dimension (already resolved), so the entities are
+    still visited in increasing dimension, and each entity's own small
+    diagonal block of :math:`B` is inverted (:func:`~finat.
+    physically_mapped.inverse`) and used to eliminate the
+    already-known contribution of the lower-dimensional entities.
     """
 
     #: If False, physical facet moments are plain integrals rather than
@@ -302,112 +140,85 @@ class ScalarPhysicallyMappedElement(ZanyPhysicallyMappedElement):
             raise NotImplementedError(
                 f"{type(self).__name__} expects an affine pullback, not {mappings}.")
 
-    def _invariant_dofs(self, group, dim, sd):
-        # Point values pull back exactly; only derivative nodes need work.
-        return {i for i, ell in group.items() if ell.order == 0}
+    def basis_transformation(self, coordinate_mapping) -> ListTensor:
+        fiat_element = self._element
+        self._check_mapping(fiat_element)
 
-    def _facet_dof_rows(self, V, group, fiat_element, entity, J, processed):
-        _scalar_facet_rows(V, group, fiat_element, entity, J, processed,
-                           self.tol, self.avg)
+        ref_el = fiat_element.get_reference_element()
+        sd = ref_el.get_spatial_dimension()
+        bary, = ref_el.make_points(sd, 0, sd + 1)
+        J = coordinate_mapping.jacobian_at(bary)
+        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                          dtype=object)
+        K = adjugate(Jnp).T
 
-    def _point_dof_rows(self, V, group, fiat_element, J, processed):
-        _scalar_point_rows(V, group, J, processed, self.tol)
+        nodes = fiat_element.dual_basis()
+        entity_ids = fiat_element.entity_dofs()
+        ndof = fiat_element.space_dimension()
+        B = numpy.empty((ndof, ndof), dtype=object)
+        V = numpy.empty((ndof, ndof), dtype=object)
 
+        processed = []
+        for dim in entity_ids:
+            for entity in entity_ids[dim]:
+                rows = entity_ids[dim][entity]
+                for i in rows:
+                    ell = PhysicallyMappedFunctional.from_fiat(nodes[i])
+                    if ell.order > 0:
+                        direction = self._physical_direction(ell, dim, sd, entity, ref_el, K)
+                        ell = ell.with_direction(direction, J=J)
+                    row = ell.evaluate(fiat_element)
+                    B[i, :] = [x if isinstance(x, Node) else Literal(x) for x in row]
 
-def _scalar_facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
-                       entity: int, J: Node, processed: set, tol: float,
-                       avg: bool = True) -> None:
-    r"""Assemble the rows of V for derivative nodes on a facet.
+                # B[rows, :] @ V = I restricted to rows: eliminate the
+                # (already-known) contribution of lower-dimensional
+                # entities and solve the entity's own diagonal block.
+                target = numpy.full((len(rows), ndof), Zero(), dtype=object)
+                for a, i in enumerate(rows):
+                    target[a, i] = Literal(1.0)
+                if processed:
+                    target = target - B[numpy.ix_(rows, processed)] @ V[processed, :]
+                Dinv = inverse(B[numpy.ix_(rows, rows)])
+                V[rows, :] = Dinv @ target
+                processed.extend(rows)
 
-    Physical facet nodes take their normal component along the physical
-    facet normal and their tangential components along the mapped
-    reference tangents.  The pulled-back reference node is expanded in
-    this frame, and the tangential remainders, being derivatives along
-    mapped reference tangents, coincide with reference functionals that
-    are eliminated numerically through already assembled rows of V.
+        _rescale_derivative_dofs(V, fiat_element, coordinate_mapping)
+        ndof = self.space_dimension()
+        return ListTensor(V[:, :ndof].T)
 
-    :arg V: Object array being assembled.
-    :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
-        for the derivative nodes on this facet.
-    :arg fiat_element: The FIAT element.
-    :arg entity: The facet number.
-    :arg J: GEM expression for the cell Jacobian.
-    :arg processed: Indices of the already assembled rows; updated in place.
-    :arg tol: Tolerance for detecting zeros in the numeric coefficients.
-    :arg avg: If False, physical facet moments are plain integrals rather
-        than integral averages, and their columns are rescaled by the
-        physical facet measure.
-    """
-    frame = FacetFrame(fiat_element, entity, J)
-    for i, ell in group.items():
-        # Split the direction into normal and tangential parts
-        a, *beta = frame.reference_coefficients(ell.direction)
-        if abs(a) < tol:
-            # Mapped tangential derivatives are invariant
-            processed.add(i)
-            continue
+    def _physical_direction(self, ell: PhysicallyMappedFunctional, dim: int, sd: int,
+                            entity: int, ref_el, K: numpy.ndarray) -> numpy.ndarray:
+        r"""Build the physical direction tensor of a derivative node.
 
-        # Expand the pulled-back node in the physical frame
-        x = frame.decompose(ell.pullback(J).direction)
-        c = x[0] * frame.normal_scale / a
-        if not avg and len(ell.points) > 1:
-            # the physical moment is a plain integral, not an average
-            c = c / frame.measure
-        row = numpy.full(V.shape[1], Zero(), dtype=object)
-        row[i] = c
-        for k, that in enumerate(frame.tangents):
-            r = x[k + 1] - c * beta[k]
-            coefficients = ell.with_direction(that).evaluate(fiat_element)
-            coefficients[abs(coefficients) < tol] = 0
-            for j in numpy.flatnonzero(coefficients):
-                if j not in processed:
-                    raise NotImplementedError(
-                        f"Completion of node {i} couples to node {j}, "
-                        "which has not been transformed yet.")
-                row = row + V[j, :] * (r * coefficients[j])
-        V[i, :] = row
-        processed.add(i)
+        :arg ell: The reference functional, with its numeric direction
+            recovered by :meth:`PhysicallyMappedFunctional.from_fiat`.
+        :arg dim: Topological dimension of the node's entity.
+        :arg sd: Spatial dimension of the cell.
+        :arg entity: The entity number.
+        :arg ref_el: The reference cell.
+        :arg K: GEM cofactor matrix :math:`\operatorname{adj}(J)^T`.
+        :returns: The GEM direction tensor of the physical node.
+        """
+        if dim != sd - 1:
+            # A vertex or interior derivative jet is a fixed Cartesian
+            # tensor: its meaning does not depend on cell geometry.
+            return numpy.array([Literal(d) for d in ell.direction], dtype=object)
 
-
-def _scalar_point_rows(V: numpy.ndarray, group: dict, J: Node,
-                       processed: set, tol: float) -> None:
-    r"""Assemble the rows of V for derivative nodes away from facets.
-
-    Away from facets there is no geometric frame, and physical nodes
-    keep the reference (Cartesian) directions, so the group must span
-    all directions and acts as its own completion: this is the
-    affine-interpolation equivalent case, and each pulled-back node is
-    expanded within the group.
-
-    :arg V: Object array being assembled.
-    :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
-        for the derivative nodes on this entity.
-    :arg J: GEM expression for the cell Jacobian.
-    :arg processed: Indices of the already assembled rows; updated in place.
-    :arg tol: Tolerance for detecting zeros in the numeric coefficients.
-    """
-    suborders = {}
-    for i, ell in group.items():
-        suborders.setdefault(ell.order, {})[i] = ell
-
-    for sub in suborders.values():
-        directions = numpy.array([ell.direction for ell in sub.values()])
-        if len(set(ell.points for ell in sub.values())) > 1:
-            raise NotImplementedError("Group nodes at different points.")
-        if directions.shape[0] != directions.shape[1]:
-            raise NotImplementedError(
-                "Directions do not span the derivative jet.")
-
-        # coefficients of the direction basis expansion of each multi-index
-        Dinv = numpy.linalg.inv(directions.T)
-        for i, ell in sub.items():
-            Jd = ell.pullback(J).direction
-            for col, (j, ellj) in enumerate(sub.items()):
-                s = _weight_ratio(ell.weights, ellj.weights, tol)
-                x = s * Dinv[col]
-                nz = numpy.flatnonzero(abs(x) > tol)
-                V[i, j] = reduce(add, (Jd[m] * x[m] for m in nz)) if len(nz) else Zero()
-            processed.add(i)
+        # A facet derivative node differentiates along the reference
+        # normal; the physical normal is its cofactor image K@direction
+        # (the standard transformation law for the normal of a
+        # hyperplane under an affine map), normalized to unit length to
+        # match FIAT's own facet dof convention (compute_normal).
+        Kd = K @ ell.direction
+        if self.avg or len(ell.points) == 1:
+            norm = Power(reduce(add, (Kd[m] * Kd[m] for m in range(sd))), Literal(0.5))
+            return Kd / norm
+        # A plain integral (not a measure-intrinsic average) scales the
+        # unit-normal moment back up by the reference facet measure,
+        # since the physical and reference facet measures differ by
+        # exactly the norm of Kd that was just divided out.
+        vol = ref_el.volume_of_subcomplex(sd - 1, entity)
+        return Kd * vol
 
 
 class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
@@ -415,7 +226,13 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
     tensor-valued element under the (double) contravariant Piola
     pullback.
 
-    The roles of the normal and tangential directions are mirrored with
+    Following the factorization :math:`V = E V^c D` of Kirby (2017) and
+    Brubeck & Kirby (2025), the matrix :math:`V` relating the reference
+    nodes to the push-forwards of the physical nodes is assembled one
+    topological entity at a time, in increasing dimension, so that the
+    completion of a node on an entity can always be resolved against
+    the already-assembled rows of lower-dimensional entities.  The
+    roles of the normal and tangential directions are mirrored with
     respect to the scalar case: interior value moments are Piola
     invariant by construction; value moments on a facet are resolved in
     the frame of the scaled facet normal (the cofactor image of the
@@ -423,6 +240,38 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
     elsewhere have no geometric frame to expand in and instead act as
     their own completion group.
     """
+
+    def basis_transformation(self, coordinate_mapping) -> ListTensor:
+        fiat_element = self._element
+        self._check_mapping(fiat_element)
+
+        ref_el = fiat_element.get_reference_element()
+        sd = ref_el.get_spatial_dimension()
+        bary, = ref_el.make_points(sd, 0, sd + 1)
+        J = coordinate_mapping.jacobian_at(bary)
+
+        nodes = fiat_element.dual_basis()
+        V = identity(fiat_element.space_dimension())
+
+        processed = set()
+        entity_ids = fiat_element.entity_dofs()
+        for dim in sorted(entity_ids):
+            for entity in sorted(entity_ids[dim]):
+                group = {i: PhysicallyMappedFunctional.from_fiat(nodes[i])
+                         for i in entity_ids[dim][entity]}
+                invariant = self._invariant_dofs(group, dim, sd)
+                processed.update(invariant)
+                group = {i: ell for i, ell in group.items() if i not in invariant}
+                if not group:
+                    continue
+                if dim == sd - 1:
+                    self._facet_dof_rows(V, group, fiat_element, entity, J, processed)
+                else:
+                    self._point_dof_rows(V, group, fiat_element, J, processed)
+
+        _rescale_derivative_dofs(V, fiat_element, coordinate_mapping)
+        ndof = self.space_dimension()
+        return ListTensor(V[:, :ndof].T)
 
     def _check_mapping(self, fiat_element):
         mappings = set(fiat_element.mapping())
@@ -461,20 +310,19 @@ def _piola_facet_rows(V: numpy.ndarray, group: dict,
                       processed: set, tol: float) -> None:
     r"""Assemble the rows of V for facet moments of Piola-mapped values.
 
-    This mirrors :func:`_scalar_facet_rows` with the roles of the normal
-    and tangential directions exchanged: under the contravariant Piola
-    map the scaled facet normal is the image of the reference one under
-    the cofactor matrix :math:`K = \operatorname{adj}(J)^T`, so pure
-    normal moments are invariant, while the scaled tangents map by
-    :math:`J`.  Distinct nodes on a facet can share the same tangential
-    directions (e.g. two RT-type facet dofs in 3D) and are only told
-    apart by how their weight varies from point to point, so a node is
-    identified by its full per-point profile of frame coordinates, not
-    by direction alone; the pulled-back reference node mixes the
-    coordinates through the frame expansion of :math:`K\hat{t}_k`, the
-    tangential profiles are matched within the group, and the residual
-    normal profile is eliminated numerically through already assembled
-    rows of V.
+    This mirrors the scalar case with the roles of the normal and
+    tangential directions exchanged: under the contravariant Piola map
+    the scaled facet normal is the image of the reference one under the
+    cofactor matrix :math:`K = \operatorname{adj}(J)^T`, so pure normal
+    moments are invariant, while the scaled tangents map by :math:`J`.
+    Distinct nodes on a facet can share the same tangential directions
+    (e.g. two RT-type facet dofs in 3D) and are only told apart by how
+    their weight varies from point to point, so a node is identified by
+    its full per-point profile of frame coordinates, not by direction
+    alone; the pulled-back reference node mixes the coordinates through
+    the frame expansion of :math:`K\hat{t}_k`, the tangential profiles
+    are matched within the group, and the residual normal profile is
+    eliminated numerically through already assembled rows of V.
 
     :arg V: Object array being assembled.
     :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
@@ -586,11 +434,11 @@ def _piola_point_rows(V: numpy.ndarray, group: dict, J: Node,
                       processed: set, tol: float) -> None:
     r"""Assemble the rows of V for point values of Piola-mapped fields.
 
-    This mirrors :func:`_scalar_point_rows`: away from facets, physical
-    point evaluations keep the reference (Cartesian) components, which
-    pull back through the cofactor matrix :math:`K = \operatorname{adj}(J)^T`
-    of the contravariant Piola map, so the group of components at each
-    point acts as its own completion.
+    Away from facets, physical point evaluations keep the reference
+    (Cartesian) components, which pull back through the cofactor matrix
+    :math:`K = \operatorname{adj}(J)^T` of the contravariant Piola map,
+    so the group of components at each point acts as its own
+    completion.
 
     :arg V: Object array being assembled.
     :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional

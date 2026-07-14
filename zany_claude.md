@@ -62,77 +62,87 @@ Goal: replace the hand-coded `basis_transformation` methods with a helper that d
 $V = E V^c D$ directly from a FIAT element's dual basis. The implementation must mirror
 the theory factor by factor, not merely reproduce matrix entries:
 
-**Status (2026-07-13).** The symbolic dof lives in `finat/functional.py` as
+**Status (2026-07-14).** The symbolic dof lives in `finat/functional.py` as
 `finat.PhysicallyMappedFunctional`. `finat/physically_mapped.py` stays fully generic:
 `PhysicallyMappedElement` is unchanged from before this project, still an abstract
 mixin with no knowledge of the zany theory, used as-is by hand-coded elements (AW,
-HCT, PowellSabin, Walkington, ...). All the automation lives in `finat/zany.py`, as a
-template method on `ZanyPhysicallyMappedElement(PhysicallyMappedElement)`: the
-entity-by-entity assembly loop is implemented once, in its concrete
-`basis_transformation`, calling four hooks (`_check_mapping`, `_invariant_dofs`,
-`_facet_dof_rows`, `_point_dof_rows`) that carry ALL mapping-specific knowledge — the
-loop itself contains no `if piola` anywhere. Two mixins implement those hooks,
-`ScalarPhysicallyMappedElement` (affine pullback: Morley, Hermite, Argyris, Bell) and
-`PiolaPhysicallyMappedElement` ((double) contravariant Piola: MTW, Johnson-Mercier,
-Guzman-Neilan), plus the pure math functions they call (`FacetFrame`,
-`_scalar_facet_rows`, `_scalar_point_rows`, `_piola_facet_rows`, `_piola_point_rows`) —
-these take plain arrays/GEM expressions, no `self`, so the mathematics stays readable
-independent of the class plumbing. Concrete elements (`finat.Morley`, etc.) are now
-just a citation plus a FIAT constructor call: mixing in the right base class is enough,
-`basis_transformation` is inherited (MRO example: `Morley -> ScalarPhysicallyMappedElement
--> ZanyPhysicallyMappedElement -> PhysicallyMappedElement -> ...`). `ndof` truncation is
-no longer a parameter; the loop always slices by `self.space_dimension()`, which
-constrained elements (Bell, GN) already override. Tests:
-`test/finat/test_zany_automation.py`; `check_zany_mapping` lives in the finat conftest
-and is provided to test modules as a pytest fixture (pytest runs with
-`--import-mode=importlib`, so test modules cannot import from each other or from
-conftest).
+HCT, PowellSabin, Walkington, ...). The automation lives in `finat/zany.py`, but the
+two mixins no longer share one template-method loop: `PiolaPhysicallyMappedElement`
+((double) contravariant Piola: MTW, Johnson-Mercier, Guzman-Neilan) keeps the original
+entity-ordered `_check_mapping`/`_invariant_dofs`/`_facet_dof_rows`/`_point_dof_rows`
+hook design (untouched); `ScalarPhysicallyMappedElement` (affine pullback: Morley,
+Hermite, Argyris, Bell) was rewritten from scratch around a much simpler idea — see
+below. `ZanyPhysicallyMappedElement` now only holds what both still share: `tol` and
+`_rescale_derivative_dofs`. Concrete elements (`finat.Morley`, etc.) are still just a
+citation plus a FIAT constructor call. Tests: `test/finat/test_zany_automation.py`;
+`check_zany_mapping` lives in the finat conftest and is provided to test modules as a
+pytest fixture (pytest runs with `--import-mode=importlib`, so test modules cannot
+import from each other or from conftest).
 
-**Framework design.** A dof is a symbolic `finat.PhysicallyMappedFunctional`:
-$\ell(f) = \sum_q w_q \langle D, \nabla^m f(x_q)\rangle$ with numeric points/weights
-and a direction tensor $D$ that is numeric on the reference cell and GEM otherwise.
-There is *no dispatch over FIAT functional types*: `PhysicallyMappedFunctional.from_fiat`
-reads only `pt_dict`/`deriv_dict` and recovers the order and common direction numerically
-(rank-one SVD of the derivative weights). Operations: covariant `pullback(J)`
-(contract direction slots with $J$), `with_direction`, and numeric `evaluate` against
-a nodal basis (the generalized Vandermonde realizing the $D$ factor of $V = E V^c D$).
-The row of $V$ for a reference node $\hat\ell$ with direction $\hat d = a\hat n +
-\sum_k \beta_k \hat t_k$ (numeric split) is assembled generically:
+**Framework design, rewritten for the scalar case.** The old design (frame
+decomposition into normal/tangential coordinates, `FacetFrame`, `generalized_cross`,
+per-entity completion recursion through already-assembled rows of $V$) is gone for
+`ScalarPhysicallyMappedElement`. The replacement starts from duality directly: a
+physical node $\ell_i$ restricted to the polynomial space equals $\sum_j
+\ell_i(\hat\psi_j)\,\hat n_j$, i.e. row $i$ of $B$ with $B_{ij} = \ell_i(\hat\psi_j)$
+is the *generalized Vandermonde* evaluation of the physical node against the
+*reference* nodal basis $\hat\psi_j = F^*(\hat\psi_j)$ (the FIAT basis functions,
+transplanted to physical space by the plain affine cell map, no Piola-style pullback
+scaling). $B$ relates physical nodes to *reference basis functions*, not to reference
+nodes, so it is $V = B^{-1}$ that is actually needed — computing $B$ directly is not
+the free lunch it looks like; the matrix must still be inverted.
 
-* $a = 0$ (value dofs, or tangential directions): push-forward invariant, identity row.
-* otherwise solve $J\hat d = x_0 C + \sum_k x_k J\hat t_k$ symbolically
-  (`FacetFrame.decompose`, adjugate/determinant of the polynomial frame matrix), where
-  $C$ = generalized cross product of the mapped tangents. The physical node has
-  direction $aN + \sum\beta_k J\hat t_k$ with $N = \kappa C/\|C\|$, so its coefficient
-  is $c = x_0\|C\|/(\kappa a)$ and the tangential remainders are $r_k = x_k - c\beta_k$
-  (careful: *not* $a x_k$ — the SVD direction may be $-\hat n$, and all formulas must be
-  invariant under that sign flip; a sign bug here flips exactly the edges where the SVD
-  chose the opposite orientation).
-* the remainders multiply completion functionals along *mapped reference tangents*,
-  which coincide with reference functionals; `PhysicallyMappedFunctional.evaluate` gives their numeric
-  expansion in the element's own nodes, and the row combination recurses through the
-  already-assembled rows of $V$ (entities processed in increasing dimension), which
-  will later let completions couple to vertex jets (Argyris/HCT) for free.
-
-Derivative nodes *away from facets* (`_scalar_point_rows`, covering Hermite vertex
-gradients) have no geometric frame: FIAT keeps Cartesian directions on the physical
-cell, so the group of derivative nodes on the entity acts as its own completion — this
-is precisely affine-interpolation equivalence. The pulled-back direction $J\hat d_i$
-is expanded in the group's own (numeric) direction basis, with weight-ratio factors
-making the expansion invariant under the SVD scale/sign ambiguity of each node's
-recovered $(w, D)$ factorization. The group must span the derivative jet, share its
-points, and have pairwise-parallel weights; otherwise `NotImplementedError`.
+* `PhysicallyMappedFunctional.evaluate` (`finat/functional.py`) computes one row of
+  $B$ directly, with no geometric frame: `self.direction` is the *physical* direction
+  tensor (unchanged Cartesian tensor for vertex/interior jets; cofactor image of the
+  reference normal, renormalized to unit length, for facet derivative dofs — see
+  `ScalarPhysicallyMappedElement._physical_direction`), and the chain rule
+  $\nabla_x^m(\hat\psi_j\circ F) = (J^{-1})^{\otimes m}:\hat\nabla^m\hat\psi_j$ is
+  applied to the *tabulation* (not to `direction`, which stays untouched and is simply
+  contracted with the raw weights, $W_q = w_q D$, at the end) — this avoids ever having
+  to work out which side of a bilinear pairing needs $J^{-1}$ vs. $(J^{-1})^T$: `Tab`
+  is built as a genuine (uncompressed, repeated-per-index-ordering) tensor of shape
+  `(ndof, npoints) + (sd,)*order` and each of the `order` trailing slots is contracted
+  with $J^{-1}$ in turn via `numpy.tensordot`, always targeting the axis right after
+  the `(ndof, npoints)` prefix so that an unprocessed slot cycles into that position
+  every iteration (get this axis position wrong — e.g. always contracting the *last*
+  axis — and the same slot gets contracted twice while another is never touched; this
+  is invisible for order 1 and silently wrong for order $\ge 2$, i.e. every vertex
+  Hessian dof in Bell/Argyris, so always check against a genuine order-2 case, not
+  just Morley/Hermite, before trusting a refactor of this contraction).
+* $B$ is not diagonal (a physical derivative node's row is generally nonzero against
+  many reference basis functions), but it *is* block lower triangular by increasing
+  topological dimension: a physical node's row is nonzero only on its own entity and
+  on strictly-lower-dimensional entities (this is the same structural fact the old
+  per-entity completion recursion relied on, now discovered as a property of $B$
+  rather than asserted by construction). `ScalarPhysicallyMappedElement.
+  basis_transformation` therefore still visits entities in increasing dimension, but
+  only to invert $B$ into $V$: each entity's own small diagonal block of $B$ is
+  inverted with `finat.physically_mapped.inverse` (reused as-is; it already exploits
+  further internal block/identity structure, e.g. order-0 trace moments sitting next
+  to order-1 normal moments within one Argyris edge's block) and used to eliminate the
+  already-known contribution of lower-dimensional entities from the target (`I`
+  restricted to this entity's rows). Do not invert the whole $B$ at once with generic
+  `adjugate`/`determinant` cofactor expansion — it is combinatorial in the matrix size
+  and only tractable because each per-entity block is small.
+* Order-0 (value) physical nodes are exactly their reference functional (no geometric
+  counterpart to build), so `evaluate` returns *numeric* Python floats for that
+  branch — remember to wrap them in `gem.Literal` before writing into the (GEM-typed)
+  $B$/$V$ arrays, `ListTensor` will raise an opaque `AttributeError` on a bare float.
 
 Key facts the framework rests on:
 
-* **FIAT normals are "UFC consistent":** computed from the tangents by the same formula
-  on reference and physical cells (`UFCTriangle.compute_normal` rotates the scaled edge
-  tangent; `UFCTetrahedron.compute_normal` is $-2\times$ the unit cross product of the
-  scaled face tangents), with cell-independent magnitude. Hence $N = \kappa C/\|C\|$
-  with $\kappa$ recoverable from reference data, and no orientation logic is needed
-  (assumes $\det J > 0$). For the record, the fully simplified closed forms the solve
-  reproduces are $a = \det J\sqrt{\det\hat G/\det G}$ and $b = G^{-1}T^TJ\hat n$ with
-  Gram matrices of the (mapped) tangents.
+* **The physical facet normal is the cofactor image of the reference one, full stop.**
+  No "UFC-consistent normal" recovery, `generalized_cross`, or cell-independent-$\kappa$
+  argument is needed: $K\hat n$ (any reference vector proportional to the facet normal,
+  $K = \operatorname{adj}(J)^T$) is already, exactly, the (non-unit) physical scaled
+  normal — the identity `_piola_facet_rows` already relies on for the Piola case.
+  Renormalizing by $\|K\hat n\|$ gives the physical *unit* normal FIAT's own facet dofs
+  are built against (`ref_el.compute_normal`); the earlier session's `FacetFrame` reached
+  the same fact through a much longer detour (mapped-tangent cross products, recovering
+  a cell-independent scale constant $\kappa$ from reference data) that is no longer
+  needed now that nothing needs to *decompose* a direction into a normal/tangential
+  frame in the first place.
 * **Integral averages are push-forward invariant.** FIAT's Morley dofs are averages
   (`FacetQuadratureRule(..., avg=True)`), so physical nodes share the reference weights
   and no `physical_edge_lengths` appear. The framework *assumes* measure-intrinsic
@@ -144,33 +154,28 @@ Key facts the framework rests on:
   hand-written scaling. `cell_size()` returns raw numpy values in the test mappings but
   GEM in Firedrake, so use operator arithmetic (`havg**(-m)`), not GEM constructors
   (GEM overloads `+ - * / ** @` with `Zero`/constant folding; keep numpy object arrays
-  on the left when scaling by a GEM scalar).
+  on the left when scaling by a GEM scalar). Unaffected by the rewrite above.
 
-Extensions beyond first order and Morley/Hermite:
+Extensions beyond first order and Morley/Hermite (all still automatic under the new
+design, no per-element special-casing beyond `_physical_direction`'s
+facet-vs-vertex/interior split):
 
-* `PhysicallyMappedFunctional` directions live in derivative multi-index space (`multiindices`, axis
-  order for $m=1$); `pullback` distributes them over a symmetric tensor (dividing by
-  multiplicities), contracts every slot with $J$ (`numpy.tensordot` on object arrays),
-  and collapses back. Point-jet groups are split per order; each order solves in its
-  own multi-index direction basis (Argyris/Bell vertex jets: gradient + Hessian).
-* Facet completions of Argyris edge moments couple to vertex jets and same-edge trace
-  moments; the existing row recursion handles both with no new code (trace moments are
-  order-0 and thus invariant; FIAT builds all these moments with
-  `FacetQuadratureRule(avg=True)`, i.e. measure-intrinsic, as the framework assumes).
 * `ScalarPhysicallyMappedElement.avg = False` (an instance attribute Argyris sets from
   its constructor kwarg) reproduces the legacy FInAT convention where physical facet
-  moments are plain integrals: their columns are divided by the physical facet measure
-  $\|C\| |\hat e| / \|\hat C\|$ (`FacetFrame.measure`). Single-point facet dofs
-  (Argyris "point" variant) are unaffected.
-* Bell is the extended-element pattern: FIAT.Bell is the 21-node quintic element with
-  the constraint functionals as extra edge nodes; overriding `space_dimension()` to 18
-  drops the constraint *columns* of $V$ at the end of the template method (their rows
-  still contribute the $D$-matrix entries through the completion recursion), and the
-  FInAT element overrides `entity_dofs`.
-* Known convention change: the generic $h^{-m}$ conditioning scaling now also applies
-  to integral-variant Argyris edge moments, which the hand-written code left unscaled
-  (Morley scaled them; the legacy convention was inconsistent). Invisible when
-  `cell_size == 1`; flag in PR review.
+  moments are plain integrals rather than averages: `_physical_direction` scales the
+  unit-normal direction back up by the *reference* facet volume instead of
+  renormalizing by $\|K\hat n\|$, i.e. the moment keeps the shared reference weights
+  but stops being measure-intrinsic. Single-point facet dofs (Argyris "point" variant)
+  are unaffected (guarded by `len(ell.points) == 1`).
+* Bell is still the extended-element pattern: FIAT.Bell is the 21-node quintic element
+  with the constraint functionals as extra edge nodes; overriding `space_dimension()`
+  to 18 drops the constraint *columns* of $V$ at the end (their rows are still needed
+  to invert $B$'s lower-dimensional blocks, i.e. vertex rows still eliminate against
+  them), and the FInAT element overrides `entity_dofs`.
+* Known convention change carried over unchanged from the previous design: the generic
+  $h^{-m}$ conditioning scaling also applies to integral-variant Argyris edge moments,
+  which the hand-written code left unscaled (Morley scaled them; the legacy convention
+  was inconsistent). Invisible when `cell_size == 1`; flag in PR review.
 
 **Piola-mapped elements** (Aznaran, Kirby & Farrell 2022). `PhysicallyMappedFunctional` carries a
 value rank: component weight profiles (nq x sd^rank) parsed from `pt_dict` component
