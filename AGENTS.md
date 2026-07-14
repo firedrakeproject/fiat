@@ -9,11 +9,7 @@ This document outlines the guidelines and architectural context for AI agents as
 When assisting with contributions to FIAT and the Firedrake project, AI agents and their human counterparts must adhere to the following strict policies:
 
 * The use of AI tools must be explicitly declared alongside the specific tool used.
-* A human developer must lead the Pull Request.
-* The human contributor must understand every change made to the codebase.
 * Reviewer questions must be answered directly by the human, rather than acting as a relay to the AI.
-* Any generated code must be executed locally to verify that it functions correctly.
-* AI tools must not be used to resolve issues that are labeled as 'good first issue'.
 
 ---
 
@@ -36,7 +32,6 @@ Despite being called "fiat", this repository (Python package `firedrake_fiat`) c
 * `finat/` — symbolic layer on top of FIAT. Physically mapped elements (`finat/physically_mapped.py`, `finat/argyris.py`, `finat/morley.py`, `finat/hct.py`, `finat/piola_mapped.py`, …) construct GEM expressions for basis transformations.
 * `gem/` — the tensor-algebra intermediate language used to express transformations symbolically (`gem/gem.py` for nodes, `gem/interpreter.py` to evaluate expressions numerically in tests).
 * `test/` — note the singular name: tests live at `test/finat/test_zany_mapping.py`, `test/FIAT/...`, `test/gem/...` (not `tests/`).
-* `literature/` — untracked folder with LaTeX sources of the two theory papers: `Kirby2017Transformation/paper.tex` (A general approach to transforming finite elements) and `BrubeckKirby2025Macroelements/paper.tex` (transformation theory for macroelements, §"Transformation theory").
 
 ## Environment and Setup
 
@@ -91,67 +86,6 @@ experience of automating the Kirby (2017) / Aznaran-Kirby-Farrell (2022) / Brube
 (2025) transformation theory (`finat/zany.py`, `finat/functional.py`) for Morley, Hermite,
 Argyris, Bell, Mardal-Tai-Winther, Johnson-Mercier, and Guzman-Neilan. The lessons below are
 about *how to design and debug this kind of code*, not just about this one project.
-
-### Mathematical structures to recognize in FIAT/FInAT
-
-* **A degree of freedom is fully described by five numbers, not by its FIAT class.** Every
-  functional FIAT builds from `pt_dict`/`deriv_dict` reduces to (points, weights, derivative
-  order $m$, a direction tensor of rank $m$, a value rank for vector/tensor-valued dofs).
-  `IntegralMomentOfNormalDerivative`, `PointNormalDerivative`, `TensorBidirectionalIntegralMoment`,
-  etc. are just different ways of *constructing* the same five numbers. Recognizing this
-  collapses "N functional types to support" into "one shape to recover numerically"
-  (`finat.PhysicallyMappedFunctional.from_fiat`, `finat/functional.py`).
-* **Pullback is always "contract each tensor slot of the direction with a fixed matrix."**
-  Order-0 (values) are invariant (zero slots to contract). Order-$m$ derivatives contract $m$
-  slots with the Jacobian $J$ (the chain rule). Rank-$r$ Piola values contract $r$ slots with
-  the cofactor matrix $K = \operatorname{adj}(J)^T$. This is *the same operation* with a
-  different matrix, which is why the scalar and Piola code in `finat/zany.py` are mirror images
-  of each other (`_scalar_point_rows` / `_piola_point_rows`, `_scalar_facet_rows` /
-  `_piola_facet_rows`) rather than unrelated implementations.
-* **Frame decomposition is the one computational primitive underlying every non-affine
-  element.** Facet dofs (Morley/Argyris/Bell normal derivatives; MTW/JM/GN normal-tangential
-  moments) and vertex-jet completions (Hermite/Argyris/Bell gradients and Hessians) are all
-  solved the *same* way: split a direction/profile into an invariant part and a part that needs
-  completing, express the pulled-back quantity in the frame built from the mapped generators of
-  that split (`FacetFrame`, or the direction-basis inverse in `_scalar_point_rows`), and solve
-  symbolically via `adjugate`/`determinant`. Once this pattern is visible, "add a new element"
-  stops being "derive new math" and becomes "which invariant subspace, which frame."
-* **Constrained/extended elements are the same construction as a restriction.** Bell and
-  Guzman-Neilan are both "take the extended FIAT element with its constraint functionals as
-  extra dofs, transform the whole thing, then keep only the first $\nu$ columns." This is
-  Kirby (2017) §5's extended-element proposition, and in code it is nothing more than
-  `space_dimension()` returning a smaller count than the FIAT element's — no special-casing
-  needed in the transformation loop itself.
-
-### Confusing mathematical ideas, clarified
-
-* **The Jacobian direction is flipped between the papers and the code.** The papers define
-  $F$ from physical to reference space, so their $J$ is FInAT's Jacobian *inverse*.
-  `coordinate_mapping.jacobian_at(point)` returns $\partial x_{\text{phys}}/\partial
-  x_{\text{ref}}$ (see "FInAT implementation conventions" below); a paper's $J^{-T}$ is FInAT's
-  plain Jacobian, transposed. This is a constant source of "why does my formula look
-  transposed" confusion — check this convention flip before suspecting a sign or index bug.
-* **Components against a reciprocal/dual basis transform contragrediently — this is the single
-  subtlety that broke 3D and is not in any of the papers.** FIAT builds the tangential
-  component of 3D Piola-mapped dofs (MTW) using `cross(n, t_k)`, the *reciprocal* partner of
-  the tangent frame, not the tangent frame itself. A general fact from differential geometry:
-  if a frame transforms by a matrix $A$, components expressed against its *reciprocal* frame
-  transform by $A^{-T}$ (up to a determinant factor), not by $A$. Kirby (2017)/Aznaran-Kirby-
-  Farrell (2022) only work out the 2D case, where the tangent "plane" is 1-dimensional and this
-  correction $S^{-1}$ collapses to $1$ — silently hiding the effect. **Whenever a FIAT dual set
-  builds a direction via a cross product against the normal (a common way to get "the other
-  in-plane directions" in 3D), check whether its transformation law is contragredient before
-  assuming it matches the direct frame.**
-* **Numerically recovered invariants (SVD, pinv) are only defined up to a group action, and
-  formulas built from them must be invariant under that action.** `from_fiat`'s SVD recovers a
-  direction/weight pair $(\hat n, w)$ up to a joint sign flip ($\hat n \to -\hat n$, $w \to
-  -w$ leaves the functional unchanged). A formula like $r_k = a x_k + (1-c)\beta_k$ that
-  implicitly assumes a particular sign will be wrong on exactly the subset of entities where
-  SVD happened to pick the other sign — a bug that looks like it "mostly works" and is
-  otherwise very hard to localize. The fix, $r_k = x_k - c\beta_k$, is invariant under the
-  joint flip. **Always test the full topology of a non-degenerate, non-symmetric physical
-  cell** (see `test/finat/conftest.py::MyMapping`'s deliberately irregular vertex coordinates) —
-  a symmetric test cell can accidentally hide a sign bug that only shows up on a generic mesh.
 
 ### Design strategies that generalize
 
