@@ -8,19 +8,29 @@ import numpy
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
+from finat.hdivcurl import HCurlElement, HDivElement
 
 
 class EnrichedElement(FiniteElementBase):
     """A finite element whose basis functions are the union of the
     basis functions of several other finite elements."""
 
-    def __new__(cls, elements):
+    def __new__(cls, elements, is_nodal_enriched=None):
         elements = tuple(chain.from_iterable(e.elements if isinstance(e, EnrichedElement) else (e,) for e in elements))
         if len(elements) == 1:
             return elements[0]
         else:
             self = super().__new__(cls)
             self.elements = elements
+
+            if is_nodal_enriched is None:
+                is_nodal_enriched = all(
+                    is_orthogonal(elements[i], elements[j])
+                    for i in range(len(elements))
+                    for j in range(i+1, len(elements))
+                )
+
+            self.is_nodal_enriched = is_nodal_enriched
             return self
 
     @cached_property
@@ -149,6 +159,34 @@ class EnrichedElement(FiniteElementBase):
             result, = mappings
             return result
 
+    def dual_evaluation(self, argument, coordinate_mapping=None):
+        if not self.is_nodal_enriched:
+            raise NotImplementedError(
+                f"Dual evaluation not defined for element {type(self).__name__}"
+            )
+        # Gather results from all sub-elements
+        # Each sub_result is (eval_expr, local_indices)
+        sub_results = [sub.dual_evaluation(argument, coordinate_mapping=coordinate_mapping)
+                       for sub in self.elements]
+
+        # Extract the evaluation sub-expressions
+        # We must ensure that all subindices are in the free indices of subexpr
+        # before wrapping in ComponentTensor. If some are missing (e.g. if the
+        # expression simplified to a constant), we multiply by a dummy ones tensor.
+        evals = []
+        for sub, (subexpr, subindices) in zip(self.elements, sub_results):
+            missing_indices = tuple(idx for idx in subindices if idx not in subexpr.free_indices)
+            if missing_indices:
+                shape = tuple(idx.extent for idx in missing_indices)
+                ones = gem.Literal(numpy.ones(shape))
+                dummy = gem.Indexed(ones, missing_indices)
+                subexpr = gem.Product(subexpr, dummy)
+            evals.append(gem.ComponentTensor(subexpr, subindices))
+
+        beta = self.get_indices()
+        expr = gem.Indexed(gem.Concatenate(*evals), beta)
+        return expr, beta
+
 
 def tree_map(f, *args):
     """Like the built-in :py:func:`map`, but applies to a tuple tree."""
@@ -201,3 +239,12 @@ def concatenate_entity_permutations(elements):
                     offset = len(o_e_dim_permutations)
                     o_e_dim_permutations += list(offset + q for q in p)
     return permutations
+
+
+def is_orthogonal(A, B):
+    """Test whether two elements are orthogonal."""
+    if isinstance(A, (HCurlElement, HDivElement)) and isinstance(B, (HCurlElement, HDivElement)):
+        Amap = A.transform(gem.Literal(numpy.ones(A.wrappee.value_shape)))
+        Bmap = B.transform(gem.Literal(numpy.ones(B.wrappee.value_shape)))
+        return sum(a * b for a, b in zip(Amap, Bmap)) == gem.Literal(0.0)
+    return False
