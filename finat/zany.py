@@ -466,12 +466,15 @@ def _piola_facet_rows(V: numpy.ndarray, group: dict,
     map the scaled facet normal is the image of the reference one under
     the cofactor matrix :math:`K = \operatorname{adj}(J)^T`, so pure
     normal moments are invariant, while the scaled tangents map by
-    :math:`J`.  Each node carries a per-point profile of frame
-    coordinates, shared by its physical counterpart; the pulled-back
-    reference node mixes the coordinates through the frame expansion of
-    :math:`K\hat{t}_k`, the tangential profiles are matched within the
-    group, and the residual normal profile is eliminated numerically
-    through already assembled rows of V.
+    :math:`J`.  Distinct nodes on a facet can share the same tangential
+    directions (e.g. two RT-type facet dofs in 3D) and are only told
+    apart by how their weight varies from point to point, so a node is
+    identified by its full per-point profile of frame coordinates, not
+    by direction alone; the pulled-back reference node mixes the
+    coordinates through the frame expansion of :math:`K\hat{t}_k`, the
+    tangential profiles are matched within the group, and the residual
+    normal profile is eliminated numerically through already assembled
+    rows of V.
 
     :arg V: Object array being assembled.
     :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
@@ -493,7 +496,11 @@ def _piola_facet_rows(V: numpy.ndarray, group: dict,
                       dtype=object)
     K = adjugate(Jnp).T
 
-    # Reference frame coordinate profiles, shared with the physical nodes
+    # Reference frame coordinate profiles, shared with the physical nodes:
+    # each node's own quadrature weights, decomposed into (normal,
+    # tangential) frame coordinates at each of its points.  This is what
+    # distinguishes nodes with the same tangential directions from one
+    # another (see the point-dependence note in the docstring above).
     coords = {}
     for i, ell in group.items():
         C = ell.weights.reshape(-1, *(sd,) * ell.rank)
@@ -533,10 +540,13 @@ def _piola_facet_rows(V: numpy.ndarray, group: dict,
         (numpy.linalg.det(Ghat_t) / determinant(G))
     Y[1:, :] = Sinv @ Y[1:, :]
 
-    # Numeric matching of the tangential coordinate profiles in the group
+    # Numeric matching of the tangential coordinate profiles in the group.
+    # B has full row rank by unisolvence, so the Gram matrix B @ B.T is
+    # square and invertible; a rank deficiency (a genuine bug) surfaces
+    # as a LinAlgError here rather than a silent least-squares fit.
     B = numpy.array([coords[j][:, 1:].ravel() for j in group])
-    Bpinv = numpy.linalg.pinv(B)
-    Bpinv[abs(Bpinv) < tol] = 0
+    Binv = numpy.linalg.inv(B @ B.T) @ B
+    Binv[abs(Binv) < tol] = 0
 
     # Numeric elimination of the normal profile: one pure normal moment
     # per quadrature point, evaluated on the nodal basis
@@ -556,7 +566,7 @@ def _piola_facet_rows(V: numpy.ndarray, group: dict,
         P = P.reshape(len(points), -1)
 
         row = numpy.full(V.shape[1], Zero(), dtype=object)
-        c = Bpinv.T @ P[:, 1:].ravel()
+        c = Binv @ P[:, 1:].ravel()
         for cj, j in zip(c, group):
             row[j] = cj
         # Residual normal profile after removing the group contribution
