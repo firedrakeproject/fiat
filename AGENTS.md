@@ -29,9 +29,13 @@ FIAT operates within Firedrake's automated system for solving partial differenti
 Despite being called "fiat", this repository (Python package `firedrake_fiat`) contains **three** packages plus their tests, all in one tree:
 
 * `FIAT/` — reference-element definitions: cells, polynomial sets, dual bases (`FIAT/functional.py` holds the taxonomy of degree-of-freedom functionals), and element families.
-* `finat/` — symbolic layer on top of FIAT. Physically mapped elements (`finat/physically_mapped.py`, `finat/argyris.py`, `finat/morley.py`, `finat/hct.py`, `finat/piola_mapped.py`, …) construct GEM expressions for basis transformations.
-* `gem/` — the tensor-algebra intermediate language used to express transformations symbolically (`gem/gem.py` for nodes, `gem/interpreter.py` to evaluate expressions numerically in tests).
+* `finat/` — symbolic layer on top of FIAT. Physically mapped elements (`finat/physically_mapped.py`, `finat/argyris.py`, `finat/morley.py`, `finat/hct.py`, `finat/piola_mapped.py`, …) construct GEM expressions for basis transformations. See `finat/AGENTS.md` for package-specific implementation conventions.
+* `gem/` — the tensor-algebra intermediate language used to express transformations symbolically (`gem/gem.py` for nodes, `gem/interpreter.py` to evaluate expressions numerically in tests). See `gem/AGENTS.md` for package-specific implementation conventions.
 * `test/` — note the singular name: tests live at `test/finat/test_zany_mapping.py`, `test/FIAT/...`, `test/gem/...` (not `tests/`).
+
+Read the subdirectory `AGENTS.md` for any package you are about to edit — they hold
+implementation-level conventions (GEM operator overloading rules, FInAT Jacobian sign
+conventions, etc.) that this top-level file does not repeat.
 
 ## Environment and Setup
 
