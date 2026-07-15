@@ -353,8 +353,8 @@ def _scalar_facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElemen
         if not avg and len(ell.points) > 1:
             # the physical moment is a plain integral, not an average
             c = c / frame.measure
-        row = numpy.full(V.shape[1], Zero(), dtype=object)
-        row[i] = c
+
+        V[i, i] = c
         for k, that in enumerate(frame.tangents):
             r = x[k + 1] - c * beta[k]
             coefficients = ell.with_direction(that).evaluate(fiat_element)
@@ -364,8 +364,7 @@ def _scalar_facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElemen
                     raise NotImplementedError(
                         f"Completion of node {i} couples to node {j}, "
                         "which has not been transformed yet.")
-                row = row + V[j, :] * (r * coefficients[j])
-        V[i, :] = row
+                V[i] += V[j] * (r * coefficients[j])
         processed.add(i)
 
 
