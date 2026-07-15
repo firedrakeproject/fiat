@@ -36,6 +36,7 @@ realizes :math:`E V^c`, and the numeric elimination of the tangential
 (respectively normal) completion realizes :math:`D`.
 """
 
+from abc import abstractmethod
 from functools import reduce
 from operator import add
 
@@ -44,7 +45,7 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from gem import Literal, ListTensor, Node, Power, Zero
 from finat.functional import PhysicallyMappedFunctional
-from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity
+from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity, inverse
 
 
 def generalized_cross(tangents) -> numpy.ndarray:
@@ -153,10 +154,10 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
     the already-assembled rows of lower-dimensional entities.
 
     On each entity, nodes that are already push-forward invariant
-    (:meth:`_invariant_dofs`) contribute an identity row for free,
+    (:meth:`invariant_dofs`) contribute an identity row for free,
     since :math:`V` starts out as the identity.  The rest are assembled
-    by :meth:`_facet_dof_rows` (on a codimension-1 entity) or
-    :meth:`_point_dof_rows` (elsewhere); these hooks, together with
+    by :meth:`facet_dof_rows` (on a codimension-1 entity) or
+    :meth:`point_dof_rows` (elsewhere); these hooks, together with
     :meth:`_check_mapping`, encode the mapping-specific (affine or
     Piola) part of the theory, and :meth:`basis_transformation` itself
     contains no knowledge of which mapping is in play.
@@ -184,15 +185,15 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
             for entity in sorted(entity_ids[dim]):
                 group = {i: PhysicallyMappedFunctional.from_fiat(nodes[i])
                          for i in entity_ids[dim][entity]}
-                invariant = self._invariant_dofs(group, dim, sd)
+                invariant = self.invariant_dofs(group, dim, sd)
                 processed.update(invariant)
                 group = {i: ell for i, ell in group.items() if i not in invariant}
                 if not group:
                     continue
                 if dim == sd - 1:
-                    self._facet_dof_rows(V, group, fiat_element, entity, J, processed)
+                    self.facet_dof_rows(V, group, fiat_element, entity, J, processed, tol=self.tol)
                 else:
-                    self._point_dof_rows(V, group, fiat_element, J, processed)
+                    self.point_dof_rows(V, group, fiat_element, entity, J, processed, tol=self.tol)
 
         _rescale_derivative_dofs(V, fiat_element, coordinate_mapping)
         ndof = self.space_dimension()
@@ -204,10 +205,10 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
         :arg fiat_element: The FIAT element defined on the reference cell.
         :raises NotImplementedError: If the pullback is not supported.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
+        pass
 
-    def _invariant_dofs(self, group, dim, sd):
+    @abstractmethod
+    def invariant_dofs(self, group, dim, sd):
         """Select the nodes of an entity that are already push-forward invariant.
 
         :arg group: Dict mapping node index to :class:`PhysicallyMappedFunctional`
@@ -217,10 +218,10 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
         :returns: The subset of ``group`` keys whose row of :math:`V` is
             the identity row.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
+        pass
 
-    def _facet_dof_rows(self, V, group, fiat_element, entity, J, processed):
+    @abstractmethod
+    def facet_dof_rows(self, V, group, fiat_element, entity, J, processed, tol):
         """Assemble the rows of V for the non-invariant nodes on a facet.
 
         :arg V: Object array being assembled; rows are set in place.
@@ -231,11 +232,12 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
         :arg J: GEM expression for the cell Jacobian.
         :arg processed: Indices of the already assembled rows of ``V``;
             updated in place.
+        :arg tol: Tolerance for detecting zeros in the numeric coefficients.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
+        pass
 
-    def _point_dof_rows(self, V, group, fiat_element, J, processed):
+    @abstractmethod
+    def point_dof_rows(self, V, group, fiat_element, entity, J, processed, tol):
         """Assemble the rows of V for the non-invariant nodes away from a facet.
 
         :arg V: Object array being assembled; rows are set in place.
@@ -245,9 +247,9 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
         :arg J: GEM expression for the cell Jacobian.
         :arg processed: Indices of the already assembled rows of ``V``;
             updated in place.
+        :arg tol: Tolerance for detecting zeros in the numeric coefficients.
         """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not implement automatic basis transformation.")
+        pass
 
 
 def _rescale_derivative_dofs(V, fiat_element, coordinate_mapping):
@@ -302,111 +304,101 @@ class ScalarPhysicallyMappedElement(ZanyPhysicallyMappedElement):
             raise NotImplementedError(
                 f"{type(self).__name__} expects an affine pullback, not {mappings}.")
 
-    def _invariant_dofs(self, group, dim, sd):
+    def invariant_dofs(self, group, dim, sd):
         # Point values pull back exactly; only derivative nodes need work.
         return {i for i, ell in group.items() if ell.order == 0}
 
-    def _facet_dof_rows(self, V, group, fiat_element, entity, J, processed):
-        _scalar_facet_rows(V, group, fiat_element, entity, J, processed,
-                           self.tol, self.avg)
+    def facet_dof_rows(self, V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
+                       entity: int, J: Node, processed: set, tol: float) -> None:
+        r"""Assemble the rows of V for derivative nodes on a facet.
 
-    def _point_dof_rows(self, V, group, fiat_element, J, processed):
-        _scalar_point_rows(V, group, J, processed, self.tol)
+        Physical facet nodes take their normal component along the physical
+        facet normal and their tangential components along the mapped
+        reference tangents.  The pulled-back reference node is expanded in
+        this frame, and the tangential remainders, being derivatives along
+        mapped reference tangents, coincide with reference functionals that
+        are eliminated numerically through already assembled rows of V.
 
+        :arg V: Object array being assembled.
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
+            for the derivative nodes on this facet.
+        :arg fiat_element: The FIAT element.
+        :arg entity: The facet number.
+        :arg J: GEM expression for the cell Jacobian.
+        :arg processed: Indices of the already assembled rows; updated in place.
+        :arg tol: Tolerance for detecting zeros in the numeric coefficients.
+        :arg avg: If False, physical facet moments are plain integrals rather
+            than integral averages, and their columns are rescaled by the
+            physical facet measure.
+        """
+        frame = FacetFrame(fiat_element, entity, J)
+        for i, ell in group.items():
+            # Split the direction into normal and tangential parts
+            a, *beta = frame.reference_coefficients(ell.direction)
+            if abs(a) < tol:
+                # Mapped tangential derivatives are invariant
+                processed.add(i)
+                continue
 
-def _scalar_facet_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
-                       entity: int, J: Node, processed: set, tol: float,
-                       avg: bool = True) -> None:
-    r"""Assemble the rows of V for derivative nodes on a facet.
+            # Expand the pulled-back node in the physical frame
+            x = frame.decompose(ell.pullback(J).direction)
+            c = x[0] * frame.normal_scale / a
+            if not self.avg and len(ell.points) > 1:
+                # the physical moment is a plain integral, not an average
+                c = c / frame.measure
 
-    Physical facet nodes take their normal component along the physical
-    facet normal and their tangential components along the mapped
-    reference tangents.  The pulled-back reference node is expanded in
-    this frame, and the tangential remainders, being derivatives along
-    mapped reference tangents, coincide with reference functionals that
-    are eliminated numerically through already assembled rows of V.
-
-    :arg V: Object array being assembled.
-    :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
-        for the derivative nodes on this facet.
-    :arg fiat_element: The FIAT element.
-    :arg entity: The facet number.
-    :arg J: GEM expression for the cell Jacobian.
-    :arg processed: Indices of the already assembled rows; updated in place.
-    :arg tol: Tolerance for detecting zeros in the numeric coefficients.
-    :arg avg: If False, physical facet moments are plain integrals rather
-        than integral averages, and their columns are rescaled by the
-        physical facet measure.
-    """
-    frame = FacetFrame(fiat_element, entity, J)
-    for i, ell in group.items():
-        # Split the direction into normal and tangential parts
-        a, *beta = frame.reference_coefficients(ell.direction)
-        if abs(a) < tol:
-            # Mapped tangential derivatives are invariant
+            V[i, i] = c
+            for k, that in enumerate(frame.tangents):
+                r = x[k + 1] - c * beta[k]
+                coefficients = ell.with_direction(that).evaluate(fiat_element)
+                coefficients[abs(coefficients) < tol] = 0
+                for j in numpy.flatnonzero(coefficients):
+                    if j not in processed:
+                        raise NotImplementedError(
+                            f"Completion of node {i} couples to node {j}, "
+                            "which has not been transformed yet.")
+                    V[i] += V[j] * (r * coefficients[j])
             processed.add(i)
-            continue
 
-        # Expand the pulled-back node in the physical frame
-        x = frame.decompose(ell.pullback(J).direction)
-        c = x[0] * frame.normal_scale / a
-        if not avg and len(ell.points) > 1:
-            # the physical moment is a plain integral, not an average
-            c = c / frame.measure
+    def point_dof_rows(self, V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
+                       entity: int, J: Node, processed: set, tol: float) -> None:
+        r"""Assemble the rows of V for derivative nodes away from facets.
 
-        V[i, i] = c
-        for k, that in enumerate(frame.tangents):
-            r = x[k + 1] - c * beta[k]
-            coefficients = ell.with_direction(that).evaluate(fiat_element)
-            coefficients[abs(coefficients) < tol] = 0
-            for j in numpy.flatnonzero(coefficients):
-                if j not in processed:
-                    raise NotImplementedError(
-                        f"Completion of node {i} couples to node {j}, "
-                        "which has not been transformed yet.")
-                V[i] += V[j] * (r * coefficients[j])
-        processed.add(i)
+        Away from facets there is no geometric frame, and physical nodes
+        keep the reference (Cartesian) directions, so the group must span
+        all directions and acts as its own completion: this is the
+        affine-interpolation equivalent case, and each pulled-back node is
+        expanded within the group.
 
+        :arg V: Object array being assembled.
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
+            for the derivative nodes on this entity.
+        :arg J: GEM expression for the cell Jacobian.
+        :arg processed: Indices of the already assembled rows; updated in place.
+        :arg tol: Tolerance for detecting zeros in the numeric coefficients.
+        """
+        suborders = {}
+        for i, ell in group.items():
+            suborders.setdefault(ell.order, {})[i] = ell
 
-def _scalar_point_rows(V: numpy.ndarray, group: dict, J: Node,
-                       processed: set, tol: float) -> None:
-    r"""Assemble the rows of V for derivative nodes away from facets.
+        for sub in suborders.values():
+            directions = numpy.array([ell.direction for ell in sub.values()])
+            if len(set(ell.points for ell in sub.values())) > 1:
+                raise NotImplementedError("Group nodes at different points.")
+            if directions.shape[0] != directions.shape[1]:
+                raise NotImplementedError(
+                    "Directions do not span the derivative jet.")
 
-    Away from facets there is no geometric frame, and physical nodes
-    keep the reference (Cartesian) directions, so the group must span
-    all directions and acts as its own completion: this is the
-    affine-interpolation equivalent case, and each pulled-back node is
-    expanded within the group.
-
-    :arg V: Object array being assembled.
-    :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
-        for the derivative nodes on this entity.
-    :arg J: GEM expression for the cell Jacobian.
-    :arg processed: Indices of the already assembled rows; updated in place.
-    :arg tol: Tolerance for detecting zeros in the numeric coefficients.
-    """
-    suborders = {}
-    for i, ell in group.items():
-        suborders.setdefault(ell.order, {})[i] = ell
-
-    for sub in suborders.values():
-        directions = numpy.array([ell.direction for ell in sub.values()])
-        if len(set(ell.points for ell in sub.values())) > 1:
-            raise NotImplementedError("Group nodes at different points.")
-        if directions.shape[0] != directions.shape[1]:
-            raise NotImplementedError(
-                "Directions do not span the derivative jet.")
-
-        # coefficients of the direction basis expansion of each multi-index
-        Dinv = numpy.linalg.inv(directions.T)
-        for i, ell in sub.items():
-            Jd = ell.pullback(J).direction
-            for col, (j, ellj) in enumerate(sub.items()):
-                s = _weight_ratio(ell.weights, ellj.weights, tol)
-                x = s * Dinv[col]
-                nz = numpy.flatnonzero(abs(x) > tol)
-                V[i, j] = reduce(add, (Jd[m] * x[m] for m in nz)) if len(nz) else Zero()
-            processed.add(i)
+            # coefficients of the direction basis expansion of each multi-index
+            Dinv = numpy.linalg.inv(directions.T)
+            for i, ell in sub.items():
+                Jd = ell.pullback(J).direction
+                for col, (j, ellj) in enumerate(sub.items()):
+                    s = _weight_ratio(ell.weights, ellj.weights, tol)
+                    x = s * Dinv[col]
+                    nz = numpy.flatnonzero(abs(x) > tol)
+                    V[i, j] = reduce(add, (Jd[m] * x[m] for m in nz)) if len(nz) else Zero()
+                processed.add(i)
 
 
 class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
@@ -423,6 +415,18 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
     their own completion group.
     """
 
+    @staticmethod
+    def _check_piola_group(group: dict) -> None:
+        """Validate that a group of non-invariant Piola-mapped nodes are all
+        value moments with a nonzero value rank.
+
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional.
+        :raises NotImplementedError: If a node is a scalar weight or carries
+            a derivative, which the theory does not yet cover.
+        """
+        if any(ell.rank == 0 or ell.order > 0 for ell in group.values()):
+            raise NotImplementedError("Cannot yet Piola-transform this node group.")
+
     def _check_mapping(self, fiat_element):
         mappings = set(fiat_element.mapping())
         if mappings not in ({"contravariant piola"}, {"double contravariant piola"}):
@@ -430,196 +434,174 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
                 f"{type(self).__name__} expects a (double) contravariant "
                 f"Piola pullback, not {mappings}.")
 
-    def _invariant_dofs(self, group, dim, sd):
+    def invariant_dofs(self, group, dim, sd):
         # Interior moments are Piola invariant by construction
         return {i for i, ell in group.items() if ell.order == 0 and dim == sd}
 
-    def _facet_dof_rows(self, V, group, fiat_element, entity, J, processed):
-        _check_piola_group(group)
-        _piola_facet_rows(V, group, fiat_element, entity, J, processed, self.tol)
+    def facet_dof_rows(self, V: numpy.ndarray, group: dict,
+                       fiat_element: FiniteElement, entity: int, J: Node,
+                       processed: set, tol: float) -> None:
+        r"""Assemble the rows of V for facet moments of Piola-mapped values.
 
-    def _point_dof_rows(self, V, group, fiat_element, J, processed):
-        _check_piola_group(group)
-        _piola_point_rows(V, group, J, processed, self.tol)
+        This mirrors :func:`_scalar_facet_rows` with the roles of the normal
+        and tangential directions exchanged: under the contravariant Piola
+        map the scaled facet normal is the image of the reference one under
+        the cofactor matrix :math:`K = \operatorname{adj}(J)^T`, so pure
+        normal moments are invariant, while the scaled tangents map by
+        :math:`J`.  Distinct nodes on a facet can share the same tangential
+        directions (e.g. two RT-type facet dofs in 3D) and are only told
+        apart by how their weight varies from point to point, so a node is
+        identified by its full per-point profile of frame coordinates, not
+        by direction alone; the pulled-back reference node mixes the
+        coordinates through the frame expansion of :math:`K\hat{t}_k`, the
+        tangential profiles are matched within the group, and the residual
+        normal profile is eliminated numerically through already assembled
+        rows of V.
 
+        :arg V: Object array being assembled.
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
+            for the value moments on this facet.
+        :arg fiat_element: The FIAT element.
+        :arg entity: The facet number.
+        :arg J: GEM expression for the cell Jacobian.
+        :arg processed: Indices of the already assembled rows; updated in place.
+        :arg tol: Tolerance for detecting zeros in the numeric coefficients.
+        """
+        PiolaPhysicallyMappedElement._check_piola_group(group)
+        ref_el = fiat_element.get_reference_element()
+        sd = ref_el.get_spatial_dimension()
+        that = ref_el.compute_tangents(sd - 1, entity)
+        nhat = ref_el.compute_scaled_normal(entity)
+        Ghat = numpy.column_stack([nhat, *that])
+        Ghatinv = numpy.linalg.inv(Ghat)
 
-def _check_piola_group(group: dict) -> None:
-    """Validate that a group of non-invariant Piola-mapped nodes are all
-    value moments with a nonzero value rank.
+        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                          dtype=object)
+        Knp = adjugate(Jnp).T
 
-    :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional.
-    :raises NotImplementedError: If a node is a scalar weight or carries
-        a derivative, which the theory does not yet cover.
-    """
-    if any(ell.rank == 0 or ell.order > 0 for ell in group.values()):
-        raise NotImplementedError("Cannot yet Piola-transform this node group.")
+        # Reference frame coordinate profiles, shared with the physical nodes:
+        # each node's own quadrature weights, decomposed into (normal,
+        # tangential) frame coordinates at each of its points.  This is what
+        # distinguishes nodes with the same tangential directions from one
+        # another (see the point-dependence note in the docstring above).
+        coords = {}
+        for i, ell in group.items():
+            C = ell.weights.reshape(-1, *(sd,) * ell.rank)
+            for _ in range(ell.rank):
+                C = numpy.tensordot(C, Ghatinv, axes=(1, 1))
+            coords[i] = C.reshape(len(ell.points), -1)
+            # Pure normal moments are Piola invariant
+            if numpy.allclose(coords[i][:, 1:], 0, atol=tol):
+                processed.add(i)
 
+        group = {i: ell for i, ell in group.items() if i not in processed}
+        if not group:
+            return
+        rank, = {ell.rank for ell in group.values()}
+        points, = {ell.points for ell in group.values()}
 
-def _piola_facet_rows(V: numpy.ndarray, group: dict,
-                      fiat_element: FiniteElement, entity: int, J: Node,
-                      processed: set, tol: float) -> None:
-    r"""Assemble the rows of V for facet moments of Piola-mapped values.
+        # Frame coordinates of the mapped frame image of the reference frame:
+        # the normal is invariant and the pulled tangents are expanded by a
+        # symbolic solve in the mapped frame [K nhat | J that_k]
+        Kn = nhat @ Knp.T
+        Jt = that @ Jnp.T
+        A = numpy.column_stack([Kn, *Jt])
+        Y = numpy.full((sd, sd), Zero(), dtype=object)
+        Y[0, 0] = Literal(1.0)
+        Y[:, 1:] = inverse(A) @ (Knp @ that.T)
 
-    This mirrors :func:`_scalar_facet_rows` with the roles of the normal
-    and tangential directions exchanged: under the contravariant Piola
-    map the scaled facet normal is the image of the reference one under
-    the cofactor matrix :math:`K = \operatorname{adj}(J)^T`, so pure
-    normal moments are invariant, while the scaled tangents map by
-    :math:`J`.  Distinct nodes on a facet can share the same tangential
-    directions (e.g. two RT-type facet dofs in 3D) and are only told
-    apart by how their weight varies from point to point, so a node is
-    identified by its full per-point profile of frame coordinates, not
-    by direction alone; the pulled-back reference node mixes the
-    coordinates through the frame expansion of :math:`K\hat{t}_k`, the
-    tangential profiles are matched within the group, and the residual
-    normal profile is eliminated numerically through already assembled
-    rows of V.
+        # Physical tangential components are built on the reciprocal basis
+        # (cross products of the frame), so they carry the in-plane
+        # contravariant transformation S = adj(G Ghat^{-1})^T of the change
+        # of tangent Gram matrices.  Absorb S^{-1} into the coordinate
+        # mixing so that the physical profiles keep the reference
+        # coordinates; in 2D the tangent plane is one-dimensional and S = 1.
+        G = Jt @ Jt.T
+        Ghat_t = that @ that.T
+        Sinv = (numpy.linalg.inv(Ghat_t) @ G) * \
+            (numpy.linalg.det(Ghat_t) / determinant(G))
+        Y[1:, :] = Sinv @ Y[1:, :]
 
-    :arg V: Object array being assembled.
-    :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
-        for the value moments on this facet.
-    :arg fiat_element: The FIAT element.
-    :arg entity: The facet number.
-    :arg J: GEM expression for the cell Jacobian.
-    :arg processed: Indices of the already assembled rows; updated in place.
-    :arg tol: Tolerance for detecting zeros in the numeric coefficients.
-    """
-    ref_el = fiat_element.get_reference_element()
-    sd = ref_el.get_spatial_dimension()
-    that = ref_el.compute_tangents(sd - 1, entity)
-    nhat = ref_el.compute_scaled_normal(entity)
-    Ghat = numpy.column_stack([nhat, *that])
-    Ghatinv = numpy.linalg.inv(Ghat)
+        # Numeric matching of the tangential coordinate profiles in the group.
+        # B has full row rank by unisolvence, so the Gram matrix B @ B.T is
+        # square and invertible; a rank deficiency (a genuine bug) surfaces
+        # as a LinAlgError here rather than a silent least-squares fit.
+        B = numpy.array([coords[j][:, 1:].ravel() for j in group])
+        Binv = numpy.linalg.inv(B @ B.T) @ B
+        Binv[abs(Binv) < tol] = 0
 
-    Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                      dtype=object)
-    K = adjugate(Jnp).T
-
-    # Reference frame coordinate profiles, shared with the physical nodes:
-    # each node's own quadrature weights, decomposed into (normal,
-    # tangential) frame coordinates at each of its points.  This is what
-    # distinguishes nodes with the same tangential directions from one
-    # another (see the point-dependence note in the docstring above).
-    coords = {}
-    for i, ell in group.items():
-        C = ell.weights.reshape(-1, *(sd,) * ell.rank)
-        for _ in range(ell.rank):
-            C = numpy.tensordot(C, Ghatinv, axes=(1, 1))
-        coords[i] = C.reshape(len(ell.points), -1)
-        # Pure normal moments are Piola invariant
-        if numpy.allclose(coords[i][:, 1:], 0, atol=tol):
-            processed.add(i)
-
-    group = {i: ell for i, ell in group.items() if i not in processed}
-    if not group:
-        return
-    rank, = {ell.rank for ell in group.values()}
-    points, = {ell.points for ell in group.values()}
-
-    # Frame coordinates of the mapped frame image of the reference frame:
-    # the normal is invariant and the pulled tangents are expanded by a
-    # symbolic solve in the mapped frame [K nhat | J that_k]
-    A = numpy.column_stack([K @ nhat, *(Jnp @ t for t in that)])
-    adjA = adjugate(A)
-    detA = determinant(A)
-    Y = numpy.full((sd, sd), Zero(), dtype=object)
-    Y[0, 0] = Literal(1.0)
-    for k, t in enumerate(that):
-        Y[:, k + 1] = (adjA @ (K @ t)) / detA
-
-    # Physical tangential components are built on the reciprocal basis
-    # (cross products of the frame), so they carry the in-plane
-    # contravariant transformation S = adj(G Ghat^{-1})^T of the change
-    # of tangent Gram matrices.  Absorb S^{-1} into the coordinate
-    # mixing so that the physical profiles keep the reference
-    # coordinates; in 2D the tangent plane is one-dimensional and S = 1.
-    G = numpy.array([[Jnp @ t1 @ (Jnp @ t2) for t2 in that] for t1 in that])
-    Ghat_t = that @ that.T
-    Sinv = (numpy.linalg.inv(Ghat_t) @ G) * \
-        (numpy.linalg.det(Ghat_t) / determinant(G))
-    Y[1:, :] = Sinv @ Y[1:, :]
-
-    # Numeric matching of the tangential coordinate profiles in the group.
-    # B has full row rank by unisolvence, so the Gram matrix B @ B.T is
-    # square and invertible; a rank deficiency (a genuine bug) surfaces
-    # as a LinAlgError here rather than a silent least-squares fit.
-    B = numpy.array([coords[j][:, 1:].ravel() for j in group])
-    Binv = numpy.linalg.inv(B @ B.T) @ B
-    Binv[abs(Binv) < tol] = 0
-
-    # Numeric elimination of the normal profile: one pure normal moment
-    # per quadrature point, evaluated on the nodal basis
-    ndir = numpy.ones(())
-    for _ in range(rank):
-        ndir = numpy.multiply.outer(ndir, nhat)
-    T = fiat_element.tabulate(0, points)[(0,) * sd]
-    L = numpy.einsum("jcq,c->jq", T.reshape(T.shape[0], -1, len(points)),
-                     ndir.ravel())
-    L[abs(L) < tol] = 0
-
-    for i, ell in group.items():
-        # Pull back the coordinate profile, contracting each slot with Y
-        P = coords[i].reshape(-1, *(sd,) * rank)
+        # Numeric elimination of the normal profile: one pure normal moment
+        # per quadrature point, evaluated on the nodal basis
+        ndir = numpy.ones(())
         for _ in range(rank):
-            P = numpy.tensordot(P, Y, axes=(1, 1))
-        P = P.reshape(len(points), -1)
+            ndir = numpy.multiply.outer(ndir, nhat)
+        T = fiat_element.tabulate(0, points)[(0,) * sd]
+        L = numpy.einsum("jcq,c->jq", T.reshape(T.shape[0], -1, len(points)),
+                         ndir.ravel())
+        L[abs(L) < tol] = 0
 
-        row = numpy.full(V.shape[1], Zero(), dtype=object)
-        c = Binv @ P[:, 1:].ravel()
-        for cj, j in zip(c, group):
-            row[j] = cj
-        # Residual normal profile after removing the group contribution
-        residual = P[:, 0] - c @ numpy.array([coords[j][:, 0] for j in group])
-        for q in range(len(points)):
-            for m in numpy.flatnonzero(L[:, q]):
-                if m not in processed:
-                    raise NotImplementedError(
-                        f"Completion of node {i} couples to node {m}, "
-                        "which has not been transformed yet.")
-                row = row + V[m, :] * (residual[q] * L[m, q])
-        V[i, :] = row
-        processed.add(i)
+        for i, ell in group.items():
+            # Pull back the coordinate profile, contracting each slot with Y
+            P = coords[i].reshape(-1, *(sd,) * rank)
+            for _ in range(rank):
+                P = numpy.tensordot(P, Y, axes=(1, 1))
+            P = P.reshape(len(points), -1)
 
-
-def _piola_point_rows(V: numpy.ndarray, group: dict, J: Node,
-                      processed: set, tol: float) -> None:
-    r"""Assemble the rows of V for point values of Piola-mapped fields.
-
-    This mirrors :func:`_scalar_point_rows`: away from facets, physical
-    point evaluations keep the reference (Cartesian) components, which
-    pull back through the cofactor matrix :math:`K = \operatorname{adj}(J)^T`
-    of the contravariant Piola map, so the group of components at each
-    point acts as its own completion.
-
-    :arg V: Object array being assembled.
-    :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
-        for the value nodes on this entity.
-    :arg J: GEM expression for the cell Jacobian.
-    :arg processed: Indices of the already assembled rows; updated in place.
-    :arg tol: Tolerance for detecting zeros in the numeric coefficients.
-    """
-    sd = J.shape[0]
-    Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                      dtype=object)
-    K = adjugate(Jnp).T
-
-    subgroups = {}
-    for i, ell in group.items():
-        if len(ell.points) != 1 or ell.rank != 1:
-            raise NotImplementedError(
-                "Only single-point vector evaluations are handled.")
-        subgroups.setdefault(ell.points, {})[i] = ell
-
-    for sub in subgroups.values():
-        directions = numpy.array([ell.weights[0] for ell in sub.values()])
-        if directions.shape[0] != directions.shape[1]:
-            raise NotImplementedError(
-                "Directions do not span the vector components.")
-        Dinv = numpy.linalg.inv(directions.T)
-        for i, ell in sub.items():
-            Kd = K @ ell.weights[0]
-            for col, j in enumerate(sub):
-                x = Dinv[col]
-                nz = numpy.flatnonzero(abs(x) > tol)
-                V[i, j] = reduce(add, (Kd[m] * x[m] for m in nz)) if len(nz) else Zero()
+            c = Binv @ P[:, 1:].ravel()
+            for cj, j in zip(c, group):
+                V[i, j] = cj
+            # Residual normal profile after removing the group contribution
+            residual = P[:, 0] - c @ numpy.array([coords[j][:, 0] for j in group])
+            for q in range(len(points)):
+                for m in numpy.flatnonzero(L[:, q]):
+                    if m not in processed:
+                        raise NotImplementedError(
+                            f"Completion of node {i} couples to node {m}, "
+                            "which has not been transformed yet.")
+                    V[i] += V[m] * (residual[q] * L[m, q])
             processed.add(i)
+
+    def point_dof_rows(self, V: numpy.ndarray, group: dict,
+                       fiat_element: FiniteElement, entity: int, J: Node,
+                       processed: set, tol: float) -> None:
+        r"""Assemble the rows of V for point values of Piola-mapped fields.
+
+        This mirrors :func:`_scalar_point_rows`: away from facets, physical
+        point evaluations keep the reference (Cartesian) components, which
+        pull back through the cofactor matrix :math:`K = \operatorname{adj}(J)^T`
+        of the contravariant Piola map, so the group of components at each
+        point acts as its own completion.
+
+        :arg V: Object array being assembled.
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
+            for the value nodes on this entity.
+        :arg J: GEM expression for the cell Jacobian.
+        :arg processed: Indices of the already assembled rows; updated in place.
+        :arg tol: Tolerance for detecting zeros in the numeric coefficients.
+        """
+        PiolaPhysicallyMappedElement._check_piola_group(group)
+        sd = J.shape[0]
+        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                          dtype=object)
+        K = adjugate(Jnp).T
+
+        subgroups = {}
+        for i, ell in group.items():
+            if len(ell.points) != 1 or ell.rank != 1:
+                raise NotImplementedError(
+                    "Only single-point vector evaluations are handled.")
+            subgroups.setdefault(ell.points, {})[i] = ell
+
+        for sub in subgroups.values():
+            directions = numpy.array([ell.weights[0] for ell in sub.values()])
+            if directions.shape[0] != directions.shape[1]:
+                raise NotImplementedError(
+                    "Directions do not span the vector components.")
+            Dinv = numpy.linalg.inv(directions.T)
+            for i, ell in sub.items():
+                Kd = K @ ell.weights[0]
+                for col, j in enumerate(sub):
+                    x = Dinv[col]
+                    nz = numpy.flatnonzero(abs(x) > tol)
+                    V[i, j] = reduce(add, (Kd[m] * x[m] for m in nz)) if len(nz) else Zero()
+                processed.add(i)
