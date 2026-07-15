@@ -26,10 +26,10 @@ knowledge; this module supplies the two mixins implementing them:
 * :class:`PiolaPhysicallyMappedElement`, for vector- or tensor-valued
   elements under the (double) contravariant Piola pullback --
   Mardal-Tai-Winther, Johnson-Mercier, Guzman-Neilan.  The roles of the
-  normal and tangential directions are mirrored: the scaled facet
-  normal is the cofactor image of the reference one, so pure
-  normal-component moments are invariant, while scaled tangents map by
-  the Jacobian.
+  normal and tangential directions are mirrored (:class:`PiolaFacetFrame`):
+  the scaled facet normal is the cofactor image of the reference one, so
+  pure normal-component moments are invariant, while scaled tangents map
+  by the Jacobian.
 
 In the language of the theory, the frame expansion in either mixin
 realizes :math:`E V^c`, and the numeric elimination of the tangential
@@ -130,6 +130,64 @@ class FacetFrame:
         return [reduce(add, (self._adjA[m, i] * direction[i]
                              for i in range(sd))) / self._detA
                 for m in range(sd)]
+
+
+class PiolaFacetFrame:
+    r"""Normal/tangential frame of a facet for the (double) contravariant
+    Piola pullback, and its expansion under push-forward.
+
+    The roles of the normal and tangential directions are mirrored with
+    respect to :class:`FacetFrame`: the reference frame's scaled normal
+    :math:`\hat{n}` maps by the cofactor matrix :math:`K =
+    \operatorname{adj}(J)^T`, while its tangents :math:`\hat{t}_k` map by
+    :math:`J` directly.  ``Y`` is the (symbolic) matrix expanding the
+    pulled-back frame image :math:`[K\hat{n}\;|\;K\hat{t}_k]` in the
+    physical frame :math:`[K\hat{n}\;|\;J\hat{t}_k]`; the mapped tangents
+    are built on the reciprocal basis in dimension > 2, so their
+    coordinates carry an extra in-plane contravariant correction
+    :math:`S^{-1}` folded into ``Y``'s tangential rows.
+
+    :arg fiat_element: The FIAT element, providing the reference cell.
+    :arg entity: The facet number.
+    :arg J: GEM expression for the cell Jacobian.
+    """
+
+    def __init__(self, fiat_element: FiniteElement, entity: int, J: Node):
+        ref_el = fiat_element.get_reference_element()
+        sd = ref_el.get_spatial_dimension()
+        self.tangents = ref_el.compute_tangents(sd - 1, entity)
+        self.normal = ref_el.compute_scaled_normal(entity)
+
+        Ghat = numpy.column_stack([self.normal, *self.tangents])
+        self.Ghatinv = numpy.linalg.inv(Ghat)
+
+        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                          dtype=object)
+        Knp = adjugate(Jnp).T
+
+        # Frame coordinates of the mapped frame image of the reference frame:
+        # the normal is invariant and the pulled tangents are expanded by a
+        # symbolic solve in the mapped frame [K nhat | J that_k]
+        Kn = self.normal @ Knp.T
+        Jt = self.tangents @ Jnp.T
+        A = numpy.column_stack([Kn, *Jt])
+
+        Y = numpy.full((sd, sd), Zero(), dtype=object)
+        Y[0, 0] = Literal(1.0)
+        Y[:, 1:] = inverse(A) @ (Knp @ self.tangents.T)
+
+        # Physical tangential components are built on the reciprocal basis
+        # (cross products of the frame), so they carry the in-plane
+        # contravariant transformation S = adj(G Ghat^{-1})^T of the change
+        # of tangent Gram matrices.  Absorb S^{-1} into the coordinate
+        # mixing so that the physical profiles keep the reference
+        # coordinates; in 2D the tangent plane is one-dimensional and S = 1.
+        G = Jt @ Jt.T
+        Ghat_t = self.tangents @ self.tangents.T
+        Sinv = (numpy.linalg.inv(Ghat_t) @ G) * \
+            (numpy.linalg.det(Ghat_t) / determinant(G))
+        Y[1:, :] = Sinv @ Y[1:, :]
+        self.Y = Y
 
 
 def _weight_ratio(wi: numpy.ndarray, wj: numpy.ndarray, tol: float) -> float:
@@ -426,6 +484,97 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         if any(ell.rank == 0 or ell.order > 0 for ell in group.values()):
             raise NotImplementedError("Cannot yet Piola-transform this node group.")
 
+    @staticmethod
+    def _divergence_rows(V: numpy.ndarray, group: dict, J: Node, processed: set) -> dict:
+        r"""Assemble the rows of V for divergence nodes and strip them from the group.
+
+        The (double) contravariant Piola pullback commutes with the
+        divergence up to the Jacobian determinant, independently of the
+        entity the node sits on, so each divergence node is its own,
+        trivially invariant group.
+
+        :arg V: Object array being assembled; rows are set in place.
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
+            for the nodes on this entity.
+        :arg J: GEM expression for the cell Jacobian.
+        :arg processed: Indices of the already assembled rows; updated in place.
+        :returns: The remaining, non-divergence nodes of ``group``.
+        """
+        divs = {i: ell for i, ell in group.items() if ell.divergence}
+        if divs:
+            sd = J.shape[0]
+            Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                              dtype=object)
+            detJ = determinant(Jnp)
+            for i, ell in divs.items():
+                V[i, i] = detJ * ell.weights[0]
+                processed.add(i)
+        return {i: ell for i, ell in group.items() if i not in divs}
+
+    @staticmethod
+    def _is_cartesian_point_group(group: dict) -> bool:
+        """Recognize a group of Cartesian point-value nodes sharing one point.
+
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional.
+        :returns: True if every node is a rank-1, order-0 node at the same
+            single point, spanning exactly as many components as the group
+            has members -- the same structural pattern :meth:`_piola_point_rows`
+            (and :meth:`ScalarPhysicallyMappedElement.point_dof_rows`) expect,
+            regardless of the entity dimension the group sits on.
+        """
+        points = {ell.points for ell in group.values()}
+        return (len(points) == 1 and len(next(iter(points))) == 1
+                and all(ell.order == 0 and ell.rank == 1 for ell in group.values()))
+
+    @staticmethod
+    def _piola_point_rows(V: numpy.ndarray, group: dict, J: Node,
+                          processed: set, tol: float) -> None:
+        r"""Assemble the rows of V for Cartesian point values of Piola-mapped fields.
+
+        Physical point evaluations keep the reference (Cartesian) components,
+        which pull back through the cofactor matrix :math:`K =
+        \operatorname{adj}(J)^T` of the contravariant Piola map, so the group
+        of components sharing a point acts as its own completion.  This is
+        the same treatment regardless of which entity the point sits on: a
+        single-point, rank-1 node group spanning the Cartesian components is
+        not a facet moment (whose weights are genuine, usually multi-point
+        quadrature averages aligned with the facet normal/tangential frame)
+        even when it happens to sit on a codimension-1 entity, e.g. the edge
+        dofs of :class:`~finat.alfeld_sorokina.AlfeldSorokina`.
+
+        :arg V: Object array being assembled.
+        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
+            for the value nodes on this entity.
+        :arg J: GEM expression for the cell Jacobian.
+        :arg processed: Indices of the already assembled rows; updated in place.
+        :arg tol: Tolerance for detecting zeros in the numeric coefficients.
+        """
+        sd = J.shape[0]
+        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
+                          dtype=object)
+        K = adjugate(Jnp).T
+
+        subgroups = {}
+        for i, ell in group.items():
+            if len(ell.points) != 1 or ell.rank != 1:
+                raise NotImplementedError(
+                    "Only single-point vector evaluations are handled.")
+            subgroups.setdefault(ell.points, {})[i] = ell
+
+        for sub in subgroups.values():
+            directions = numpy.array([ell.weights[0] for ell in sub.values()])
+            if directions.shape[0] != directions.shape[1]:
+                raise NotImplementedError(
+                    "Directions do not span the vector components.")
+            Dinv = numpy.linalg.inv(directions.T)
+            for i, ell in sub.items():
+                Kd = K @ ell.weights[0]
+                for col, j in enumerate(sub):
+                    x = Dinv[col]
+                    nz = numpy.flatnonzero(abs(x) > tol)
+                    V[i, j] = reduce(add, (Kd[m] * x[m] for m in nz)) if len(nz) else Zero()
+                processed.add(i)
+
     def _check_mapping(self, fiat_element):
         mappings = set(fiat_element.mapping())
         if mappings not in ({"contravariant piola"}, {"double contravariant piola"}):
@@ -466,17 +615,21 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         :arg processed: Indices of the already assembled rows; updated in place.
         :arg tol: Tolerance for detecting zeros in the numeric coefficients.
         """
+        group = self._divergence_rows(V, group, J, processed)
+        if not group:
+            return
+        if self._is_cartesian_point_group(group):
+            # Not a genuine facet moment (see _piola_point_rows): e.g. the
+            # edge dofs of AlfeldSorokina are plain Cartesian point values
+            # that happen to sit on a codimension-1 entity.
+            PiolaPhysicallyMappedElement._check_piola_group(group)
+            self._piola_point_rows(V, group, J, processed, tol)
+            return
         PiolaPhysicallyMappedElement._check_piola_group(group)
-        ref_el = fiat_element.get_reference_element()
-        sd = ref_el.get_spatial_dimension()
-        that = ref_el.compute_tangents(sd - 1, entity)
-        nhat = ref_el.compute_scaled_normal(entity)
-        Ghat = numpy.column_stack([nhat, *that])
-        Ghatinv = numpy.linalg.inv(Ghat)
-
-        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                          dtype=object)
-        Knp = adjugate(Jnp).T
+        sd = J.shape[0]
+        frame = PiolaFacetFrame(fiat_element, entity, J)
+        nhat = frame.normal
+        Y = frame.Y
 
         # Reference frame coordinate profiles, shared with the physical nodes:
         # each node's own quadrature weights, decomposed into (normal,
@@ -487,7 +640,7 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         for i, ell in group.items():
             C = ell.weights.reshape(-1, *(sd,) * ell.rank)
             for _ in range(ell.rank):
-                C = numpy.tensordot(C, Ghatinv, axes=(1, 1))
+                C = numpy.tensordot(C, frame.Ghatinv, axes=(1, 1))
             coords[i] = C.reshape(len(ell.points), -1)
             # Pure normal moments are Piola invariant
             if numpy.allclose(coords[i][:, 1:], 0, atol=tol):
@@ -498,29 +651,6 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
             return
         rank, = {ell.rank for ell in group.values()}
         points, = {ell.points for ell in group.values()}
-
-        # Frame coordinates of the mapped frame image of the reference frame:
-        # the normal is invariant and the pulled tangents are expanded by a
-        # symbolic solve in the mapped frame [K nhat | J that_k]
-        Kn = nhat @ Knp.T
-        Jt = that @ Jnp.T
-        A = numpy.column_stack([Kn, *Jt])
-
-        Y = numpy.full((sd, sd), Zero(), dtype=object)
-        Y[0, 0] = Literal(1.0)
-        Y[:, 1:] = inverse(A) @ (Knp @ that.T)
-
-        # Physical tangential components are built on the reciprocal basis
-        # (cross products of the frame), so they carry the in-plane
-        # contravariant transformation S = adj(G Ghat^{-1})^T of the change
-        # of tangent Gram matrices.  Absorb S^{-1} into the coordinate
-        # mixing so that the physical profiles keep the reference
-        # coordinates; in 2D the tangent plane is one-dimensional and S = 1.
-        G = Jt @ Jt.T
-        Ghat_t = that @ that.T
-        Sinv = (numpy.linalg.inv(Ghat_t) @ G) * \
-            (numpy.linalg.det(Ghat_t) / determinant(G))
-        Y[1:, :] = Sinv @ Y[1:, :]
 
         # Numeric matching of the tangential coordinate profiles in the group.
         # B has full row rank by unisolvence, so the Gram matrix B @ B.T is
@@ -609,29 +739,8 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         :arg processed: Indices of the already assembled rows; updated in place.
         :arg tol: Tolerance for detecting zeros in the numeric coefficients.
         """
+        group = self._divergence_rows(V, group, J, processed)
+        if not group:
+            return
         PiolaPhysicallyMappedElement._check_piola_group(group)
-        sd = J.shape[0]
-        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                          dtype=object)
-        K = adjugate(Jnp).T
-
-        subgroups = {}
-        for i, ell in group.items():
-            if len(ell.points) != 1 or ell.rank != 1:
-                raise NotImplementedError(
-                    "Only single-point vector evaluations are handled.")
-            subgroups.setdefault(ell.points, {})[i] = ell
-
-        for sub in subgroups.values():
-            directions = numpy.array([ell.weights[0] for ell in sub.values()])
-            if directions.shape[0] != directions.shape[1]:
-                raise NotImplementedError(
-                    "Directions do not span the vector components.")
-            Dinv = numpy.linalg.inv(directions.T)
-            for i, ell in sub.items():
-                Kd = K @ ell.weights[0]
-                for col, j in enumerate(sub):
-                    x = Dinv[col]
-                    nz = numpy.flatnonzero(abs(x) > tol)
-                    V[i, j] = reduce(add, (Kd[m] * x[m] for m in nz)) if len(nz) else Zero()
-                processed.add(i)
+        self._piola_point_rows(V, group, J, processed, tol)

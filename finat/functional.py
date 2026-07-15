@@ -51,16 +51,27 @@ class PhysicallyMappedFunctional:
     direction :
         For ``order > 0``, the direction tensor of rank ``order``,
         either numeric or a GEM expression; ``None`` for ``order == 0``.
+    divergence :
+        Whether this is a divergence functional: the trace, at each
+        point, of the tensor pairing an order-1 derivative multi-index
+        with a rank-1 value component.  Unlike an ordinary derivative,
+        this does not have a single ``direction``, since the trace
+        pattern spans the full derivative and value index ranges; it is
+        recovered and handled as its own case because it commutes with
+        the (contravariant) Piola pullback up to the Jacobian
+        determinant, independently of the entity it sits on.
 
     """
 
     def __init__(self, points: tuple, weights: numpy.ndarray,
-                 order: int = 0, direction=None, rank: int = 0):
+                 order: int = 0, direction=None, rank: int = 0,
+                 divergence: bool = False):
         self.points = points
         self.weights = weights
         self.order = order
         self.direction = direction
         self.rank = rank
+        self.divergence = divergence
 
     @classmethod
     def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12) -> "PhysicallyMappedFunctional":
@@ -112,12 +123,32 @@ class PhysicallyMappedFunctional:
         lookup = {alpha: k for k, alpha in enumerate(alphas)}
 
         points = tuple(node.deriv_dict)
+        has_comp = any(comp != tuple() for pt in points
+                       for w, alpha, comp in node.deriv_dict[pt])
+        if has_comp:
+            # A divergence: at each point, the weights pairing an
+            # order-1 derivative multi-index with a rank-1 value
+            # component must form a scalar multiple of the trace.
+            if order != 1:
+                raise NotImplementedError(
+                    f"{type(node).__name__} has vector components.")
+            weights = numpy.zeros(len(points))
+            for q, pt in enumerate(points):
+                Wq = numpy.zeros((sd, sd))
+                for w, alpha, comp in node.deriv_dict[pt]:
+                    if len(comp) != 1:
+                        raise NotImplementedError(
+                            f"{type(node).__name__} has vector components.")
+                    Wq[lookup[tuple(alpha)], comp[0]] += w
+                if not numpy.allclose(Wq, Wq[0, 0] * numpy.eye(sd), atol=tol):
+                    raise NotImplementedError(
+                        f"{type(node).__name__} is not a divergence functional.")
+                weights[q] = Wq[0, 0]
+            return cls(points, weights, order=order, divergence=True)
+
         W = numpy.zeros((len(points), len(alphas)))
         for q, pt in enumerate(points):
             for w, alpha, comp in node.deriv_dict[pt]:
-                if comp != tuple():
-                    raise NotImplementedError(
-                        f"{type(node).__name__} has vector components.")
                 W[q, lookup[tuple(alpha)]] += w
 
         # Factor the weights as a common direction times scalar weights

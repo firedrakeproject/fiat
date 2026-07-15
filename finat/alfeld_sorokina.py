@@ -1,41 +1,17 @@
 import FIAT
-import numpy
-from gem import ListTensor
 
 from finat.citations import cite
 from finat.fiat_elements import FiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
-from finat.piola_mapped import piola_inverse
+from finat.zany import PiolaPhysicallyMappedElement
 
 
-class AlfeldSorokina(PhysicallyMappedElement, FiatElement):
+class AlfeldSorokina(PiolaPhysicallyMappedElement, FiatElement):
+    """The Alfeld-Sorokina C0 quadratic macroelement with C0 divergence.
+
+    This element belongs to a Stokes complex, and is paired with CG1(Alfeld).
+    The basis transformation is derived automatically from the FIAT dual
+    basis; see :class:`finat.zany.PiolaPhysicallyMappedElement`.
+    """
     def __init__(self, cell, degree=2):
         cite("AlfeldSorokina2016")
         super().__init__(FIAT.AlfeldSorokina(cell, degree))
-
-    def basis_transformation(self, coordinate_mapping):
-        sd = self.cell.get_spatial_dimension()
-        bary, = self.cell.make_points(sd, 0, sd+1)
-        J = coordinate_mapping.jacobian_at(bary)
-        detJ = coordinate_mapping.detJ_at(bary)
-
-        dofs = self.entity_dofs()
-        V = identity(self.space_dimension())
-
-        # Undo the Piola transform
-        nodes = self._element.get_dual_set().nodes
-        Finv = piola_inverse(self.cell, J, detJ)
-        for dim in sorted(dofs):
-            for e in sorted(dofs[dim]):
-                k = 0
-                while k < len(dofs[dim][e]):
-                    cur = dofs[dim][e][k]
-                    if len(nodes[cur].deriv_dict) > 0:
-                        V[cur, cur] = detJ
-                        k += 1
-                    else:
-                        s = dofs[dim][e][k:k+sd]
-                        V[numpy.ix_(s, s)] = Finv
-                        k += sd
-
-        return ListTensor(V.T)

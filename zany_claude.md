@@ -235,10 +235,41 @@ discrepancy" in `finat/piola_mapped.py`) emerges automatically from the Vandermo
 residual elimination, since the per-point normal moments evaluate against vertex basis
 functions of the extended element.
 
-Next steps: remaining PiolaBubbleElement users (GN second kind, H1div: interior
-derivative moments need the divergence detJ rule), ArnoldWinther (vertex tensor values
-+ higher facet moments), the extended-element path for reduced HCT (macro polynomial
-spaces); covariant elements.
+**AlfeldSorokina and GuzmanNeilanH1div (divergence at vertices).** AlfeldSorokina's dual
+basis interleaves, at every vertex, one `PointDivergence` node with `sd` `ComponentPointEvaluation`
+nodes at the same point; GuzmanNeilanH1div wraps the same AlfeldSorokina dofs (plus GN
+facet bubbles), so it needs the identical fix. `PointDivergence` does not fit the
+existing `PhysicallyMappedFunctional` shapes: it has both `order = 1` (a derivative) and
+`comp != ()` (a value component) on the *same* weight entries, in the pattern $\ell(v) =
+\sum_i \partial_i v_i$ — a trace pairing an order-1 derivative multi-index with a rank-1
+value component, not a rank-one `direction` the SVD factorization can recover. Recovered
+in `from_fiat` by testing, per point, that the $(alpha, comp)$ weight matrix is a scalar
+multiple of the identity; represented with a new `divergence: bool` flag (order and rank
+are otherwise meaningless for this node, so reusing them would have made `evaluate`/
+`pullback` silently wrong for it — a new field beats overloading old ones here). Handling
+is a one-line closed form, not a generalization of the existing machinery: the
+(contravariant) Piola pullback commutes with the divergence up to $\det J$, regardless of
+which entity the node sits on, so `PiolaPhysicallyMappedElement._divergence_rows` strips
+divergence nodes out of the group first and sets `V[i, i] = detJ * ell.weights[0]`
+directly, before either `facet_dof_rows` or `point_dof_rows` runs.
+
+Stripping the divergence node still left a `facet_dof_rows` bug: AlfeldSorokina's edge
+dofs (`dim == sd - 1` in 2D) are `ComponentPointEvaluation`s too — plain Cartesian point
+values that happen to sit on a codimension-1 entity, not genuine facet moments. Routing
+them through the normal/tangential frame logic built for MTW/JM/GN produced a singular
+Gram matrix (`B @ B.T`), because that logic assumes the tangential-only residual group
+has exactly `sd - 1` members (the facet completion count), but `sd` unrelated Cartesian
+components don't reduce to that shape. Fix: `_is_cartesian_point_group` recognizes a
+group of rank-1, order-0 nodes sharing one single point (real facet moments are built
+from multi-point quadrature, even at low order — verified by checking `len(ell.points)`
+for BernardiRaugel/MTW/JM/GN facet dofs, all $>1$) and dispatches it to the same
+`_piola_point_rows` Cartesian-component transform `point_dof_rows` uses, regardless of
+the entity's topological dimension. This is the same lesson as the FacetFrame work:
+dispatch on what the node's *data* looks like, never on which entity it happens to sit on.
+
+Next steps: GN second kind (interior derivative moments need the divergence detJ rule,
+same as above), ArnoldWinther (vertex tensor values + higher facet moments), the
+extended-element path for reduced HCT (macro polynomial spaces); covariant elements.
 
 The implementation mirrors the theory factor by factor:
 
