@@ -43,7 +43,7 @@ from operator import add
 import numpy
 
 from FIAT.finite_element import FiniteElement
-from gem import Literal, ListTensor, Node, Power, Zero
+from gem import Literal, ListTensor, Node, Zero
 from finat.functional import PhysicallyMappedFunctional
 from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity, inverse
 
@@ -104,8 +104,7 @@ class FacetFrame:
         self._adjA = adjugate(A)
         self._detA = determinant(A)
 
-        normC = Power(reduce(add, (C[i] * C[i] for i in range(sd))),
-                      Literal(0.5))
+        normC = (C @ C) ** 0.5
         self.normal_scale = normC / kappa
         vol = ref_el.volume_of_subcomplex(sd - 1, entity)
         self.measure = normC * (vol / numpy.linalg.norm(Chat))
@@ -506,6 +505,7 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         Kn = nhat @ Knp.T
         Jt = that @ Jnp.T
         A = numpy.column_stack([Kn, *Jt])
+
         Y = numpy.full((sd, sd), Zero(), dtype=object)
         Y[0, 0] = Literal(1.0)
         Y[:, 1:] = inverse(A) @ (Knp @ that.T)
@@ -530,8 +530,19 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         Binv = numpy.linalg.inv(B @ B.T) @ B
         Binv[abs(Binv) < tol] = 0
 
-        # Numeric elimination of the normal profile: one pure normal moment
-        # per quadrature point, evaluated on the nodal basis
+        # Numeric elimination of the residual normal profile against every
+        # basis function of the element (not just this facet's own normal
+        # dofs, since a completing dof may live on a different point set,
+        # e.g. Guzman-Neilan's mixed-order facet dofs). The quadrature-point
+        # axis is contracted purely numerically here, one reference-frame
+        # multi-index at a time, so that whether a coupling is present is
+        # decided from a plain numeric array (exact zero where a profile has
+        # no support at these points) rather than by inspecting the type of
+        # a symbolic GEM expression -- a sum of symbolic terms that is
+        # identically zero for all J need not reduce to a literal
+        # gem.Zero() node, so testing that structurally would either miss
+        # real cancellations or (as here) spuriously keep terms whose
+        # numeric coefficient actually vanishes.
         ndir = numpy.ones(())
         for _ in range(rank):
             ndir = numpy.multiply.outer(ndir, nhat)
@@ -539,6 +550,12 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         L = numpy.einsum("jcq,c->jq", T.reshape(T.shape[0], -1, len(points)),
                          ndir.ravel())
         L[abs(L) < tol] = 0
+        # Lmap[i][m, r] = sum_q L[m, q] * coords[i][q, r]: numeric coupling
+        # of every basis function to each frame coordinate of node i's own
+        # profile, contracted over the shared quadrature points.
+        Lmap = {i: L @ coords[i] for i in group}
+        for i in Lmap:
+            Lmap[i][abs(Lmap[i]) < tol] = 0
 
         for i, ell in group.items():
             # Pull back the coordinate profile, contracting each slot with Y
@@ -548,17 +565,30 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
             P = P.reshape(len(points), -1)
 
             c = Binv @ P[:, 1:].ravel()
-            for cj, j in zip(c, group):
-                V[i, j] = cj
-            # Residual normal profile after removing the group contribution
-            residual = P[:, 0] - c @ numpy.array([coords[j][:, 0] for j in group])
-            for q in range(len(points)):
-                for m in numpy.flatnonzero(L[:, q]):
+            V[i, list(group)] = c
+
+            # Couple the residual normal profile to every basis function,
+            # one reference-frame multi-index (or group member) at a time:
+            # each numeric column of Lmap decides its own sparsity, and the
+            # small symbolic frame-mixing coefficient only scales terms
+            # that already survived the numeric test.
+            terms = []
+            for index in numpy.ndindex(*(sd,) * rank):
+                flat = numpy.ravel_multi_index(index, (sd,) * rank)
+                coef = Literal(1.0)
+                for r in index:
+                    coef = coef * Y[0, r]
+                terms.append((Lmap[i][:, flat], coef))
+            for k, j in enumerate(group):
+                terms.append((-Lmap[j][:, 0], c[k]))
+
+            for vec, coef in terms:
+                for m in numpy.flatnonzero(vec):
                     if m not in processed:
                         raise NotImplementedError(
                             f"Completion of node {i} couples to node {m}, "
                             "which has not been transformed yet.")
-                    V[i] += V[m] * (residual[q] * L[m, q])
+                    V[i] += V[m] * (vec[m] * coef)
             processed.add(i)
 
     def point_dof_rows(self, V: numpy.ndarray, group: dict,

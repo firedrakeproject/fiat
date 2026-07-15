@@ -186,7 +186,32 @@ stacks the group's own reference tangential profiles and has full row rank by
 unisolvence, so $B B^T$ is invertible and a rank deficiency (a genuine bug) surfaces as
 a hard numerical error rather than passing silently; the residual normal profile is
 eliminated by per-point normal moments through the Vandermonde recursion (this is where
-e.g. tangential-to-normal couplings emerge). Key subtlety (in any dimension > 2): FIAT builds tangential value
+e.g. tangential-to-normal couplings emerge).
+
+**Sparsity gotcha: fold the quadrature-point sum numerically, never symbolically.** The
+naive way to do that last elimination is to build the per-point residual (a GEM
+expression, since it involves the symbolic mixing matrix $Y$) and dot it against the
+tabulated-basis row `L[m, :]` (numeric) with a Python loop over points, accumulating
+into `V[i] += V[m] * (residual[q] * L[m, q])`. This reproduces the right *numbers* but
+not the right *sparsity*: whenever the true coupling to some dof `m` is zero, it is zero
+only as an analytic identity in $J$ (a cancellation across quadrature points or across
+frame directions), not as a literal `gem.Zero()` node — GEM has no polynomial-identity
+simplifier, so `isinstance(x, gem.Zero)` (or eyeballing `x != 0`) cannot detect this, and
+the resulting matrix keeps a dense cloud of numerically-tiny-but-symbolically-nonzero
+entries (compare against the hand-coded matrix's exact sparsity, e.g. MTW's
+`normal_tangential_transform`, to see the gap). The fix: contract the quadrature-point
+axis while everything is still numeric — `Lmap[i] = L @ coords[i]` (both plain arrays)
+— and only *afterwards* multiply by the (few, small) symbolic frame-mixing scalars
+($Y[0, r]$, or $-c_j$ for each group member's own normal profile), one reference-frame
+multi-index/group-member at a time rather than summed together first. Sparsity is then
+decided by thresholding the numeric `Lmap` columns (`abs(...) < tol`), exactly the same
+idiom already used for `Binv`/`B` above; a symbolic sum of several *different* GEM
+scalars must never be built first and then inspected for zero-ness, since that sum's
+GEM shape does not reveal whether it is analytically zero. Verified by comparing bit-for-
+bit against the deleted hand-coded `MardalTaiWinther.basis_transformation` sparsity
+pattern for order 1 (2D/3D) and order 2 (3D): zero extra and zero missing entries.
+
+Key subtlety (in any dimension > 2): FIAT builds tangential value
 components on the **reciprocal basis** (`cross(n, t_k)`), which transforms in-plane
 contravariantly: absorb $S^{-1} = (\det\hat G_t/\det G_t)\hat G_t^{-1} G_t$
 (tangent Gram change) into $Y$'s tangential rows; in 2D $S = 1$, which hides the effect.
