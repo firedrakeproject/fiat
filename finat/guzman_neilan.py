@@ -2,14 +2,14 @@ import FIAT
 
 from finat.citations import cite
 from finat.piola_mapped import PiolaBubbleElement
-from finat.zany import PiolaPhysicallyMappedElement
+from finat.zany import ZanyPhysicallyMappedElement
 
 
-class GuzmanNeilanFirstKindH1(PiolaPhysicallyMappedElement, PiolaBubbleElement):
+class GuzmanNeilanFirstKindH1(ZanyPhysicallyMappedElement, PiolaBubbleElement):
     """Pk^d enriched with Guzman-Neilan bubbles.
 
     The basis transformation is derived automatically from the FIAT
-    dual basis (see :class:`finat.zany.PiolaPhysicallyMappedElement`);
+    dual basis (see :class:`finat.zany.ZanyPhysicallyMappedElement`);
     the trailing tangential facet constraints of the extended element
     are dropped from the physical element by
     :meth:`~finat.piola_mapped.PiolaBubbleElement.space_dimension`.

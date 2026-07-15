@@ -9,7 +9,7 @@ from gem import Literal, Zero
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
 from finat.physically_mapped import identity
-from finat.zany import ScalarPhysicallyMappedElement
+from finat.zany import ZanyPhysicallyMappedElement
 
 
 def _jet_transform(J, order):
@@ -128,11 +128,11 @@ def _edge_transform(V, vorder, eorder, fiat_cell, coordinate_mapping, avg=False)
                 V[s, s + eorder] = -Bnt
 
 
-class Argyris(ScalarPhysicallyMappedElement, ScalarFiatElement):
+class Argyris(ZanyPhysicallyMappedElement, ScalarFiatElement):
     """The Argyris element.
 
     The basis transformation is derived automatically from the FIAT
-    dual basis; see :class:`finat.zany.ScalarPhysicallyMappedElement`.
+    dual basis; see :class:`finat.zany.ZanyPhysicallyMappedElement`.
     """
     def __init__(self, cell, degree=5, variant=None, avg=False):
         cite("Argyris1968")

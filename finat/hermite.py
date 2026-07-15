@@ -2,14 +2,14 @@ import FIAT
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.zany import ScalarPhysicallyMappedElement
+from finat.zany import ZanyPhysicallyMappedElement
 
 
-class Hermite(ScalarPhysicallyMappedElement, ScalarFiatElement):
+class Hermite(ZanyPhysicallyMappedElement, ScalarFiatElement):
     """The cubic Hermite element.
 
     The basis transformation is derived automatically from the FIAT
-    dual basis; see :class:`finat.zany.ScalarPhysicallyMappedElement`.
+    dual basis; see :class:`finat.zany.ZanyPhysicallyMappedElement`.
     """
     def __init__(self, cell, degree=3):
         cite("Ciarlet1972")

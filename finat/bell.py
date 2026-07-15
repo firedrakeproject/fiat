@@ -3,16 +3,16 @@ from copy import deepcopy
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.zany import ScalarPhysicallyMappedElement
+from finat.zany import ZanyPhysicallyMappedElement
 
 
-class Bell(ScalarPhysicallyMappedElement, ScalarFiatElement):
+class Bell(ZanyPhysicallyMappedElement, ScalarFiatElement):
     """The Bell element.
 
     FIAT provides the extended element on the full quintic space, with
     the cubic normal derivative constraints appended as extra edge
     nodes; the transformation of the extended element is derived
-    automatically (see :class:`finat.zany.ScalarPhysicallyMappedElement`),
+    automatically (see :class:`finat.zany.ZanyPhysicallyMappedElement`),
     and the constraint degrees of freedom are dropped from the physical
     element by overriding :meth:`space_dimension`.
     """

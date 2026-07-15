@@ -69,11 +69,9 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     Concrete elements either implement :meth:`basis_transformation`
     entirely by hand, or derive it automatically by mixing in
-    :class:`~finat.zany.ScalarPhysicallyMappedElement` or
-    :class:`~finat.zany.PiolaPhysicallyMappedElement`, which (via
-    :class:`~finat.zany.ZanyPhysicallyMappedElement`) supply the
-    entity-by-entity assembly loop of Kirby (2017) and
-    Brubeck & Kirby (2025).
+    :class:`~finat.zany.ZanyPhysicallyMappedElement`, which supplies
+    the generalized-Vandermonde construction of Kirby (2017),
+    Aznaran-Kirby-Farrell (2022), and Brubeck & Kirby (2025).
     """
 
     def __init__(self, *args, **kwargs):

@@ -41,7 +41,7 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from FIAT.polynomial_set import mis
 from FIAT.functional import Functional as FIATFunctional
-from gem import Node
+from gem import Node, Zero
 from finat.physically_mapped import adjugate, determinant
 
 
@@ -198,14 +198,43 @@ class PhysicallyMappedFunctional:
             The vector of values of this functional on the nodal basis.
 
         """
+        tol = 1E-12
         sd = fiat_element.get_reference_element().get_spatial_dimension()
         tab = fiat_element.tabulate(self.order, self.points)
         if self.rank > 0:
-            T = tab[(0,) * sd]
+            if self.order > 0:
+                raise NotImplementedError(
+                    "A derivative of a Piola-mapped value is not yet supported.")
+            # The reference nodal basis is transplanted to physical
+            # space by the element's own pullback (contracting each
+            # value axis with J^{-T} or J/det J, per fiat_element.
+            # mapping()); :attr:`weights` carries the *test* function's
+            # own, separately built, physical geometry (see
+            # :meth:`finat.zany.ZanyPhysicallyMappedElement._physical_weights`).
+            raw = tab[(0,) * sd]  # shape (ndof,) + value_shape + (npoints,)
+            raw[abs(raw) < tol] = 0
+            support = numpy.flatnonzero(numpy.any(raw, axis=tuple(range(1, raw.ndim))))
+
+            result = numpy.full(raw.shape[0], Zero(), dtype=object)
+            if len(support) == 0:
+                return result
+            T = raw[support]
+            if self.J is not None:
+                T = _pullback_values(T, fiat_element.mapping()[0], self.J, sd)
             T = T.reshape(T.shape[0], -1, len(self.points))
-            return numpy.einsum("jcq,qc->j", T, self.weights)
+            result[support] = numpy.einsum("jcq,qc->j", T, self.weights)
+            return result
+
         if self.order == 0:
-            return tab[(0,) * sd] @ self.weights
+            raw = tab[(0,) * sd]  # shape (ndof,) + value_shape + (npoints,)
+            raw[abs(raw) < tol] = 0
+            support = numpy.flatnonzero(numpy.any(raw, axis=tuple(range(1, raw.ndim))))
+            T = raw[support]
+            Tw = T @ self.weights
+
+            result = numpy.full(raw.shape[0], Zero(), dtype=object)
+            result[support] = Tw
+            return result
 
         order = self.order
         shape = (sd,) * order
@@ -215,15 +244,16 @@ class PhysicallyMappedFunctional:
         # only contract the dofs with some nonzero tabulated derivative
         # here, following the sparsity pattern of Walkington's V.
         raw = numpy.array([tab[alpha] for alpha in alphas])  # (nalpha, ndof, npoints)
+        raw[abs(raw) < tol] = 0
         support = numpy.flatnonzero(numpy.any(raw, axis=(0, 2)))
-        result = numpy.zeros(raw.shape[1], dtype=object)
+        result = numpy.full(raw.shape[1], Zero(), dtype=object)
         if len(support) == 0:
             return result
 
         # Full (uncompressed) reference derivative tensor, restricted to
         # the support: tab[alpha] repeated at every index ordering of its
         # multi-index, one per surviving basis function and point.
-        Tab = numpy.empty((len(support), len(self.points)) + shape)
+        Tab = numpy.full((len(support), len(self.points)) + shape, Zero())
         for index in numpy.ndindex(shape):
             alpha = _index_alpha(index, sd)
             Tab[(..., *index)] = tab[alpha][support]
@@ -254,6 +284,7 @@ class PhysicallyMappedFunctional:
 
         result[support] = numpy.tensordot(Tab, W, axes=(tuple(range(1, order + 2)),
                                                         tuple(range(order + 1))))
+
         return result
 
 
@@ -263,3 +294,58 @@ def _index_alpha(index: tuple, sd: int) -> tuple:
     for k in index:
         alpha[k] += 1
     return tuple(alpha)
+
+
+#: Value-axis pullback of each FIAT mapping, as the sequence of per-axis
+#: pullback codes used by :func:`FIAT.macro.pullback`: 1 for a covariant
+#: axis (contracted with :math:`J^{-T}`), 2 for a contravariant one
+#: (contracted with :math:`J/\det J`).
+_PULLBACK_FORMDEGREE = {
+    "affine": (),
+    "covariant piola": (1,),
+    "contravariant piola": (2,),
+    "double covariant piola": (1, 1),
+    "double contravariant piola": (2, 2),
+    "covariant contravariant piola": (1, 2),
+    "contravariant covariant piola": (2, 1),
+}
+
+
+def _pullback_values(T: numpy.ndarray, mapping: str, J: Node, sd: int) -> numpy.ndarray:
+    r"""Map the value axes of a reference tabulation to physical space.
+
+    Generalizes :func:`FIAT.macro.pullback` to a symbolic Jacobian: each
+    value axis of ``T`` is contracted in turn with :math:`J^{-T}`
+    (covariant) or :math:`J/\det J` (contravariant), following
+    ``mapping``, by temporarily swapping that axis with the last one.
+
+    :arg T: Tabulation, shape ``(ndof,) + value_shape + (npoints,)``.
+    :arg mapping: A FIAT mapping string, e.g. ``"contravariant piola"``.
+    :arg J: GEM expression for the cell Jacobian.
+    :arg sd: Spatial dimension of the cell.
+    :returns: The physical-space tabulation, the same shape as ``T``.
+    """
+    try:
+        formdegree = _PULLBACK_FORMDEGREE[mapping]
+    except KeyError:
+        raise NotImplementedError(f"Unrecognized mapping {mapping!r}.")
+    if not formdegree:
+        return T
+
+    Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)], dtype=object)
+    Jinv = adjugate(Jnp) / determinant(Jnp)
+    K = Jnp / determinant(Jnp)
+    pullback_matrix = {1: Jinv.T, 2: K}
+
+    T = T.astype(object)
+    ndim = T.ndim
+    for i, k in enumerate(formdegree):
+        # The batch axis (dofs) is axis 0; the value axes immediately
+        # follow it, before the trailing points axis.
+        axis = i + 1
+        perm = list(range(ndim))
+        perm[axis], perm[-1] = perm[-1], perm[axis]
+        T = T.transpose(perm)
+        T = numpy.tensordot(T, pullback_matrix[k], axes=(-1, 1))
+        T = T.transpose(perm)
+    return T

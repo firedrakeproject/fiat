@@ -6,7 +6,7 @@ import pytest
 from gem.interpreter import evaluate
 from finat.functional import PhysicallyMappedFunctional
 from finat.fiat_elements import FiatElement
-from finat.zany import PiolaPhysicallyMappedElement, ScalarPhysicallyMappedElement
+from finat.zany import ZanyPhysicallyMappedElement
 
 
 @pytest.mark.parametrize("dimension", [2, 3])
@@ -55,25 +55,15 @@ def test_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, element, dimensio
     assert np.allclose(Ms, expected)
 
 
-def test_unsupported_mapping_scalar(ref_to_phys):
-    """A ScalarPhysicallyMappedElement rejects a non-affine FIAT element."""
+def test_unsupported_mapping(ref_to_phys):
+    """ZanyPhysicallyMappedElement rejects an unrecognized pullback."""
     mapping = ref_to_phys[2]
 
-    class BogusScalar(ScalarPhysicallyMappedElement, FiatElement):
+    class BogusZany(ZanyPhysicallyMappedElement, FiatElement):
         pass
 
-    element = BogusScalar(FIAT.Nedelec(mapping.ref_cell, 1))
-    with pytest.raises(NotImplementedError):
-        element.basis_transformation(mapping)
-
-
-def test_unsupported_mapping_piola(ref_to_phys):
-    """A PiolaPhysicallyMappedElement rejects a covariant FIAT element."""
-    mapping = ref_to_phys[2]
-
-    class BogusPiola(PiolaPhysicallyMappedElement, FiatElement):
-        pass
-
-    element = BogusPiola(FIAT.Nedelec(mapping.ref_cell, 1))
+    fiat_element = FIAT.Nedelec(mapping.ref_cell, 1)
+    fiat_element._mapping = "nonsense"
+    element = BogusZany(fiat_element)
     with pytest.raises(NotImplementedError):
         element.basis_transformation(mapping)
