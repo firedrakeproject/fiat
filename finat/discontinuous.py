@@ -1,4 +1,5 @@
 import FIAT
+from FIAT.precision import DEFAULT_SCALAR_DTYPE
 
 from gem.utils import cached_property
 
@@ -65,11 +66,11 @@ class DiscontinuousElement(FiniteElementBase):
     def fiat_equivalent(self):
         return FIAT.DiscontinuousElement(self.element.fiat_equivalent)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
-        return self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, scalar_type=scalar_type)
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+        return self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, dtype=dtype)
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
-        return self.element.point_evaluation(order, refcoords, entity, coordinate_mapping, scalar_type=scalar_type)
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+        return self.element.point_evaluation(order, refcoords, entity, coordinate_mapping, dtype=dtype)
 
     @property
     def dual_basis(self):

@@ -9,6 +9,7 @@ try:
 except ImportError:
     symbolics = sympy
 from FIAT.polynomial_set import mis
+from FIAT.precision import DEFAULT_SCALAR_DTYPE
 from FIAT.reference_element import UFCQuadrilateral
 from gem.utils import cached_property
 
@@ -86,7 +87,7 @@ class DirectSerendipity(DirectlyDefinedElement, FiniteElementBase):
             dphi = tuple(diff(phi, xx, alpha) for phi in phis)
             return self._deriv_cache.setdefault(key, dphi)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
         '''Return code for evaluating the element at known points on the
         reference element.
 
@@ -122,7 +123,7 @@ class DirectSerendipity(DirectlyDefinedElement, FiniteElementBase):
 
         return result
 
-    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, scalar_type=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
         raise NotImplementedError("Not done yet, sorry!")
 
     def mapping(self):

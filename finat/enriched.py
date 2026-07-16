@@ -3,6 +3,7 @@ from itertools import chain
 from operator import add, methodcaller
 
 import FIAT
+from FIAT.precision import DEFAULT_SCALAR_DTYPE
 import gem
 import numpy
 from gem.utils import cached_property
@@ -123,7 +124,7 @@ class EnrichedElement(FiniteElementBase):
         return {key: merge(result[key] for result in results)
                 for key in keys}
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
         '''Return code for evaluating the element at known points on the
         reference element.
 
@@ -131,11 +132,11 @@ class EnrichedElement(FiniteElementBase):
         :param ps: the point set object.
         :param entity: the cell entity on which to tabulate.
         '''
-        results = [element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, scalar_type=scalar_type)
+        results = [element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, dtype=dtype)
                    for element in self.elements]
         return self._compose_evaluations(results)
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -146,7 +147,7 @@ class EnrichedElement(FiniteElementBase):
                           free indices are arbitrary.
         :param entity: the cell entity on which to tabulate.
         '''
-        results = [element.point_evaluation(order, refcoords, entity, coordinate_mapping, scalar_type=scalar_type)
+        results = [element.point_evaluation(order, refcoords, entity, coordinate_mapping, dtype=dtype)
                    for element in self.elements]
         return self._compose_evaluations(results)
 

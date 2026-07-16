@@ -10,7 +10,7 @@ to allow users to get coordinates that they want."""
 import numpy
 import math
 from FIAT import reference_element, jacobi
-from FIAT.precision import prec
+from FIAT.precision import prec, DEFAULT_SCALAR_DTYPE
 
 
 def morton_index2(p, q=0):
@@ -366,7 +366,7 @@ class ExpansionSet(object):
                 result[alpha] = vals
         return result
 
-    def _tabulate(self, n, pts, order=0, scalar_type=None):
+    def _tabulate(self, n, pts, order=0, dtype=DEFAULT_SCALAR_DTYPE):
         """A version of tabulate() that also works for a single point."""
         pts = numpy.asarray(pts)
         unique = self.continuity is not None and order == 0
@@ -379,7 +379,8 @@ class ExpansionSet(object):
 
         if pts.dtype == object:
             # If binning is undefined, scale by the characteristic function of each subcell
-            Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique, scalar_type=scalar_type)
+            tol = prec(1E-12, dtype)
+            Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique, tol=tol)
             for cell, phi in phis.items():
                 for alpha in phi:
                     phi[alpha] *= Xi[cell]
@@ -730,19 +731,16 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     return cell_point_map
 
 
-def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12, scalar_type=None):
+def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     """Computes the partition of unity functions for each subcell.
 
     :arg ref_el: a SimplicialComplex.
     :arg pt: a physical point on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
-    :kwarg tol: the absolute tolerance, calibrated for double precision.
-    :kwarg scalar_type: the caller's working precision (a numpy dtype), used
-        to loosen `tol` via `FIAT.precision.prec` when running at a coarser
-        precision than double. If `None`, `tol` is used unchanged.
+    :kwarg tol: the absolute tolerance, already adjusted for the caller's
+        working precision (see `FIAT.precision.prec`).
     :returns: a list of (weighted) characteristic functions for each subcell.
     """
-    tol = prec(tol, scalar_type)
     import gem
     sd = ref_el.get_spatial_dimension()
     top = ref_el.get_topology()

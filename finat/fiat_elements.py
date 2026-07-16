@@ -1,4 +1,5 @@
 import FIAT
+from FIAT.precision import DEFAULT_SCALAR_DTYPE
 import gem
 import numpy as np
 from gem.utils import cached_property
@@ -57,18 +58,18 @@ class FiatElement(FiniteElementBase):
         # Just return the underlying FIAT element
         return self._element
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
         '''Return code for evaluating the element at known points on the
         reference element.
 
         :param order: return derivatives up to this order.
         :param ps: the point set.
         :param entity: the cell entity on which to tabulate.
-        :param scalar_type: the caller's working precision (a numpy dtype);
+        :param dtype: the caller's working precision (a numpy dtype);
             only meaningful for macro elements evaluated at symbolic points.
         '''
         fiat_element = self._element
-        fiat_result = fiat_element.tabulate(order, ps.points, entity, scalar_type=scalar_type)
+        fiat_result = fiat_element.tabulate(order, ps.points, entity, dtype=dtype)
         # In almost all cases, we have
         # self.space_dimension() == self._element.space_dimension()
         # But for Bell, FIAT reports 21 basis functions,
@@ -124,7 +125,7 @@ class FiatElement(FiniteElementBase):
             result[alpha] = expr
         return result
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -137,7 +138,7 @@ class FiatElement(FiniteElementBase):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
-        :param scalar_type: the caller's working precision (a numpy dtype);
+        :param dtype: the caller's working precision (a numpy dtype);
             only meaningful for macro elements evaluated at symbolic points.
         '''
         if entity is None:
@@ -153,7 +154,7 @@ class FiatElement(FiniteElementBase):
         ps = PointSingleton(Xi)
         result = self.basis_evaluation(order, ps, entity=entity,
                                        coordinate_mapping=coordinate_mapping,
-                                       scalar_type=scalar_type)
+                                       dtype=dtype)
 
         # Apply symbolic simplification
         vals = result.values()

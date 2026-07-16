@@ -4,6 +4,8 @@ from collections.abc import Mapping
 import gem
 import numpy
 
+from FIAT.precision import DEFAULT_SCALAR_DTYPE
+
 from finat.citations import cite
 
 
@@ -85,8 +87,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M = self.basis_transformation(coordinate_mapping)
         return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
-        result = super().basis_evaluation(order, ps, entity=entity, scalar_type=scalar_type)
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+        result = super().basis_evaluation(order, ps, entity=entity, dtype=dtype)
         return self.map_tabulation(result, coordinate_mapping)
 
     def dual_transformation(self, Q, coordinate_mapping=None):
