@@ -34,6 +34,71 @@ knowledge; this module supplies the two mixins implementing them:
 In the language of the theory, the frame expansion in either mixin
 realizes :math:`E V^c`, and the numeric elimination of the tangential
 (respectively normal) completion realizes :math:`D`.
+
+**Glossary.** :math:`E`, :math:`V^c`, and :math:`D` are never materialized as
+literal matrices; each is realized implicitly by a piece of the assembly:
+
+* :math:`V` -- the object array assembled in place by
+  :meth:`ZanyPhysicallyMappedElement.basis_transformation`; row = reference
+  node, column = physical node (see ``gem/AGENTS.md``).  Starts as the
+  identity (:func:`~finat.physically_mapped.identity`), which *is* the
+  :math:`E V^c D` factorization for push-forward-invariant nodes.
+* :math:`E` -- realized by keeping only the row(s) a hook actually assembles
+  (e.g. the normal row in :meth:`ScalarPhysicallyMappedElement.facet_dof_rows`,
+  discarding the tangential ones) and, for extended/constrained elements
+  (Bell, Guzman-Neilan), by the final column truncation to
+  ``self.space_dimension()``.
+* :math:`V^c` -- the pure chain-rule/frame content: :class:`FacetFrame` (or
+  :class:`PiolaFacetFrame`) built from ``J``, giving the diagonal
+  "own-node" coefficient (``c`` below) and, in the Piola case, the mixing
+  matrix ``Y``.
+* :math:`D` -- the numeric elimination of a completion functional through
+  *already-assembled* rows of ``V`` (the ``processed`` set), via
+  :meth:`~finat.functional.PhysicallyMappedFunctional.evaluate`'s
+  generalized-Vandermonde row (scalar case) or the ``Binv``/``Lmap`` numeric
+  contractions (Piola case).
+
+Other recurring symbols, and where the numeric/symbolic boundary falls:
+
+* ``J`` -- the cell Jacobian, with :math:`x = J\hat x + b` (reference to
+  physical; see :meth:`~finat.physically_mapped.PhysicalGeometry.jacobian_at`).
+  This is the *inverse transpose* of the Jacobian in Kirby (2017)'s
+  convention, whose map :math:`F` goes physical to reference -- a factor
+  such as a vertex-gradient block of :math:`M` that this module computes as
+  plain ``J`` is the paper's :math:`J_{\mathrm{paper}}^{-T}`.  ``J`` is a
+  GEM node (indexable, has ``.shape``); :func:`_materialize_jacobian`
+  produces the numpy object array of GEM scalars that
+  :func:`~finat.physically_mapped.determinant`/:func:`~finat.physically_mapped.adjugate`
+  require.
+* ``K`` -- the cofactor matrix :math:`\operatorname{adj}(J)^T`, the
+  contravariant Piola map's action on a (scaled) normal or on a divergence
+  weight; unrelated to a stiffness matrix despite the common letter.
+* ``normal`` -- reference facet normal, but *not* the same scaling in the
+  two frame classes: :class:`FacetFrame` uses the unit-ish
+  ``compute_normal`` (its physical image needs rescaling by
+  ``normal_scale``), while :class:`PiolaFacetFrame` uses the already-scaled
+  ``compute_scaled_normal`` (its physical image, ``K @ normal``, is used
+  directly).
+* ``direction``, ``weights``, ``order``, ``rank``, ``divergence`` -- the
+  numeric-or-symbolic fields of a :class:`~finat.functional.PhysicallyMappedFunctional`;
+  ``direction``/``weights`` are plain numbers as read off the *reference*
+  FIAT element, and become GEM expressions only after
+  :meth:`~finat.functional.PhysicallyMappedFunctional.pullback` is applied
+  (there is no separate type for the two life stages -- track it from
+  context, as the hooks in this module do).
+* ``a``, ``beta`` -- normal/tangential coefficients of a *numeric* direction
+  in the reference frame (:meth:`FacetFrame.reference_coefficients`).
+* ``x`` -- coefficients of a (possibly symbolic) pulled-back direction in
+  the *physical* frame (:meth:`FacetFrame.decompose`).
+* ``c``, ``r`` -- the diagonal own-node coefficient and the tangential
+  completion residual in :meth:`ScalarPhysicallyMappedElement.facet_dof_rows`.
+* ``Dinv`` -- inverse of the numeric direction basis spanning a point-jet or
+  Cartesian-component group (``point_dof_rows``, ``_piola_point_rows``).
+* ``B``, ``Binv``, ``L``, ``Lmap`` -- the tangential-profile Gram system and
+  the numeric quadrature-point contractions in
+  :meth:`PiolaPhysicallyMappedElement.facet_dof_rows`; see the "sparsity
+  gotcha" note there for why the quadrature-point axis must be contracted
+  numerically before multiplying by any symbolic frame-mixing scalar.
 """
 
 from abc import abstractmethod
@@ -46,6 +111,20 @@ from FIAT.finite_element import FiniteElement
 from gem import Literal, ListTensor, Node, Zero
 from finat.functional import PhysicallyMappedFunctional
 from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity, inverse
+
+
+def _materialize_jacobian(J: Node) -> numpy.ndarray:
+    """Materialize a GEM Jacobian node as a numpy object array of GEM scalars.
+
+    :arg J: GEM expression for the cell Jacobian, shape ``(sd, sd)``.
+    :returns: A ``(sd, sd)`` numpy object array with the same entries as
+        ``J``, usable with the numeric-or-symbolic linear algebra of
+        :mod:`finat.physically_mapped` (:func:`~finat.physically_mapped.determinant`,
+        :func:`~finat.physically_mapped.adjugate`), which index a GEM node's
+        entries directly rather than through numpy fancy indexing.
+    """
+    sd = J.shape[0]
+    return numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)], dtype=object)
 
 
 def generalized_cross(tangents) -> numpy.ndarray:
@@ -161,8 +240,7 @@ class PiolaFacetFrame:
         Ghat = numpy.column_stack([self.normal, *self.tangents])
         self.Ghatinv = numpy.linalg.inv(Ghat)
 
-        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                          dtype=object)
+        Jnp = _materialize_jacobian(J)
         Knp = adjugate(Jnp).T
 
         # Frame coordinates of the mapped frame image of the reference frame:
@@ -502,10 +580,7 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         """
         divs = {i: ell for i, ell in group.items() if ell.divergence}
         if divs:
-            sd = J.shape[0]
-            Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                              dtype=object)
-            detJ = determinant(Jnp)
+            detJ = determinant(_materialize_jacobian(J))
             for i, ell in divs.items():
                 V[i, i] = detJ * ell.weights[0]
                 processed.add(i)
@@ -549,10 +624,7 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         :arg processed: Indices of the already assembled rows; updated in place.
         :arg tol: Tolerance for detecting zeros in the numeric coefficients.
         """
-        sd = J.shape[0]
-        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                          dtype=object)
-        K = adjugate(Jnp).T
+        K = adjugate(_materialize_jacobian(J)).T
 
         subgroups = {}
         for i, ell in group.items():

@@ -271,6 +271,149 @@ Next steps: GN second kind (interior derivative moments need the divergence detJ
 same as above), ArnoldWinther (vertex tensor values + higher facet moments), the
 extended-element path for reduced HCT (macro polynomial spaces); covariant elements.
 
+## Paper process (Kirby, Marsden & Brubeck, "Automation of Finite Element
+Transformations"): staged plan
+
+Process agreed 2026-07-16 (full plan: `~/.claude/plans/lazy-yawning-quasar.md`): alternate
+a *math stage* (derive/restate theory, hand-work an example, extract a glossary) with a
+*code stage* (rename/refactor to match, verify via `test/finat/test_zany_mapping.py` +
+`flake8` + `pydocstyle`), starting with the scalar case (Stages 0-3) and then testing the
+hypothesis that Piola-mapped elements unify further by composing the Piola transform with
+the scalar machinery (Stages 4-6), before assembling `fiat_zany_auto/paper.tex` (Stage 7).
+Math work accumulates here before being promoted into the paper. Stage 0 (restate
+pullback/push-forward duality, $M = V^T$, and $V = EV^cD$ precisely) is already satisfied
+by the "Transformation Theory" section opening this file.
+
+### Stage 1 (2026-07-16): worked example — Hermite vertex jets
+
+The affine-interpolation-equivalent case (`ScalarPhysicallyMappedElement.point_dof_rows`,
+`finat/zany.py:420-458`), worked by hand and checked to machine precision against
+`finat.Hermite.basis_transformation` on a concrete triangle.
+
+**Setup.** Reference cell $\hat K$ = UFC triangle, vertex $\hat v_0 = (0,0)$. FIAT's cubic
+Hermite dual basis carries, at $\hat v_0$, one value node and two derivative nodes
+$\hat\ell_1 = \partial/\partial\hat x_1$, $\hat\ell_2 = \partial/\partial\hat x_2$
+(`FIAT.hermite.CubicHermite(ref).dual_basis()`, confirmed via `deriv_dict`). Physical
+triangle vertices `((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))` (the `phys_el` fixture of
+`test/finat/conftest.py`), giving the constant Jacobian
+$$J = \begin{pmatrix} 1.17 & 0.15 \\ -0.19 & 1.74\end{pmatrix}$$
+(`coordinate_mapping.jacobian_at`, i.e. $x = J\hat x + b$ — this is the *code's* $J$,
+mapping reference to physical; see the reconciliation note below for how it relates to
+the "paper's $J$" of the opening Transformation Theory section).
+
+**Mechanism.** Away from a facet there is no geometric frame (`FacetFrame` does not
+apply), so `point_dof_rows` treats the whole order-1 group at $\hat v_0$ as its own
+completion, exactly the affine-interpolation-equivalent case of Kirby (2017): the group
+must span the derivative jet, and $V$'s $2\times2$ block on $\{1,2\}$ is obtained by
+expanding each node's *pulled-back* direction in the group's own direction basis.
+Precisely (`finat/zany.py:437-458`):
+
+1. `PhysicallyMappedFunctional.from_fiat` recovers each $\hat\ell_i$'s direction/weight
+   pair $(d_i, w_i)$ from the reference dual basis by a rank-1 SVD of the derivative
+   weight matrix — only determined up to a common sign/scale, so $w_i d_i$ (not $d_i$
+   alone) is the invariant quantity, the *true* reference direction $e_i$. Here FIAT
+   stores $\hat\ell_1$ directly as $(d_1,w_1)=((1,0),\,1)$, but recovers $\hat\ell_2$ as
+   $(d_2,w_2) = ((0,-1),\,-1)$ (sign flipped by the SVD) — with $e_2 = w_2 d_2 = (0,1)$
+   the correct Cartesian direction is recovered regardless.
+2. `directions = [d_1; d_2]`, `Dinv = inv(directions.T)`: because $d_i$ (not $e_i$) enters
+   here, $Dinv$ absorbs the same sign ambiguity that $w_i$ will later correct.
+3. For each pair $(i,j)$: `s = _weight_ratio(w_i, w_j)` $= w_i/w_j$ recovers the *relative*
+   sign/scale between the two recovered factorizations (`_weight_ratio` raises if the
+   weights are not simply proportional — here trivially $\pm1/\pm1$), and
+   `x = s * Dinv[col_j]`; then `V[i,j] = pullback(J, d_i) @ x`, where
+   `pullback(J, d_i) = J @ d_i` for an order-1 direction (verified numerically: the chain
+   rule for a first derivative is a plain linear map, no transpose, since `direction` is
+   contravariant in the *entity* Jacobian at this stage — the transpose appears only once
+   $d_i$ is re-expressed in the *dual* frame `Dinv` provides).
+
+Composing steps 2-3 for the true (sign-corrected) directions $e_i$ collapses to the clean
+statement $V[i,j] = e_j^T J\, e_i$ — i.e. on this basis $V\big|_{\{1,2\}} = E^TJE$ with
+$E = [e_1\,|\,e_2]$ (here $E=I$, the Cartesian basis, so $V\big|_{\{1,2\}} = J^T$ exactly);
+the $w_i/d_i$ split and `_weight_ratio` correction exist only so this holds *regardless*
+of which sign/scale `from_fiat`'s SVD happens to recover, not because the mathematics
+needs a sign at all.
+
+**Verification.** Computed by hand from the formula above and checked bit-for-bit against
+`finat.Hermite(ref).basis_transformation(mapping)` (evaluated via `gem.interpreter`):
+$$
+V\big|_{\{1,2\}} = J^T = \begin{pmatrix} 1.17 & -0.19 \\ 0.15 & 1.74 \end{pmatrix}
+\quad\Longleftrightarrow\quad
+M\big|_{\{1,2\}} = V^T\big|_{\{1,2\}} = J = \begin{pmatrix} 1.17 & 0.15 \\ -0.19 & 1.74 \end{pmatrix},
+$$
+matching `M[1:3,1:3]` from the running code exactly (both diagonal *and* off-diagonal
+entries, so the sign/scale bookkeeping above is exercised nontrivially, not just checked
+on a symmetric or diagonal case).
+
+**Reconciliation with the opening Transformation Theory section.** Line 15 there states
+the vertex-gradient block of $M$ as "$J^{-T}$ ... in the *paper's* $J$." The code's
+`coordinate_mapping.jacobian_at` returns $J_{code}$ with $x = J_{code}\hat x + b$
+(reference $\to$ physical), whereas Kirby (2017)'s $F$ maps physical $\to$ reference, so
+its Jacobian is $J_{paper} = J_{code}^{-1}$; hence $J_{paper}^{-T} = J_{code}^T$, exactly
+the $M$ block computed above. **Glossary note for Stage 3**: every code docstring should
+state explicitly which of these two (inverse, transpose-of-each-other) conventions a
+given $J$ is, since the two papers' $F$ and the code's `coordinate_mapping` point in
+opposite directions.
+
+### Stage 2 (2026-07-16): worked example — Morley edge completion
+
+The general (non-equivalent) completion case (`ScalarPhysicallyMappedElement.facet_dof_rows`,
+`finat/zany.py:368-418`, using `FacetFrame`), worked by hand for edge 0 (the hypotenuse,
+joining vertices 1 and 2) on the same physical triangle as Stage 1, and checked bit-for-bit
+against `finat.Morley`.
+
+**Setup.** FIAT's Morley dual basis has, on edge 0, a single node $\hat\ell_3$: the
+normal derivative at the midpoint $(0.5,0.5)$, stored as an *average*
+(`deriv_dict` weights $(1,1)/\sqrt2$ on $(\partial_{\hat x_1}, \partial_{\hat x_2})$,
+i.e. direction $\hat n = (1,1)/\sqrt2$, the reference normal itself — Morley has no
+separate tangential-derivative node, so $\hat\ell_3$ must be *completed* using the
+vertex value nodes ($\hat\ell_1,\hat\ell_2$ at $v_1=(1,0)$, $v_2=(0,1)$, already
+processed since $\mathrm{order}=0$) before it can be expanded on the physical cell.
+Reference edge-0 tangent (FIAT) $\hat t = (-1,1)$ (the chord $v_2-v_1$, unnormalized).
+
+**Mechanism.** `FacetFrame(Mo, 0, J)` builds the reference frame
+$[\hat n\,|\,\hat t\,]$ and its physical image $[C\,|\,J\hat t\,]$ with
+$C = $ `generalized_cross`$(J\hat t)$ (here just a $90°$ rotation of $J\hat t$ in 2D).
+`facet_dof_rows` then, for $\hat\ell_3$:
+
+1. `reference_coefficients(\hat\ell_3.direction)` solves $\hat d = a\hat n + \beta\hat t$
+   for $(a,\beta)$ in the *reference* frame — here $a=-1$ (sign from the SVD recovery
+   of `from_fiat`, harmless: every downstream quantity built from $a$ is consistently
+   rescaled), $\beta=0$ exactly, since $\hat\ell_3$'s direction *is* the reference normal
+   with no tangential component by construction.
+2. `decompose(\hat\ell_3.pullback(J).direction)` solves the *physical*, symbolic system
+   $J\hat d = x_0 C + x_1 J\hat t$ via `adjugate`/`determinant` (Cramer's rule, since $J$
+   is symbolic in general; numeric here because $J$ is the constant matrix of Stage 1)
+   giving $(x_0,x_1) = (0.612629,\,-0.244111)$.
+3. $c = x_0\cdot(\|C\|/\kappa)/a = 1.337343$ becomes $V[3,3]$ — the diagonal
+   "own-node" coefficient, i.e. the $B_{nn}$ entry of the notebook's $2\times2$ block
+   $B = \hat G J^{-T} G^T$ (line 34 of the Transformation Theory section above; that
+   block's off-diagonal $B_{nt}$ entry is exactly $-c\beta/a$-type bookkeeping, here
+   $0$ since $\beta=0$).
+4. The tangential residual $r = x_1 - c\beta = -0.244111$ is *not itself* a new
+   unknown: because $\hat t$ is a **mapped reference tangent**, the reference
+   functional "derivative along $\hat t$ at the midpoint" coincides with a functional
+   already expressible in the element's own reference basis — `ell.with_direction(\hat t)
+   .evaluate(Mo)` (a numeric generalized-Vandermonde row) gives coefficients
+   $(0,1,-1,0,0,0)$: the classical fact that for a quadratic, the derivative along the
+   full chord at the midpoint equals $f(v_2)-f(v_1)$ exactly (Brubeck & Kirby 2025's
+   univariate-exactness/FTC argument realizing $D$, here in its simplest 1-node form).
+5. Elimination: $V[3,1] \mathrel{+}= r\cdot1 = -0.244111$, $V[3,2] \mathrel{+}= r\cdot(-1)
+   = +0.244111$ — both already-`processed` vertex rows, so no `NotImplementedError`.
+
+**Verification.** `finat.Morley(ref).basis_transformation(mapping)` (same physical
+triangle as Stage 1) gives column 3 of $M=V^T$ as
+$M[:,3] = (0,\,-0.244111,\,0.244111,\,1.337343,\,0,\,0)$, matching $V[3,\cdot]$ from
+steps 3-5 to 6 decimal places.
+
+**What this example newly exercises, vs. Stage 1.** Stage 1's Cartesian point-jet
+group needed only $E=I$ (no frame) and a diagonal-plus-off-diagonal $V^c$ block coming
+purely from the chain rule. Here, for the first time, $E$ (the frame's normal/tangential
+extraction, keeping only the normal row) and $D$ (the numeric elimination of the
+tangential residual through *already-assembled, lower-dimension* rows — vertex nodes,
+processed before edges by the increasing-dimension loop of `basis_transformation`) are
+both genuinely nontrivial and distinct, which is exactly the completion mechanism the
+notebook's $V=EV^cD$ factorization (lines 21-36) describes in the abstract.
+
 The implementation mirrors the theory factor by factor:
 
 1. **Sparsity from topology**: each row of $V$ is a reference node; its nonzero columns
@@ -288,3 +431,42 @@ The implementation mirrors the theory factor by factor:
    generalized Vandermonde matrix. This is where GEM-based dual evaluation comes in.
 4. Constrained spaces (reduced HCT, Bell) reuse the same machinery on the extended
    element; the FIAT element must expose the constraint functionals as extra dofs.
+
+### Stage 3 (2026-07-16): scalar glossary + code refactor — done
+
+Deliverables, applied to `finat/zany.py` only (zero semantic diff, no behavior change):
+
+* A module-level glossary docstring mapping every recurring symbol (`V`, `E`, `V^c`, `D`,
+  `J`, `K`, `normal`, `direction`/`weights`/`order`/`rank`/`divergence`, `a`, `beta`, `x`,
+  `c`, `r`, `Dinv`, `B`/`Binv`/`L`/`Lmap`) to its code location and mathematical role, and
+  stating explicitly which Jacobian-inverse convention `J` uses relative to Kirby (2017)'s
+  $F$ (the Stage 1 finding).
+* `_materialize_jacobian(J)`: a new free function replacing three copies of the same
+  `numpy.array([[J[i, k] ...` snippet (`PiolaFacetFrame.__init__`, `_divergence_rows`,
+  `_piola_point_rows`), so the numpy-materialized Jacobian has one name and one
+  construction site instead of three silently-identical ones.
+* `FacetFrame.normal`/`PiolaFacetFrame.normal`'s differing scaling convention
+  (`compute_normal` vs `compute_scaled_normal`) is now stated in the module glossary,
+  not just each class's own docstring, so it's visible without reading both classes.
+
+Verified: `pytest test/finat/test_zany_mapping.py test/finat/test_zany_automation.py`
+(124 passed), the full `test/finat/` suite (338 passed, 8 skipped), `flake8 finat/zany.py`,
+`pydocstyle finat/zany.py` — all clean, no matrix entries changed.
+
+This closes the first math-code loop (Stages 0-3, scalar case). Stages 4+ (Piola
+composition hypothesis and beyond) remain only roughly sketched in the plan file and will
+be planned in detail next.
+
+### Paper migration (2026-07-16)
+
+The plan now lives at `~/git/fiat_zany_auto/PLAN.md`, and the scalar theory
+(Stages 0-3 above) has been drafted as Section 2 of `~/git/fiat_zany_auto/paper.tex`
+("Automation of finite element transformations", Kirby, Marsden & Brubeck; acmart,
+compiles cleanly with `make`). Key notation choices made in the draft, to keep
+consistent going forward: $F: K \to \hat K$ physical-to-reference (Kirby 2017), but $J$
+defined by $F^{-1}(\hat x) = J\hat x + b$ (the *code's* Jacobian, stated explicitly in
+eq. 2.3); the generic node $\ell_{X,w,d}$; the push-forward closed form
+$F_*(\ell_{X,w,d}) = \hat\ell_{\hat X, w, (J^{-1})^{\otimes m}d}$; the "design equation"
+$J^{\otimes m}\hat d = \sum_j c_j d_j$ as the unifying statement of every row solve; and
+a theory-to-code correspondence table (Table 1). The Piola/implementation/examples
+sections are `\todo` stubs pending Stages 4+.
