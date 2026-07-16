@@ -35,6 +35,7 @@ from FIAT.orientation_utils import (
     make_cell_orientation_reflection_map_tensorproduct,
     make_entity_permutations_simplex,
 )
+from FIAT.precision import prec
 
 POINT = 0
 LINE = 1
@@ -265,7 +266,7 @@ class Cell:
         """
         raise NotImplementedError("Should be implemented in a subclass.")
 
-    def point_entity_ids(self, points, tol=1E-10):
+    def point_entity_ids(self, points, tol=prec(1E-10)):
         """Returns the topological entity association for points on this cell."""
         raise NotImplementedError("Should be implemented in a subclass.")
 
@@ -800,7 +801,7 @@ class SimplicialComplex(Cell):
         """
         return self.distance_to_point_l1(point, entity=entity) <= epsilon
 
-    def point_entity_ids(self, points, tol=1e-10):
+    def point_entity_ids(self, points, tol=prec(1e-10)):
         """Return the topological entity association for points on this cell."""
         top = self.get_topology()
         entity_ids = {dim: {entity: [] for entity in top[dim]} for dim in top}
@@ -1289,7 +1290,7 @@ class TensorProductCell(Cell):
         return sum(c.distance_to_point_l1(point[..., s], rescale=rescale)
                    for c, s in zip(self.cells, point_slices))
 
-    def point_entity_ids(self, points, tol=1e-10):
+    def point_entity_ids(self, points, tol=prec(1e-10)):
         """Return the topological entity association for points on this cell."""
         points = numpy.asarray(points)
         point_slices = TensorProductCell._split_slices(self.get_dimension())
@@ -1490,7 +1491,7 @@ class Hypercube(Cell):
         For more information see the docstring for the UFCSimplex method."""
         return self.product.distance_to_point_l1(point, rescale=rescale)
 
-    def point_entity_ids(self, points, tol=1E-10):
+    def point_entity_ids(self, points, tol=prec(1E-10)):
         """Return the topological entity association for points on this cell."""
         entity_ids = {}
         product_ids = self.product.point_entity_ids(points, tol=tol)

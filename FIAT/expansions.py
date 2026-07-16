@@ -10,6 +10,7 @@ to allow users to get coordinates that they want."""
 import numpy
 import math
 from FIAT import reference_element, jacobi
+from FIAT.precision import prec
 
 
 def morton_index2(p, q=0):
@@ -686,7 +687,7 @@ def polynomial_cell_node_map(ref_el, n, continuity=None):
     return cell_node_map
 
 
-def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
+def compute_cell_point_map(ref_el, pts, unique=True, tol=prec(1E-12)):
     """Maps cells on a simplicial complex to points.
     Points outside the complex are binned to the nearest cell.
 
@@ -729,7 +730,7 @@ def compute_cell_point_map(ref_el, pts, unique=True, tol=1E-12):
     return cell_point_map
 
 
-def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
+def compute_partition_of_unity(ref_el, pt, unique=True, tol=prec(1E-12)):
     """Computes the partition of unity functions for each subcell.
 
     :arg ref_el: a SimplicialComplex.

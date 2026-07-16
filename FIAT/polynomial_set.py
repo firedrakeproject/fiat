@@ -18,6 +18,7 @@
 import numpy
 from itertools import chain
 from FIAT import expansions
+from FIAT.precision import prec
 
 
 def mis(m, n):
@@ -157,7 +158,7 @@ def form_matrix_product(mats, alpha):
     return result
 
 
-def spanning_basis(A, nullspace=False, rtol=1e-10):
+def spanning_basis(A, nullspace=False, rtol=prec(1e-10)):
     """Construct a basis that spans the rows of A via SVD.
     """
     Aflat = A.reshape(A.shape[0], -1)

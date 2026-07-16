@@ -1,6 +1,7 @@
 import FIAT
 import gem
 import numpy as np
+from FIAT.precision import prec
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
@@ -152,7 +153,7 @@ class FiatElement(FiniteElementBase):
 
         # Apply symbolic simplification
         vals = result.values()
-        vals = map(gem.optimise.ffc_rounding, vals, [1E-13]*len(vals))
+        vals = map(gem.optimise.ffc_rounding, vals, [prec(1E-13)]*len(vals))
         vals = gem.optimise.constant_fold_zero(vals)
         vals = map(gem.optimise.aggressive_unroll, vals)
         vals = gem.optimise.remove_componenttensors(vals)
@@ -192,7 +193,7 @@ class FiatElement(FiniteElementBase):
         # the boundary of the integration domain.
         unique_points = []
         unique_indices = [None]*len(allpts)
-        atol = 1E-12
+        atol = prec(1E-12)
         for i in range(len(allpts)):
             for j in reversed(range(len(unique_points))):
                 if np.allclose(unique_points[j], allpts[i], atol=atol):
