@@ -65,7 +65,7 @@ class RuntimeTabulated(FiniteElementBase):
     def space_dimension(self):
         return self.degree + 1
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
         """Return code for evaluating the element at known points on the
         reference element.
 
@@ -94,7 +94,7 @@ class RuntimeTabulated(FiniteElementBase):
                 result[alpha] = gem.partial_indexed(gem.Variable(name, shape), ps.indices)
         return result
 
-    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, scalar_type=None):
         raise NotImplementedError("Point evaluation not supported for runtime tabulated elements")
 
     @property

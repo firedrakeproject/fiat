@@ -1,7 +1,6 @@
 import FIAT
 import gem
 import numpy as np
-from FIAT.precision import prec
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
@@ -58,16 +57,18 @@ class FiatElement(FiniteElementBase):
         # Just return the underlying FIAT element
         return self._element
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
         '''Return code for evaluating the element at known points on the
         reference element.
 
         :param order: return derivatives up to this order.
         :param ps: the point set.
         :param entity: the cell entity on which to tabulate.
+        :param scalar_type: the caller's working precision (a numpy dtype);
+            only meaningful for macro elements evaluated at symbolic points.
         '''
         fiat_element = self._element
-        fiat_result = fiat_element.tabulate(order, ps.points, entity)
+        fiat_result = fiat_element.tabulate(order, ps.points, entity, scalar_type=scalar_type)
         # In almost all cases, we have
         # self.space_dimension() == self._element.space_dimension()
         # But for Bell, FIAT reports 21 basis functions,
@@ -123,7 +124,7 @@ class FiatElement(FiniteElementBase):
             result[alpha] = expr
         return result
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -136,6 +137,8 @@ class FiatElement(FiniteElementBase):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
+        :param scalar_type: the caller's working precision (a numpy dtype);
+            only meaningful for macro elements evaluated at symbolic points.
         '''
         if entity is None:
             entity = (self.cell.get_dimension(), 0)
@@ -149,11 +152,12 @@ class FiatElement(FiniteElementBase):
         Xi = tuple(gem.Indexed(refcoords, i) for i in np.ndindex(refcoords.shape))
         ps = PointSingleton(Xi)
         result = self.basis_evaluation(order, ps, entity=entity,
-                                       coordinate_mapping=coordinate_mapping)
+                                       coordinate_mapping=coordinate_mapping,
+                                       scalar_type=scalar_type)
 
         # Apply symbolic simplification
         vals = result.values()
-        vals = map(gem.optimise.ffc_rounding, vals, [prec(1E-13)]*len(vals))
+        vals = map(gem.optimise.ffc_rounding, vals, [1E-13]*len(vals))
         vals = gem.optimise.constant_fold_zero(vals)
         vals = map(gem.optimise.aggressive_unroll, vals)
         vals = gem.optimise.remove_componenttensors(vals)
@@ -193,7 +197,7 @@ class FiatElement(FiniteElementBase):
         # the boundary of the integration domain.
         unique_points = []
         unique_indices = [None]*len(allpts)
-        atol = prec(1E-12)
+        atol = 1E-12
         for i in range(len(allpts)):
             for j in reversed(range(len(unique_points))):
                 if np.allclose(unique_points[j], allpts[i], atol=atol):

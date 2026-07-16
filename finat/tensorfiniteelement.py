@@ -108,7 +108,7 @@ class TensorFiniteElement(FiniteElementBase):
     def value_shape(self):
         return self._shape + self._base_element.value_shape
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
         r"""Produce the recipe for basis function evaluation at a set of points :math:`q`:
 
         .. math::
@@ -117,11 +117,11 @@ class TensorFiniteElement(FiniteElementBase):
             \nabla\boldsymbol\phi_{(\epsilon \gamma \zeta) (i \alpha \beta) q} = \delta_{\alpha \epsilon} \delta_{\beta \gamma}\nabla\phi_{\zeta i q}
         """
         scalar_evaluation = self._base_element.basis_evaluation
-        return self._tensorise(scalar_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping))
+        return self._tensorise(scalar_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, scalar_type=scalar_type))
 
-    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, scalar_type=None):
         scalar_evaluation = self._base_element.point_evaluation
-        return self._tensorise(scalar_evaluation(order, point, entity, coordinate_mapping))
+        return self._tensorise(scalar_evaluation(order, point, entity, coordinate_mapping, scalar_type=scalar_type))
 
     def _tensorise(self, scalar_evaluation):
         # Old basis function and value indices

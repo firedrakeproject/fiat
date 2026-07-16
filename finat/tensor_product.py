@@ -132,18 +132,18 @@ class TensorProductElement(FiniteElementBase):
                 result[Delta] = gem.ComponentTensor(scalar, multiindex)
         return result
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
 
         ps_factors = factor_point_set(self.cell, entity_dim, ps)
 
-        factor_results = [fe.basis_evaluation(order, ps_, e)
+        factor_results = [fe.basis_evaluation(order, ps_, e, scalar_type=scalar_type)
                           for fe, ps_, e in zip(self.factors, ps_factors, entities)]
 
         return self._merge_evaluations(factor_results)
 
-    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, scalar_type=None):
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
 
@@ -161,7 +161,7 @@ class TensorProductElement(FiniteElementBase):
             ))
 
         # Subelement results
-        factor_results = [fe.point_evaluation(order, p_, e)
+        factor_results = [fe.point_evaluation(order, p_, e, scalar_type=scalar_type)
                           for fe, p_, e in zip(self.factors, point_factors, entities)]
 
         return self._merge_evaluations(factor_results)

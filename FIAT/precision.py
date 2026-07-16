@@ -1,18 +1,19 @@
-"""Tolerance adjustment for PETSc's active floating-point precision."""
+"""Tolerance adjustment for the caller's floating-point precision."""
 import math
 
 import numpy
 
-try:
-    from petsc4py.PETSc import ScalarType as _PETScScalarType
-except ImportError:
-    _PETScScalarType = numpy.float64
 
-# Whether PETSc's scalar type has single-precision (4-byte) real components
-# (covers both real single and single-complex builds).
-single_precision = numpy.zeros((), dtype=_PETScScalarType).real.dtype == numpy.dtype(numpy.float32)
+def prec(tol: float, scalar_type=None) -> float:
+    """Return ``sqrt(tol)`` if `scalar_type` has single-precision (4-byte)
+    real components, else `tol` unchanged.
 
-
-def prec(tol: float) -> float:
-    """Return ``sqrt(tol)`` in single precision, else ``tol`` unchanged."""
-    return math.sqrt(tol) if single_precision else tol
+    :arg tol: the tolerance appropriate for double precision.
+    :arg scalar_type: a numpy dtype (or dtype-convertible object) describing
+        the caller's working precision, e.g. `form_compiler_parameters
+        ["scalar_type"]`. If `None`, `tol` is returned unchanged.
+    """
+    if scalar_type is None:
+        return tol
+    is_single = numpy.zeros((), dtype=numpy.dtype(scalar_type)).real.dtype == numpy.dtype(numpy.float32)
+    return math.sqrt(tol) if is_single else tol

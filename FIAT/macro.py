@@ -3,7 +3,6 @@ from itertools import chain, combinations
 import numpy
 
 from FIAT import expansions, polynomial_set, reference_element
-from FIAT.precision import prec
 from FIAT.quadrature import FacetQuadratureRule, QuadratureRule
 from FIAT.reference_element import (TRIANGLE, SimplicialComplex, lattice_iter,
                                     make_lattice)
@@ -409,7 +408,7 @@ class MacroQuadratureRule(QuadratureRule):
             wts.extend(Q_cur.wts)
 
         # Collapse repeated points if any of them lie on facets
-        atol = prec(1E-10)
+        atol = 1E-10
         sd = ref_el.get_spatial_dimension()
         top = ref_el.get_topology()
         for cell in top[sd]:

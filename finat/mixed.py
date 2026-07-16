@@ -87,12 +87,12 @@ class MixedSubElement(FiniteElementBase):
         return {alpha: promote(table)
                 for alpha, table in core_eval.items()}
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        core_eval = self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping)
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
+        core_eval = self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, scalar_type=scalar_type)
         return self._transform_evaluation(core_eval)
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
-        core_eval = self.element.point_evaluation(order, refcoords, entity)
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
+        core_eval = self.element.point_evaluation(order, refcoords, entity, scalar_type=scalar_type)
         return self._transform_evaluation(core_eval)
 
     @property

@@ -95,7 +95,7 @@ class FiniteElement(object):
         """Return the dimension of the finite element space."""
         return len(self.get_dual_set())
 
-    def tabulate(self, order, points, entity=None):
+    def tabulate(self, order, points, entity=None, scalar_type=None):
         """Return tabulated values of derivatives up to given order of
         basis functions at given points.
 
@@ -105,6 +105,10 @@ class FiniteElement(object):
                      indicating which topological entity of the
                      reference element to tabulate on.  If ``None``,
                      default cell-wise tabulation is performed.
+        :arg scalar_type: the caller's working precision (a numpy dtype);
+                     only meaningful for macro elements evaluated at
+                     symbolic points. If ``None``, double precision is
+                     assumed.
         """
         raise NotImplementedError("Must be specified in the element subclass of FiniteElement.")
 
@@ -178,7 +182,7 @@ class CiarletElement(FiniteElement):
         finite element."""
         return self.poly_set.get_coeffs()
 
-    def tabulate(self, order, points, entity=None):
+    def tabulate(self, order, points, entity=None, scalar_type=None):
         """Return tabulated values of derivatives up to given order of
         basis functions at given points.
 
@@ -188,13 +192,17 @@ class CiarletElement(FiniteElement):
                      indicating which topological entity of the
                      reference element to tabulate on.  If ``None``,
                      default cell-wise tabulation is performed.
+        :arg scalar_type: the caller's working precision (a numpy dtype);
+                     only meaningful for macro elements evaluated at
+                     symbolic points. If ``None``, double precision is
+                     assumed.
         """
         if entity is None:
             entity = (self.ref_el.get_spatial_dimension(), 0)
 
         entity_dim, entity_id = entity
         transform = self.ref_el.get_entity_transform(entity_dim, entity_id)
-        return self.poly_set.tabulate(transform(points), order)
+        return self.poly_set.tabulate(transform(points), order, scalar_type=scalar_type)
 
     def value_shape(self):
         "Return the value shape of the finite element functions."

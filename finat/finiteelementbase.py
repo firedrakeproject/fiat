@@ -152,7 +152,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         return tuple(gem.Index(extent=d) for d in self.value_shape)
 
     @abstractmethod
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
         '''Return code for evaluating the element at known points on the
         reference element.
 
@@ -162,10 +162,12 @@ class FiniteElementBase(metaclass=ABCMeta):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
+        :param scalar_type: the caller's working precision (a numpy dtype);
+            only meaningful for macro elements evaluated at symbolic points.
         '''
 
     @abstractmethod
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -178,6 +180,8 @@ class FiniteElementBase(metaclass=ABCMeta):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
+        :param scalar_type: the caller's working precision (a numpy dtype);
+            only meaningful for macro elements evaluated at symbolic points.
         '''
 
     @property

@@ -85,8 +85,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         M = self.basis_transformation(coordinate_mapping)
         return MappedTabulation(M, ref_tabulation, indices=self.restriction_indices)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        result = super().basis_evaluation(order, ps, entity=entity)
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
+        result = super().basis_evaluation(order, ps, entity=entity, scalar_type=scalar_type)
         return self.map_tabulation(result, coordinate_mapping)
 
     def dual_transformation(self, Q, coordinate_mapping=None):

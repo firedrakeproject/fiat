@@ -86,7 +86,7 @@ class DirectSerendipity(DirectlyDefinedElement, FiniteElementBase):
             dphi = tuple(diff(phi, xx, alpha) for phi in phis)
             return self._deriv_cache.setdefault(key, dphi)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
         '''Return code for evaluating the element at known points on the
         reference element.
 
@@ -122,7 +122,7 @@ class DirectSerendipity(DirectlyDefinedElement, FiniteElementBase):
 
         return result
 
-    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, scalar_type=None):
         raise NotImplementedError("Not done yet, sorry!")
 
     def mapping(self):

@@ -126,7 +126,7 @@ class QuadratureElement(FiniteElementBase):
 
         return FIAT.QuadratureElement(self.cell, ps.points, weights)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
         '''Return code for evaluating the element at known points on the
         reference element.
 
@@ -161,7 +161,7 @@ class QuadratureElement(FiniteElementBase):
         sd = self.cell.get_spatial_dimension()
         return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
         raise NotImplementedError("QuadratureElement cannot do point evaluation!")
 
     @property

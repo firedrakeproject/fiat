@@ -65,11 +65,11 @@ class DiscontinuousElement(FiniteElementBase):
     def fiat_equivalent(self):
         return FIAT.DiscontinuousElement(self.element.fiat_equivalent)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        return self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping)
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, scalar_type=None):
+        return self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, scalar_type=scalar_type)
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
-        return self.element.point_evaluation(order, refcoords, entity, coordinate_mapping)
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, scalar_type=None):
+        return self.element.point_evaluation(order, refcoords, entity, coordinate_mapping, scalar_type=scalar_type)
 
     @property
     def dual_basis(self):

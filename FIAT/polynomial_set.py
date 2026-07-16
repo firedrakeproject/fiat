@@ -18,7 +18,6 @@
 import numpy
 from itertools import chain
 from FIAT import expansions
-from FIAT.precision import prec
 
 
 def mis(m, n):
@@ -66,9 +65,13 @@ class PolynomialSet(object):
         return numpy.dot(self.coeffs,
                          self.expansion_set.tabulate(self.embedded_degree, pts))
 
-    def tabulate(self, pts, jet_order=0):
-        """Returns the values of the polynomial set."""
-        base_vals = self.expansion_set._tabulate(self.embedded_degree, pts, order=jet_order)
+    def tabulate(self, pts, jet_order=0, scalar_type=None):
+        """Returns the values of the polynomial set.
+
+        :arg scalar_type: the caller's working precision (a numpy dtype);
+            see `FIAT.expansions.ExpansionSet._tabulate`.
+        """
+        base_vals = self.expansion_set._tabulate(self.embedded_degree, pts, order=jet_order, scalar_type=scalar_type)
         result = {alpha: numpy.dot(self.coeffs, base_vals[alpha]) for alpha in base_vals}
         return result
 
@@ -158,7 +161,7 @@ def form_matrix_product(mats, alpha):
     return result
 
 
-def spanning_basis(A, nullspace=False, rtol=prec(1e-10)):
+def spanning_basis(A, nullspace=False, rtol=1e-10):
     """Construct a basis that spans the rows of A via SVD.
     """
     Aflat = A.reshape(A.shape[0], -1)
