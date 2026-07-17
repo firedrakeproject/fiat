@@ -1660,7 +1660,8 @@ Points outside the complex are binned to the nearest cell.</p>
 <li><p><strong>ref_el</strong> – a SimplicialComplex.</p></li>
 <li><p><strong>pt</strong> – a physical point on the complex.</p></li>
 <li><p><strong>unique</strong> – Are we assigning a unique cell to points on facets?</p></li>
-<li><p><strong>tol</strong> – the absolute tolerance.</p></li>
+<li><p><strong>tol</strong> – the absolute tolerance, already adjusted for the caller’s
+working precision (see <cite>FIAT.precision.calibrate_tolerance</cite>).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -4325,6 +4326,33 @@ on the 6-way Powell-Sabin split of a triangle.</p>
 </dd></dl>
 
 </section>
+<section id="module-FIAT.precision">
+<span id="fiat-precision-module"></span><h2>FIAT.precision module<a class="headerlink" href="#module-FIAT.precision" title="Link to this heading">¶</a></h2>
+<p>Tolerance adjustment for the caller’s floating-point precision.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="FIAT.precision.DEFAULT_SCALAR_DTYPE">
+<span class="sig-prename descclassname"><span class="pre">FIAT.precision.</span></span><span class="sig-name descname"><span class="pre">DEFAULT_SCALAR_DTYPE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">dtype('float64')</span></span><a class="headerlink" href="#FIAT.precision.DEFAULT_SCALAR_DTYPE" title="Link to this definition">¶</a></dt>
+<dd><p>Working precision assumed when the caller does not specify one.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="FIAT.precision.calibrate_tolerance">
+<span class="sig-prename descclassname"><span class="pre">FIAT.precision.</span></span><span class="sig-name descname"><span class="pre">calibrate_tolerance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">dtype('float64')</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="reference internal" href="_modules/FIAT/precision.html#calibrate_tolerance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.precision.calibrate_tolerance" title="Link to this definition">¶</a></dt>
+<dd><p>Relax <cite>tol</cite> to <code class="docutils literal notranslate"><span class="pre">sqrt(tol)</span></code> if <cite>dtype</cite> is single-precision,
+since float32’s unit roundoff (~1.2e-7) is much larger than
+float64’s (~2.2e-16). Otherwise <cite>tol</cite> is returned unchanged.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>tol</strong> – the tolerance appropriate for double precision.</p></li>
+<li><p><strong>dtype</strong> – the caller’s working precision. <cite>None</cite> behaves like
+double precision.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
 <section id="module-FIAT.quadrature">
 <span id="fiat-quadrature-module"></span><h2>FIAT.quadrature module<a class="headerlink" href="#module-FIAT.quadrature" title="Link to this heading">¶</a></h2>
 <dl class="py class">
@@ -5785,6 +5813,20 @@ specified by subelement dimension.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="FIAT.reference_element.cast_vertices">
+<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">cast_vertices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">verts</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#cast_vertices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.cast_vertices" title="Link to this definition">¶</a></dt>
+<dd><p>Cast a tuple of vertex coordinate tuples to the given numpy dtype.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>verts</strong> – a tuple of tuples of vertex coordinates.</p></li>
+<li><p><strong>dtype</strong> – a numpy dtype, or <cite>None</cite> to leave <cite>verts</cite> unchanged.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="FIAT.reference_element.compute_unflattening_map">
 <span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">compute_unflattening_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">topology_dict</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#compute_unflattening_map"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.compute_unflattening_map" title="Link to this definition">¶</a></dt>
 <dd><p>This function returns unflattening map for the given tensor product topology dict.</p>
@@ -5876,7 +5918,7 @@ midpoint.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.reference_element.symmetric_simplex">
-<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">symmetric_simplex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#symmetric_simplex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.symmetric_simplex" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">symmetric_simplex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#symmetric_simplex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.symmetric_simplex" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <dl class="py function">
@@ -5889,22 +5931,36 @@ If input argument is not the tuple, returns input.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.reference_element.ufc_cell">
-<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">ufc_cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#ufc_cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.ufc_cell" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">ufc_cell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#ufc_cell"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.ufc_cell" title="Link to this definition">¶</a></dt>
 <dd><p>Handle incoming calls from FFC.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.reference_element.ufc_hypercube">
-<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">ufc_hypercube</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#ufc_hypercube"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.ufc_hypercube" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">ufc_hypercube</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#ufc_hypercube"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.ufc_hypercube" title="Link to this definition">¶</a></dt>
 <dd><p>Factory function that maps spatial dimension to an instance of
 the UFC reference hypercube of that dimension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dtype</strong> – optional numpy dtype to cast the vertex coordinates to.
+Defaults to the plain Python <cite>float</cite> used by the hardcoded
+vertex coordinates.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="FIAT.reference_element.ufc_simplex">
-<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">ufc_simplex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#ufc_simplex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.ufc_simplex" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">FIAT.reference_element.</span></span><span class="sig-name descname"><span class="pre">ufc_simplex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spatial_dim</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dtype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/FIAT/reference_element.html#ufc_simplex"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#FIAT.reference_element.ufc_simplex" title="Link to this definition">¶</a></dt>
 <dd><p>Factory function that maps spatial dimension to an instance of
 the UFC reference simplex of that dimension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dtype</strong> – optional numpy dtype to cast the vertex coordinates to.
+Defaults to the plain Python <cite>float</cite> used by the hardcoded
+vertex coordinates.</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
@@ -6944,6 +7000,11 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.powell_sabin.QuadraticPowellSabin6DualSet"><code class="docutils literal notranslate"><span class="pre">QuadraticPowellSabin6DualSet</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#module-FIAT.precision">FIAT.precision module</a><ul>
+<li><a class="reference internal" href="#FIAT.precision.DEFAULT_SCALAR_DTYPE"><code class="docutils literal notranslate"><span class="pre">DEFAULT_SCALAR_DTYPE</span></code></a></li>
+<li><a class="reference internal" href="#FIAT.precision.calibrate_tolerance"><code class="docutils literal notranslate"><span class="pre">calibrate_tolerance()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#module-FIAT.quadrature">FIAT.quadrature module</a><ul>
 <li><a class="reference internal" href="#FIAT.quadrature.CollapsedQuadratureSimplexRule"><code class="docutils literal notranslate"><span class="pre">CollapsedQuadratureSimplexRule</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.quadrature.CollapsedQuadratureTetrahedronRule"><code class="docutils literal notranslate"><span class="pre">CollapsedQuadratureTetrahedronRule</span></code></a></li>
@@ -7125,6 +7186,7 @@ Simplices in one, two, and three dimensions are supported.</p>
 <li><a class="reference internal" href="#FIAT.reference_element.UFCTriangle.compute_normal"><code class="docutils literal notranslate"><span class="pre">UFCTriangle.compute_normal()</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#FIAT.reference_element.cast_vertices"><code class="docutils literal notranslate"><span class="pre">cast_vertices()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.compute_unflattening_map"><code class="docutils literal notranslate"><span class="pre">compute_unflattening_map()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.default_simplex"><code class="docutils literal notranslate"><span class="pre">default_simplex()</span></code></a></li>
 <li><a class="reference internal" href="#FIAT.reference_element.flatten_entities"><code class="docutils literal notranslate"><span class="pre">flatten_entities()</span></code></a></li>

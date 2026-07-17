@@ -484,6 +484,14 @@ FIAT.powell\_sabin module
    :show-inheritance:
    :undoc-members:
 
+FIAT.precision module
+---------------------
+
+.. automodule:: FIAT.precision
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 FIAT.quadrature module
 ----------------------
 
