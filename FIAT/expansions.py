@@ -379,7 +379,7 @@ class ExpansionSet(object):
 
         if pts.dtype == object:
             # If binning is undefined, scale by the characteristic function of each subcell
-            tol = prec(1E-12, dtype)
+            tol = prec(1E-12, numpy.array(self.ref_el.vertices).dtype)
             Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique, tol=tol)
             for cell, phi in phis.items():
                 for alpha in phi:
