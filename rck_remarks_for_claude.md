@@ -29,7 +29,11 @@ For facet nodes and completion, does this work for derivative nodes that are lin
 In that case, do we reproduce the fundamental theorem of calculus, writing the completed derivative as the difference between point values on the edges?
 This is claimed after (2.21), but a proof that we get FTOC would be nice.
 
+
 Is there a nice analog of some Stokes-like theorem for an integral moment of a normal derivative on a face of a tetrahedron?  I think there is something like this in Xu's papers on generalized nonconforming elements.  Again, it would be nice to show (a theorem?) that we get that from our numerics in the special case.
+
+Is it necessary at all to "bin" nodes that have the same set of points and/or weights, or does this sort of fall out numerically?
+
 
 
 I also think the recursive reduction to form the V matrix product without E V^c D being all explicit is very nice.  However, I think it's worth separating the
@@ -38,4 +42,12 @@ presentation into two parts:
 2) then keep describing the reduction via row recursion as a separate step.  It's got to be morally equivalent to some graph algorithm for a sparse triple product, but with blocks based on cell topology somehow. 
 
 (2.23) again may have to deal with the possibility that these matrices have negative determinant?
+
+Phrase the recursion in pseudocode (algorithmic in latex)
+
+It would be nice to work out (explicitly with formulas?) the Morley and maybe hexic Argryis to demonstrate the process.
+Then, we should put in an example of an element whose transformation is *not* explicitly known in the literature (e.g. one of Xu's generalized nonconforming elements?)
+
+
+Stylistic point: is it worth identifying propositions/theorems about the calcultaions we do to, say, identify the structure/entries of V^c, E, D, and the recursive algorithm for the product?
 
