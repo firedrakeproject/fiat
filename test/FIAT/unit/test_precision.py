@@ -32,10 +32,11 @@ def test_prec_complex_single_returns_sqrt_tol():
     assert prec(1E-12, numpy.complex64) == math.sqrt(1E-12)
 
 
-def macro_element():
+def macro_element(dtype):
     """A macro element whose symbolic tabulation exercises
     FIAT.expansions.compute_partition_of_unity, where `dtype` is used."""
     K = ufc_simplex(1)
+    K.vertices = tuple(map(tuple, numpy.array(K.vertices, dtype=dtype)))
     return DiscontinuousLagrange(K, 1, variant="iso")
 
 
