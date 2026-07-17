@@ -48,8 +48,8 @@ def test_dtype_propagates_into_symbolic_tabulation():
     fe32 = macro_element(dtype=numpy.float32)
     x0 = sympy.Symbol("x0")
 
-    tab64 = fe.tabulate(0, (x0,), dtype=numpy.float64)[(0,)][0]
-    tab32 = fe.tabulate(0, (x0,), dtype=numpy.float32)[(0,)][0]
+    tab64 = fe64.tabulate(0, (x0,))[(0,)][0]
+    tab32 = fe32.tabulate(0, (x0,))[(0,)][0]
 
     assert sympy.Float(1E-12) in tab64.atoms(sympy.Float)
     assert sympy.Float(math.sqrt(1E-12)) in tab32.atoms(sympy.Float)
