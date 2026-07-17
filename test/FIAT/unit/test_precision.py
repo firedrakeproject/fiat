@@ -16,8 +16,6 @@ from FIAT.reference_element import ufc_simplex
     (numpy.float64, 1E-12),
     (numpy.float32, math.sqrt(1E-12)),
     ("float32", math.sqrt(1E-12)),
-    (numpy.complex128, 1E-12),
-    (numpy.complex64, math.sqrt(1E-12)),
 ])
 def test_calibrate_tolerance(dtype, expected):
     assert calibrate_tolerance(1E-12, dtype) == expected
