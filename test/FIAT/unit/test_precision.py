@@ -1,7 +1,9 @@
 import math
 
+import gem
 import numpy
-import sympy
+from gem.interpreter import evaluate
+from gem.node import traversal
 
 from FIAT import DiscontinuousLagrange
 from FIAT.precision import calibrate_tolerance
@@ -39,19 +41,30 @@ def macro_element(dtype):
     return DiscontinuousLagrange(K, 1, variant="iso")
 
 
+def literals(expr):
+    """Return the set of gem.Literal values appearing in a gem expression."""
+    return {node.value for node in traversal([expr]) if isinstance(node, gem.Literal)}
+
+
+def evaluate_at(exprs, x0, value):
+    """Evaluate an iterable of gem expressions at x0 = value."""
+    results = evaluate(list(exprs), bindings={x0: numpy.asarray(value)})
+    return numpy.array([result.arr for result in results])
+
+
 def test_dtype_propagates_into_symbolic_tabulation():
     """The `dtype`-adjusted tolerance should appear verbatim in the
-    symbolic expression tree produced by tabulating a macro element,
+    gem expression tree produced by tabulating a macro element,
     confirming it reaches FIAT.expansions.compute_partition_of_unity."""
     fe64 = macro_element(dtype=numpy.float64)
     fe32 = macro_element(dtype=numpy.float32)
-    x0 = sympy.Symbol("x0")
+    x0 = gem.Variable("x0", ())
 
     tab64 = fe64.tabulate(0, (x0,))[(0,)][0]
     tab32 = fe32.tabulate(0, (x0,))[(0,)][0]
 
-    assert sympy.Float(1E-12) in tab64.atoms(sympy.Float)
-    assert sympy.Float(math.sqrt(1E-12)) in tab32.atoms(sympy.Float)
+    assert 1E-12 in literals(tab64)
+    assert math.sqrt(1E-12) in literals(tab32)
 
 
 def test_dtype_changes_macro_tabulation_near_subcell_boundary():
@@ -61,20 +74,20 @@ def test_dtype_changes_macro_tabulation_near_subcell_boundary():
     boundary both dtypes should agree."""
     fe64 = macro_element(dtype=numpy.float64)
     fe32 = macro_element(dtype=numpy.float32)
-    x0 = sympy.Symbol("x0")
+    x0 = gem.Variable("x0", ())
 
     tab64 = fe64.tabulate(0, (x0,))[(0,)]
     tab32 = fe32.tabulate(0, (x0,))[(0,)]
-    f64 = sympy.lambdify(x0, list(tab64))
-    f32 = sympy.lambdify(x0, list(tab32))
 
     # The macro element splits the interval at its midpoint (x0 = 0.5).
     # 1e-9 lies between the float64 tolerance (1e-12) and the
     # float32-adjusted tolerance (sqrt(1e-12) = 1e-6), so the two
     # dtypes classify this point into different subcells.
     near_boundary = 0.5 + 1e-9
-    assert not numpy.allclose(f64(near_boundary), f32(near_boundary))
+    assert not numpy.allclose(evaluate_at(tab64, x0, near_boundary),
+                              evaluate_at(tab32, x0, near_boundary))
 
     # Far from the boundary, both dtypes classify the point the same way.
     away_from_boundary = 0.5 + 1e-3
-    assert numpy.allclose(f64(away_from_boundary), f32(away_from_boundary))
+    assert numpy.allclose(evaluate_at(tab64, x0, away_from_boundary),
+                          evaluate_at(tab32, x0, away_from_boundary))

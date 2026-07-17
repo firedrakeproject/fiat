@@ -16,5 +16,5 @@ def calibrate_tolerance(tol: float, dtype=DEFAULT_SCALAR_DTYPE) -> float:
     :arg dtype: the caller's working precision. `None` behaves like
         double precision.
     """
-    is_single = numpy.dtype(dtype).name in ("float32", "complex64")
+    is_single = numpy.dtype(dtype) in (numpy.dtype(numpy.float32), numpy.dtype(numpy.complex64))
     return math.sqrt(tol) if is_single else tol
