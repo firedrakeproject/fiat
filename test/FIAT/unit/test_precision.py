@@ -44,7 +44,8 @@ def test_dtype_propagates_into_symbolic_tabulation():
     """The `dtype`-adjusted tolerance should appear verbatim in the
     symbolic expression tree produced by tabulating a macro element,
     confirming it reaches FIAT.expansions.compute_partition_of_unity."""
-    fe = macro_element()
+    fe64 = macro_element(dtype=numpy.float64)
+    fe32 = macro_element(dtype=numpy.float32)
     x0 = sympy.Symbol("x0")
 
     tab64 = fe.tabulate(0, (x0,), dtype=numpy.float64)[(0,)][0]
