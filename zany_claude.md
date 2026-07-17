@@ -470,3 +470,53 @@ $F_*(\ell_{X,w,d}) = \hat\ell_{\hat X, w, (J^{-1})^{\otimes m}d}$; the "design e
 $J^{\otimes m}\hat d = \sum_j c_j d_j$ as the unifying statement of every row solve; and
 a theory-to-code correspondence table (Table 1). The Piola/implementation/examples
 sections are `\todo` stubs pending Stages 4+.
+
+### Review response, RCK round 1 (2026-07-17)
+
+Robert's remarks (`rck_remarks_for_claude.md`) addressed in `~/git/fiat_zany_auto/paper.tex`
+(now 12 pp., compiles clean). Disposition:
+
+- **det J > 0 dropped everywhere.** §2.1 now states both orientations occur under UFC;
+  the normal formula (2.14) is presented as orientation-covariant (κ = ±1, ν flips with
+  C exactly as the reference formula would on a reflected cell); (2.23) notes Gram
+  determinants are positive and det J enters linearly. *Verified in code*: ran
+  `check_zany_mapping` on a clockwise triangle (det J = −2.06) for Morley, Hermite,
+  Bell, Argyris(5,6,7, avg=True), WuXuH3NC, WuXuRobustH3NC, and on a reflected tet
+  (det J = −1.28) for Morley/Hermite — all pass. **Note: the test-suite fixtures only
+  use positively oriented cells; suggest adding a flipped-cell parametrization.**
+- **Notation**: physical/reference normals renamed N, n̂ → ν, ν̂ (avoids clash with
+  nodes n̂_j and node-set 𝒩). Facet frame and scaled tangents (t̂_k = v̂_k − v̂_0)
+  now defined explicitly (new eqs. framedef/scaledtangents).
+- **(2.8) scope**: one direction + one order per functional stated as deliberate,
+  no premature generalization; symmetry-WLOG + rank-deficiency remark (d = ν⊗ν rank 1;
+  construction never uses rank; covers Wu–Xu-type nodes).
+- **"dividing by J"** → multiplying each slot by J^{-1} (gradients by J^{-T});
+  invariance/design-equation paragraphs rewritten ("conversely" contrast made explicit;
+  numeric-vs-symbolic split cued early); no-type-dispatch point added ("a normal
+  component is detected through a ≠ 0, not declared through a class hierarchy").
+- **Binning**: §2.4 now states grouping = entity (element data) + order (numeric);
+  shared points/weight-ratios/direction-basis are checked numerically, nothing else needed.
+- **FTOC proof**: new Prop. 2.1 (exactness identities are recovered — unisolvence
+  uniqueness, 1-line proof), with FTOC instance proved (average → all C¹; Morley
+  midpoint → on P̂ via linearity of ∂_t f along the edge) and IBP/Stokes-type (Wu–Xu
+  face moments) as further instances.
+- **E, V^c, D separated then recursion (his 2-part request)**: §2.6 now defines the
+  three factors exactly (V^c block per eq:Vcblock, E Boolean, D rows = w·V — self-
+  referential but triangular by entity structure), §2.7 "Row recursion" evaluates the
+  product without materializing (graph/topological-order remark included), with
+  **Algorithm 1** (algpseudocode) mirroring `basis_transformation`/`facet_dof_rows`.
+- **Worked examples**: explicit 6×6 Morley V with closed forms c_e = det J |t̂|/|Jt̂|,
+  r_e = (Jν̂·Jt̂)/|Jt̂|² — *verified to 6.7e-16 against the code on both orientations*;
+  hexic Argyris completion rows computed: ℓ̂⁽⁰⁾ = δ_{v+} − δ_{v−} (FTOC) and
+  ℓ̂⁽¹⁾ = 3δ_{v+} + 3δ_{v−} − μ̂_ê (IBP, couples to same-edge trace moment; exact
+  integers to machine precision).
+- **Novel-element example**: sec:examples todo now points at WuXuH3NC/WuXuRobustH3NC,
+  which the automation already handles (tested above).
+- **Honesty fix**: scalar completions only ever couple to *identity* rows; the fully
+  recursive regime (coupling into non-identity rows) is now correctly attributed to the
+  Piola macroelements (§3, deferred).
+- New bib entries: `ufc` (Alnæs–Logg–Mardal FEniCS-book chapter), `wu-xu` (Math. Comp. 2019).
+
+Not done (open for co-authors): whether more calculations deserve proposition status
+(only Prop 2.1 added so far); explicit Stokes-identity theorem for tet face moments
+(covered as an instance of Prop 2.1, no standalone theorem); India's email still TODO.
