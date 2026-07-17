@@ -14,6 +14,7 @@ import warnings
 
 from FIAT.dual_set import DualSet
 from FIAT.polynomial_set import PolynomialSet
+from FIAT.precision import DEFAULT_SCALAR_DTYPE
 from FIAT.quadrature_schemes import create_quadrature
 
 
