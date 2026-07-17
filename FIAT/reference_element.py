@@ -977,7 +977,7 @@ class SymmetricSimplex(Simplex):
 class Point(Simplex):
     """This is the reference point."""
 
-    def __init__(self, dtype=None):
+    def __init__(self):
         verts = ((),)
         topology = {0: {0: (0,)}}
         super().__init__(POINT, verts, topology)
@@ -1006,8 +1006,8 @@ class DefaultLine(DefaultSimplex):
 class UFCInterval(UFCSimplex):
     """This is the reference interval with vertices (0.0,) and (1.0,)."""
 
-    def __init__(self, dtype=None):
-        verts = cast_vertices(((0.0,), (1.0,)), dtype)
+    def __init__(self):
+        verts = ((0.0,), (1.0,))
         edges = {0: (0, 1)}
         topology = {0: {0: (0,), 1: (1,)},
                     1: edges}
@@ -1033,8 +1033,8 @@ class UFCTriangle(UFCSimplex):
     """This is the reference triangle with vertices (0.0,0.0),
     (1.0,0.0), and (0.0,1.0)."""
 
-    def __init__(self, dtype=None):
-        verts = cast_vertices(((0.0, 0.0), (1.0, 0.0), (0.0, 1.0)), dtype)
+    def __init__(self):
+        verts = ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
         edges = {0: (1, 2), 1: (0, 2), 2: (0, 1)}
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
@@ -1125,8 +1125,8 @@ class UFCTetrahedron(UFCSimplex):
     """This is the reference tetrahedron with vertices (0,0,0),
     (1,0,0),(0,1,0), and (0,0,1)."""
 
-    def __init__(self, dtype=None):
-        verts = cast_vertices(((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)), dtype)
+    def __init__(self):
+        verts = ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
         vs = {0: (0, ),
               1: (1, ),
               2: (2, ),
@@ -1654,19 +1654,27 @@ def make_affine_mapping(xs, ys):
     return A, b
 
 
-def ufc_hypercube(spatial_dim):
+def ufc_hypercube(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
-    the UFC reference hypercube of that dimension."""
+    the UFC reference hypercube of that dimension.
+
+    :arg dtype: optional numpy dtype to cast the vertex coordinates to.
+        Defaults to the plain Python `float` used by the hardcoded
+        vertex coordinates.
+    """
     if spatial_dim == 0:
-        return Point()
+        cell = Point()
     elif spatial_dim == 1:
-        return UFCInterval()
+        cell = UFCInterval()
     elif spatial_dim == 2:
-        return UFCQuadrilateral()
+        cell = UFCQuadrilateral()
     elif spatial_dim == 3:
-        return UFCHexahedron()
+        cell = UFCHexahedron()
     else:
         raise RuntimeError(f"Can't create UFC hypercube of dimension {spatial_dim}.")
+    if dtype is not None:
+        cell.vertices = cast_vertices(cell.vertices, dtype)
+    return cell
 
 
 def default_simplex(spatial_dim):
@@ -1693,15 +1701,18 @@ def ufc_simplex(spatial_dim, dtype=None):
         vertex coordinates.
     """
     if spatial_dim == 0:
-        return Point(dtype=dtype)
+        cell = Point()
     elif spatial_dim == 1:
-        return UFCInterval(dtype=dtype)
+        cell = UFCInterval()
     elif spatial_dim == 2:
-        return UFCTriangle(dtype=dtype)
+        cell = UFCTriangle()
     elif spatial_dim == 3:
-        return UFCTetrahedron(dtype=dtype)
+        cell = UFCTetrahedron()
     else:
         raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
+    if dtype is not None:
+        cell.vertices = cast_vertices(cell.vertices, dtype)
+    return cell
 
 
 def symmetric_simplex(spatial_dim, dtype=None):
@@ -1729,9 +1740,9 @@ def ufc_cell(cell, dtype=None):
         # Tensor product cell
         return TensorProductCell(*(ufc_cell(c, dtype=dtype) for c in celltype.split(" * ")))
     elif celltype == "quadrilateral":
-        return UFCQuadrilateral(dtype=dtype)
+        return ufc_hypercube(2, dtype=dtype)
     elif celltype == "hexahedron":
-        return UFCHexahedron(dtype=dtype)
+        return ufc_hypercube(3, dtype=dtype)
     elif celltype == "vertex":
         return ufc_simplex(0, dtype=dtype)
     elif celltype == "interval":
