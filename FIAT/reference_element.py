@@ -1707,7 +1707,7 @@ def ufc_simplex(spatial_dim, dtype=None):
 def symmetric_simplex(spatial_dim):
     A = numpy.array([[2, 1, 1],
                      [0, numpy.sqrt(3), numpy.sqrt(3)/3],
-                     [0, 0, numpy.sqrt(6)*(2/3)]])
+                     [0, 0, numpy.sqrt(6)*(2/3)]], dtype=dtype)
     A = A[:spatial_dim, :][:, :spatial_dim]
     b = A.sum(axis=1) * (-1 / (1 + spatial_dim))
     Ref1 = ufc_simplex(spatial_dim)
