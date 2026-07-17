@@ -520,3 +520,151 @@ Robert's remarks (`rck_remarks_for_claude.md`) addressed in `~/git/fiat_zany_aut
 Not done (open for co-authors): whether more calculations deserve proposition status
 (only Prop 2.1 added so far); explicit Stokes-identity theorem for tet face moments
 (covered as an instance of Prop 2.1, no standalone theorem); India's email still TODO.
+
+### Stage 4 (2026-07-17): Piola theory derived as a composition with the scalar machinery
+
+Goal (user hypothesis from PLAN.md): derive the Piola-mapped case *from* the scalar
+case by composing basis transformations, as the route to unifying
+`ScalarPhysicallyMappedElement` and `PiolaPhysicallyMappedElement`. Result: the
+hypothesis is correct, the composition is exact, and it was verified to machine
+precision against every Piola element in the FInAT test zoo (automated *and*
+hand-coded), in 2D and 3D, on both orientations. Details below; conventions as in
+the paper (`~/git/fiat_zany_auto/paper.tex` §2): $F : K \to \hat K$,
+$F^{-1}(\hat x) = J\hat x + b$.
+
+**1. Composition theorem.** On an affine cell every Piola pullback factors through
+the componentwise scalar pullback $F^*_0(\hat f) = \hat f \circ F$:
+$$F^*_{\mathrm{piola}} = \theta_A \circ F^*_0, \qquad (\theta_A f)(x) = A\,f(x),$$
+with $A$ a *constant* matrix acting on the value components: $A = J/\det J$
+(contravariant), $A = J^{-T}$ (covariant), slot-wise for double variants.
+Dually, on functionals,
+$$F_*^{\mathrm{piola}} = F_*^0 \circ \theta_A^*, \qquad \theta_A^*(n) = n \circ \theta_A,$$
+and both factors act *slot-locally* on the generic node: extend the scalar node to
+$\ell_{X,W}(f) = \sum_q \langle W_q, \nabla^m f(x_q)\rangle$ where $W_q$ now carries
+$r$ value slots and $m$ derivative slots. Then the unified push-forward is
+$$F_*(\ell_{X,W}) = \hat\ell_{\hat X, \hat W}, \qquad
+\hat W = (\text{each contravariant value slot}) \cdot \Theta^T
+       \;\otimes\; (\text{each covariant value slot}) \cdot J^{-1}
+       \;\otimes\; (\text{each derivative slot}) \cdot J^{-1},$$
+with $\Theta^T = J^T/\det J = K^{-1}$, $K = \det J \, J^{-T}$ the cofactor matrix.
+Points and scalar weights are preserved (paper eq. 2.9 is the $r=0$ case). Note the
+collapse: **covariant value slots transform exactly like derivative slots** — a
+covariant element is "scalar theory with one more $J^{-1}$ slot".
+
+**2. Mirror duality of invariance.** A physical slot direction $\delta$ is invariant
+iff $\delta = \rho^{-1}\hat\delta$ for the slot map $\rho$:
+- derivative / covariant slots: $\delta = J\hat\delta$ — mapped tangents (scalar case,
+  paper §2.2);
+- contravariant slots: $\delta = K\hat\delta$ — cofactor images.
+
+The geometric content is one lemma used by both cases: the generalized cross
+product intertwines $J$ and $K$, $\bigwedge_k J\hat t_k = K \bigwedge_k \hat t_k$
+(i.e. $C = K\hat C$). In the scalar case this gave the physical unit normal
+$\nu = \kappa C/|C|$; in the Piola case it gives the **cofactor lemma**: FIAT's
+`compute_scaled_normal` is exactly $K$-covariant,
+$$K \hat\nu^s = \nu^s_{\mathrm{phys}} \quad \text{(verified: error} \le 3\cdot10^{-16},
+\text{all facets, 2D+3D, both orientations)},$$
+so physical normal-flux moments are invariant *with no symbolic factor at all*
+(the mirror of the scalar case's invariant mapped-tangential derivatives — but
+exact, no $\kappa$ needed). Consequence: FIAT's physical scaled normal is NOT
+always outward on negatively oriented cells; its sign rides the UFC vertex
+ordering, which is what makes the invariance orientation-robust.
+
+**3. Facet frame, mirrored, with closed-form net.** Reference frame
+$[\hat\nu^s \,|\, \hat t_k]$ (scaled normal + scaled tangents). FIAT's physical
+facet-dof conventions (read off `FIAT/mardal_tai_winther.py` and verified across
+the zoo):
+- normal profiles: against $\nu^s = K\hat\nu^s$ → invariant;
+- tangential profiles, 2D: against plain mapped tangents $J\hat t$;
+- tangential profiles, 3D: against $\nu^s \times (J\hat b)$, cross products of the
+  scaled normal with mapped in-plane (RT-profile) vectors — *same formula on
+  reference and physical cells*, the same principle as the scalar normal.
+
+Pushing the 3D convention forward with the slot calculus, using the identity
+$\Theta^T(Ka \times Jb) = (J^{-1}Ka)\times b$ and BAC-CAB, the net map on frame
+coordinates is
+$$N = \begin{pmatrix} 1 & -\det J\, \frac{\hat t_l \cdot M^{-1}\hat\nu^s}{|\hat\nu^s|^2} \\ 0 & s\,I_{d-1} \end{pmatrix},
+\qquad s = \det J\, \frac{\hat\nu^s \cdot M^{-1} \hat\nu^s}{|\hat\nu^s|^2},
+\qquad M = J^T J .$$
+The tangential block is a **scalar multiple of the identity** — the
+reciprocal-basis correction $S^{-1}$ and the mixing matrix $Y$ of
+`PiolaFacetFrame` are derived consequences of this, not independent structure;
+no in-plane matrix correction is needed. The top-right entries are the
+completion residuals (the mirror of the scalar $r_k$): a pulled-back tangential
+profile leaves behind a *normal*-direction functional, eliminated numerically
+through the generalized Vandermonde row (`evaluate` on the nodal basis), exactly
+as the scalar case eliminates *tangential* residuals. Spot-verified numbers
+(fixture cells): MTW 3D face 0: $s = 1.730944$, completion row
+$(0.006240, -0.020316)$, matching an unconstrained least-squares fit of FIAT's
+actual physical duals to 9e-16; GN2 2D edge 0 tangential dof: pushed frame
+coords $(0.398465, 1.154215)$ = closed form.
+
+**4. Divergence nodes.** $\mathrm{div}$ = contraction of one contravariant value
+slot with one derivative slot; the slot maps contract to
+$(K^{-1})(J^{-1})^T \delta = \delta/\det J$, so
+$F_*(\ell_{\mathrm{div}}) = (\det J)^{-1} \hat\ell_{\mathrm{div}}$ — invariant up
+to the scalar $\det J$, independent of entity ("the divergence miracle", =
+`_divergence_rows`). Tensor case (moments of $\mathrm{div}\,\sigma$ against
+vector weights, the Arnold-Winther constraint nodes): one value slot survives
+and maps by $\Theta^T$, same $1/\det J$; covered by the calculus, currently
+blocked only by `from_fiat` not parsing `IntegralMomentOfTensorDivergence`.
+
+**5. Point data vs moments.** Single-point order-0 nodes (vertex values, edge
+midpoint values, interior point values — C0-type data) keep Cartesian components;
+their push-forward is the plain $\Theta^T$ slot map and the group block-solve
+gives $K$-blocks per slot (the exact mirror of the scalar vertex jets, whose
+blocks are $J^T$ per slot). Interior *moments* are invariant by convention
+(physical tests are Piola-mapped). **Bug-relevant discovery**: the current
+`PiolaPhysicallyMappedElement.invariant_dofs` rule (`order == 0 and dim == sd`)
+misclassifies interior Cartesian *point* data as invariant — it happens to be
+correct for every currently automated element, but is wrong for Guzman-Neilan
+second kind (interior barycenter values → need $K$ blocks, as its hand-coded
+transformation does) and Hu-Zhang point variant (interior point values of
+$\sigma$). Discriminator that works for the whole zoo: single-point order-0
+nodes are point data; multi-point are moments. (HZ-point facet dofs additionally
+show rank-2 single-point *frame* dofs, so the facet-level Cartesian test
+`len(points)==1 and rank==1` is still needed there.)
+
+**6. Unified formulation = duality.** Everything above collapses into one
+statement: with slot-mapped weights, the generalized Vandermonde matrix
+$$B_{ij} = F_*(n_i)(\hat\psi_j)$$
+is computable for any pullback that factors through $\theta_A$, and $V = B^{-1}$,
+inverted blockwise along the entity hierarchy — the row recursion of paper
+§2.7 is precisely this block-triangular inversion. A ~60-line prototype
+(numeric $J$; slot maps + frame net + divergence + point-data rules, nothing
+else) reproduces `basis_transformation` to machine precision for:
+MTW(1,2), JohnsonMercier, ArnoldWintherNC, AlfeldSorokina, BernardiRaugel(+Bubble),
+GuzmanNeilan first kind (1,2), **GuzmanNeilan second kind**, GN Bubble, GN H1div,
+ReducedArnoldQin, ChristiansenHu, **HuZhang 3/4 in both point and integral
+variants** — 2D and 3D where defined, positive and negative orientation
+(bold = elements the current automated class cannot handle; their hand-coded
+transformations agree with the composition theory). All `check_zany_mapping`
+ground-truth tests also pass on reflected cells (fixtures only test positive
+orientation; worth adding).
+
+**7. What this means for Stage 5 (code unification).** The
+`{Scalar|Piola}PhysicallyMappedElement` split reduces to a small table keyed by
+the FIAT mapping string:
+
+| ingredient                  | affine (scalar)             | contravariant piola          | covariant piola |
+|-----------------------------|-----------------------------|------------------------------|-----------------|
+| value slot map              | $I$                         | $\Theta^T = K^{-1}$          | $J^{-1}$        |
+| derivative slot map         | $J^{-1}$                    | $J^{-1}$                     | $J^{-1}$        |
+| frame-stable directions     | tangents ($J\hat t$)        | scaled normal ($K\hat\nu^s$) | tangents        |
+| completed directions        | unit normal $\nu$           | in-plane (2D: $J\hat t$; 3D: $\nu^s{\times}J\hat b$) | normal |
+| point-data block            | $J^T$ per slot              | $K$ per slot                 | $J^T$ per slot  |
+| special contractions        | —                           | div → $\det J$               | curl analog     |
+
+plus one shared engine: recover node data numerically (`from_fiat` extended with
+value slots — already done), decide invariance from frame profiles, expand the
+non-stable part symbolically, eliminate residuals through `evaluate`, recurse
+over entities. `FacetFrame`/`PiolaFacetFrame` merge into one class parametrized
+by the stable subspace; the $S^{-1}$/`Y` machinery is replaced by the closed-form
+$N$ above. Newly automatable for free: GN2, HuZhang (both variants), BR, CH, RAQ,
+and AW/AWnc once `from_fiat` learns tensor-divergence moments. Covariant (Nedelec
+-type zany) elements: theory ready, value slot $\equiv$ derivative slot.
+
+Verification artifacts: prototype scripts run in-session 2026-07-17 (see git log
+of this file for the summary; the prototype is small enough to re-derive from
+items 1-6, and Stage 5 will turn it into the production implementation with
+symbolic $J$).
