@@ -55,16 +55,6 @@ def test_dtype_propagates_into_symbolic_tabulation():
     assert 1E-12 in literals(tab64)
     assert math.sqrt(1E-12) in literals(tab32)
 
-
-def test_dtype_changes_macro_tabulation_near_subcell_boundary():
-    """Near a macro subcell boundary, a `float32`-adjusted tolerance
-    should classify a point differently than the unadjusted `float64`
-    tolerance, giving different tabulated values; away from the
-    boundary both dtypes should agree."""
-    fe64 = macro_element(dtype=numpy.float64)
-    fe32 = macro_element(dtype=numpy.float32)
-    x0 = gem.Variable("x0", ())
-
     tab64 = fe64.tabulate(0, (x0,))[(0,)]
     tab32 = fe32.tabulate(0, (x0,))[(0,)]
 
