@@ -1716,7 +1716,7 @@ def symmetric_simplex(spatial_dim):
     return SymmetricSimplex(Ref1.get_shape(), vertices, Ref1.get_topology())
 
 
-def ufc_cell(cell):
+def ufc_cell(cell, dtype=None):
     """Handle incoming calls from FFC."""
 
     # celltype could be a string or a cell.
