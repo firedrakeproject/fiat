@@ -1710,7 +1710,7 @@ def symmetric_simplex(spatial_dim, dtype=None):
                      [0, 0, numpy.sqrt(6)*(2/3)]], dtype=dtype)
     A = A[:spatial_dim, :][:, :spatial_dim]
     b = A.sum(axis=1) * (-1 / (1 + spatial_dim))
-    Ref1 = ufc_simplex(spatial_dim)
+    Ref1 = ufc_simplex(spatial_dim, dtype=dtype)
     v = numpy.dot(Ref1.get_vertices(), A.T) + b[None, :]
     vertices = tuple(map(tuple, v))
     return SymmetricSimplex(Ref1.get_shape(), vertices, Ref1.get_topology())
@@ -1727,19 +1727,19 @@ def ufc_cell(cell, dtype=None):
 
     if " * " in celltype:
         # Tensor product cell
-        return TensorProductCell(*map(ufc_cell, celltype.split(" * ")))
+        return TensorProductCell(*(ufc_cell(c, dtype=dtype) for c in celltype.split(" * ")))
     elif celltype == "quadrilateral":
         return UFCQuadrilateral()
     elif celltype == "hexahedron":
         return UFCHexahedron()
     elif celltype == "vertex":
-        return ufc_simplex(0)
+        return ufc_simplex(0, dtype=dtype)
     elif celltype == "interval":
-        return ufc_simplex(1)
+        return ufc_simplex(1, dtype=dtype)
     elif celltype == "triangle":
-        return ufc_simplex(2)
+        return ufc_simplex(2, dtype=dtype)
     elif celltype == "tetrahedron":
-        return ufc_simplex(3)
+        return ufc_simplex(3, dtype=dtype)
     else:
         raise RuntimeError(f"Don't know how to create UFC cell of type {str(celltype)}")
 
