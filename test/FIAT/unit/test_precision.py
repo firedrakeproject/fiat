@@ -35,8 +35,7 @@ def test_prec_complex_single_returns_sqrt_tol():
 def macro_element(dtype):
     """A macro element whose symbolic tabulation exercises
     FIAT.expansions.compute_partition_of_unity, where `dtype` is used."""
-    K = ufc_simplex(1)
-    K.vertices = tuple(map(tuple, numpy.array(K.vertices, dtype=dtype)))
+    K = ufc_simplex(1, dtype=dtype)
     return DiscontinuousLagrange(K, 1, variant="iso")
 
 
