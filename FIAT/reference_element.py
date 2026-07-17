@@ -1729,9 +1729,9 @@ def ufc_cell(cell, dtype=None):
         # Tensor product cell
         return TensorProductCell(*(ufc_cell(c, dtype=dtype) for c in celltype.split(" * ")))
     elif celltype == "quadrilateral":
-        return UFCQuadrilateral()
+        return UFCQuadrilateral(dtype=dtype)
     elif celltype == "hexahedron":
-        return UFCHexahedron()
+        return UFCHexahedron(dtype=dtype)
     elif celltype == "vertex":
         return ufc_simplex(0, dtype=dtype)
     elif celltype == "interval":
