@@ -7,7 +7,7 @@ import numpy
 DEFAULT_SCALAR_DTYPE = numpy.dtype("float64")
 
 
-def prec(tol: float, dtype=DEFAULT_SCALAR_DTYPE) -> float:
+def calibrate_tolerance(tol: float, dtype=DEFAULT_SCALAR_DTYPE) -> float:
     """Return ``sqrt(tol)`` if `dtype` has single-precision (4-byte)
     real components, else `tol` unchanged.
 
@@ -18,11 +18,9 @@ def prec(tol: float, dtype=DEFAULT_SCALAR_DTYPE) -> float:
     absolute tolerance to a coarser working precision.
 
     :arg tol: the tolerance appropriate for double precision.
-    :arg dtype: a numpy dtype (or dtype-convertible object) describing
-        the caller's working precision, e.g. `form_compiler_parameters
-        ["scalar_type"]`. Defaults to `DEFAULT_SCALAR_DTYPE` (float64), for
-        which `tol` is returned unchanged. `None` is also accepted and
-        is treated the same as `DEFAULT_SCALAR_DTYPE`.
+    :arg dtype: the caller's working precision. Defaults to double
+        precision, for which `tol` is returned unchanged. `None` is
+        treated the same as the default.
     """
     is_single = numpy.zeros((), dtype=numpy.dtype(dtype)).real.dtype == numpy.dtype(numpy.float32)
     return math.sqrt(tol) if is_single else tol

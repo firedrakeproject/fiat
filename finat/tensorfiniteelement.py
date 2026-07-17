@@ -6,8 +6,6 @@ import gem
 from gem.optimise import delta_elimination, sum_factorise, traverse_product
 from gem.utils import cached_property
 
-from FIAT.precision import DEFAULT_SCALAR_DTYPE
-
 from finat.finiteelementbase import FiniteElementBase
 
 
@@ -110,7 +108,7 @@ class TensorFiniteElement(FiniteElementBase):
     def value_shape(self):
         return self._shape + self._base_element.value_shape
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         r"""Produce the recipe for basis function evaluation at a set of points :math:`q`:
 
         .. math::
@@ -119,11 +117,11 @@ class TensorFiniteElement(FiniteElementBase):
             \nabla\boldsymbol\phi_{(\epsilon \gamma \zeta) (i \alpha \beta) q} = \delta_{\alpha \epsilon} \delta_{\beta \gamma}\nabla\phi_{\zeta i q}
         """
         scalar_evaluation = self._base_element.basis_evaluation
-        return self._tensorise(scalar_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, dtype=dtype))
+        return self._tensorise(scalar_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping))
 
-    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         scalar_evaluation = self._base_element.point_evaluation
-        return self._tensorise(scalar_evaluation(order, point, entity, coordinate_mapping, dtype=dtype))
+        return self._tensorise(scalar_evaluation(order, point, entity, coordinate_mapping))
 
     def _tensorise(self, scalar_evaluation):
         # Old basis function and value indices

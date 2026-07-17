@@ -3,7 +3,6 @@ from __future__ import absolute_import, division, print_function
 from FIAT.reference_element import (UFCHexahedron, UFCQuadrilateral,
                                     compute_unflattening_map, flatten_entities,
                                     flatten_permutations)
-from FIAT.precision import DEFAULT_SCALAR_DTYPE
 from FIAT.tensor_product import FlattenedDimensions as FIAT_FlattenedDimensions
 from gem.utils import cached_property
 
@@ -65,7 +64,7 @@ class FlattenedDimensions(FiniteElementBase):
     def fiat_equivalent(self):
         return FIAT_FlattenedDimensions(self.product.fiat_equivalent)
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         """Return code for evaluating the element at known points on the
         reference element.
 
@@ -76,14 +75,14 @@ class FlattenedDimensions(FiniteElementBase):
         if entity is None:
             entity = (self.cell.get_spatial_dimension(), 0)
 
-        return self.product.basis_evaluation(order, ps, self._unflatten[entity], dtype=dtype)
+        return self.product.basis_evaluation(order, ps, self._unflatten[entity])
 
-    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def point_evaluation(self, order, point, entity=None, coordinate_mapping=None):
         if entity is None:
             entity = (self.cell.get_spatial_dimension(), 0)
 
         return self.product.point_evaluation(order, point, self._unflatten[entity],
-                                             coordinate_mapping, dtype=dtype)
+                                             coordinate_mapping)
 
     @property
     def dual_basis(self):

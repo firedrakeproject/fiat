@@ -7,8 +7,6 @@ from gem.interpreter import evaluate
 from gem.optimise import delta_elimination, sum_factorise, traverse_product
 from gem.utils import cached_property
 
-from FIAT.precision import DEFAULT_SCALAR_DTYPE
-
 from finat.quadrature import make_quadrature
 
 
@@ -154,7 +152,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         return tuple(gem.Index(extent=d) for d in self.value_shape)
 
     @abstractmethod
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at known points on the
         reference element.
 
@@ -164,12 +162,10 @@ class FiniteElementBase(metaclass=ABCMeta):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
-        :param dtype: the caller's working precision (a numpy dtype);
-            only meaningful for macro elements evaluated at symbolic points.
         '''
 
     @abstractmethod
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at an arbitrary points on
         the reference element.
 
@@ -182,8 +178,6 @@ class FiniteElementBase(metaclass=ABCMeta):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
-        :param dtype: the caller's working precision (a numpy dtype);
-            only meaningful for macro elements evaluated at symbolic points.
         '''
 
     @property

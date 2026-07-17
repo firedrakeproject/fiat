@@ -930,6 +930,17 @@ class Simplex(SimplicialComplex):
 ReferenceElement = Simplex
 
 
+def cast_vertices(verts, dtype):
+    """Cast a tuple of vertex coordinate tuples to the given numpy dtype.
+
+    :arg verts: a tuple of tuples of vertex coordinates.
+    :arg dtype: a numpy dtype, or `None` to leave `verts` unchanged.
+    """
+    if dtype is None:
+        return verts
+    return tuple(tuple(row) for row in numpy.array(verts, dtype=dtype))
+
+
 class UFCSimplex(Simplex):
 
     def construct_subelement(self, dimension):
@@ -966,7 +977,7 @@ class SymmetricSimplex(Simplex):
 class Point(Simplex):
     """This is the reference point."""
 
-    def __init__(self):
+    def __init__(self, dtype=None):
         verts = ((),)
         topology = {0: {0: (0,)}}
         super().__init__(POINT, verts, topology)
@@ -995,8 +1006,8 @@ class DefaultLine(DefaultSimplex):
 class UFCInterval(UFCSimplex):
     """This is the reference interval with vertices (0.0,) and (1.0,)."""
 
-    def __init__(self):
-        verts = ((0.0,), (1.0,))
+    def __init__(self, dtype=None):
+        verts = cast_vertices(((0.0,), (1.0,)), dtype)
         edges = {0: (0, 1)}
         topology = {0: {0: (0,), 1: (1,)},
                     1: edges}
@@ -1022,8 +1033,8 @@ class UFCTriangle(UFCSimplex):
     """This is the reference triangle with vertices (0.0,0.0),
     (1.0,0.0), and (0.0,1.0)."""
 
-    def __init__(self):
-        verts = ((0.0, 0.0), (1.0, 0.0), (0.0, 1.0))
+    def __init__(self, dtype=None):
+        verts = cast_vertices(((0.0, 0.0), (1.0, 0.0), (0.0, 1.0)), dtype)
         edges = {0: (1, 2), 1: (0, 2), 2: (0, 1)}
         faces = {0: (0, 1, 2)}
         topology = {0: {0: (0,), 1: (1,), 2: (2,)},
@@ -1114,8 +1125,8 @@ class UFCTetrahedron(UFCSimplex):
     """This is the reference tetrahedron with vertices (0,0,0),
     (1,0,0),(0,1,0), and (0,0,1)."""
 
-    def __init__(self):
-        verts = ((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    def __init__(self, dtype=None):
+        verts = cast_vertices(((0.0, 0.0, 0.0), (1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)), dtype)
         vs = {0: (0, ),
               1: (1, ),
               2: (2, ),
@@ -1673,17 +1684,22 @@ def default_simplex(spatial_dim):
         raise RuntimeError(f"Can't create default simplex of dimension {spatial_dim}.")
 
 
-def ufc_simplex(spatial_dim):
+def ufc_simplex(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
-    the UFC reference simplex of that dimension."""
+    the UFC reference simplex of that dimension.
+
+    :arg dtype: optional numpy dtype to cast the vertex coordinates to.
+        Defaults to the plain Python `float` used by the hardcoded
+        vertex coordinates.
+    """
     if spatial_dim == 0:
-        return Point()
+        return Point(dtype=dtype)
     elif spatial_dim == 1:
-        return UFCInterval()
+        return UFCInterval(dtype=dtype)
     elif spatial_dim == 2:
-        return UFCTriangle()
+        return UFCTriangle(dtype=dtype)
     elif spatial_dim == 3:
-        return UFCTetrahedron()
+        return UFCTetrahedron(dtype=dtype)
     else:
         raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
 

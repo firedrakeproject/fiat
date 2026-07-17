@@ -4,32 +4,32 @@ import numpy
 import sympy
 
 from FIAT import DiscontinuousLagrange
-from FIAT.precision import prec
+from FIAT.precision import calibrate_tolerance
 from FIAT.reference_element import ufc_simplex
 
 
-def test_prec_none_returns_tol_unchanged():
-    assert prec(1E-12, None) == 1E-12
+def test_calibrate_tolerance_none_returns_tol_unchanged():
+    assert calibrate_tolerance(1E-12, None) == 1E-12
 
 
-def test_prec_double_precision_returns_tol_unchanged():
-    assert prec(1E-12, numpy.float64) == 1E-12
+def test_calibrate_tolerance_double_precision_returns_tol_unchanged():
+    assert calibrate_tolerance(1E-12, numpy.float64) == 1E-12
 
 
-def test_prec_single_precision_returns_sqrt_tol():
-    assert prec(1E-12, numpy.float32) == math.sqrt(1E-12)
+def test_calibrate_tolerance_single_precision_returns_sqrt_tol():
+    assert calibrate_tolerance(1E-12, numpy.float32) == math.sqrt(1E-12)
 
 
-def test_prec_accepts_dtype_convertible_string():
-    assert prec(1E-12, "float32") == math.sqrt(1E-12)
+def test_calibrate_tolerance_accepts_dtype_convertible_string():
+    assert calibrate_tolerance(1E-12, "float32") == math.sqrt(1E-12)
 
 
-def test_prec_complex_double_returns_tol_unchanged():
-    assert prec(1E-12, numpy.complex128) == 1E-12
+def test_calibrate_tolerance_complex_double_returns_tol_unchanged():
+    assert calibrate_tolerance(1E-12, numpy.complex128) == 1E-12
 
 
-def test_prec_complex_single_returns_sqrt_tol():
-    assert prec(1E-12, numpy.complex64) == math.sqrt(1E-12)
+def test_calibrate_tolerance_complex_single_returns_sqrt_tol():
+    assert calibrate_tolerance(1E-12, numpy.complex64) == math.sqrt(1E-12)
 
 
 def macro_element(dtype):
@@ -59,11 +59,12 @@ def test_dtype_changes_macro_tabulation_near_subcell_boundary():
     should classify a point differently than the unadjusted `float64`
     tolerance, giving different tabulated values; away from the
     boundary both dtypes should agree."""
-    fe = macro_element()
+    fe64 = macro_element(dtype=numpy.float64)
+    fe32 = macro_element(dtype=numpy.float32)
     x0 = sympy.Symbol("x0")
 
-    tab64 = fe.tabulate(0, (x0,), dtype=numpy.float64)[(0,)]
-    tab32 = fe.tabulate(0, (x0,), dtype=numpy.float32)[(0,)]
+    tab64 = fe64.tabulate(0, (x0,))[(0,)]
+    tab32 = fe32.tabulate(0, (x0,))[(0,)]
     f64 = sympy.lambdify(x0, list(tab64))
     f32 = sympy.lambdify(x0, list(tab32))
 

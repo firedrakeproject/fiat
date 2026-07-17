@@ -18,7 +18,6 @@
 import numpy
 from itertools import chain
 from FIAT import expansions
-from FIAT.precision import DEFAULT_SCALAR_DTYPE
 
 
 def mis(m, n):
@@ -66,13 +65,9 @@ class PolynomialSet(object):
         return numpy.dot(self.coeffs,
                          self.expansion_set.tabulate(self.embedded_degree, pts))
 
-    def tabulate(self, pts, jet_order=0, dtype=DEFAULT_SCALAR_DTYPE):
-        """Returns the values of the polynomial set.
-
-        :arg dtype: the caller's working precision (a numpy dtype);
-            see `FIAT.expansions.ExpansionSet._tabulate`.
-        """
-        base_vals = self.expansion_set._tabulate(self.embedded_degree, pts, order=jet_order, dtype=dtype)
+    def tabulate(self, pts, jet_order=0):
+        """Returns the values of the polynomial set."""
+        base_vals = self.expansion_set._tabulate(self.embedded_degree, pts, order=jet_order)
         result = {alpha: numpy.dot(self.coeffs, base_vals[alpha]) for alpha in base_vals}
         return result
 

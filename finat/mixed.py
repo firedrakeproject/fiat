@@ -2,8 +2,6 @@ import numpy
 
 import gem
 
-from FIAT.precision import DEFAULT_SCALAR_DTYPE
-
 from finat.finiteelementbase import FiniteElementBase
 from finat.enriched import EnrichedElement
 
@@ -89,12 +87,12 @@ class MixedSubElement(FiniteElementBase):
         return {alpha: promote(table)
                 for alpha, table in core_eval.items()}
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
-        core_eval = self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping, dtype=dtype)
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        core_eval = self.element.basis_evaluation(order, ps, entity, coordinate_mapping=coordinate_mapping)
         return self._transform_evaluation(core_eval)
 
-    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
-        core_eval = self.element.point_evaluation(order, refcoords, entity, dtype=dtype)
+    def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
+        core_eval = self.element.point_evaluation(order, refcoords, entity)
         return self._transform_evaluation(core_eval)
 
     @property

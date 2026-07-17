@@ -1,5 +1,4 @@
 import FIAT
-from FIAT.precision import DEFAULT_SCALAR_DTYPE
 
 import gem
 from abc import ABCMeta, abstractmethod
@@ -18,7 +17,7 @@ class SpectralElement(metaclass=ABCMeta):
         """The PointSet subclass on which this element tabulates to a Delta."""
         pass
 
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at known points on the
         reference element.
 
@@ -26,7 +25,7 @@ class SpectralElement(metaclass=ABCMeta):
         :param ps: the point set.
         :param entity: the cell entity on which to tabulate.
         '''
-        result = super().basis_evaluation(order, ps, entity=entity, coordinate_mapping=coordinate_mapping, dtype=dtype)
+        result = super().basis_evaluation(order, ps, entity=entity, coordinate_mapping=coordinate_mapping)
         cell_dimension = self.cell.get_dimension()
         if entity is None or entity == (cell_dimension, 0):  # on cell interior
             space_dim = self.space_dimension()
