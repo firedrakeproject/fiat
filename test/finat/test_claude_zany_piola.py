@@ -12,8 +12,9 @@ nodes to push-forwards of physical nodes is then obtained by duality alone:
 
 .. math:: B_{ij} = F_*(n_i)(\hat\psi_j), \qquad V = B^{-1},
 
-where the physical node :math:`n_i` is defined from the reference node by
-the FIAT frame conventions:
+where :math:`\hat\psi_j` is the reference nodal basis and the physical node
+:math:`n_i` is defined from the reference node by the FIAT frame
+conventions:
 
 * facet moments: normal profiles against the physical scaled normal
   :math:`K\hat\nu^s` (invariant, by the exact covariance of
@@ -31,18 +32,32 @@ the FIAT frame conventions:
 * divergence nodes: the value and derivative slot maps contract to
   :math:`\delta/\det J`, so the row is :math:`\det J` times the identity.
 
-This module asserts that :math:`B^{-1}` agrees with
-``basis_transformation`` to machine precision for the Piola element zoo,
-in 2D and 3D, on cells of both orientations -- including hand-coded
-elements not yet handled by :class:`finat.zany.PiolaPhysicallyMappedElement`
-(Guzman-Neilan second kind, Hu-Zhang).  See ``zany_claude.md`` (Stage 4)
+Crucially, :math:`B` is never inverted densely.  Its rows obey the support
+law :math:`B_{ij} \ne 0` only if dof :math:`j` lives on the closure of dof
+:math:`i`'s entity: interior-moment, divergence, and single-point rows are
+*exactly* block-diagonal (pointwise identities, independent of the
+polynomial space), while a facet row couples to its own facet block plus,
+possibly, dofs on the boundary of that facet -- the residual left by the
+frame decomposition is a functional of the trace on the facet, and the
+trace is determined by the closure dofs (the same property that makes the
+element conforming; in the scalar theory this role is played by the
+fundamental-theorem-of-calculus exactness identities).  Hence :math:`B` is
+block lower triangular in the entity partial order and
+:func:`composition_transformation` computes :math:`V = B^{-1}` by block
+back-substitution -- the Piola instance of the scalar row recursion -- with
+one small solve per entity and fill-in confined to the closure.  Both the
+support law and the agreement with ``basis_transformation`` are asserted
+to machine precision for the Piola element zoo, in 2D and 3D, on cells of
+both orientations.  Since the whole zoo is now transformed by
+:class:`finat.zany.PiolaPhysicallyMappedElement`, this module is the
+independent verification of the automated transformations: it shares no
+code path with ``basis_transformation``.  See ``zany_claude.md`` (Stage 4)
 for the derivation.
 """
 
 import numpy as np
 import pytest
 
-import FIAT
 import finat
 from FIAT.reference_element import make_affine_mapping, ufc_simplex
 from finat.functional import PhysicallyMappedFunctional
@@ -111,11 +126,45 @@ def facet_frame_net(ref_el, entity, J):
     return Ghat @ N @ np.linalg.inv(Ghat)
 
 
-def composition_transformation(fiat_element, J):
-    """Compute V for a contravariant Piola element by duality alone.
+def closure_dofs(fiat_element, dim, entity):
+    """Indices of the dofs on the strict closure of a cell entity.
+
+    :arg fiat_element: The FIAT element.
+    :arg dim: The dimension of the entity.
+    :arg entity: The entity number.
+    :returns: The indices of the dofs supported on subentities of strictly
+        lower dimension contained in the closure of the entity.
+    """
+    top = fiat_element.get_reference_element().get_topology()
+    entity_ids = fiat_element.entity_dofs()
+    verts = set(top[dim][entity])
+    return [i for d in sorted(entity_ids) if d < dim
+            for e in entity_ids[d] if set(top[d][e]) <= verts
+            for i in entity_ids[d][e]]
+
+
+def composition_transformation(fiat_element, J, ndof=None, tol=1e-10):
+    """Compute V for a contravariant Piola element by blockwise duality.
+
+    The matrix :math:`B` of the module docstring is block lower triangular
+    in the entity partial order, so :math:`V = B^{-1}` is computed by block
+    back-substitution over the entities in order of increasing dimension:
+
+    .. math:: V_e = B_{ee}^{-1} (I_e - B_{ec} V_c),
+
+    where :math:`e` collects the dofs of one entity and :math:`c` the
+    (already processed) dofs on its strict closure.  The support law that
+    justifies the triangular structure is asserted, not assumed: every row
+    of :math:`B` must vanish outside its own entity block and closure.
+    Fill-in is confined to the closure, so the sparsity of :math:`V`
+    matches that of the row recursion in the scalar theory.
 
     :arg fiat_element: The FIAT element on the reference cell.
     :arg J: The (numeric) cell Jacobian.
+    :arg ndof: The number of exposed physical dofs; unparseable constraint
+        functionals beyond it keep identity rows (their columns are
+        truncated by the caller).  Defaults to all dofs.
+    :arg tol: Relative tolerance for the support-law assertion.
     :returns: The transformation V as a numpy array, with the same row and
         column ordering as ``basis_transformation`` before truncation of
         the trailing constraint columns.
@@ -126,17 +175,37 @@ def composition_transformation(fiat_element, J):
     Theta_T = J.T / detJ
     nodes = fiat_element.dual_basis()
     entity_ids = fiat_element.entity_dofs()
-    B = np.eye(len(nodes))
-    for dim in entity_ids:
+    nbf = len(nodes)
+    if ndof is None:
+        ndof = nbf
+    eye = np.eye(nbf)
+    V = np.zeros((nbf, nbf))
+    done = set()
+    for dim in sorted(entity_ids):
         for entity in entity_ids[dim]:
-            for i in entity_ids[dim][entity]:
-                ell = PhysicallyMappedFunctional.from_fiat(nodes[i])
+            # FIAT may list a dof on more than one entity (e.g. the edge
+            # moments of Arnold-Winther reappear in its interior list); the
+            # lowest-dimensional entity owns the dof.
+            block = [i for i in entity_ids[dim][entity] if i not in done]
+            if not block:
+                continue
+            done.update(block)
+            rows = []
+            for i in block:
+                try:
+                    ell = PhysicallyMappedFunctional.from_fiat(nodes[i])
+                except NotImplementedError:
+                    if i < ndof:
+                        raise
+                    rows.append(eye[i])
+                    continue
                 if ell.divergence:
-                    B[i] = evaluate_divergence(ell, fiat_element) / detJ
+                    rows.append(evaluate_divergence(ell, fiat_element) / detJ)
                     continue
                 point_data = (len(ell.points) == 1
                               and (ell.rank == 1 or dim != sd - 1))
                 if dim == sd and not point_data:
+                    rows.append(eye[i])
                     continue
                 if dim == sd - 1 and not point_data:
                     net = facet_frame_net(ref_el, entity, J)
@@ -146,15 +215,25 @@ def composition_transformation(fiat_element, J):
                 for _ in range(ell.rank):
                     W = np.tensordot(W, net, axes=(1, 1))
                 W = W.reshape(len(ell.points), -1)
-                B[i] = PhysicallyMappedFunctional(
-                    ell.points, W, rank=ell.rank).evaluate(fiat_element)
-    return np.linalg.inv(B)
+                rows.append(PhysicallyMappedFunctional(
+                    ell.points, W, rank=ell.rank).evaluate(fiat_element))
+            Bblock = np.asarray(rows)
+            prior = closure_dofs(fiat_element, dim, entity)
+            outside = np.setdiff1d(np.arange(nbf), block + prior)
+            if outside.size:
+                assert (np.abs(Bblock[:, outside]).max()
+                        <= tol * np.abs(Bblock).max()), \
+                    f"support law violated on entity ({dim}, {entity})"
+            V[block] = np.linalg.solve(
+                Bblock[:, block], eye[block] - Bblock[:, prior] @ V[prior])
+    return V
 
 
 piola_zoo = {
     2: [(finat.MardalTaiWinther, ()),
         (finat.JohnsonMercier, ()),
         (finat.ArnoldWintherNC, ()),
+        (finat.ArnoldWinther, ()),
         (finat.AlfeldSorokina, ()),
         (finat.BernardiRaugel, ()),
         (finat.BernardiRaugelBubble, ()),
@@ -205,6 +284,6 @@ def test_piola_composition(dimension, element, args, orientation):
     mapping = MyMapping(ref_cell, phys_cell)
     M = evaluate([finat_element.basis_transformation(mapping)])[0].arr
 
-    V = composition_transformation(finat_element._element, J)
-    V = V[:, :finat_element.space_dimension()]
-    assert np.allclose(V, M.T, atol=1e-10)
+    ndof = finat_element.space_dimension()
+    V = composition_transformation(finat_element._element, J, ndof=ndof)
+    assert np.allclose(V[:, :ndof], M.T, atol=1e-10)

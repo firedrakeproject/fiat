@@ -60,21 +60,30 @@ class PhysicallyMappedFunctional:
         recovered and handled as its own case because it commutes with
         the (contravariant) Piola pullback up to the Jacobian
         determinant, independently of the entity it sits on.
+    mapping :
+        The FIAT mapping string of the basis functions this functional
+        is dual to (``"affine"``, ``"contravariant piola"``, ...): the
+        type tag of the value slots, deciding which matrix each value
+        slot of the weight tensor is contracted with under push-forward,
+        exactly as the derivative slots of ``direction`` are contracted
+        with the Jacobian.
 
     """
 
     def __init__(self, points: tuple, weights: numpy.ndarray,
                  order: int = 0, direction=None, rank: int = 0,
-                 divergence: bool = False):
+                 divergence: bool = False, mapping: str = "affine"):
         self.points = points
         self.weights = weights
         self.order = order
         self.direction = direction
         self.rank = rank
         self.divergence = divergence
+        self.mapping = mapping
 
     @classmethod
-    def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12) -> "PhysicallyMappedFunctional":
+    def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12,
+                  mapping: str = "affine") -> "PhysicallyMappedFunctional":
         """Construct a symbolic PhysicallyMappedFunctional from a FIAT functional.
 
         The construction only inspects the point and derivative
@@ -89,6 +98,9 @@ class PhysicallyMappedFunctional:
         tol :
             Relative tolerance for the rank-one factorization of the
             derivative weights.
+        mapping :
+            The FIAT mapping string of the basis functions this
+            functional is dual to.
 
         Returns
         -------
@@ -107,7 +119,7 @@ class PhysicallyMappedFunctional:
             if rank == 0:
                 weights = numpy.asarray([w for pt in points
                                          for w, comp in node.pt_dict[pt]])
-                return cls(points, weights)
+                return cls(points, weights, mapping=mapping)
             # value weight profile: one row of component weights per point
             sd = node.ref_el.get_spatial_dimension()
             weights = numpy.zeros((len(points), sd**rank))
@@ -115,7 +127,7 @@ class PhysicallyMappedFunctional:
             for q, pt in enumerate(points):
                 for w, comp in node.pt_dict[pt]:
                     weights[q, numpy.ravel_multi_index(comp, shape)] += w
-            return cls(points, weights, rank=rank)
+            return cls(points, weights, rank=rank, mapping=mapping)
 
         sd = node.ref_el.get_spatial_dimension()
         order = node.max_deriv_order
@@ -144,7 +156,8 @@ class PhysicallyMappedFunctional:
                     raise NotImplementedError(
                         f"{type(node).__name__} is not a divergence functional.")
                 weights[q] = Wq[0, 0]
-            return cls(points, weights, order=order, divergence=True)
+            return cls(points, weights, order=order, divergence=True,
+                       mapping=mapping)
 
         W = numpy.zeros((len(points), len(alphas)))
         for q, pt in enumerate(points):
@@ -158,12 +171,14 @@ class PhysicallyMappedFunctional:
                 f"{type(node).__name__} has no common derivative direction.")
         direction = vt[0]
         weights = u[:, 0] * s[0]
-        return cls(points, weights, order=order, direction=direction)
+        return cls(points, weights, order=order, direction=direction,
+                   mapping=mapping)
 
     def with_direction(self, direction) -> "PhysicallyMappedFunctional":
         """Return the same functional with another direction tensor."""
         return type(self)(self.points, self.weights,
-                          order=self.order, direction=direction)
+                          order=self.order, direction=direction,
+                          mapping=self.mapping)
 
     def pullback(self, J: Node) -> "PhysicallyMappedFunctional":
         r"""View this reference functional as acting on physical functions.

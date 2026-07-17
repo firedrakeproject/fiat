@@ -665,7 +665,7 @@ and AW/AWnc once `from_fiat` learns tensor-divergence moments. Covariant (Nedele
 -type zany) elements: theory ready, value slot $\equiv$ derivative slot.
 
 Verification artifacts: the prototype now lives in the repo as
-`test/finat/test_zany_composition.py`, upgraded from the in-session scripts:
+`test/finat/test_claude_zany_piola.py`, upgraded from the in-session scripts:
 it computes $V = B^{-1}$ by *block back-substitution* (no dense inversion
 anywhere) and asserts both the support law of $B$ (see the Stage 5 design
 below) and agreement with `basis_transformation`, for the whole zoo, 2D and
@@ -723,7 +723,7 @@ because the closure relation is *transitive* — the predicted fill equals the
 final fill, nothing grows during the elimination. Depth of the recursion
 $\le sd$ (vertex → edge → face → interior). At no point is a dense matrix
 formed or inverted; the prototype's `np.linalg.inv` is gone
-(`composition_transformation` in `test/finat/test_zany_composition.py` now
+(`composition_transformation` in `test/finat/test_claude_zany_piola.py` now
 implements exactly this loop and asserts the support law en route).
 
 **3. Diagonal blocks invert in closed form (the symbolic cost).** The only
@@ -781,7 +781,7 @@ builds a symbolic physical Gram $G$ and its determinant for `Sinv`.
    vanishes outside the closure block (reference-time, once per element), so
    a non-conforming dof layout fails loudly instead of producing a dense or
    wrong $V$ (the generalization of Algorithm 1's assert line).
-5. Tests: keep `test_zany_composition.py` as the independent numeric ground
+5. Tests: keep `test_claude_zany_piola.py` as the independent numeric ground
    truth (it shares no code path with `basis_transformation`); add
    reflected-cell fixtures to `test_zany_mapping.py`.
 

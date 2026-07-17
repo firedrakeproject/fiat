@@ -19,8 +19,15 @@ class GuzmanNeilanFirstKindH1(PiolaPhysicallyMappedElement, PiolaBubbleElement):
         super().__init__(FIAT.GuzmanNeilanFirstKindH1(cell, order=order, quad_scheme=quad_scheme))
 
 
-class GuzmanNeilanSecondKindH1(PiolaBubbleElement):
-    """C0 Pk^d(Alfeld) enriched with Guzman-Neilan bubbles."""
+class GuzmanNeilanSecondKindH1(PiolaPhysicallyMappedElement, PiolaBubbleElement):
+    """C0 Pk^d(Alfeld) enriched with Guzman-Neilan bubbles.
+
+    The basis transformation is derived automatically from the FIAT
+    dual basis (see :class:`finat.zany.PiolaPhysicallyMappedElement`);
+    the trailing tangential facet constraints of the extended element
+    are dropped from the physical element by
+    :meth:`~finat.piola_mapped.PiolaBubbleElement.space_dimension`.
+    """
     def __init__(self, cell, order=1, quad_scheme=None):
         cite("GuzmanNeilan2018")
         super().__init__(FIAT.GuzmanNeilanSecondKindH1(cell, order=order, quad_scheme=quad_scheme))

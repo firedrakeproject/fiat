@@ -1,5 +1,5 @@
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
+from finat.physically_mapped import identity
 from finat.zany import ScalarPhysicallyMappedElement
 from finat.argyris import _vertex_transform
 from finat.citations import cite

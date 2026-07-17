@@ -110,7 +110,7 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from gem import Literal, ListTensor, Node, Zero
 from finat.functional import PhysicallyMappedFunctional
-from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity, inverse
+from finat.physically_mapped import PhysicallyMappedElement, adjugate, determinant, identity
 
 
 def _materialize_jacobian(J: Node) -> numpy.ndarray:
@@ -218,13 +218,24 @@ class PiolaFacetFrame:
     The roles of the normal and tangential directions are mirrored with
     respect to :class:`FacetFrame`: the reference frame's scaled normal
     :math:`\hat{n}` maps by the cofactor matrix :math:`K =
-    \operatorname{adj}(J)^T`, while its tangents :math:`\hat{t}_k` map by
-    :math:`J` directly.  ``Y`` is the (symbolic) matrix expanding the
-    pulled-back frame image :math:`[K\hat{n}\;|\;K\hat{t}_k]` in the
-    physical frame :math:`[K\hat{n}\;|\;J\hat{t}_k]`; the mapped tangents
-    are built on the reciprocal basis in dimension > 2, so their
-    coordinates carry an extra in-plane contravariant correction
-    :math:`S^{-1}` folded into ``Y``'s tangential rows.
+    \operatorname{adj}(J)^T`, while the physical tangential directions
+    (mapped tangents in 2D, cross products of the physical normal with
+    mapped in-plane vectors in 3D) push forward with a *scalar*
+    tangential coefficient.  ``Y`` is the matrix expanding, in reference
+    frame coordinates, the pullback of a physical node's frame profile;
+    it has the closed form
+
+    .. math::
+        Y = \begin{pmatrix} 1 & (K\hat{t}_k \cdot K\hat{n})/|K\hat{n}|^2 \\
+                            0 & \det J\, |\hat{n}|^2 / |K\hat{n}|^2\, I
+            \end{pmatrix},
+
+    valid in 2D and 3D alike: every entry is a Gram contraction of the
+    :math:`K`-mapped reference frame (:math:`K` is polynomial in
+    :math:`J`), divided by the single quadratic :math:`|K\hat{n}|^2`.
+    The top row carries the normal-direction completion residuals; the
+    diagonal tangential block is the reciprocal of the scalar
+    push-forward coefficient of the tangential directions.
 
     :arg fiat_element: The FIAT element, providing the reference cell.
     :arg entity: The facet number.
@@ -242,30 +253,31 @@ class PiolaFacetFrame:
 
         Jnp = _materialize_jacobian(J)
         Knp = adjugate(Jnp).T
+        detJ = determinant(Jnp)
 
-        # Frame coordinates of the mapped frame image of the reference frame:
-        # the normal is invariant and the pulled tangents are expanded by a
-        # symbolic solve in the mapped frame [K nhat | J that_k]
-        Kn = self.normal @ Knp.T
-        Jt = self.tangents @ Jnp.T
-        A = numpy.column_stack([Kn, *Jt])
+        Kn = Knp @ self.normal
+        qKn = Kn @ Kn
+        s_inv = detJ * (self.normal @ self.normal) / qKn
 
         Y = numpy.full((sd, sd), Zero(), dtype=object)
         Y[0, 0] = Literal(1.0)
-        Y[:, 1:] = inverse(A) @ (Knp @ self.tangents.T)
-
-        # Physical tangential components are built on the reciprocal basis
-        # (cross products of the frame), so they carry the in-plane
-        # contravariant transformation S = adj(G Ghat^{-1})^T of the change
-        # of tangent Gram matrices.  Absorb S^{-1} into the coordinate
-        # mixing so that the physical profiles keep the reference
-        # coordinates; in 2D the tangent plane is one-dimensional and S = 1.
-        G = Jt @ Jt.T
-        Ghat_t = self.tangents @ self.tangents.T
-        Sinv = (numpy.linalg.inv(Ghat_t) @ G) * \
-            (numpy.linalg.det(Ghat_t) / determinant(G))
-        Y[1:, :] = Sinv @ Y[1:, :]
+        for k, that in enumerate(self.tangents):
+            Y[0, k + 1] = ((Knp @ that) @ Kn) / qKn
+            Y[k + 1, k + 1] = s_inv
         self.Y = Y
+
+
+def _contract_slots(W: numpy.ndarray, A: numpy.ndarray) -> numpy.ndarray:
+    r"""Contract every tensor slot of W with the matrix A.
+
+    :arg W: A tensor with ``W.ndim`` slots, numeric or GEM entries.
+    :arg A: The matrix to contract each slot with, numeric or GEM entries.
+    :returns: The tensor with entries :math:`\sum A_{i_1 j_1} \cdots
+        A_{i_r j_r} W_{j_1 \dots j_r}`, with the slot order preserved.
+    """
+    for _ in range(W.ndim):
+        W = numpy.tensordot(W, A, axes=(0, 1))
+    return W
 
 
 def _weight_ratio(wi: numpy.ndarray, wj: numpy.ndarray, tol: float) -> float:
@@ -312,14 +324,29 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
         J = coordinate_mapping.jacobian_at(bary)
 
         nodes = fiat_element.dual_basis()
+        mappings = fiat_element.mapping()
+        ndof = self.space_dimension()
         V = identity(fiat_element.space_dimension())
 
         processed = set()
         entity_ids = fiat_element.entity_dofs()
         for dim in sorted(entity_ids):
             for entity in sorted(entity_ids[dim]):
-                group = {i: PhysicallyMappedFunctional.from_fiat(nodes[i])
-                         for i in entity_ids[dim][entity]}
+                group = {}
+                for i in entity_ids[dim][entity]:
+                    try:
+                        group[i] = PhysicallyMappedFunctional.from_fiat(
+                            nodes[i], mapping=mappings[i])
+                    except NotImplementedError:
+                        if i < ndof:
+                            raise
+                        # Constraint functionals of an extended element are
+                        # never exposed as physical dofs: define their
+                        # physical counterparts as the pullbacks of the
+                        # reference ones (Kirby 2017, section 5), keeping the
+                        # identity row; the corresponding columns are
+                        # truncated below.
+                        processed.add(i)
                 invariant = self.invariant_dofs(group, dim, sd)
                 processed.update(invariant)
                 group = {i: ell for i, ell in group.items() if i not in invariant}
@@ -330,9 +357,55 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
                 else:
                     self.point_dof_rows(V, group, fiat_element, entity, J, processed, tol=self.tol)
 
-        _rescale_derivative_dofs(V, fiat_element, coordinate_mapping)
-        ndof = self.space_dimension()
+        self._rescale_dofs(V, fiat_element, coordinate_mapping)
         return ListTensor(V[:, :ndof].T)
+
+    def _rescale_dofs(self, V: numpy.ndarray, fiat_element: FiniteElement,
+                      coordinate_mapping) -> None:
+        r"""Rescale the physical degrees of freedom by powers of the cell size.
+
+        Each column of ``V`` is multiplied by :meth:`dof_scale` evaluated
+        with the cell size averaged over the vertices of the dof's entity.
+        This is the FInAT convention keeping the mass matrix
+        well-conditioned; it is consistent across cells because the
+        scaling only depends on shared entities.
+
+        :arg V: Object array being assembled; columns are rescaled in place.
+        :arg fiat_element: The FIAT element defined on the reference cell.
+        :arg coordinate_mapping: Object providing the physical geometry as
+            GEM expressions.
+        """
+        # cell_size may be a GEM expression or a numpy array of numbers
+        h = coordinate_mapping.cell_size()
+        top = fiat_element.get_reference_element().get_topology()
+        nodes = fiat_element.dual_basis()
+        entity_ids = fiat_element.entity_dofs()
+        for dim in entity_ids:
+            for entity in entity_ids[dim]:
+                verts = top[dim][entity]
+                havg = reduce(add, (h[v] for v in verts)) / len(verts)
+                for i in entity_ids[dim][entity]:
+                    scale = self.dof_scale(nodes[i], dim, havg)
+                    if scale is not None:
+                        V[:, i] = V[:, i] * scale
+
+    def dof_scale(self, node, dim: int, havg):
+        r"""Return the conditioning rescaling factor of one physical dof.
+
+        The default convention redefines each physical node of derivative
+        order :math:`m > 0` with a factor :math:`h^{-m}`; elements whose
+        hand-coded transformations established a different convention
+        (e.g. the :math:`h^{-2}` vertex values of Hu-Zhang) override this
+        method.
+
+        :arg node: The FIAT functional of the dof.
+        :arg dim: Topological dimension of the entity the dof sits on.
+        :arg havg: GEM scalar for the cell size averaged over the vertices
+            of the dof's entity.
+        :returns: The GEM scaling factor, or ``None`` for no rescaling.
+        """
+        order = node.max_deriv_order
+        return havg**(-order) if order > 0 else None
 
     def _check_mapping(self, fiat_element):
         """Verify that this class knows how to transform this element's pullback.
@@ -385,35 +458,6 @@ class ZanyPhysicallyMappedElement(PhysicallyMappedElement):
         :arg tol: Tolerance for detecting zeros in the numeric coefficients.
         """
         pass
-
-
-def _rescale_derivative_dofs(V, fiat_element, coordinate_mapping):
-    r"""Rescale derivative degrees of freedom by the cell size.
-
-    Each physical node of derivative order :math:`m` is redefined with a
-    factor :math:`h^{-m}`, where :math:`h` averages the cell size over
-    the vertices of its entity.  This is the FInAT convention keeping
-    the mass matrix well-conditioned; it is consistent across cells
-    because the scaling only depends on shared entities.
-
-    :arg V: Object array being assembled; columns are rescaled in place.
-    :arg fiat_element: The FIAT element defined on the reference cell.
-    :arg coordinate_mapping: Object providing the physical geometry as
-        GEM expressions.
-    """
-    # cell_size may be a GEM expression or a numpy array of numbers
-    h = coordinate_mapping.cell_size()
-    top = fiat_element.get_reference_element().get_topology()
-    nodes = fiat_element.dual_basis()
-    entity_ids = fiat_element.entity_dofs()
-    for dim in entity_ids:
-        for entity in entity_ids[dim]:
-            verts = top[dim][entity]
-            havg = reduce(add, (h[v] for v in verts)) / len(verts)
-            for i in entity_ids[dim][entity]:
-                order = nodes[i].max_deriv_order
-                if order > 0:
-                    V[:, i] = V[:, i] * havg**(-order)
 
 
 class ScalarPhysicallyMappedElement(ZanyPhysicallyMappedElement):
@@ -587,63 +631,75 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         return {i: ell for i, ell in group.items() if i not in divs}
 
     @staticmethod
-    def _is_cartesian_point_group(group: dict) -> bool:
-        """Recognize a group of Cartesian point-value nodes sharing one point.
-
-        :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional.
-        :returns: True if every node is a rank-1, order-0 node at the same
-            single point, spanning exactly as many components as the group
-            has members -- the same structural pattern :meth:`_piola_point_rows`
-            (and :meth:`ScalarPhysicallyMappedElement.point_dof_rows`) expect,
-            regardless of the entity dimension the group sits on.
-        """
-        points = {ell.points for ell in group.values()}
-        return (len(points) == 1 and len(next(iter(points))) == 1
-                and all(ell.order == 0 and ell.rank == 1 for ell in group.values()))
-
-    @staticmethod
-    def _piola_point_rows(V: numpy.ndarray, group: dict, J: Node,
-                          processed: set, tol: float) -> None:
+    def _piola_point_rows(V: numpy.ndarray, group: dict, fiat_element: FiniteElement,
+                          J: Node, processed: set, tol: float) -> None:
         r"""Assemble the rows of V for Cartesian point values of Piola-mapped fields.
 
         Physical point evaluations keep the reference (Cartesian) components,
         which pull back through the cofactor matrix :math:`K =
-        \operatorname{adj}(J)^T` of the contravariant Piola map, so the group
-        of components sharing a point acts as its own completion.  This is
-        the same treatment regardless of which entity the point sits on: a
-        single-point, rank-1 node group spanning the Cartesian components is
-        not a facet moment (whose weights are genuine, usually multi-point
-        quadrature averages aligned with the facet normal/tangential frame)
-        even when it happens to sit on a codimension-1 entity, e.g. the edge
-        dofs of :class:`~finat.alfeld_sorokina.AlfeldSorokina`.
+        \operatorname{adj}(J)^T` of the contravariant Piola map, contracted
+        once per value slot, so the group of components sharing a point acts
+        as its own completion.
+
+        A weight tensor is only defined as a functional modulo the
+        annihilator of the value space attainable at the point: e.g. the
+        vertex weights of Hu-Zhang select one component of a *symmetric*
+        stress, so the raw upper-triangular weights and their symmetrizations
+        are the same functionals.  The value space is recovered numerically
+        from the tabulated basis, both sides of the expansion are projected
+        onto it, and the group acts as its own completion if its projected
+        span is invariant under the (projected) slot map for every Jacobian,
+        which is checked with a generic matrix.
 
         :arg V: Object array being assembled.
         :arg group: Mapping from node index to symbolic PhysicallyMappedFunctional
             for the value nodes on this entity.
+        :arg fiat_element: The FIAT element, providing the tabulated value
+            space at each point.
         :arg J: GEM expression for the cell Jacobian.
         :arg processed: Indices of the already assembled rows; updated in place.
         :arg tol: Tolerance for detecting zeros in the numeric coefficients.
         """
-        K = adjugate(_materialize_jacobian(J)).T
+        Jnp = _materialize_jacobian(J)
+        K = adjugate(Jnp).T
+        sd = K.shape[0]
 
         subgroups = {}
         for i, ell in group.items():
-            if len(ell.points) != 1 or ell.rank != 1:
+            if len(ell.points) != 1:
                 raise NotImplementedError(
-                    "Only single-point vector evaluations are handled.")
-            subgroups.setdefault(ell.points, {})[i] = ell
+                    "Only single-point evaluations are handled.")
+            subgroups.setdefault((ell.points, ell.rank), {})[i] = ell
 
-        for sub in subgroups.values():
+        for (points, rank), sub in subgroups.items():
             directions = numpy.array([ell.weights[0] for ell in sub.values()])
-            if directions.shape[0] != directions.shape[1]:
+            # Projector onto the value space attainable at the point
+            tab = fiat_element.tabulate(0, points)[(0,) * sd]
+            u, s, vt = numpy.linalg.svd(tab.reshape(tab.shape[0], -1),
+                                        full_matrices=False)
+            vt = vt[s > tol * s[0]]
+            P = vt.T @ vt
+            # Coefficient extractor: project a raw mapped weight, then expand
+            # it in the projected group weights
+            E = numpy.linalg.pinv((directions @ P).T) @ P
+            # The group acts as its own completion only if its projected span
+            # is invariant under the slot map for every Jacobian; check with
+            # a generic matrix.
+            A = numpy.cos(numpy.multiply.outer(numpy.arange(1., sd + 1),
+                                               numpy.arange(2., 2 * sd + 2, 2)))
+            mapped = numpy.stack([
+                _contract_slots(w.reshape((sd,) * rank), A).ravel()
+                for w in directions])
+            residual = (mapped - (mapped @ E.T) @ directions) @ P
+            if not numpy.allclose(residual, 0, atol=tol * numpy.abs(mapped).max()):
                 raise NotImplementedError(
-                    "Directions do not span the vector components.")
-            Dinv = numpy.linalg.inv(directions.T)
+                    "Node group does not span a slot-map invariant subspace.")
+            E[abs(E) < tol] = 0
             for i, ell in sub.items():
-                Kd = K @ ell.weights[0]
+                Kd = _contract_slots(ell.weights[0].reshape((sd,) * rank), K).ravel()
                 for col, j in enumerate(sub):
-                    x = Dinv[col]
-                    nz = numpy.flatnonzero(abs(x) > tol)
+                    x = E[col]
+                    nz = numpy.flatnonzero(x)
                     V[i, j] = reduce(add, (Kd[m] * x[m] for m in nz)) if len(nz) else Zero()
                 processed.add(i)
 
@@ -654,9 +710,35 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
                 f"{type(self).__name__} expects a (double) contravariant "
                 f"Piola pullback, not {mappings}.")
 
+    def dof_scale(self, node, dim: int, havg):
+        r"""Return the conditioning rescaling factor of one physical dof.
+
+        On top of the default derivative-order convention, vertex point
+        evaluations of tensor-valued (rank-2) fields are redefined with a
+        factor :math:`h^{-2}`, following the hand-coded Arnold-Winther and
+        Hu-Zhang transformations; facet moments are already scaled by the
+        facet measure in FIAT and need no further rescaling.
+
+        :arg node: The FIAT functional of the dof.
+        :arg dim: Topological dimension of the entity the dof sits on.
+        :arg havg: GEM scalar for the cell size averaged over the vertices
+            of the dof's entity.
+        :returns: The GEM scaling factor, or ``None`` for no rescaling.
+        """
+        if dim == 0 and node.pt_dict:
+            comps = {comp for pt in node.pt_dict for w, comp in node.pt_dict[pt]}
+            if len(max(comps)) == 2:
+                return havg**(-2)
+        return super().dof_scale(node, dim, havg)
+
     def invariant_dofs(self, group, dim, sd):
-        # Interior moments are Piola invariant by construction
-        return {i for i, ell in group.items() if ell.order == 0 and dim == sd}
+        # Interior *moments* are Piola invariant by construction: their
+        # physical test functions are themselves Piola-mapped.  Single-point
+        # nodes are Cartesian point data even in the interior (e.g. the
+        # barycenter values of Guzman-Neilan second kind) and transform
+        # through the cofactor matrix instead.
+        return {i for i, ell in group.items()
+                if ell.order == 0 and dim == sd and len(ell.points) > 1}
 
     def facet_dof_rows(self, V: numpy.ndarray, group: dict,
                        fiat_element: FiniteElement, entity: int, J: Node,
@@ -690,14 +772,20 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         group = self._divergence_rows(V, group, J, processed)
         if not group:
             return
-        if self._is_cartesian_point_group(group):
-            # Not a genuine facet moment (see _piola_point_rows): e.g. the
-            # edge dofs of AlfeldSorokina are plain Cartesian point values
-            # that happen to sit on a codimension-1 entity.
-            PiolaPhysicallyMappedElement._check_piola_group(group)
-            self._piola_point_rows(V, group, J, processed, tol)
-            return
         PiolaPhysicallyMappedElement._check_piola_group(group)
+        # Single-point rank-1 nodes are Cartesian point data, not facet
+        # moments (whose weights are genuine, usually multi-point quadrature
+        # profiles aligned with the facet frame), even when they sit on a
+        # codimension-1 entity: e.g. the edge midpoint values of
+        # AlfeldSorokina.  Single-point rank-2 nodes remain frame dofs
+        # (e.g. the edge dofs of the Hu-Zhang point variant).
+        point_data = {i: ell for i, ell in group.items()
+                      if len(ell.points) == 1 and ell.rank == 1}
+        if point_data:
+            self._piola_point_rows(V, point_data, fiat_element, J, processed, tol)
+            group = {i: ell for i, ell in group.items() if i not in point_data}
+        if not group:
+            return
         sd = J.shape[0]
         frame = PiolaFacetFrame(fiat_element, entity, J)
         nhat = frame.normal
@@ -721,77 +809,87 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         group = {i: ell for i, ell in group.items() if i not in processed}
         if not group:
             return
-        rank, = {ell.rank for ell in group.values()}
-        points, = {ell.points for ell in group.values()}
-
-        # Numeric matching of the tangential coordinate profiles in the group.
-        # B has full row rank by unisolvence, so the Gram matrix B @ B.T is
-        # square and invertible; a rank deficiency (a genuine bug) surfaces
-        # as a LinAlgError here rather than a silent least-squares fit.
-        B = numpy.array([coords[j][:, 1:].ravel() for j in group])
-        Binv = numpy.linalg.inv(B @ B.T) @ B
-        Binv[abs(Binv) < tol] = 0
-
-        # Numeric elimination of the residual normal profile against every
-        # basis function of the element (not just this facet's own normal
-        # dofs, since a completing dof may live on a different point set,
-        # e.g. Guzman-Neilan's mixed-order facet dofs). The quadrature-point
-        # axis is contracted purely numerically here, one reference-frame
-        # multi-index at a time, so that whether a coupling is present is
-        # decided from a plain numeric array (exact zero where a profile has
-        # no support at these points) rather than by inspecting the type of
-        # a symbolic GEM expression -- a sum of symbolic terms that is
-        # identically zero for all J need not reduce to a literal
-        # gem.Zero() node, so testing that structurally would either miss
-        # real cancellations or (as here) spuriously keep terms whose
-        # numeric coefficient actually vanishes.
-        ndir = numpy.ones(())
-        for _ in range(rank):
-            ndir = numpy.multiply.outer(ndir, nhat)
-        T = fiat_element.tabulate(0, points)[(0,) * sd]
-        L = numpy.einsum("jcq,c->jq", T.reshape(T.shape[0], -1, len(points)),
-                         ndir.ravel())
-        L[abs(L) < tol] = 0
-        # Lmap[i][m, r] = sum_q L[m, q] * coords[i][q, r]: numeric coupling
-        # of every basis function to each frame coordinate of node i's own
-        # profile, contracted over the shared quadrature points.
-        Lmap = {i: L @ coords[i] for i in group}
-        for i in Lmap:
-            Lmap[i][abs(Lmap[i]) < tol] = 0
-
+        # Nodes on different point sets or of different value rank (e.g. the
+        # mixed-degree edge moments of the Hu-Zhang integral variant) match
+        # their tangential profiles within their own subgroup; a genuine
+        # cross-subgroup coupling would surface below as a completion
+        # against an unprocessed node.
+        subgroups = {}
         for i, ell in group.items():
-            # Pull back the coordinate profile, contracting each slot with Y
-            P = coords[i].reshape(-1, *(sd,) * rank)
+            subgroups.setdefault((ell.points, ell.rank), {})[i] = ell
+
+        for (points, rank), sub in subgroups.items():
+            # Numeric matching of the tangential coordinate profiles in the
+            # subgroup.  B has full row rank by unisolvence, so the Gram
+            # matrix B @ B.T is square and invertible; a rank deficiency (a
+            # genuine bug) surfaces as a LinAlgError here rather than a
+            # silent least-squares fit.
+            B = numpy.array([coords[j][:, 1:].ravel() for j in sub])
+            Binv = numpy.linalg.inv(B @ B.T) @ B
+            Binv[abs(Binv) < tol] = 0
+
+            # Numeric elimination of the residual normal profile against
+            # every basis function of the element (not just this facet's own
+            # normal dofs, since a completing dof may live on a different
+            # point set, e.g. Guzman-Neilan's mixed-order facet dofs). The
+            # quadrature-point axis is contracted purely numerically here,
+            # one reference-frame multi-index at a time, so that whether a
+            # coupling is present is decided from a plain numeric array
+            # (exact zero where a profile has no support at these points)
+            # rather than by inspecting the type of a symbolic GEM
+            # expression -- a sum of symbolic terms that is identically zero
+            # for all J need not reduce to a literal gem.Zero() node, so
+            # testing that structurally would either miss real cancellations
+            # or (as here) spuriously keep terms whose numeric coefficient
+            # actually vanishes.
+            ndir = numpy.ones(())
             for _ in range(rank):
-                P = numpy.tensordot(P, Y, axes=(1, 1))
-            P = P.reshape(len(points), -1)
+                ndir = numpy.multiply.outer(ndir, nhat)
+            T = fiat_element.tabulate(0, points)[(0,) * sd]
+            L = numpy.einsum("jcq,c->jq", T.reshape(T.shape[0], -1, len(points)),
+                             ndir.ravel())
+            L[abs(L) < tol] = 0
+            # Lmap[i][m, r] = sum_q L[m, q] * coords[i][q, r]: numeric
+            # coupling of every basis function to each frame coordinate of
+            # node i's own profile, contracted over the shared quadrature
+            # points.
+            Lmap = {i: L @ coords[i] for i in sub}
+            for i in Lmap:
+                Lmap[i][abs(Lmap[i]) < tol] = 0
 
-            c = Binv @ P[:, 1:].ravel()
-            V[i, list(group)] = c
+            for i, ell in sub.items():
+                # Pull back the coordinate profile, contracting each slot with Y
+                P = coords[i].reshape(-1, *(sd,) * rank)
+                for _ in range(rank):
+                    P = numpy.tensordot(P, Y, axes=(1, 1))
+                P = P.reshape(len(points), -1)
 
-            # Couple the residual normal profile to every basis function,
-            # one reference-frame multi-index (or group member) at a time:
-            # each numeric column of Lmap decides its own sparsity, and the
-            # small symbolic frame-mixing coefficient only scales terms
-            # that already survived the numeric test.
-            terms = []
-            for index in numpy.ndindex(*(sd,) * rank):
-                flat = numpy.ravel_multi_index(index, (sd,) * rank)
-                coef = Literal(1.0)
-                for r in index:
-                    coef = coef * Y[0, r]
-                terms.append((Lmap[i][:, flat], coef))
-            for k, j in enumerate(group):
-                terms.append((-Lmap[j][:, 0], c[k]))
+                c = Binv @ P[:, 1:].ravel()
+                V[i, list(sub)] = c
 
-            for vec, coef in terms:
-                for m in numpy.flatnonzero(vec):
-                    if m not in processed:
-                        raise NotImplementedError(
-                            f"Completion of node {i} couples to node {m}, "
-                            "which has not been transformed yet.")
-                    V[i] += V[m] * (vec[m] * coef)
-            processed.add(i)
+                # Couple the residual normal profile to every basis function,
+                # one reference-frame multi-index (or subgroup member) at a
+                # time: each numeric column of Lmap decides its own sparsity,
+                # and the small symbolic frame-mixing coefficient only scales
+                # terms that already survived the numeric test.
+                terms = []
+                for index in numpy.ndindex(*(sd,) * rank):
+                    flat = numpy.ravel_multi_index(index, (sd,) * rank)
+                    coef = Literal(1.0)
+                    for r in index:
+                        coef = coef * Y[0, r]
+                    terms.append((Lmap[i][:, flat], coef))
+                for k, j in enumerate(sub):
+                    terms.append((-Lmap[j][:, 0], c[k]))
+
+                for vec, coef in terms:
+                    for m in numpy.flatnonzero(vec):
+                        if m not in processed:
+                            raise NotImplementedError(
+                                f"Completion of node {i} couples to node {m}, "
+                                "which has not been transformed yet.")
+                        V[i] += V[m] * (vec[m] * coef)
+                processed.add(i)
 
     def point_dof_rows(self, V: numpy.ndarray, group: dict,
                        fiat_element: FiniteElement, entity: int, J: Node,
@@ -815,4 +913,4 @@ class PiolaPhysicallyMappedElement(ZanyPhysicallyMappedElement):
         if not group:
             return
         PiolaPhysicallyMappedElement._check_piola_group(group)
-        self._piola_point_rows(V, group, J, processed, tol)
+        self._piola_point_rows(V, group, fiat_element, J, processed, tol)
