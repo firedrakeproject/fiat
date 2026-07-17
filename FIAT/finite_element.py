@@ -105,9 +105,6 @@ class FiniteElement(object):
                      indicating which topological entity of the
                      reference element to tabulate on.  If ``None``,
                      default cell-wise tabulation is performed.
-        :arg dtype: the caller's working precision (a numpy dtype);
-                     only meaningful for macro elements evaluated at
-                     symbolic points. Defaults to double precision.
         """
         raise NotImplementedError("Must be specified in the element subclass of FiniteElement.")
 
