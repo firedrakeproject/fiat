@@ -2,6 +2,7 @@ import math
 
 import gem
 import numpy
+import pytest
 from gem.interpreter import evaluate
 from gem.node import traversal
 
@@ -10,28 +11,16 @@ from FIAT.precision import calibrate_tolerance
 from FIAT.reference_element import ufc_simplex
 
 
-def test_calibrate_tolerance_none_returns_tol_unchanged():
-    assert calibrate_tolerance(1E-12, None) == 1E-12
-
-
-def test_calibrate_tolerance_double_precision_returns_tol_unchanged():
-    assert calibrate_tolerance(1E-12, numpy.float64) == 1E-12
-
-
-def test_calibrate_tolerance_single_precision_returns_sqrt_tol():
-    assert calibrate_tolerance(1E-12, numpy.float32) == math.sqrt(1E-12)
-
-
-def test_calibrate_tolerance_accepts_dtype_convertible_string():
-    assert calibrate_tolerance(1E-12, "float32") == math.sqrt(1E-12)
-
-
-def test_calibrate_tolerance_complex_double_returns_tol_unchanged():
-    assert calibrate_tolerance(1E-12, numpy.complex128) == 1E-12
-
-
-def test_calibrate_tolerance_complex_single_returns_sqrt_tol():
-    assert calibrate_tolerance(1E-12, numpy.complex64) == math.sqrt(1E-12)
+@pytest.mark.parametrize("dtype,expected", [
+    (None, 1E-12),
+    (numpy.float64, 1E-12),
+    (numpy.float32, math.sqrt(1E-12)),
+    ("float32", math.sqrt(1E-12)),
+    (numpy.complex128, 1E-12),
+    (numpy.complex64, math.sqrt(1E-12)),
+])
+def test_calibrate_tolerance(dtype, expected):
+    assert calibrate_tolerance(1E-12, dtype) == expected
 
 
 def macro_element(dtype):
