@@ -95,7 +95,7 @@ class FiniteElement(object):
         """Return the dimension of the finite element space."""
         return len(self.get_dual_set())
 
-    def tabulate(self, order, points, entity=None, dtype=DEFAULT_SCALAR_DTYPE):
+    def tabulate(self, order, points, entity=None):
         """Return tabulated values of derivatives up to given order of
         basis functions at given points.
 
