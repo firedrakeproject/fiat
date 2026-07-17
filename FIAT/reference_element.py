@@ -1704,7 +1704,7 @@ def ufc_simplex(spatial_dim, dtype=None):
         raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
 
 
-def symmetric_simplex(spatial_dim):
+def symmetric_simplex(spatial_dim, dtype=None):
     A = numpy.array([[2, 1, 1],
                      [0, numpy.sqrt(3), numpy.sqrt(3)/3],
                      [0, 0, numpy.sqrt(6)*(2/3)]], dtype=dtype)
