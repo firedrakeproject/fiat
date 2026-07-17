@@ -664,7 +664,127 @@ $N$ above. Newly automatable for free: GN2, HuZhang (both variants), BR, CH, RAQ
 and AW/AWnc once `from_fiat` learns tensor-divergence moments. Covariant (Nedelec
 -type zany) elements: theory ready, value slot $\equiv$ derivative slot.
 
-Verification artifacts: prototype scripts run in-session 2026-07-17 (see git log
-of this file for the summary; the prototype is small enough to re-derive from
-items 1-6, and Stage 5 will turn it into the production implementation with
-symbolic $J$).
+Verification artifacts: the prototype now lives in the repo as
+`test/finat/test_zany_composition.py`, upgraded from the in-session scripts:
+it computes $V = B^{-1}$ by *block back-substitution* (no dense inversion
+anywhere) and asserts both the support law of $B$ (see the Stage 5 design
+below) and agreement with `basis_transformation`, for the whole zoo, 2D and
+3D, both orientations (56 parametrized cases).
+
+### Stage 5 design (2026-07-17): sparsity, cost, and the unified elimination
+
+Robert's (correct) objection to the first prototype: it formed $B$ densely and
+called `inv`. That was a verification shortcut, not the algorithm. This section
+records the sparsity theory that makes the duality formulation *no less sparse
+and no more expensive* than the current hand-structured code, and the
+implementation design in enough detail to be reviewed before touching
+`finat/zany.py`.
+
+**1. Support law (sparsity theorem for $B$).** Order the dofs by the entity
+partial order: $(d, e) \preceq (d', e')$ iff $e \subseteq
+\overline{e'}$ (closure). Claim: $B_{ij} = F_*(n_i)(\hat\psi_j) \ne 0$ only if
+$\mathrm{entity}(j) \preceq \mathrm{entity}(i)$, so $B$ is block lower
+triangular with per-entity diagonal blocks. Sharper, by dof kind:
+
+* *Single-point rows* (vertex/edge/interior Cartesian point data): exactly
+  block-diagonal within the point group. Proof: $F_*(n)$ at a point $\hat x$ is
+  the $\Theta^T$-combination of the component-evaluation nodes at $\hat x$ — a
+  pointwise identity of functionals on $C^0$, needing no polynomial exactness.
+* *Divergence rows*: $B_i = e_i/\det J$ exactly. Proof: the divergence miracle
+  $(K^{-1}\!\otimes\!J^{-1})\delta = \delta/\det J$ turns $F_*(\ell_{div})$
+  into $\hat\ell_{div}/\det J$, and $\hat\ell_{div}$ *is* a reference node, so
+  its generalized Vandermonde row is $e_i$.
+* *Interior invariant moments*: $B_i = e_i$ by definition of invariance.
+* *Facet rows*: support $\subseteq$ facet block $\cup$ dofs on the strict
+  closure $\partial f$. Proof sketch: decompose the slot-mapped weight in the
+  reference frame; the frame components give the facet-block entries (the net
+  $N$); the residual $R$ is a moment supported on $f$, hence a functional of
+  the trace of its argument on $f$. For $j \notin \overline{f}$, $\hat\psi_j$
+  has vanishing dofs on $\overline{f}$, and *trace unisolvence* — the dofs on
+  $\overline{f}$ determine the traces on $f$ that facet functionals sense,
+  i.e. exactly the property that makes the element (H1- or H(div)-)
+  assemblable across facets — forces $R(\hat\psi_j) = 0$. This is the Piola
+  analogue of the scalar exactness identities (paper Prop 2.1): in Morley,
+  "the trace on $e$ is determined by closure dofs" is implemented by FTOC
+  along the edge. **Sparsity of $B$ = conformity of the dof layout.**
+
+Verified numerically (scratch script, 2026-07-17): max $|B_{ij}|$ outside the
+predicted support is $0$ to machine precision for all 28 element instances of
+the zoo, on a negatively oriented cell; the test file asserts the same law on
+both orientations on every run.
+
+**2. Elimination = block back-substitution = the paper's row recursion.**
+$BV = I$ with $B$ block triangular gives, per entity $e$ with closure dof set
+$c$ (already processed, since dims are visited in increasing order):
+$$V_e = B_{ee}^{-1}\,(I_e - B_{ec} V_c).$$
+This is the scalar row recursion $V_i = c\,e_i + \sum_{j \in P} \gamma_{ij}
+V_j$ in matrix clothing. Fill-in: $\mathrm{supp}(V_e) \subseteq e \cup c$,
+because the closure relation is *transitive* — the predicted fill equals the
+final fill, nothing grows during the elimination. Depth of the recursion
+$\le sd$ (vertex → edge → face → interior). At no point is a dense matrix
+formed or inverted; the prototype's `np.linalg.inv` is gone
+(`composition_transformation` in `test/finat/test_zany_composition.py` now
+implements exactly this loop and asserts the support law en route).
+
+**3. Diagonal blocks invert in closed form (the symbolic cost).** The only
+$J$-dependent inverses ever needed are:
+
+* point group: inverse slot map $= K$ per slot (already what
+  `_piola_point_rows` emits; $K = \mathrm{adj}(J)$ is *polynomial* in $J$);
+* divergence: $\det J$ (polynomial);
+* facet frame: $N$ is block triangular
+  $\begin{pmatrix}1 & r_l\\ 0 & sI\end{pmatrix}$ with **scalar** diagonal, so
+  $N^{-1} = \begin{pmatrix}1 & -r_l/s\\ 0 & s^{-1}I\end{pmatrix}$, and the
+  coefficients are Gram contractions of the $K$-mapped frame — no symbolic
+  $M^{-1} = (J^TJ)^{-1}$ solve, since $J^{-T}\hat\nu = K\hat\nu/\det J$:
+  $$s = \frac{|K\hat\nu^s|^2}{\det J\,|\hat\nu^s|^2}
+      = \frac{|\nu^s|^2}{\det J\,|\hat\nu^s|^2}, \qquad
+    r_l = -\frac{(K\hat t_l)\cdot(K\hat\nu^s)}{\det J\,|\hat\nu^s|^2}$$
+  (verified to 1e-15, both orientations, 2D and 3D). Note the mirror of the
+  scalar edge coefficient $c_e = \det J\,|\hat t_e|/|J\hat t_e|$: numerator
+  and denominator swap roles under $J \leftrightarrow K$, tangent
+  $\leftrightarrow$ normal — the covariant/contravariant duality again.
+
+Everything else in $B_{ee}$ and $B_{ec}$ is *numeric and $J$-independent*:
+restricted generalized Vandermonde data (reference tabulations contracted
+with reference weights), computable and cacheable at element construction.
+Each symbolic entry of $V_e$ is a sum of $\le$ (number of frame monomials)
+terms (numeric constant) $\times$ (monomial in $\{1, s, r_l, \det J, K_{ab}\}$)
+— for rank-$r$ elements the monomials come from $N^{\otimes r}$, still a fixed
+finite set. This is the paper's $V = E\,V^c D$ factorization surfacing again:
+numeric completion $E$, symbolic (block-)diagonal $V^c$, diagonal scaling $D$.
+Per-dof symbolic cost: $O(sd^2)$ rational scalars; total GEM size $O(n\,sd^2)$
+— no symbolic LU, and *cheaper* than the current `PiolaFacetFrame` path, which
+builds a symbolic physical Gram $G$ and its determinant for `Sinv`.
+
+**4. Implementation plan (what actually changes, reviewable pieces).**
+
+1. `finat/functional.py`: give `PhysicallyMappedFunctional` typed value slots
+   (mapping string per slot: affine / contravariant / covariant) and one
+   `pushforward(J, K)` that applies $J^{-1}$ per derivative slot (the existing
+   `pullback`) and $\Theta^T$ resp. $J^{-1}$ per value slot. Extend `from_fiat`
+   to tensor-divergence moments (trace over one derivative+value slot pair,
+   remaining value slot kept) — unlocks AW/AWnc.
+2. `finat/zany.py`: one `basis_transformation` loop over entity blocks in
+   increasing dimension (the skeleton already exists); per-block behavior
+   chosen from *data* (divergence flag, single-point, entity dim, mapping
+   string), not from the Scalar/Piola subclass. `FacetFrame` and
+   `PiolaFacetFrame` merge into one frame class parametrized by the stable
+   subspace; it precomputes the numeric restricted Vandermonde/profile data at
+   construction and emits the $\{c\ \text{or}\ s, r_l, \det J\}$ closed forms
+   at transformation time. Delete `Y`/`Sinv`; `_piola_point_rows` and
+   `_divergence_rows` become instances of the generic slot-map inverse.
+3. Fix the interior point-data rule (`invariant_dofs`): single-point order-0
+   nodes are point data (K blocks), multi-point are invariant moments —
+   unlocks GN2 and HuZhang-point.
+4. Runtime guard = the support law: assert the numeric residual expansion
+   vanishes outside the closure block (reference-time, once per element), so
+   a non-conforming dof layout fails loudly instead of producing a dense or
+   wrong $V$ (the generalization of Algorithm 1's assert line).
+5. Tests: keep `test_zany_composition.py` as the independent numeric ground
+   truth (it shares no code path with `basis_transformation`); add
+   reflected-cell fixtures to `test_zany_mapping.py`.
+
+Risk framing unchanged from PLAN.md: abandon any piece that adds more
+complexity than it removes; the theory above is the review artifact to be
+signed off *before* production code moves.
