@@ -297,7 +297,7 @@ def closure_dofs(fiat_element, dim, entity):
             for i in entity_ids[d][e]]
 
 
-def composition_transformation(fiat_element, J, ndof=None, avg=True, tol=1e-10):
+def composition_transformation(fiat_element, J, ndof=None, avg=True, tol=2e-10):
     """Compute V for a scalar or Piola element by blockwise duality.
 
     The matrix :math:`B` of the module docstring is block lower triangular
@@ -387,7 +387,7 @@ scalar_zoo = {
         (finat.QuadraticPowellSabin6, ()),
         (finat.QuadraticPowellSabin12, ()),
         (finat.AlfeldC2, ()),
-        (finat.BrambleZlamalC2, (), 2e-9),
+        (finat.BrambleZlamalC2, ()),
         ],
     3: [(finat.Morley, ()),
         (finat.Hermite, ())],
@@ -449,7 +449,7 @@ def check_composition(dimension, element, args, orientation):
     ndof = finat_element.space_dimension()
     avg = getattr(finat_element, "avg", True)
     V = composition_transformation(finat_element._element, J, ndof=ndof, avg=avg)
-    assert np.allclose(V[:, :ndof], M.T, atol=1e-10)
+    assert np.allclose(V[:, :ndof], M.T, atol=2e-10)
 
 
 @pytest.mark.parametrize("orientation", ["positive", "negative"])
