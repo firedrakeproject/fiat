@@ -30,6 +30,12 @@ def make_points(K, degree):
     return pts
 
 
+@pytest.mark.parametrize("degree, space_dimension", [(13, 127), (14, 144)])
+def test_hct_high_order_degree(degree: int, space_dimension: int) -> None:
+    fe = HCT(ufc_simplex(2), degree)
+    assert fe.space_dimension() == space_dimension
+
+
 @pytest.mark.parametrize("reduced", (False, True))
 def test_hct_constant(cell, reduced):
     # Test that bfs associated with point evaluation sum up to 1

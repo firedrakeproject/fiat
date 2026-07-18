@@ -84,6 +84,31 @@ def test_expansion_values(cell, degree):
             assert numpy.allclose(uh, exact, atol=1E-14)
 
 
+@pytest.mark.parametrize("dim", [2, 3])
+@pytest.mark.parametrize("variant", [None, "bubble"])
+def test_high_order_expansion_derivatives(dim, variant):
+    cell = reference_element.default_simplex(dim)
+    degree = 5
+    order = 4
+    points = reference_element.make_lattice(cell.get_vertices(), 5, interior=1)
+
+    fallback = expansions.ExpansionSet(cell, variant=variant)
+    fallback.recurrence_order = 2
+    expected = fallback._tabulate(degree, points, order=order)
+
+    recurrence = expansions.ExpansionSet(cell, variant=variant)
+
+    def get_dmats(*args, **kwargs):
+        raise AssertionError("high-order derivatives should use recurrence tabulation")
+
+    recurrence.get_dmats = get_dmats
+    actual = recurrence._tabulate(degree, points, order=order)
+
+    assert actual.keys() == expected.keys()
+    for alpha in actual:
+        assert numpy.allclose(actual[alpha], expected[alpha], atol=1E-10, rtol=1E-10)
+
+
 @pytest.mark.parametrize("degree", [10])
 def test_expansion_orthonormality(cell, degree):
     U = expansions.ExpansionSet(cell)
