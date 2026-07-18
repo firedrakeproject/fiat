@@ -1,69 +1,227 @@
-r"""Numeric prototype of the unified transformation theory for Piola elements.
+r"""Numeric prototype of the unified transformation theory, scalar and Piola.
 
-On an affine cell, every Piola pullback factors through the componentwise
-affine pullback: :math:`F^*_{piola} = \theta_A \circ F^*_{affine}`, with
-:math:`\theta_A` pointwise multiplication of the value components by a
-constant matrix.  Dually, the push-forward of a degree of freedom acts
-slot-locally on its weight tensor: each contravariant value slot is
-contracted with :math:`\Theta^T = J^T/\det J = K^{-1}` (:math:`K` the
-cofactor matrix of :math:`J`), and each derivative slot with :math:`J^{-1}`,
-exactly as in the scalar theory.  The matrix :math:`V` relating reference
-nodes to push-forwards of physical nodes is then obtained by duality alone:
+The transformation matrix is obtained by duality alone:
 
-.. math:: B_{ij} = F_*(n_i)(\hat\psi_j), \qquad V = B^{-1},
+.. math:: B_{ij} = n_i(\hat\psi_j \circ F^{-1}), \qquad V = B^{-1},
 
-where :math:`\hat\psi_j` is the reference nodal basis and the physical node
-:math:`n_i` is defined from the reference node by the FIAT frame
-conventions:
+where :math:`\hat\psi_j` is the reference nodal basis, :math:`F` the cell
+map, and :math:`n_i` the physical node.  Two ingredients make the rows of
+:math:`B` computable without any frame algebra:
 
-* facet moments: normal profiles against the physical scaled normal
-  :math:`K\hat\nu^s` (invariant, by the exact covariance of
-  ``compute_scaled_normal``), tangential profiles against the mapped
-  tangents :math:`J\hat{t}` in 2D, and against cross products
-  :math:`\nu^s \times J\hat{b}` of the scaled normal with mapped in-plane
-  vectors in 3D, whose push-forward has the closed form implemented in
-  :func:`facet_frame_net` (a *scalar* tangential block -- the ``Y`` mixing
-  matrix and ``Sinv`` reciprocal-basis correction of
-  :class:`finat.zany.PiolaFacetFrame` are consequences of this formula);
-* single-point evaluations (vertex, edge, or interior point data): Cartesian
-  components kept, so the slot map is plain :math:`\Theta^T`;
-* interior moments: invariant by convention (physical test functions are
-  Piola-mapped);
-* divergence nodes: the value and derivative slot maps contract to
-  :math:`\delta/\det J`, so the row is :math:`\det J` times the identity.
+* **Physical nodes by per-slot maps.**  The physical node shares the
+  points and weights of its reference partner; only the directional data
+  changes, one tensor slot at a time.  A derivative slot of a facet node
+  maps its unit-normal component to the unit physical normal
+  :math:`K\hat{n}/|K\hat{n}|` (:math:`K = \operatorname{adj}(J)^T` the
+  cofactor matrix, which maps normals to normals) and its tangential
+  complement by :math:`J` (mapped tangents); away from facets derivative
+  slots are Cartesian and keep their reference directions.  A
+  contravariant value slot of a facet moment maps its scaled-normal
+  component by :math:`K` (the cofactor lemma :math:`K\hat\nu^s = \nu^s`
+  is exact) and its tangential complement by :math:`J`.  Cartesian point
+  data keeps its weights, interior moments are invariant by convention
+  (physical test functions are Piola-mapped), and divergence nodes
+  contract to :math:`\det J` times the identity.
+
+* **The adjoint acts on the tabulation.**  The push-forward of a
+  reference node contracts each derivative slot of its direction with
+  :math:`J` (:math:`d = J^{\otimes m}\hat{d}`); dually, instead of
+  transforming directions, each derivative slot of the *numeric*
+  reference tabulation is contracted with :math:`J^{-T}` (the physical
+  derivatives of :math:`\hat\psi_j\circ F^{-1}`) and each value slot
+  with :math:`J/\det J` (its physical Piola values), once per node
+  group.  A row of :math:`B` is then the plain numeric pairing of the
+  physical node data with the transformed tabulation; push-forward
+  invariance (mapped-tangential moments, point values) needs no special
+  cases -- it falls out as exact Kronecker rows.
 
 Crucially, :math:`B` is never inverted densely.  Its rows obey the support
 law :math:`B_{ij} \ne 0` only if dof :math:`j` lives on the closure of dof
 :math:`i`'s entity: interior-moment, divergence, and single-point rows are
 *exactly* block-diagonal (pointwise identities, independent of the
-polynomial space), while a facet row couples to its own facet block plus,
-possibly, dofs on the boundary of that facet -- the residual left by the
-frame decomposition is a functional of the trace on the facet, and the
-trace is determined by the closure dofs (the same property that makes the
-element conforming; in the scalar theory this role is played by the
-fundamental-theorem-of-calculus exactness identities).  Hence :math:`B` is
-block lower triangular in the entity partial order and
-:func:`composition_transformation` computes :math:`V = B^{-1}` by block
-back-substitution -- the Piola instance of the scalar row recursion -- with
-one small solve per entity and fill-in confined to the closure.  Both the
-support law and the agreement with ``basis_transformation`` are asserted
-to machine precision for the Piola element zoo, in 2D and 3D, on cells of
-both orientations.  Since the whole zoo is now transformed by
-:class:`finat.zany.PiolaPhysicallyMappedElement`, this module is the
-independent verification of the automated transformations: it shares no
-code path with ``basis_transformation``.  See ``zany_claude.md`` (Stage 4)
-for the derivation.
+polynomial space); a vertex-jet row is an exact combination of the
+reference jet dofs at the same vertex (duality of the nodal basis); and a
+facet row couples to its own facet block plus, possibly, dofs on the
+boundary of that facet -- the residual left by the tangential components
+is a functional of the trace on the facet, and the trace is determined by
+the closure dofs (the same property that makes the element conforming; in
+the scalar theory this role is played by the fundamental-theorem-of-
+calculus exactness identities).  Hence :math:`B` is block lower triangular
+in the entity partial order and :func:`composition_transformation`
+computes :math:`V = B^{-1}` by block back-substitution -- one small solve
+per entity, fill-in confined to the closure.  Both the support law and the
+agreement with ``basis_transformation`` are asserted to machine precision
+for the scalar and Piola element zoos, in 2D and 3D, on cells of both
+orientations.  This module is the independent verification of the
+automated transformations: it shares no code path with
+``basis_transformation``.  See ``zany_claude.md`` (Stages 4-5) for the
+derivation.
 """
+
+from math import factorial, prod
 
 import numpy as np
 import pytest
 
 import finat
+from FIAT.polynomial_set import mis
 from FIAT.reference_element import make_affine_mapping, ufc_simplex
 from finat.functional import PhysicallyMappedFunctional
 from gem.interpreter import evaluate
 
 from .conftest import MyMapping
+
+
+def contract_slot(T, A, axis):
+    """Contract one tensor slot with a matrix.
+
+    :arg T: The tensor.
+    :arg A: The matrix.
+    :arg axis: The slot of ``T`` to contract.
+    :returns: The tensor with ``T'[..., i, ...] = sum_k A[i, k] T[..., k, ...]``.
+    """
+    return np.moveaxis(np.tensordot(T, A, axes=(axis, 1)), -1, axis)
+
+
+def tensorize_direction(direction, sd, order):
+    """Distribute multi-index direction coefficients over a symmetric tensor.
+
+    :arg direction: Direction coefficients in the multi-index basis.
+    :arg sd: The spatial dimension.
+    :arg order: The derivative order.
+    :returns: The symmetric direction tensor, normalized so that the full
+        contraction with an index-wise derivative tabulation reproduces
+        the multi-index pairing.
+    """
+    alphas = sorted(mis(sd, order), reverse=True)
+    lookup = {alpha: k for k, alpha in enumerate(alphas)}
+    D = np.zeros((sd,) * order)
+    for index in np.ndindex(D.shape):
+        alpha = [0] * sd
+        for k in index:
+            alpha[k] += 1
+        scale = prod(map(factorial, alpha)) / factorial(order)
+        D[index] = direction[lookup[tuple(alpha)]] * scale
+    return D
+
+
+def derivative_tabulation(fiat_element, order, points, weights):
+    """Weighted symmetric-tensor derivative tabulation of the nodal basis.
+
+    :arg fiat_element: The FIAT element.
+    :arg order: The derivative order.
+    :arg points: The quadrature points.
+    :arg weights: The quadrature weights.
+    :returns: The tensor ``T[j, i1, ..., im] = sum_q w_q
+        (d^m psi_j / dx_i1 ... dx_im)(x_q)``.
+    """
+    sd = fiat_element.get_reference_element().get_spatial_dimension()
+    tab = fiat_element.tabulate(order, points)
+    nbf = tab[(0,) * sd].shape[0]
+    T = np.zeros((nbf,) + (sd,) * order)
+    for index in np.ndindex((sd,) * order):
+        alpha = [0] * sd
+        for k in index:
+            alpha[k] += 1
+        T[(slice(None), *index)] = tab[tuple(alpha)] @ weights
+    return T
+
+
+def facet_slot_map(ref_el, entity, J, derivative):
+    r"""Per-slot physical direction map of a facet node.
+
+    A derivative slot maps its component along the FIAT normal
+    :math:`\hat{n}` to the FIAT physical normal -- the norm-preserving
+    rescaling of the cofactor image :math:`K\hat{n}` (:math:`K =
+    \operatorname{adj}(J)^T` maps normals to normals, and the norm of
+    the FIAT normal depends only on the reference cell) -- and its
+    tangential complement by :math:`J` (mapped tangents).
+
+    A contravariant value slot maps its component along the scaled
+    normal :math:`\hat\nu^s` by :math:`K` (the cofactor lemma
+    :math:`K\hat\nu^s = \nu^s` is exact), and its tangential complement
+    to the cofactor image projected onto the physical facet, scaled by
+    :math:`|K\hat\nu^s|^2/(\det J\, |\hat\nu^s|^2)` -- the reciprocal
+    of the scalar tangential push-forward coefficient, which in 2D
+    reduces to the mapped tangent :math:`J\hat{t}`.
+
+    :arg ref_el: The reference cell.
+    :arg entity: The facet number.
+    :arg J: The (numeric) cell Jacobian.
+    :arg derivative: If True, use the derivative-slot convention;
+        if False, the contravariant value-slot convention.
+    :returns: The map as an ``(sd, sd)`` array acting on one slot.
+    """
+    sd = ref_el.get_spatial_dimension()
+    detJ = np.linalg.det(J)
+    K = detJ * np.linalg.inv(J).T
+    if derivative:
+        n = ref_el.compute_normal(entity)
+        Kn = K @ n
+        Kn = Kn * (np.linalg.norm(n) / np.linalg.norm(Kn))
+        P = np.outer(n, n) / (n @ n)
+        return np.outer(Kn, n) / (n @ n) + J @ (np.eye(sd) - P)
+    n = ref_el.compute_scaled_normal(entity)
+    Kn = K @ n
+    P = np.outer(n, n) / (n @ n)
+    Q = np.eye(sd) - np.outer(Kn, Kn) / (Kn @ Kn)
+    s = (Kn @ Kn) / (detJ * (n @ n))
+    return np.outer(Kn, n) / (n @ n) + s * (Q @ K @ (np.eye(sd) - P))
+
+
+def scalar_derivative_row(fiat_element, ell, Phi, J):
+    r"""B row of a scalar derivative node.
+
+    The physical direction is the per-slot map :math:`\Phi^{\otimes m}`
+    of the reference direction; the derivative slots of the tabulation
+    carry the adjoint of the push-forward, :math:`J^{-T}` per slot.
+
+    :arg fiat_element: The FIAT element.
+    :arg ell: The parsed reference node.
+    :arg Phi: The per-slot physical direction map.
+    :arg J: The (numeric) cell Jacobian.
+    :returns: The vector of values of the physical node on the
+        pushed-forward nodal basis.
+    """
+    sd = J.shape[0]
+    T = derivative_tabulation(fiat_element, ell.order, ell.points, ell.weights)
+    A = np.linalg.inv(J).T
+    D = tensorize_direction(ell.direction, sd, ell.order)
+    for slot in range(ell.order):
+        T = contract_slot(T, A, 1 + slot)
+        D = contract_slot(D, Phi, slot)
+    return np.tensordot(T, D, axes=(tuple(range(1, ell.order + 1)),
+                                    tuple(range(ell.order))))
+
+
+def piola_value_row(fiat_element, ell, Phi, J):
+    r"""B row of a contravariant value node.
+
+    The value slots of the tabulation carry the physical Piola values,
+    :math:`J/\det J` per slot; the weights are mapped per slot by
+    ``Phi`` (facet moments) or kept Cartesian (point data).
+
+    :arg fiat_element: The FIAT element.
+    :arg ell: The parsed reference node.
+    :arg Phi: The per-slot physical weight map, or None for Cartesian
+        point data.
+    :arg J: The (numeric) cell Jacobian.
+    :returns: The vector of values of the physical node on the
+        pushed-forward nodal basis.
+    """
+    sd = J.shape[0]
+    r = ell.rank
+    npts = len(ell.points)
+    Theta = J / np.linalg.det(J)
+    T = fiat_element.tabulate(0, ell.points)[(0,) * sd]
+    T = T.reshape(T.shape[0], *(sd,) * r, npts)
+    W = ell.weights.reshape(npts, *(sd,) * r)
+    for slot in range(r):
+        T = contract_slot(T, Theta, 1 + slot)
+        if Phi is not None:
+            W = contract_slot(W, Phi, 1 + slot)
+    return np.tensordot(T, W, axes=((*range(1, r + 1), r + 1),
+                                    (*range(1, r + 1), 0)))
 
 
 def evaluate_divergence(ell, fiat_element):
@@ -81,49 +239,45 @@ def evaluate_divergence(ell, fiat_element):
     return div @ ell.weights
 
 
-def facet_frame_net(ref_el, entity, J):
-    r"""Net Cartesian map taking a facet node's reference weights to the
-    weights of its pushed-forward physical partner.
+def physical_node_row(fiat_element, ell, dim, entity, J, avg):
+    """B row of one parseable node, or None if push-forward invariant.
 
-    In frame coordinates :math:`[\hat\nu^s | \hat{t}_l]` the map is
-
-    .. math::
-        N = \begin{pmatrix} 1 & -\det J\, \hat{t}_l \cdot M^{-1}\hat\nu^s
-                                / |\hat\nu^s|^2 \\
-                            0 & s I \end{pmatrix},
-        \qquad
-        s = \det J\, \frac{\hat\nu^s \cdot M^{-1}\hat\nu^s}{|\hat\nu^s|^2},
-        \qquad M = J^T J,
-
-    for the 3D cross-product tangential convention; in 2D the tangential
-    directions are the plain mapped tangents.  The top-right entries are the
-    completion residuals: a pulled-back tangential profile leaves behind a
-    normal-direction functional, eliminated through the generalized
-    Vandermonde row exactly as in the scalar theory.
-
-    :arg ref_el: The reference cell.
-    :arg entity: The facet number.
+    :arg fiat_element: The FIAT element.
+    :arg ell: The parsed reference node.
+    :arg dim: The dimension of the entity the node sits on.
+    :arg entity: The entity number.
     :arg J: The (numeric) cell Jacobian.
-    :returns: The net map as an (sd, sd) array acting on Cartesian weights.
+    :arg avg: If False, physical scalar facet moments are plain
+        integrals rather than the measure-intrinsic integral averages of
+        the reference weights, and the row is rescaled by the physical
+        facet measure.
+    :returns: The row, or None for a row of the identity.
     """
+    ref_el = fiat_element.get_reference_element()
     sd = ref_el.get_spatial_dimension()
-    detJ = np.linalg.det(J)
-    nu = ref_el.compute_scaled_normal(entity)
-    tangents = ref_el.compute_tangents(sd - 1, entity)
-    Ghat = np.column_stack([nu, *tangents])
-    if sd == 2:
-        K = detJ * np.linalg.inv(J).T
-        P = np.column_stack([K @ nu, J @ tangents[0]])
-        return (J.T / detJ) @ P @ np.linalg.inv(Ghat)
-    M = J.T @ J
-    Minv_nu = np.linalg.solve(M, nu)
-    nn = nu @ nu
-    N = np.zeros((sd, sd))
-    N[0, 0] = 1.0
-    for l, t in enumerate(tangents):
-        N[l + 1, l + 1] = detJ * (nu @ Minv_nu) / nn
-        N[0, l + 1] = -detJ * (t @ Minv_nu) / nn
-    return Ghat @ N @ np.linalg.inv(Ghat)
+    if ell.divergence:
+        return evaluate_divergence(ell, fiat_element) / np.linalg.det(J)
+    if ell.rank:
+        point_data = len(ell.points) == 1 and (ell.rank == 1 or dim != sd - 1)
+        if dim == sd and not point_data:
+            return None
+        Phi = (facet_slot_map(ref_el, entity, J, derivative=False)
+               if dim == sd - 1 and not point_data else None)
+        return piola_value_row(fiat_element, ell, Phi, J)
+    if ell.order == 0:
+        return None
+    Phi = (facet_slot_map(ref_el, entity, J, derivative=True)
+           if dim == sd - 1 else np.eye(sd))
+    row = scalar_derivative_row(fiat_element, ell, Phi, J)
+    if not avg and len(ell.points) > 1 and dim == sd - 1:
+        # The reference weights are measure-intrinsic (integral averages),
+        # so a plain physical integral carries the physical facet measure.
+        n = ref_el.compute_scaled_normal(entity)
+        K = np.linalg.det(J) * np.linalg.inv(J).T
+        measure = (ref_el.volume_of_subcomplex(sd - 1, entity)
+                   * np.linalg.norm(K @ n) / np.linalg.norm(n))
+        row = row * measure
+    return row
 
 
 def closure_dofs(fiat_element, dim, entity):
@@ -143,8 +297,8 @@ def closure_dofs(fiat_element, dim, entity):
             for i in entity_ids[d][e]]
 
 
-def composition_transformation(fiat_element, J, ndof=None, tol=1e-10):
-    """Compute V for a contravariant Piola element by blockwise duality.
+def composition_transformation(fiat_element, J, ndof=None, avg=True, tol=1e-10):
+    """Compute V for a scalar or Piola element by blockwise duality.
 
     The matrix :math:`B` of the module docstring is block lower triangular
     in the entity partial order, so :math:`V = B^{-1}` is computed by block
@@ -164,15 +318,12 @@ def composition_transformation(fiat_element, J, ndof=None, tol=1e-10):
     :arg ndof: The number of exposed physical dofs; unparseable constraint
         functionals beyond it keep identity rows (their columns are
         truncated by the caller).  Defaults to all dofs.
+    :arg avg: Whether physical scalar facet moments are integral averages.
     :arg tol: Relative tolerance for the support-law assertion.
     :returns: The transformation V as a numpy array, with the same row and
         column ordering as ``basis_transformation`` before truncation of
         the trailing constraint columns.
     """
-    ref_el = fiat_element.get_reference_element()
-    sd = ref_el.get_spatial_dimension()
-    detJ = np.linalg.det(J)
-    Theta_T = J.T / detJ
     nodes = fiat_element.dual_basis()
     entity_ids = fiat_element.entity_dofs()
     nbf = len(nodes)
@@ -199,24 +350,8 @@ def composition_transformation(fiat_element, J, ndof=None, tol=1e-10):
                         raise
                     rows.append(eye[i])
                     continue
-                if ell.divergence:
-                    rows.append(evaluate_divergence(ell, fiat_element) / detJ)
-                    continue
-                point_data = (len(ell.points) == 1
-                              and (ell.rank == 1 or dim != sd - 1))
-                if dim == sd and not point_data:
-                    rows.append(eye[i])
-                    continue
-                if dim == sd - 1 and not point_data:
-                    net = facet_frame_net(ref_el, entity, J)
-                else:
-                    net = Theta_T
-                W = ell.weights.reshape(-1, *(sd,) * ell.rank)
-                for _ in range(ell.rank):
-                    W = np.tensordot(W, net, axes=(1, 1))
-                W = W.reshape(len(ell.points), -1)
-                rows.append(PhysicallyMappedFunctional(
-                    ell.points, W, rank=ell.rank).evaluate(fiat_element))
+                row = physical_node_row(fiat_element, ell, dim, entity, J, avg)
+                rows.append(eye[i] if row is None else row)
             Bblock = np.asarray(rows)
             prior = closure_dofs(fiat_element, dim, entity)
             outside = np.setdiff1d(np.arange(nbf), block + prior)
@@ -228,6 +363,35 @@ def composition_transformation(fiat_element, J, ndof=None, tol=1e-10):
                 Bblock[:, block], eye[block] - Bblock[:, prior] @ V[prior])
     return V
 
+
+# Scalar elements, including hand-coded macroelement transformations
+# (HCT, Powell-Sabin, Alfeld/Bramble-Zlamal C2) never before reproduced by
+# the automated theory.  BrambleZlamalC2 needs a looser tolerance: FIAT's
+# own dual basis and tabulation only agree to ~4e-10 on its ill-conditioned
+# order-4 vertex jets.  Walkington is excluded: its extended tabulation has
+# full rank, so the constraint columns of the transformation are not a
+# convention, and the hand-coded transformation disagrees there both with
+# this prototype and with a direct physical-cell fit (see zany_claude.md).
+scalar_zoo = {
+    2: [(finat.Morley, ()),
+        (finat.Hermite, ()),
+        (finat.Bell, ()),
+        (finat.Argyris, ()),
+        (finat.Argyris, (5, "point")),
+        (finat.Argyris, (6,)),
+        (finat.WuXuH3NC, ()),
+        (finat.WuXuRobustH3NC, ()),
+        (finat.HsiehCloughTocher, ()),
+        (finat.HsiehCloughTocher, (4,)),
+        (finat.ReducedHsiehCloughTocher, ()),
+        (finat.QuadraticPowellSabin6, ()),
+        (finat.QuadraticPowellSabin12, ()),
+        (finat.AlfeldC2, ()),
+        (finat.BrambleZlamalC2, (), 2e-9),
+        ],
+    3: [(finat.Morley, ()),
+        (finat.Hermite, ())],
+}
 
 piola_zoo = {
     2: [(finat.MardalTaiWinther, ()),
@@ -271,10 +435,8 @@ orientations = {
 }
 
 
-@pytest.mark.parametrize("orientation", ["positive", "negative"])
-@pytest.mark.parametrize("dimension, element, args", [
-    (dim, *case) for dim in piola_zoo for case in piola_zoo[dim]])
-def test_piola_composition(dimension, element, args, orientation):
+def check_composition(dimension, element, args, orientation):
+    """Compare the blockwise duality V against basis_transformation."""
     ref_cell = ufc_simplex(dimension)
     phys_cell = ufc_simplex(dimension)
     phys_cell.vertices = orientations[(dimension, orientation)]
@@ -285,5 +447,20 @@ def test_piola_composition(dimension, element, args, orientation):
     M = evaluate([finat_element.basis_transformation(mapping)])[0].arr
 
     ndof = finat_element.space_dimension()
-    V = composition_transformation(finat_element._element, J, ndof=ndof)
+    avg = getattr(finat_element, "avg", True)
+    V = composition_transformation(finat_element._element, J, ndof=ndof, avg=avg)
     assert np.allclose(V[:, :ndof], M.T, atol=1e-10)
+
+
+@pytest.mark.parametrize("orientation", ["positive", "negative"])
+@pytest.mark.parametrize("dimension, element, args", [
+    (dim, *case) for dim in scalar_zoo for case in scalar_zoo[dim]])
+def test_scalar_composition(dimension, element, args, orientation):
+    check_composition(dimension, element, args, orientation)
+
+
+@pytest.mark.parametrize("orientation", ["positive", "negative"])
+@pytest.mark.parametrize("dimension, element, args", [
+    (dim, *case) for dim in piola_zoo for case in piola_zoo[dim]])
+def test_piola_composition(dimension, element, args, orientation):
+    check_composition(dimension, element, args, orientation)
