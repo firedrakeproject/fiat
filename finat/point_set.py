@@ -233,6 +233,70 @@ class TensorPointSet(AbstractPointSet):
                 for s, o in zip(self.factors, other.factors))
 
 
+class CollapsedTensorProductPointSet(AbstractPointSet):
+    """A point set with tensor-product structure in collapsed (Duffy)
+    coordinates, mapped onto the reference simplex.
+
+    The factors are one-dimensional point sets on the ``[0, 1]`` reference
+    interval holding the collapsed coordinates ``eta_t``; the represented
+    points are their image under the Duffy map on the reference simplex,
+
+        ``x_t = eta_t * prod(u > t) (1 - eta_u)``.
+
+    Parameters
+    ----------
+    factors : tuple of AbstractPointSet
+        One-dimensional point sets of collapsed coordinates, one per
+        spatial dimension of the simplex.
+
+    """
+
+    def __init__(self, factors):
+        self.factors = tuple(factors)
+        assert all(ps.dimension == 1 for ps in self.factors)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.factors!r})"
+
+    @property
+    def dimension(self):
+        return len(self.factors)
+
+    @cached_property
+    def points(self):
+        etas = [ps.points.ravel() for ps in self.factors]
+        grids = list(numpy.meshgrid(*etas, indexing="ij"))
+        dim = len(grids)
+        for u in range(1, dim):
+            weight = 1.0 - grids[u]
+            for t in range(u):
+                grids[t] = grids[t] * weight
+        return numpy.stack([grid.ravel() for grid in grids], axis=-1)
+
+    @cached_property
+    def indices(self):
+        return tuple(chain(*[ps.indices for ps in self.factors]))
+
+    @cached_property
+    def expression(self):
+        etas = [gem.Indexed(ps.expression, (0,)) for ps in self.factors]
+        dim = len(etas)
+        result = []
+        for t in range(dim):
+            expr = etas[t]
+            for u in range(t + 1, dim):
+                expr = gem.Product(expr, gem.Sum(gem.one, gem.Product(gem.Literal(-1.0), etas[u])))
+            result.append(expr)
+        return gem.ListTensor(result)
+
+    def almost_equal(self, other, tolerance=1e-12):
+        """Approximate numerical equality of point sets"""
+        return type(self) is type(other) and \
+            len(self.factors) == len(other.factors) and \
+            all(s.almost_equal(o, tolerance=tolerance)
+                for s, o in zip(self.factors, other.factors))
+
+
 class FacetPointSet(AbstractPointSet):
     """A point set on facets.
 

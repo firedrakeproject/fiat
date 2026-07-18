@@ -69,6 +69,38 @@ def test_point_evaluation_zany(ref_to_phys, element, degree):
         assert numpy.allclose(val, expected[alpha][:num_dof])
 
 
+@pytest.mark.parametrize('degree', [1, 4])
+def test_duffy_evaluation(cell, degree):
+    from FIAT.expansions import morton_index2, morton_index3
+    from finat.point_set import PointSet, CollapsedTensorProductPointSet
+
+    dim = cell.get_spatial_dimension()
+    element = finat.Legendre(cell, degree, variant="integral")
+
+    # Unequal point counts per axis, including the collapsed vertex eta=1
+    factors = [PointSet(numpy.linspace(0, 1, 3 + axis)[:, None]) for axis in range(dim)]
+    ps = CollapsedTensorProductPointSet(factors)
+    multiindex, duffy = element.duffy_evaluation(1, ps)
+
+    dense_ps = PointSet(ps.points)
+    expected = element.basis_evaluation(1, dense_ps)
+    assert expected.keys() == duffy.keys()
+
+    idx = ((lambda *index: index[0]), morton_index2, morton_index3)[dim-1]
+    lattice_shape = (degree + 1,) * dim
+    for alpha, table in expected.items():
+        exp, = gem.interpreter.evaluate([table])
+        exp = exp.broadcast(dense_ps.indices)
+        act, = gem.interpreter.evaluate([duffy[alpha]])
+        act = act.broadcast(multiindex + ps.indices).reshape(*lattice_shape, -1)
+        for index in numpy.ndindex(lattice_shape):
+            if sum(index) > degree:
+                assert numpy.allclose(act[index], 0.0)
+            else:
+                assert numpy.allclose(act[index], exp[:, idx(*index)],
+                                      rtol=1E-10, atol=1E-12)
+
+
 if __name__ == '__main__':
     import os
     pytest.main(os.path.abspath(__file__))

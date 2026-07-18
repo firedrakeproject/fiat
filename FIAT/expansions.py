@@ -21,6 +21,87 @@ def morton_index3(p, q=0, r=0):
     return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
 
 
+def morton_index(dim, n, *multiindex):
+    """Flat Morton index of a simplex lattice multi-index.
+
+    Parameters
+    ----------
+    dim : int
+        The spatial dimension, i.e. the length of ``multiindex``.
+    n : int
+        The polynomial degree; unused, kept for a uniform signature with
+        :func:`morton_forward_table` / :func:`morton_inverse_table`.
+    *multiindex : int
+        The lattice multi-index ``(i_1, ..., i_dim)``.
+
+    Returns
+    -------
+    int
+        The flat expansion set index of ``multiindex``, as used to
+        enumerate the members of :class:`ExpansionSet` and, for elements
+        whose nodal basis coincides with the expansion set (e.g.
+        `FIAT.Legendre`), the degree of freedom index.
+
+    """
+    idx = (lambda p: p, morton_index2, morton_index3)[dim - 1]
+    return idx(*multiindex)
+
+
+def morton_forward_table(dim, n):
+    """Table mapping a rectangular lattice multi-index to its Morton index.
+
+    Parameters
+    ----------
+    dim : int
+        The spatial dimension.
+    n : int
+        The polynomial degree.
+
+    Returns
+    -------
+    numpy.ndarray
+        An integer array of shape ``(n + 1,) * dim`` such that
+        ``table[i_1, ..., i_dim]`` is the Morton index of the lattice
+        point, for points on the simplex lattice (``sum(multiindex) <=
+        n``).  Entries outside the simplex lattice are clamped to a
+        valid (but otherwise meaningless) degree of freedom index; those
+        entries are only ever read where the corresponding tabulation is
+        exactly zero.
+
+    """
+    ndof = math.comb(n + dim, dim)
+    table = numpy.zeros((n + 1,) * dim, dtype=int)
+    for multiindex in reference_element.lattice_iter(0, n + 1, dim):
+        table[multiindex] = morton_index(dim, n, *multiindex)
+    # Out-of-lattice entries default to 0, already a valid dof index.
+    return numpy.minimum(table, ndof - 1)
+
+
+def morton_inverse_table(dim, n):
+    """Table mapping a Morton (flat) index to its lattice multi-index.
+
+    Parameters
+    ----------
+    dim : int
+        The spatial dimension.
+    n : int
+        The polynomial degree.
+
+    Returns
+    -------
+    numpy.ndarray
+        An integer array of shape ``(ndof, dim)``, the inverse of
+        :func:`morton_forward_table` restricted to the simplex lattice,
+        where ``ndof = math.comb(n + dim, dim)``.
+
+    """
+    ndof = math.comb(n + dim, dim)
+    table = numpy.zeros((ndof, dim), dtype=int)
+    for multiindex in reference_element.lattice_iter(0, n + 1, dim):
+        table[morton_index(dim, n, *multiindex)] = multiindex
+    return table
+
+
 def jrc(a, b, n):
     """Jacobi recurrence coefficients"""
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
@@ -49,6 +130,73 @@ def pad_jacobian(A, embedded_dim):
     """Pad coordinate mapping Jacobian by appending zero rows."""
     A = numpy.pad(A, [(0, embedded_dim - A.shape[0]), (0, 0)])
     return tuple(row[..., None] for row in A)
+
+
+def dubiner_jacobi_parameters(codim: int, m: int, variant: str | None) -> tuple:
+    """Jacobi parameters for one axis of the Dubiner recurrence.
+
+    Parameters
+    ----------
+    codim : int
+        The number of already-extended axes, ``len(sub_index)``.
+    m : int
+        The sum of the lattice indices of the already-extended axes.
+    variant : str or None
+        The expansion set variant.
+
+    Returns
+    -------
+    tuple
+        ``(alpha, beta, a, b)`` where ``(alpha, beta)`` are the Jacobi
+        parameters and ``(a, b)`` are the degree-one recurrence
+        coefficients.
+
+    """
+    if variant == "bubble":
+        alpha = 2 * m
+        beta = 0
+        a = b = -0.5
+    else:
+        alpha = 2 * m + codim
+        beta = 0
+        if variant == "dual":
+            alpha += 1 + codim
+            beta = 1
+        a = 0.5 * (alpha + beta) + 1.0
+        b = 0.5 * (alpha - beta)
+    return alpha, beta, a, b
+
+
+def dubiner_norm2(d: int, m: int, i: int, variant: str | None) -> float:
+    """Squared normalization factor applied when the Dubiner recurrence
+    extends a basis member to dimension ``d``.
+
+    Parameters
+    ----------
+    d : int
+        The dimension being extended to, ``codim + 1``.
+    m : int
+        The sum of the lattice indices of the previous axes.
+    i : int
+        The lattice index along the axis being extended.
+    variant : str or None
+        The expansion set variant.
+
+    Returns
+    -------
+    float
+        The squared scaling factor for the extended member.
+
+    """
+    if variant is not None:
+        shift = 1 if variant == "dual" else 0
+        p = i + shift
+        alpha = 2 * (m + d * shift) - 1
+        norm2 = (0.5 + d) / d
+        if p > 0 and p + alpha > 0:
+            norm2 *= (p + alpha) * (2*p + alpha) / p
+        return norm2
+    return (2*(m + i) + d) / d
 
 
 def jacobi_factors(x, y, z, dx, dy, dz):
@@ -103,7 +251,6 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     if dim > 3 or dim < 0:
         raise ValueError("Invalid number of spatial dimensions")
 
-    beta = 1 if variant == "dual" else 0
     coefficients = integrated_jrc if variant == "bubble" else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
@@ -116,15 +263,7 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
 
-            if variant == "bubble":
-                alpha = 2 * sum(sub_index)
-                a = b = -0.5
-            else:
-                alpha = 2 * sum(sub_index) + len(sub_index)
-                if variant == "dual":
-                    alpha += 1 + len(sub_index)
-                a = 0.5 * (alpha + beta) + 1.0
-                b = 0.5 * (alpha - beta)
+            alpha, beta, a, b = dubiner_jacobi_parameters(codim, sum(sub_index), variant)
 
             fcur = a * fa - b * fb
             phi[inext] = fcur * phi[icur]
@@ -169,21 +308,96 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
         # normalize
         d = codim + 1
-        shift = 1 if variant == "dual" else 0
         for index in reference_element.lattice_iter(0, n+1, d):
             icur = idx(*index)
-            if variant is not None:
-                p = index[-1] + shift
-                alpha = 2 * (sum(index[:-1]) + d * shift) - 1
-                norm2 = (0.5 + d) / d
-                if p > 0 and p + alpha > 0:
-                    norm2 *= (p + alpha) * (2*p + alpha) / p
-            else:
-                norm2 = (2*sum(index) + d) / d
-            scale = math.sqrt(norm2)
+            scale = math.sqrt(dubiner_norm2(d, sum(index[:-1]), index[-1], variant))
             for result in results:
                 result[icur] *= scale
     return results
+
+
+def principal_functions(n: int, eta: numpy.ndarray, axis: int, order: int = 0,
+                        variant: str | None = None) -> dict:
+    """Tabulate the one-dimensional principal functions of the Dubiner
+    expansion along one collapsed axis.
+
+    On collapsed tensor-product coordinates ``eta`` in ``[-1, 1]^d``, the
+    Dubiner expansion member with lattice multi-index ``(i_1, ..., i_d)``
+    factorizes into a product over axes of one-dimensional principal
+    functions (Karniadakis and Sherwin),
+
+        ``phi_(i_1..i_d)(xi(eta)) = scale * prod_t G_t[m_t, i_t](eta_t)``,
+
+    where ``m_t = i_1 + ... + i_{t-1}`` and
+
+        ``G_t[m, i](eta) = sqrt(dubiner_norm2(t, m, i)) * w(eta)^m * g_(m,i)(eta)``
+
+    with ``w(eta) = (1 - eta)/2`` and ``g_(m,i)`` a degree-``i`` Jacobi-type
+    polynomial satisfying the single-axis restriction of the recurrence of
+    `dubiner_recurrence`.
+
+    Parameters
+    ----------
+    n : int
+        The polynomial degree.
+    eta : numpy.ndarray
+        Points on the ``(-1, 1)`` interval of the collapsed axis.
+    axis : int
+        The one-based axis number ``t``.
+    order : int
+        The maximum order of differentiation in ``eta``.
+    variant : str or None
+        The expansion set variant, see `dubiner_recurrence`.
+
+    Returns
+    -------
+    dict
+        Mapping mode names to tables ``T[m, i, pt]`` of shape
+        ``(num_m, n+1, len(eta))``, where ``num_m = 1`` for the first axis
+        and ``n+1`` otherwise, with zeros for ``m + i > n``.  Modes:
+        ``'V'``: values ``G[m, i]``; and for ``order >= 1``:
+        ``'D'``: ``d/deta G[m, i]``;
+        ``'tD'``: ``(1+eta)/2 * d/deta G[m, i]``; and
+        ``'W'``: ``G[m, i] / w``, zeroed for ``m == 0``, which is the
+        weight-shifted table produced by the chain rule of the Duffy map.
+
+    """
+    eta = numpy.asarray(eta)
+    coefficients = integrated_jrc if variant == "bubble" else jrc
+    w = 0.5 * (1.0 - eta)
+    dw = -0.5
+    npts = eta.shape[0]
+    num_m = 1 if axis == 1 else n + 1
+    modes = ("V",) if order == 0 else ("V", "D", "W", "tD")
+    tables = {mode: numpy.zeros((num_m, n+1, npts), dtype=eta.dtype) for mode in modes}
+    for m in range(num_m):
+        alpha, beta, a, b = dubiner_jacobi_parameters(axis - 1, m, variant)
+        # Single-axis restriction of the Dubiner recurrence: the factors
+        # (fa, fb, fc) reduce to (eta, -1, 1) times powers of the weights of
+        # the subsequent axes, which are tabulated separately.
+        g = numpy.zeros((n + 1 - m, npts), dtype=eta.dtype)
+        dg = numpy.zeros_like(g)
+        g[0] = 1.0
+        if n - m > 0:
+            g[1] = a * eta + b
+            dg[1] = a
+            for i in range(1, n - m):
+                a, b, c = coefficients(alpha, beta, i)
+                g[i+1] = (a * eta + b) * g[i] - c * g[i-1]
+                dg[i+1] = (a * eta + b) * dg[i] + a * g[i] - c * dg[i-1]
+        wm = w ** m
+        # Zero rule: the weight-shifted tables at m == 0 only ever multiply
+        # derivative factors that vanish identically, so w^(-1) never appears.
+        wm1 = w ** (m-1) if m > 0 else numpy.zeros(npts, dtype=eta.dtype)
+        for i in range(n + 1 - m):
+            # dubiner_recurrence applies no normalization for n == 0
+            scale = math.sqrt(dubiner_norm2(axis, m, i, variant)) if n > 0 else 1.0
+            tables["V"][m, i] = scale * wm * g[i]
+            if order > 0:
+                tables["W"][m, i] = scale * wm1 * g[i]
+                tables["D"][m, i] = scale * (wm * dg[i] + m * dw * wm1 * g[i])
+                tables["tD"][m, i] = 0.5 * (1.0 + eta) * tables["D"][m, i]
+    return tables
 
 
 def C0_basis(dim, n, tabulations):
@@ -364,6 +578,72 @@ class ExpansionSet(object):
                     for j in range(start, end):
                         vals = numpy.dot(dmat.T, vals)
                 result[alpha] = vals
+        return result
+
+    def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0, cell: int = 0) -> dict:
+        """Tabulate the expansion set in separable form on collapsed
+        tensor-product points.
+
+        The evaluation points are the image on the reference cell of the
+        tensor-product grid ``eta_pts``, collapsed onto the default simplex
+        by the Duffy map (`xi_triangle`, `xi_tetrahedron`).
+
+        Parameters
+        ----------
+        n : int
+            The polynomial degree.
+        eta_pts : tuple of numpy.ndarray
+            One array of points on the ``(-1, 1)`` interval per spatial
+            dimension, holding the collapsed coordinates of each axis.
+        order : int
+            The maximum order of differentiation, currently up to 1.
+        cell : int
+            The subcell id.
+
+        Returns
+        -------
+        dict
+            Mapping each derivative multi-index alpha with ``|alpha| <= order``
+            to a list of separable terms ``(coeff, factors)``, with ``coeff``
+            a float and ``factors`` a tuple of per-axis tables such that
+
+                ``D^alpha phi_(i_1..i_d) = sum_terms coeff * prod_t factors[t][m_t, i_t, pt_t]``
+
+            on the lattice ``i_1 + ... + i_d <= n``, where ``m_1 = 0`` and
+            ``m_t = i_1 + ... + i_{t-1}``.  Members are enumerated by the
+            lattice multi-index through `morton_index2` / `morton_index3`.
+            Tables are shared between terms, so consumers may deduplicate
+            them by identity.
+
+        """
+        if order > 1:
+            raise NotImplementedError("tabulate_duffy is limited to first derivatives")
+        if self.continuity is not None:
+            raise NotImplementedError("tabulate_duffy does not yet support C0 expansion sets")
+        sd = self.ref_el.get_spatial_dimension()
+        assert len(eta_pts) == sd
+        A, b = self.affine_mappings[cell]
+        scale = self.get_scale(n, cell=cell)
+        if self.variant == "bubble":
+            scale = -scale
+        tables = [principal_functions(n, eta_pts[t], t + 1, order=order, variant=self.variant)
+                  for t in range(sd)]
+
+        result = {(0,) * sd: [(scale, tuple(table["V"] for table in tables))]}
+        if order > 0:
+            # Chain rule of the Duffy map:
+            # d/dxi_k = sum(t <= k) ((1+eta_t)/2)^{t < k} prod(u > t) (1/w_u) d/deta_t.
+            def eta_term(k, t):
+                modes = ("V",)*t + ("tD" if t < k else "D",) + ("W",)*(sd-1-t)
+                return tuple(table[mode] for table, mode in zip(tables, modes))
+
+            xi_terms = [[eta_term(k, t) for t in range(k + 1)] for k in range(sd)]
+            # Push forward to the cell coordinates: d/dx_k = sum_l A[l, k] d/dxi_l.
+            for k in range(sd):
+                alpha = tuple(int(u == k) for u in range(sd))
+                result[alpha] = [(scale * A[l, k], factors)
+                                 for l in range(sd) if A[l, k] != 0.0
+                                 for factors in xi_terms[l]]
         return result
 
     def _tabulate(self, n, pts, order=0):

@@ -32,7 +32,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Variable', 'Sum', 'Product', 'Division', 'FloorDiv', 'Remainder', 'Power',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
-           'Index', 'VariableIndex', 'Indexed', 'ComponentTensor',
+           'Index', 'JaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
@@ -640,6 +640,47 @@ class Index(IndexBase):
 
     def __setstate__(self, state):
         self.name, self.extent, self.count = state
+
+
+class JaggedIndex(Index):
+    """Free index whose effective iteration bound depends on the values of
+    other (parent) free indices.
+
+    The iteration bound is ``0 <= i < extent - (p_1 + ... + p_k)`` for
+    parent indices ``p_1, ..., p_k``.  The ``extent`` attribute remains the
+    static upper bound, attained when every parent index is zero, so
+    consumers that ignore the jagged structure and treat this as a plain
+    :class:`Index` of extent ``extent`` remain correct, provided that
+    expressions indexed by a `JaggedIndex` evaluate to zero outside the
+    jagged bounds.  The jagged bounds are thus purely a loop optimization.
+
+    Parameters
+    ----------
+    name : str, optional
+        Name of the index.
+    extent : int, optional
+        Static (rectangular) upper bound of the index.
+    parents : tuple of Index
+        The indices whose values reduce the iteration bound.  Loops over
+        this index must nest inside the loops over its parents.
+
+    """
+
+    __slots__ = ('parents',)
+
+    def __init__(self, name: str | None = None, extent: int | None = None,
+                 parents: tuple = ()):
+        super().__init__(name=name, extent=extent)
+        parents = tuple(parents)
+        assert all(isinstance(p, Index) for p in parents)
+        self.parents = parents
+
+    def __getstate__(self):
+        return super().__getstate__() + (self.parents,)
+
+    def __setstate__(self, state):
+        super().__setstate__(state[:-1])
+        self.parents = state[-1]
 
 
 class VariableIndex(IndexBase):

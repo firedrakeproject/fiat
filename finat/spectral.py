@@ -1,11 +1,14 @@
 import FIAT
+import numpy
 
 import gem
 from abc import ABCMeta, abstractmethod
+from functools import reduce
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement, Lagrange, DiscontinuousLagrange
-from finat.point_set import GaussLobattoLegendrePointSet, GaussLegendrePointSet, KMVPointSet
+from finat.point_set import (GaussLobattoLegendrePointSet, GaussLegendrePointSet,
+                             KMVPointSet, CollapsedTensorProductPointSet)
 
 
 class SpectralElement(metaclass=ABCMeta):
@@ -70,6 +73,99 @@ class Legendre(ScalarFiatElement):
     def __init__(self, cell, degree, variant=None):
         fiat_element = FIAT.Legendre(cell, degree, variant=variant)
         super().__init__(fiat_element)
+
+    def duffy_evaluation(self, order, ps, entity=None):
+        """Return the sum-factorized tabulation of the element on a
+        collapsed tensor-product point set.
+
+        The basis functions are enumerated by a lattice multi-index
+        ``(i_1, ..., i_d)`` rather than the flat basis index; the flat index
+        of a member is its Morton index (`FIAT.expansions.morton_index2`,
+        `FIAT.expansions.morton_index3`).  The lattice indices range over the
+        rectangular bounding box of the simplex lattice; entries outside the
+        simplex lattice (``i_1 + ... + i_d > degree``) tabulate to zero.
+
+        Parameters
+        ----------
+        order : int
+            The maximum order of differentiation, currently up to 1.
+        ps : CollapsedTensorProductPointSet
+            The point set with collapsed tensor-product structure.
+        entity : tuple or None
+            The cell entity on which to tabulate; only the cell itself is
+            supported.
+
+        Returns
+        -------
+        tuple
+            ``(multiindex, result)``, where ``multiindex`` is a tuple of d
+            `gem.JaggedIndex` of extent ``degree + 1``, each with the
+            preceding indices as parents, enumerating the basis lattice,
+            and ``result`` maps each derivative multi-index alpha
+            to a scalar gem expression with free indices
+            ``multiindex + ps.indices``.
+
+        """
+        assert isinstance(ps, CollapsedTensorProductPointSet)
+        cell_dim = self.cell.get_dimension()
+        if entity is not None and entity != (cell_dim, 0):
+            raise NotImplementedError("duffy_evaluation is only supported on the cell interior")
+        if self.complex.is_macrocell():
+            raise NotImplementedError("duffy_evaluation is not supported on split cells")
+
+        degree = self.degree
+        poly_set = self._element.get_nodal_basis()
+        coeffs = poly_set.get_coeffs()
+        # The element basis must be a uniform rescaling of the expansion set
+        unit = coeffs[(0,) * coeffs.ndim]
+        if not numpy.allclose(coeffs, unit * numpy.eye(len(coeffs))):
+            raise NotImplementedError("duffy_evaluation requires the element basis "
+                                      "to coincide with the expansion set")
+        expansion_set = poly_set.get_expansion_set()
+        etas = tuple(2.0 * f.points.ravel() - 1.0 for f in ps.factors)
+        duffy = expansion_set.tabulate_duffy(degree, etas, order=order)
+        duffy = {alpha: [(unit * coeff, factors) for coeff, factors in terms]
+                 for alpha, terms in duffy.items()}
+
+        sd = self.cell.get_spatial_dimension()
+        multiindex = []
+        for _ in range(sd):
+            multiindex.append(gem.JaggedIndex(extent=degree + 1, parents=tuple(multiindex)))
+        multiindex = tuple(multiindex)
+        # Index expressions for the weight exponents m_t = i_1 + ... + i_{t-1}:
+        # the first two are affine, the rest are looked up in an index table.
+        m_indices = [0, *multiindex[:1]]
+        for t in range(2, sd):
+            # Clamp the exponent to stay in bounds on the rectangular bounding
+            # box of the lattice: out-of-lattice entries are already zeroed by
+            # the factors of the previous axes.
+            table = reduce(numpy.add.outer, (numpy.arange(degree + 1),) * t)
+            table = numpy.minimum(table, degree)
+            m_indices.append(gem.VariableIndex(
+                gem.Indexed(gem.Literal(table, dtype=gem.uint_type), multiindex[:t])))
+
+        literals = {}
+
+        def as_gem(table):
+            key = id(table)
+            try:
+                return literals[key]
+            except KeyError:
+                return literals.setdefault(key, gem.Literal(table))
+
+        result = {}
+        for alpha, terms in duffy.items():
+            exprs = []
+            for coeff, factors in terms:
+                expr = reduce(gem.Product,
+                              (gem.Indexed(as_gem(table), (m, i, pt))
+                               for table, m, i, pt in zip(factors, m_indices,
+                                                          multiindex, ps.indices)))
+                if coeff != 1.0:
+                    expr = gem.Product(gem.Literal(coeff), expr)
+                exprs.append(expr)
+            result[alpha] = reduce(gem.Sum, exprs)
+        return multiindex, result
 
 
 class IntegratedLegendre(ScalarFiatElement):

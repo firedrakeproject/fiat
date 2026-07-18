@@ -84,6 +84,96 @@ def test_expansion_values(cell, degree):
             assert numpy.allclose(uh, exact, atol=1E-14)
 
 
+def duffy_points(dim, etas):
+    """Collapse a tensor-product grid of collapsed coordinates onto the
+    default simplex."""
+    grids = numpy.meshgrid(*etas, indexing="ij")
+    flat = tuple(grid.ravel() for grid in grids)
+    if dim == 2:
+        flat = expansions.xi_triangle(flat)
+    elif dim == 3:
+        flat = expansions.xi_tetrahedron(flat)
+    return numpy.stack(flat, axis=-1)
+
+
+def duffy_term_value(factors, index):
+    """Evaluate the outer product of the per-axis factors of a separable
+    term for a given lattice multi-index."""
+    vals = numpy.ones(())
+    m = 0
+    for table, i in zip(factors, index):
+        vals = numpy.multiply.outer(vals, table[m, i])
+        m += i
+    return vals.ravel()
+
+
+@pytest.mark.parametrize("degree", [0, 1, 4])
+@pytest.mark.parametrize("variant", [None, "dual"])
+@pytest.mark.parametrize("make_cell", [reference_element.default_simplex,
+                                       reference_element.ufc_simplex])
+def test_tabulate_duffy(make_cell, variant, degree):
+    for dim in (1, 2, 3):
+        cell = make_cell(dim)
+        U = expansions.ExpansionSet(cell, variant=variant)
+        # Unequal point counts per axis, including the collapsed vertex eta=1
+        etas = [numpy.linspace(-1, 1, 3 + axis) for axis in range(dim)]
+        A, b = U.affine_mappings[0]
+        pts = numpy.linalg.solve(A, (duffy_points(dim, etas) - b).T).T
+        expected = U._tabulate_on_cell(degree, pts, order=1)
+        duffy = U.tabulate_duffy(degree, etas, order=1)
+        assert expected.keys() == duffy.keys()
+
+        idx = (lambda p: p, expansions.morton_index2, expansions.morton_index3)[dim-1]
+        for alpha in expected:
+            for index in reference_element.lattice_iter(0, degree+1, dim):
+                vals = sum(coeff * duffy_term_value(factors, index)
+                           for coeff, factors in duffy[alpha])
+                assert numpy.allclose(vals, expected[alpha][idx(*index)], rtol=1E-10, atol=1E-10)
+
+
+@pytest.mark.parametrize("degree", [0, 1, 4])
+@pytest.mark.parametrize("dim", [1, 2, 3])
+def test_morton_tables(dim, degree):
+    """`expansions.morton_forward_table` / `expansions.morton_inverse_table`
+    must agree with `expansions.morton_index` on the simplex lattice, and
+    be mutual inverses there; this is the Morton dof numbering that
+    `tsfc.fem`'s sum-factorized argument/coefficient translation relies
+    on to gather/scatter without reordering FIAT's degrees of freedom.
+    """
+    import math
+    fwd = expansions.morton_forward_table(dim, degree)
+    inv = expansions.morton_inverse_table(dim, degree)
+    ndof = math.comb(degree + dim, dim)
+    assert fwd.shape == (degree + 1,) * dim
+    assert inv.shape == (ndof, dim)
+
+    seen = numpy.zeros(ndof, dtype=bool)
+    for multiindex in reference_element.lattice_iter(0, degree + 1, dim):
+        r = expansions.morton_index(dim, degree, *multiindex)
+        assert fwd[multiindex] == r
+        assert tuple(inv[r]) == multiindex
+        seen[r] = True
+    assert numpy.all(seen)
+
+
+@pytest.mark.parametrize("degree", [4])
+def test_principal_functions_bubble(cell, degree):
+    dim = cell.get_spatial_dimension()
+    variant = "bubble"
+    etas = [numpy.linspace(-1, 1, 3 + axis) for axis in range(dim)]
+    ref_pts = duffy_points(dim, etas).T
+    scale = 1.0
+    phi, = expansions.dubiner_recurrence(dim, degree, 0, ref_pts,
+                                         numpy.eye(dim), scale, variant=variant)
+    tables = [expansions.principal_functions(degree, etas[axis], axis + 1, variant=variant)
+              for axis in range(dim)]
+
+    idx = (lambda p: p, expansions.morton_index2, expansions.morton_index3)[dim-1]
+    for index in reference_element.lattice_iter(0, degree+1, dim):
+        vals = -scale * duffy_term_value([table["V"] for table in tables], index)
+        assert numpy.allclose(vals, phi[idx(*index)], rtol=1E-10, atol=1E-10)
+
+
 @pytest.mark.parametrize("degree", [10])
 def test_expansion_orthonormality(cell, degree):
     U = expansions.ExpansionSet(cell)

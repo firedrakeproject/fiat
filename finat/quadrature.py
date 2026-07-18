@@ -1,6 +1,7 @@
 import hashlib
 from abc import ABCMeta, abstractmethod
-from functools import cached_property
+from functools import cached_property, reduce
+from math import factorial
 
 import gem
 import numpy
@@ -8,8 +9,10 @@ from FIAT.quadrature import GaussLegendreQuadratureLineRule
 from FIAT.quadrature_schemes import create_quadrature as fiat_scheme
 from FIAT.reference_element import LINE, QUADRILATERAL, TENSORPRODUCT
 from gem.utils import safe_repr
+from recursivenodes.quadrature import gaussjacobi
 
-from finat.point_set import (GaussLegendrePointSet, GaussLobattoLegendrePointSet,
+from finat.point_set import (CollapsedTensorProductPointSet,
+                             GaussLegendrePointSet, GaussLobattoLegendrePointSet,
                              KMVPointSet, PointSet, TensorPointSet)
 
 
@@ -26,10 +29,12 @@ def make_quadrature(ref_el, degree, scheme="default"):
     :arg ref_el: The FIAT cell to create the quadrature for.
     :arg degree: The degree of polynomial that the rule should
         integrate exactly.
-    :kwarg scheme: The quadrature scheme, can be choosen from ["default", "canonical", "KMV"]
+    :kwarg scheme: The quadrature scheme, can be choosen from ["default", "canonical", "KMV", "collapsed"]
         "default" -> hard-coded scheme for low degree and collapsed Gauss scheme for high degree,
         "canonical" -> collapsed Gauss scheme,
-        "KMV" -> spectral lumped scheme for low degree (<=6 on triangles, <=3 on tetrahedra).
+        "KMV" -> spectral lumped scheme for low degree (<=6 on triangles, <=3 on tetrahedra),
+        "collapsed" -> collapsed Gauss scheme on simplices, keeping the
+        tensor-product structure in collapsed coordinates for sum factorization.
     """
     if ref_el.get_shape() == TENSORPRODUCT:
         try:
@@ -47,6 +52,9 @@ def make_quadrature(ref_el, degree, scheme="default"):
 
     if degree < 0:
         raise ValueError("Need positive degree, not %d" % degree)
+
+    if scheme.lower() == "collapsed":
+        return collapsed_gauss_jacobi_quadrature(ref_el, degree)
 
     if scheme.lower() in {"kmv", "lump"}:
         fiat_rule = fiat_scheme(ref_el, degree, "KMV")
@@ -67,6 +75,46 @@ def make_quadrature(ref_el, degree, scheme="default"):
         point_set = PointSet(fiat_rule.get_points())
 
     return QuadratureRule(point_set, fiat_rule.get_weights(), ref_el=ref_el, io_ornt_map_tuple=fiat_rule._intrinsic_orientation_permutation_map_tuple)
+
+
+def collapsed_gauss_jacobi_quadrature(ref_el, degree):
+    """Create a collapsed Gauss-Jacobi quadrature rule on a simplex, keeping
+    the tensor-product structure in collapsed coordinates.
+
+    Per-axis Gauss-Jacobi rules are collapsed onto the simplex through the
+    Duffy map ``x_t = eta_t * prod(u > t) (1 - eta_u)``; the Jacobi weight
+    ``(1 - eta_u)**u`` of axis ``u`` absorbs the Duffy Jacobian, so the
+    simplex weights are products of the one-dimensional weights.
+
+    Parameters
+    ----------
+    ref_el : FIAT.reference_element.Cell
+        The simplex to create the quadrature rule on.
+    degree : int
+        The degree of polynomial that the rule should integrate exactly.
+
+    Returns
+    -------
+    CollapsedTensorProductQuadratureRule
+        The structured quadrature rule.
+
+    """
+    if ref_el.is_macrocell():
+        raise NotImplementedError("Collapsed quadrature is not supported on split cells")
+    dim = ref_el.get_spatial_dimension()
+    num_points = (degree + 1 + 1) // 2  # exact integration
+    factors = []
+    for axis in range(dim):
+        xs, ws = gaussjacobi(num_points, axis, 0.0)
+        # Map from the biunit to the unit interval, folding the change of
+        # measure of the Jacobi weight into the quadrature weights
+        xs = (1.0 + xs) / 2.0
+        ws = ws / 2.0 ** (axis + 1)
+        if axis == 0:
+            # The Duffy map produces points on the unit simplex
+            ws = ws * (ref_el.volume() * factorial(dim))
+        factors.append(QuadratureRule(PointSet(xs[:, None]), ws))
+    return CollapsedTensorProductQuadratureRule(factors, ref_el=ref_el)
 
 
 class AbstractQuadratureRule(metaclass=ABCMeta):
@@ -176,3 +224,35 @@ class TensorProductQuadratureRule(AbstractQuadratureRule):
     @cached_property
     def weight_expression(self):
         return gem.Product(*(q.weight_expression for q in self.factors))
+
+
+class CollapsedTensorProductQuadratureRule(AbstractQuadratureRule):
+    """Simplex quadrature rule with tensor-product structure in collapsed
+    coordinates, following Karniadakis & Sherwin.
+
+    Parameters
+    ----------
+    factors : tuple of QuadratureRule
+        One-dimensional quadrature rules of collapsed coordinates on the
+        unit interval, one per spatial dimension of the simplex, with the
+        Duffy Jacobian folded into the weights.
+    ref_el : FIAT.reference_element.Cell
+        The simplex the quadrature rule integrates over.
+
+    """
+
+    def __init__(self, factors, ref_el=None):
+        self.ref_el = ref_el
+        self.factors = tuple(factors)
+        self._intrinsic_orientation_permutation_map_tuple = (None,)
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.factors!r}, {self.ref_el!r})"
+
+    @cached_property
+    def point_set(self):
+        return CollapsedTensorProductPointSet([q.point_set for q in self.factors])
+
+    @cached_property
+    def weight_expression(self):
+        return reduce(gem.Product, (q.weight_expression for q in self.factors))
