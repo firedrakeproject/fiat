@@ -22,7 +22,9 @@ its points and weights: integral moments must be measure-intrinsic
 Brubeck & Kirby (2025).
 """
 
+from functools import reduce
 from math import factorial, prod
+from operator import mul
 
 import numpy
 
@@ -180,51 +182,58 @@ class PhysicallyMappedFunctional:
                           order=self.order, direction=direction,
                           mapping=self.mapping)
 
-    def pullback(self, J: Node) -> "PhysicallyMappedFunctional":
-        r"""View this reference functional as acting on physical functions.
+    def pullback(self, A) -> "PhysicallyMappedFunctional":
+        r"""Contract each derivative slot of the direction with a matrix.
 
         By the chain rule, reference derivatives of a pullback are
-        physical derivatives contracted with the Jacobian, so the
-        direction tensor maps covariantly: each slot is contracted
-        with :math:`J`.
+        physical derivatives contracted with the Jacobian, so viewing
+        this reference functional as acting on physical functions
+        amounts to contracting each slot of the direction tensor with
+        the cell Jacobian; more general per-slot matrices arise when
+        the direction is instead mapped through a physical frame.
 
         Parameters
         ----------
-        J :
-            GEM expression for the cell Jacobian.
+        A :
+            The per-slot matrix: a GEM expression of shape ``(sd, sd)``,
+            or an ``(sd, sd)`` array with numeric or GEM scalar entries.
 
         Returns
         -------
         PhysicallyMappedFunctional
-            The functional with direction :math:`J \\otimes \\dots
-            \\otimes J : D`, acting on physical derivatives at the
-            images of the reference points.
+            The functional with direction :math:`A \\otimes \\dots
+            \\otimes A : D`, collapsed back onto multi-index
+            coefficients.
 
         """
         if self.order == 0:
             return self
-        sd = J.shape[0]
+        if isinstance(A, Node):
+            sd = A.shape[0]
+            A = numpy.array([[A[i, k] for k in range(sd)] for i in range(sd)],
+                            dtype=object)
+        A = numpy.asarray(A)
+        sd = A.shape[0]
+        symbolic = A.dtype == object
         alphas = multiindices(sd, self.order)
         lookup = {alpha: k for k, alpha in enumerate(alphas)}
 
-        # Distribute the multi-index coefficients over a symmetric tensor
-        T = numpy.zeros((sd,) * self.order)
-        for index in numpy.ndindex(T.shape):
+        direction = numpy.full(len(alphas), Zero() if symbolic else 0.0,
+                               dtype=object if symbolic else float)
+        shape = (sd,) * self.order
+        for index in numpy.ndindex(shape):
+            # Distribute the multi-index coefficients over a symmetric tensor
             alpha = _index_alpha(index, sd)
             scale = prod(map(factorial, alpha)) / factorial(self.order)
-            T[index] = self.direction[lookup[alpha]] * scale
-
-        # Contract each slot with the Jacobian
-        Jnp = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)],
-                          dtype=object)
-        for _ in range(self.order):
-            T = numpy.tensordot(T, Jnp, axes=(0, 1))
-
-        # Collapse back onto multi-index coefficients
-        direction = numpy.full(len(alphas), Zero(), dtype=object)
-        for index in numpy.ndindex(T.shape):
-            k = lookup[_index_alpha(index, sd)]
-            direction[k] = direction[k] + T[index]
+            d = self.direction[lookup[alpha]] * scale
+            if not isinstance(d, Node) and d == 0:
+                continue
+            # Contract each slot with A, collapsing onto multi-indices
+            for target in numpy.ndindex(shape):
+                term = reduce(mul, (A[target[k], index[k]]
+                                    for k in range(self.order)), d)
+                m = lookup[_index_alpha(target, sd)]
+                direction[m] = direction[m] + term
         return self.with_direction(direction)
 
     def evaluate(self, fiat_element: FiniteElement) -> numpy.ndarray:

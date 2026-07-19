@@ -788,3 +788,60 @@ builds a symbolic physical Gram $G$ and its determinant for `Sinv`.
 Risk framing unchanged from PLAN.md: abandon any piece that adds more
 complexity than it removes; the theory above is the review artifact to be
 signed off *before* production code moves.
+
+---
+
+## Stage 5 SHIPPED — duality engine as the default `basis_transformation` (2026-07-19)
+
+The mixin-unification plan above (Stage 5c/"Implementation plan" items 1–3)
+was **superseded by a course change**: instead of merging the frame classes,
+the numeric prototype of `test/finat/test_claude_zany_piola.py` was turned
+directly into product code.  `PhysicallyMappedElement.basis_transformation`
+(`finat/physically_mapped.py`) now assembles $B_{ij} = n_i(\hat\psi_j \circ
+F^{-1})$ symbolically in GEM and inverts it sparsely; `finat/zany.py` shrank
+from ~900 lines (FacetFrame, PiolaFacetFrame, four hooks, two mixins) to two
+thin configuration mixins (`_check_mapping` guards + the Piola `dof_scale`
+override).  Paper §4 ("Assembly by duality and sparsity-preserving
+inversion") documents the theory.
+
+**Engine design (all in `finat/physically_mapped.py`):**
+
+1. *Per-slot maps, adjoint on the tabulation.*  One effective matrix per
+   slot: $G = J^{-1}\Phi$ (derivative slots), $G = (J/\det J)^T\Phi$ (value
+   slots), applied to the reference direction/weights via the generalized
+   `PhysicallyMappedFunctional.pullback(A)` (now accepts any numeric or GEM
+   matrix); rows of $B$ are then numeric Vandermonde pairings.  Numerator/
+   denominator form keeps numerators polynomial: $s_i = (\det J\,|K\hat n|)^m$
+   for scalar facet rows, $\det J^{2r}$ for Piola facet rows (using the exact
+   identity $J^T K\hat\nu^s = \det J\, \hat\nu^s$), $\det J$ for divergence.
+
+2. *Sparsity and constants inferred from numerics.*  $B$ is assembled at 3
+   deterministic sample Jacobians (`_sample_jacobians`, cosine-based, one
+   orientation-reversing).  Entries below `pattern_tol = 1e-10` (row-relative)
+   at every sample are structural `gem.Zero`; entries equal at every sample
+   are constants (snapped to integers where they round), so invariant rows
+   never touch symbolic algebra.  No closure bookkeeping, no invariance case
+   analysis, no support-law *assumption* — the pattern is measured.
+
+3. *SCC block triangularization + sparse back-substitution.*  Tarjan on the
+   coupling digraph emits diagonal blocks in dependency order;
+   $V_S = (B'_{SS})^{-1}(\mathrm{diag}(s_i) I_S - B'_{Sc}V_c)$ with one
+   adjugate/determinant pair per block, cached across identical blocks
+   (vertex jets of different vertices hit the cache).  GEM constant folding
+   through `Zero` keeps everything sparse; gotcha: numpy object arrays must
+   be the *left* operand of elementwise products, else GEM broadcasts a
+   vector node (`V[j] * coef`, not `coef * V[j]`).
+
+**Verification:** full finat suite 430 passed / 8 skipped (includes
+`test_zany_mapping` direct physical fits, both orientations, and the
+independent prototype cross-check in `test_claude_zany_piola.py`, which
+still shares no code path with `basis_transformation`); flake8 + pydocstyle
+clean; opaque `gem.Variable` Jacobian path verified bit-identical to the
+literal path with max 3–9 nonzeros per row of $M$.
+
+**Numeric groundwork:** pattern-only elimination validated over the entire
+scalar + Piola zoos before the symbolic build (scratch `validate_pattern.py`):
+max diagonal block 5×5 (BrambleZlamalC2 order-4 jets), pattern leak ≤ 1e-14
+except BZC2 (~1e-10, its known FIAT-side conditioning).  Hand-coded
+transformations (HCT, PS, C2 elements, WuXu, Walkington) still override the
+engine and are untouched.
