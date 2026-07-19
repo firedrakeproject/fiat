@@ -2,37 +2,15 @@ import FIAT
 import numpy
 
 from FIAT.polynomial_set import mis
-from gem import ListTensor, Literal, Power, Zero
+from gem import ListTensor, Zero
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
 from finat.physically_mapped import identity, PhysicallyMappedElement
 from finat.argyris import _vertex_transform, _normal_tangential_transform
+from finat.morley import morley_transform
 from copy import deepcopy
 from itertools import chain
-
-
-def morley_transform(cell, J, detJ, face):
-    adjugate = lambda A: ListTensor([[A[1, 1], -1*A[1, 0]], [-1*A[0, 1], A[0, 0]]])
-    sd = cell.get_spatial_dimension()
-    thats = cell.compute_tangents(sd-1, face)
-    nhat = numpy.cross(*thats)
-    ahat = numpy.linalg.norm(nhat)
-    nhat /= numpy.dot(nhat, nhat)
-
-    Jn = J @ Literal(nhat)
-    Jt = J @ Literal(thats.T)
-    Gnt = Jn.T @ Jt
-    Gtt = Jt.T @ Jt
-    detG = Gtt[0, 0]*Gtt[1, 1] - Gtt[0, 1]*Gtt[1, 0]
-    area = Power(detG, Literal(0.5))
-
-    Bnn = detJ / area
-    Bnt = Gnt @ adjugate(Gtt) / detG
-    Bnn *= ahat
-    Bnt *= ahat
-    Bnt = (-1*(Bnt[0] + Bnt[1]), Bnt[0], Bnt[1])
-    return Bnn, Bnt
 
 
 class Walkington(PhysicallyMappedElement, ScalarFiatElement):
@@ -46,7 +24,7 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
             reduced_dofs[sd-1][entity] = reduced_dofs[sd-1][entity][:1]
         self._entity_dofs = reduced_dofs
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         # Jacobian at barycenter
         sd = self.cell.get_spatial_dimension()
         top = self.cell.get_topology()
