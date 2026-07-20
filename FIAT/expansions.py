@@ -77,6 +77,142 @@ def morton_forward_table(dim, n):
     return numpy.minimum(table, ndof - 1)
 
 
+def lexicographic_permutation(dim, n):
+    """Permutation from Morton (total-degree-major) order to lattice-lexicographic order.
+
+    Lattice-lexicographic order enumerates the simplex lattice with the
+    first coordinate slowest-varying and the last coordinate
+    fastest-varying (``p`` outer, ..., innermost coordinate inner), the
+    same nesting `finat.duffy.DuffyElement.duffy_evaluation` builds via
+    nested `gem.JaggedIndex` (each with the previous coordinates as
+    parents). This is the dof order `FIAT.hierarchical.LegendreDual` uses,
+    so that the flat dof index is affine in the innermost coordinate for
+    each fixed value of the outer coordinates -- unlike the Morton
+    (total-degree-major) index, which mixes all coordinates
+    non-separably. See `finat/duffy.py` for how that affine structure is
+    exploited (`gem.FlexiblyIndexed`, offset a function of the outer
+    coordinates only).
+
+    Parameters
+    ----------
+    dim : int
+        The spatial dimension.
+    n : int
+        The polynomial degree.
+
+    Returns
+    -------
+    numpy.ndarray
+        An integer array of length ``ndof = math.comb(n + dim, dim)``
+        such that ``perm[j]`` is the Morton index of the ``j``-th lattice
+        point in lattice-lexicographic order. If ``phis`` is an array
+        whose rows enumerate the members of :class:`ExpansionSet` in
+        Morton order (as `ExpansionSet`/`ONPolynomialSet` tabulate them),
+        ``phis[perm]`` re-enumerates the same rows in
+        lattice-lexicographic order.
+
+    """
+    ndof = math.comb(n + dim, dim)
+    return numpy.fromiter((morton_index(dim, n, *multiindex) for multiindex in _lex_iter(dim, n)),
+                          dtype=int, count=ndof)
+
+
+def _lex_iter(dim, n):
+    """Iterate the simplex lattice in lattice-lexicographic order.
+
+    The first coordinate is slowest-varying, the last fastest-varying;
+    see `lexicographic_permutation`.
+    """
+    if dim == 1:
+        for p in range(n + 1):
+            yield (p,)
+    else:
+        for p in range(n + 1):
+            for rest in _lex_iter(dim - 1, n - p):
+                yield (p,) + rest
+
+
+def lexicographic_multiindices(dim, n):
+    """Lattice multi-index of each lattice-lexicographic dof position.
+
+    Parameters
+    ----------
+    dim : int
+        The spatial dimension.
+    n : int
+        The polynomial degree.
+
+    Returns
+    -------
+    numpy.ndarray
+        An integer array of shape ``(ndof, dim)`` such that row ``j`` is
+        the lattice multi-index ``(i_1, ..., i_dim)`` of dof ``j``, when
+        dofs are ordered lattice-lexicographically (see
+        `lexicographic_permutation`); the inverse of the mapping
+        `lexicographic_permutation` composes with `morton_index` to
+        express.
+
+    """
+    ndof = math.comb(n + dim, dim)
+    return numpy.fromiter((i for multiindex in _lex_iter(dim, n) for i in multiindex),
+                          dtype=int, count=ndof * dim).reshape(ndof, dim)
+
+
+def lexicographic_offsets(dim, n):
+    """Small per-axis-prefix offset tables for lattice-lexicographic order.
+
+    For a lattice-lexicographic-ordered dof index ``j`` with lattice
+    multi-index ``(i_1, ..., i_dim)``, ``j == offsets[dim - 2][i_1, ...,
+    i_{dim - 1}] + i_dim``: the flat index is affine (slope 1) in the
+    innermost coordinate for each fixed value of the outer coordinates.
+    This is what lets `finat/duffy.py` address the flat dof storage via
+    `gem.FlexiblyIndexed` (one small table lookup for the outer
+    coordinates, then a unit-stride term for the innermost one) instead
+    of the non-separable Morton index formula.
+
+    Entries for a prefix that is not on the simplex lattice (i.e. whose
+    lattice point ``(i_1, ..., i_{t + 1}, 0, ..., 0)`` has ``sum > n``)
+    are set to ``ndof`` (one past the last valid flat index), not ``0``:
+    they must compare as "larger than any real flat index" so that a
+    step-sum search recovering a coordinate by counting how many table
+    entries a real ``r < ndof`` clears (see `finat/duffy.py`) does not
+    spuriously count an out-of-lattice entry, which a ``0`` default
+    would (comparing as smaller than, rather than unreachable by, every
+    real index).
+
+    Parameters
+    ----------
+    dim : int
+        The spatial dimension (1, 2, or 3).
+    n : int
+        The polynomial degree.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        ``dim - 1`` integer arrays, the ``t``-th of shape ``(n + 1,) *
+        (t + 1)``, giving the flat dof index of ``(i_1, ..., i_{t + 1},
+        0, ..., 0)`` for each prefix ``(i_1, ..., i_{t + 1})``. Empty for
+        ``dim == 1`` (no offsetting needed: the flat index *is* the only
+        lattice coordinate).
+
+    """
+    ndof = math.comb(n + dim, dim)
+    multiindices = lexicographic_multiindices(dim, n)
+    offsets = []
+    for t in range(dim - 1):
+        shape = (n + 1,) * (t + 1)
+        table = numpy.full(shape, ndof, dtype=int)
+        prefixes = multiindices[:, :t + 1]
+        seen = numpy.zeros(shape, dtype=bool)
+        for j, prefix in enumerate(map(tuple, prefixes)):
+            if not seen[prefix]:
+                table[prefix] = j
+                seen[prefix] = True
+        offsets.append(table)
+    return tuple(offsets)
+
+
 def morton_inverse_table(dim, n):
     """Table mapping a Morton (flat) index to its lattice multi-index.
 

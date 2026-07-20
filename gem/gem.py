@@ -1107,8 +1107,16 @@ class Delta(Scalar, Terminal):
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
-        # Set up free indices
-        free_indices = [index for index in (i, j) if isinstance(index, Index)]
+        # Set up free indices.  A VariableIndex operand is not itself a free
+        # index, but its wrapped expression may be free in other indices
+        # (e.g. a Morton index computed from a lattice multiindex); those
+        # need to propagate here too, exactly as Indexed/FlexiblyIndexed do.
+        free_indices = []
+        for index in (i, j):
+            if isinstance(index, Index):
+                free_indices.append(index)
+            elif isinstance(index, VariableIndex):
+                free_indices.extend(index.expression.free_indices)
         self.free_indices = tuple(unique(free_indices))
         self._dtype = dtype
         return self

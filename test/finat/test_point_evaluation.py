@@ -71,7 +71,7 @@ def test_point_evaluation_zany(ref_to_phys, element, degree):
 
 @pytest.mark.parametrize('degree', [1, 4])
 def test_duffy_evaluation(cell, degree):
-    from FIAT.expansions import morton_index2, morton_index3
+    from FIAT.expansions import lexicographic_multiindices
     from finat.point_set import PointSet, CollapsedTensorProductPointSet
 
     dim = cell.get_spatial_dimension()
@@ -86,7 +86,9 @@ def test_duffy_evaluation(cell, degree):
     expected = element.basis_evaluation(1, dense_ps)
     assert expected.keys() == duffy.keys()
 
-    idx = ((lambda *index: index[0]), morton_index2, morton_index3)[dim-1]
+    # dof j's lattice coordinates, per FIAT.hierarchical.LegendreDual's
+    # lattice-lexicographic dof order.
+    flat_of = {tuple(row): j for j, row in enumerate(lexicographic_multiindices(dim, degree))}
     lattice_shape = (degree + 1,) * dim
     for alpha, table in expected.items():
         exp, = gem.interpreter.evaluate([table])
@@ -97,7 +99,7 @@ def test_duffy_evaluation(cell, degree):
             if sum(index) > degree:
                 assert numpy.allclose(act[index], 0.0)
             else:
-                assert numpy.allclose(act[index], exp[:, idx(*index)],
+                assert numpy.allclose(act[index], exp[:, flat_of[index]],
                                       rtol=1E-10, atol=1E-12)
 
 

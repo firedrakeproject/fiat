@@ -13,6 +13,7 @@ from FIAT.reference_element import symmetric_simplex
 from FIAT.quadrature import FacetQuadratureRule
 from FIAT.polynomial_set import ONPolynomialSet, make_bubbles
 from FIAT.check_format_variant import check_format_variant, parse_quadrature_scheme
+from FIAT.expansions import lexicographic_permutation
 from FIAT.P0 import P0
 
 
@@ -34,7 +35,13 @@ def make_dual_bubbles(ref_el, degree, codim=0, interpolant_deg=None, quad_scheme
 
 
 class LegendreDual(dual_set.DualSet):
-    """The dual basis for Legendre elements."""
+    """The dual basis for Legendre elements.
+
+    Nodes are ordered lattice-lexicographically (`FIAT.expansions.
+    lexicographic_permutation`), not in the expansion set's native Morton
+    order: `finat.duffy.DuffyElement` relies on this so that the flat dof
+    index is affine in the innermost lattice coordinate.
+    """
     def __init__(self, ref_el, degree, codim=0, interpolant_deg=None, quad_scheme=None):
         if interpolant_deg is None:
             interpolant_deg = degree
@@ -48,6 +55,8 @@ class LegendreDual(dual_set.DualSet):
         poly_set = ONPolynomialSet(ref_facet, degree, scale="L2 piola")
         Q_ref = parse_quadrature_scheme(ref_facet, degree + interpolant_deg, quad_scheme)
         phis = poly_set.tabulate(Q_ref.get_points())[(0,) * dim]
+        if dim > 0:
+            phis = phis[lexicographic_permutation(dim, degree)]
         for entity in sorted(top[dim]):
             cur = len(nodes)
             Q_facet = FacetQuadratureRule(ref_el, dim, entity, Q_ref, avg=True)

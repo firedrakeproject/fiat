@@ -338,6 +338,16 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         to_, = list({delta.i, delta.j} - {from_})
 
         sum_indices.remove(from_)
+        if isinstance(to_, VariableIndex):
+            # `from_` is not simply dropped: the substitution below
+            # exposes `to_`'s wrapped free indices (e.g. a lattice
+            # multiindex inside a Morton index expression) wherever
+            # `from_` used to appear, so they must join the sum indices
+            # too, or later free-index bookkeeping (e.g. the recomputed
+            # ``variable.free_indices``) will no longer match.
+            for index in to_.expression.free_indices:
+                if index not in sum_indices:
+                    sum_indices.append(index)
 
         factors = [substitute(f, from_, to_) for f in factors]
 

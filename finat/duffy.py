@@ -3,9 +3,9 @@ from functools import reduce
 import numpy
 
 import gem
-from FIAT.expansions import morton_inverse_table
 from gem.node import MemoizerArg
 from gem.optimise import contraction, ffc_rounding, filtered_replace_indices
+from FIAT.expansions import lexicographic_offsets, lexicographic_permutation
 from finat.point_set import CollapsedTensorProductPointSet
 
 
@@ -19,58 +19,127 @@ def _one(n):
     return gem.Literal(n, dtype=gem.uint_type)
 
 
-def _morton_index_expr(multiindex, ndof):
-    """Flat Morton index of a lattice multi-index, as index arithmetic.
+def _flat_index_expr(multiindex, ndof, offsets):
+    """Flat lattice-lexicographic index of a lattice multi-index, as index
+    arithmetic against a small table.
 
-    Computes `FIAT.expansions.morton_index2` / `morton_index3`'s formula
-    directly as a `gem.Node` built from `gem.Sum`/`gem.Product`/
-    `gem.FloorDiv` on the multi-index components, rather than a table
-    lookup.
+    `FIAT.expansions.lexicographic_offsets`' tables make the dof order
+    FIAT now uses (`FIAT.hierarchical.LegendreDual`) affine in the
+    innermost lattice coordinate for each fixed value of the outer
+    coordinates, so the flat index is just one small table lookup (over
+    the outer coordinates only) plus the innermost coordinate -- unlike
+    the old Morton (total-degree-major) index, whose formula mixes all
+    coordinates non-separably and needed genuine arithmetic.
 
     ``multiindex`` ranges over the rectangular bounding box of the
     simplex lattice (each `gem.JaggedIndex` has extent ``degree + 1``),
     including points outside the simplex lattice (``sum(multiindex) >
-    degree``), for which the raw formula overshoots ``ndof - 1``. Like
-    `FIAT.expansions.morton_forward_table`, the result is clamped to
-    ``ndof - 1`` for those points: the corresponding tabulation is exactly
-    zero there, so the clamped (but otherwise meaningless) index is only
-    ever multiplied by zero.
+    degree``), for which the table lookup already returns ``ndof`` (see
+    `FIAT.expansions.lexicographic_offsets`), overshooting ``ndof - 1``.
+    Like the old Morton table, the result is clamped to ``ndof - 1`` for
+    those points: the corresponding tabulation is exactly zero there, so
+    the clamped (but otherwise meaningless) index is only ever multiplied
+    by zero.
 
     Parameters
     ----------
     multiindex : tuple of gem.Index
         The lattice multi-index, of length 1, 2, or 3.
     ndof : int
-        The element's space dimension, i.e. the number of points on the
-        simplex lattice; the result is clamped to ``ndof - 1``.
+        The element's space dimension; the result is clamped to
+        ``ndof - 1``.
+    offsets : tuple of numpy.ndarray
+        `FIAT.expansions.lexicographic_offsets`'s per-axis-prefix tables.
 
     Returns
     -------
     gem.Node
         A scalar expression of dtype `gem.uint_type`, free in
-        ``multiindex``, equal to the flat Morton index, clamped to
-        ``ndof - 1``.
+        ``multiindex``, equal to the flat lattice-lexicographic index,
+        clamped to ``ndof - 1``.
 
     """
-    values = [_index_value(index) for index in multiindex]
-    if len(values) == 1:
-        p, = values
-        expr = p
-    elif len(values) == 2:
-        p, q = values
-        s = gem.Sum(p, q)
-        shell = gem.FloorDiv(gem.Product(s, gem.Sum(s, _one(1))), _one(2))
-        expr = gem.Sum(shell, q)
-    elif len(values) == 3:
-        p, q, r = values
-        s = gem.Sum(gem.Sum(p, q), r)
-        qr = gem.Sum(q, r)
-        shell = gem.FloorDiv(gem.Product(gem.Product(s, gem.Sum(s, _one(1))), gem.Sum(s, _one(2))), _one(6))
-        layer = gem.FloorDiv(gem.Product(qr, gem.Sum(qr, _one(1))), _one(2))
-        expr = gem.Sum(gem.Sum(shell, layer), r)
+    if len(multiindex) == 1:
+        expr = _index_value(multiindex[0])
     else:
-        raise NotImplementedError("Morton index arithmetic is only implemented up to dimension 3")
+        offset = gem.Indexed(gem.Literal(offsets[-1], dtype=gem.uint_type), multiindex[:-1])
+        expr = gem.Sum(offset, _index_value(multiindex[-1]))
     return gem.MinValue(expr, _one(ndof - 1))
+
+
+def _step_ge(a, b):
+    """1 if a >= b else 0, for gem uint scalar expressions a, b."""
+    return gem.Conditional(gem.Comparison(">=", a, b), _one(1), _one(0))
+
+
+def _step_le(a, b):
+    """1 if a <= b else 0, for gem uint scalar expressions a, b."""
+    return gem.Conditional(gem.Comparison("<=", a, b), _one(1), _one(0))
+
+
+def _bounded_sub(a, b, bound):
+    """``a - b`` as a gem uint expression, given ``0 <= b <= a <= bound``.
+
+    Unsigned index arithmetic has no subtraction (subtracting would
+    underflow whenever ``b > a``, which cannot be ruled out for `Node`
+    dtypes without a signed type), so this counts, for each candidate
+    ``0 < k <= bound``, whether ``b + k`` is still ``<= a``: exactly
+    ``a - b`` of them are.
+    """
+    terms = [_step_le(gem.Sum(b, _one(k)), a) for k in range(1, bound + 1)]
+    return reduce(gem.Sum, terms, _one(0))
+
+
+def _inverse_lex_index_exprs(r, sd, degree, offsets):
+    """Lattice multi-index of a flat lattice-lexicographic dof index.
+
+    Inverts `_flat_index_expr`: given the flat degree-of-freedom index
+    ``r`` (assumed on the simplex lattice, i.e. not a clamped
+    out-of-lattice value), returns the lattice multi-index
+    ``(i_1, ..., i_sd)`` such that `_flat_index_expr` maps it back to
+    ``r``. Each outer coordinate is recovered by counting, via
+    `_step_ge`, how many of the (at most ``degree``) candidate thresholds
+    from `FIAT.expansions.lexicographic_offsets`'s tables ``r`` clears;
+    the innermost coordinate is recovered via `_bounded_sub` against the
+    resulting offset.
+
+    Parameters
+    ----------
+    r : gem.Node
+        Scalar expression of dtype `gem.uint_type`, the value of the
+        flat index (e.g. `_index_value` of the `gem.Index` itself).
+    sd : int
+        Number of lattice axes (2 or 3; 1 is the identity map and needs
+        no inversion).
+    degree : int
+        The element's polynomial degree.
+    offsets : tuple of numpy.ndarray
+        `FIAT.expansions.lexicographic_offsets`'s per-axis-prefix tables.
+
+    Returns
+    -------
+    tuple of gem.Node
+        The ``sd`` lattice coordinates, each a scalar expression of
+        dtype `gem.uint_type`, free in whatever ``r`` is free in.
+
+    """
+    if sd == 2:
+        table, = offsets
+        p = reduce(gem.Sum, (_step_ge(r, _one(int(table[k]))) for k in range(1, degree + 1)), _one(0))
+        offset_p = gem.Indexed(gem.Literal(table, dtype=gem.uint_type), (gem.VariableIndex(p),))
+        q = _bounded_sub(r, offset_p, degree)
+        return p, q
+    elif sd == 3:
+        table1, table2 = offsets
+        p = reduce(gem.Sum, (_step_ge(r, _one(int(table1[k]))) for k in range(1, degree + 1)), _one(0))
+        p_idx = gem.VariableIndex(p)
+        q = reduce(gem.Sum, (_step_ge(r, gem.Indexed(gem.Literal(table2, dtype=gem.uint_type), (p_idx, k)))
+                             for k in range(1, degree + 1)), _one(0))
+        offset_pq = gem.Indexed(gem.Literal(table2, dtype=gem.uint_type), (p_idx, gem.VariableIndex(q)))
+        last = _bounded_sub(r, offset_pq, degree)
+        return p, q, last
+    else:
+        raise NotImplementedError("Lattice-lexicographic index arithmetic is only implemented up to dimension 3")
 
 
 class DuffyElement:
@@ -80,9 +149,9 @@ class DuffyElement:
 
     The basis functions are enumerated by a lattice multi-index rather
     than the flat degree-of-freedom index; the flat index of a lattice
-    point is its Morton index (`FIAT.expansions.morton_index`), the same
-    enumeration FIAT already uses for the element's degrees of freedom,
-    so no reordering of the element's dof numbering is involved.
+    point is its lattice-lexicographic index
+    (`FIAT.expansions.lexicographic_permutation`), the dof order
+    `FIAT.hierarchical.LegendreDual` uses.
     """
 
     def duffy_evaluation(self, order, ps, entity=None):
@@ -91,7 +160,8 @@ class DuffyElement:
 
         The basis functions are enumerated by a lattice multi-index
         ``(i_1, ..., i_d)`` rather than the flat basis index; the flat index
-        of a member is its Morton index (`FIAT.expansions.morton_index`).
+        of a member is its lattice-lexicographic index
+        (`FIAT.expansions.lexicographic_permutation`).
         The lattice indices range over the rectangular bounding box of the
         simplex lattice; entries outside the simplex lattice
         (``i_1 + ... + i_d > degree``) tabulate to zero.
@@ -125,11 +195,17 @@ class DuffyElement:
             raise NotImplementedError("duffy_evaluation is not supported on split cells")
 
         degree = self.degree
+        sd = self.cell.get_spatial_dimension()
         poly_set = self._element.get_nodal_basis()
         coeffs = poly_set.get_coeffs()
-        # The element basis must be a uniform rescaling of the expansion set
+        # The element basis must be a uniform rescaling of the expansion
+        # set, permuted from Morton to lattice-lexicographic dof order
+        # (FIAT.hierarchical.LegendreDual).
         unit = coeffs[(0,) * coeffs.ndim]
-        if not numpy.allclose(coeffs, unit * numpy.eye(len(coeffs))):
+        perm = lexicographic_permutation(sd, degree)
+        expected = numpy.zeros_like(coeffs)
+        expected[numpy.arange(len(coeffs)), perm] = unit
+        if not numpy.allclose(coeffs, expected):
             raise NotImplementedError("duffy_evaluation requires the element basis "
                                       "to coincide with the expansion set")
         expansion_set = poly_set.get_expansion_set()
@@ -138,7 +214,6 @@ class DuffyElement:
         duffy = {alpha: [(unit * coeff, factors) for coeff, factors in terms]
                  for alpha, terms in duffy.items()}
 
-        sd = self.cell.get_spatial_dimension()
         multiindex = []
         for _ in range(sd):
             multiindex.append(gem.JaggedIndex(extent=degree + 1, parents=tuple(multiindex)))
@@ -221,13 +296,14 @@ class DuffyElement:
 
         The sum over the flat degree-of-freedom index is rewritten as a sum
         over the lattice multi-index, gathering the coefficient vector
-        through the same Morton dof numbering FIAT already uses
-        (`FIAT.expansions.morton_index2` / `morton_index3`), computed as
-        index arithmetic (`_morton_index_expr`) rather than a table
-        lookup.  `gem.optimise.contraction` sum-factorizes the resulting
-        nested sum over the lattice multi-index, exploiting the same
-        axis-separable structure that makes `duffy_evaluation` itself
-        O(p^d).
+        through the same lattice-lexicographic dof numbering FIAT now uses
+        (`FIAT.hierarchical.LegendreDual`), computed as index arithmetic
+        against a small table (`_flat_index_expr`,
+        `FIAT.expansions.lexicographic_offsets`) rather than a full
+        ``ndof``-sized lookup.  `gem.optimise.contraction` sum-factorizes
+        the resulting nested sum over the lattice multi-index, exploiting
+        the same axis-separable structure that makes `duffy_evaluation`
+        itself O(p^d).
 
         Parameters
         ----------
@@ -258,7 +334,9 @@ class DuffyElement:
                   for alpha, table in result.items()
                   if sum(alpha) == order}
 
-        r_index = gem.VariableIndex(_morton_index_expr(multiindex, self.space_dimension()))
+        ndof = self.space_dimension()
+        offsets = lexicographic_offsets(len(multiindex), self.degree)
+        r_index = gem.VariableIndex(_flat_index_expr(multiindex, ndof, offsets))
         vec_r, = gem.optimise.remove_componenttensors([gem.Indexed(vec, (r_index,))])
         zeta = self.get_value_indices()
         value_dict = {}
@@ -275,10 +353,24 @@ def _scatter_to_dof_index(multiindex, result, element):
     `gem.ComponentTensor` of shape ``(element.space_dimension(),)``
     indexed by the flat degree-of-freedom index, matching the shape
     convention of the standard (non-factorized) tabulation.  The flat
-    index of a lattice point is its Morton index
-    (`FIAT.expansions.morton_index`), the same enumeration FIAT already
-    uses for the element's degrees of freedom, so no reordering of the
-    element's dof numbering is involved.
+    index of a lattice point is its lattice-lexicographic index
+    (`FIAT.expansions.lexicographic_permutation`), the dof order
+    `FIAT.hierarchical.LegendreDual` uses.
+
+    Substitutes each lattice axis with `_inverse_lex_index_exprs`'s index
+    arithmetic against a small table (`FIAT.expansions.
+    lexicographic_offsets`, not a full ``ndof``-sized inverse table),
+    expressing the lattice multi-index as a function of the new flat
+    index ``r`` -- exactly the substitution `translate_argument`/
+    `translate_coefficient` already use for canonical quadrature-point
+    reordering (`gem.node.MemoizerArg(gem.optimise.
+    filtered_replace_indices)`).  This keeps ``r`` a genuine flat index
+    throughout (matching `element.get_indices()`'s convention), unlike
+    scattering via an `IndexSum`-`gem.Delta` construction over the full
+    lattice bounding box, which is also correct but was measured to
+    regress the downstream quadrature-contraction flop count (the outer
+    loop over the lattice bounding box is asymptotically larger than the
+    flat ``ndof`` loop it replaces).
 
     Parameters
     ----------
@@ -298,15 +390,15 @@ def _scatter_to_dof_index(multiindex, result, element):
         ``(element.space_dimension(),)``.
 
     """
-    sd = len(multiindex)
     ndof = element.space_dimension()
     r = gem.Index(extent=ndof)
-    inv_table = morton_inverse_table(sd, element.degree)
-    subst = tuple(
-        (axis, gem.VariableIndex(gem.Indexed(
-            gem.Literal(numpy.ascontiguousarray(inv_table[:, t]), dtype=gem.uint_type), (r,))))
-        for t, axis in enumerate(multiindex)
-    )
+    if len(multiindex) == 1:
+        # 1D: the flat index already *is* the (only) lattice coordinate.
+        subst = ((multiindex[0], r),)
+    else:
+        offsets = lexicographic_offsets(len(multiindex), element.degree)
+        inverse = _inverse_lex_index_exprs(_index_value(r), len(multiindex), element.degree, offsets)
+        subst = tuple((axis, gem.VariableIndex(expr)) for axis, expr in zip(multiindex, inverse))
     mapper = MemoizerArg(filtered_replace_indices)
     return {alpha: gem.ComponentTensor(mapper(expr, subst), (r,))
             for alpha, expr in result.items()}
