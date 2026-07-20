@@ -30,12 +30,6 @@ def make_points(K, degree):
     return pts
 
 
-@pytest.mark.parametrize("degree, space_dimension", [(13, 127), (14, 144)])
-def test_hct_high_order_degree(degree: int, space_dimension: int) -> None:
-    fe = HCT(ufc_simplex(2), degree)
-    assert fe.space_dimension() == space_dimension
-
-
 @pytest.mark.parametrize("reduced", (False, True))
 def test_hct_constant(cell, reduced):
     # Test that bfs associated with point evaluation sum up to 1
@@ -80,3 +74,9 @@ def test_full_polynomials(cell, reduced):
     C1 = CkPolynomialSet(ref_complex, degree, order=1, variant="bubble")
     C1_tab = C1.tabulate(pts)[(0, 0)]
     assert span_greater_equal(tab, C1_tab)
+
+
+@pytest.mark.parametrize("degree, space_dimension", [(13, 127), (14, 144)])
+def test_hct_high_order_degree(degree: int, space_dimension: int) -> None:
+    fe = HCT(ufc_simplex(2), degree)
+    assert fe.space_dimension() == space_dimension
