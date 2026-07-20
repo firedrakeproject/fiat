@@ -10,6 +10,7 @@ to allow users to get coordinates that they want."""
 import numpy
 import math
 from FIAT import reference_element, jacobi
+from FIAT.precision import calibrate_tolerance
 
 
 def morton_index2(p, q=0):
@@ -414,7 +415,8 @@ class ExpansionSet(object):
 
         if pts.dtype == object:
             # If binning is undefined, scale by the characteristic function of each subcell
-            Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique)
+            tol = calibrate_tolerance(1E-12, numpy.array(self.ref_el.vertices).dtype)
+            Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique, tol=tol)
             for cell, phi in phis.items():
                 for alpha in phi:
                     phi[alpha] *= Xi[cell]
@@ -771,7 +773,8 @@ def compute_partition_of_unity(ref_el, pt, unique=True, tol=1E-12):
     :arg ref_el: a SimplicialComplex.
     :arg pt: a physical point on the complex.
     :kwarg unique: Are we assigning a unique cell to points on facets?
-    :kwarg tol: the absolute tolerance.
+    :kwarg tol: the absolute tolerance, already adjusted for the caller's
+        working precision (see `FIAT.precision.calibrate_tolerance`).
     :returns: a list of (weighted) characteristic functions for each subcell.
     """
     import gem
