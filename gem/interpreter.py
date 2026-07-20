@@ -153,11 +153,15 @@ def _evaluate_variable(e, self):
 
 @_evaluate.register(gem.Power)
 @_evaluate.register(gem.Division)
+@_evaluate.register(gem.FloorDiv)
+@_evaluate.register(gem.Remainder)
 @_evaluate.register(gem.Product)
 @_evaluate.register(gem.Sum)
 def _evaluate_operator(e, self):
     op = {gem.Product: operator.mul,
           gem.Division: operator.truediv,
+          gem.FloorDiv: operator.floordiv,
+          gem.Remainder: operator.mod,
           gem.Sum: operator.add,
           gem.Power: operator.pow}[type(e)]
 

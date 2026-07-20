@@ -3,10 +3,74 @@ from functools import reduce
 import numpy
 
 import gem
-from FIAT.expansions import morton_forward_table, morton_inverse_table
+from FIAT.expansions import morton_inverse_table
 from gem.node import MemoizerArg
 from gem.optimise import contraction, ffc_rounding, filtered_replace_indices
 from finat.point_set import CollapsedTensorProductPointSet
+
+
+def _index_value(index):
+    """GEM scalar expression for the numeric value of a `gem.Index`."""
+    return gem.Indexed(gem.Literal(numpy.arange(index.extent, dtype=gem.uint_type),
+                                   dtype=gem.uint_type), (index,))
+
+
+def _one(n):
+    return gem.Literal(n, dtype=gem.uint_type)
+
+
+def _morton_index_expr(multiindex, ndof):
+    """Flat Morton index of a lattice multi-index, as index arithmetic.
+
+    Computes `FIAT.expansions.morton_index2` / `morton_index3`'s formula
+    directly as a `gem.Node` built from `gem.Sum`/`gem.Product`/
+    `gem.FloorDiv` on the multi-index components, rather than a table
+    lookup.
+
+    ``multiindex`` ranges over the rectangular bounding box of the
+    simplex lattice (each `gem.JaggedIndex` has extent ``degree + 1``),
+    including points outside the simplex lattice (``sum(multiindex) >
+    degree``), for which the raw formula overshoots ``ndof - 1``. Like
+    `FIAT.expansions.morton_forward_table`, the result is clamped to
+    ``ndof - 1`` for those points: the corresponding tabulation is exactly
+    zero there, so the clamped (but otherwise meaningless) index is only
+    ever multiplied by zero.
+
+    Parameters
+    ----------
+    multiindex : tuple of gem.Index
+        The lattice multi-index, of length 1, 2, or 3.
+    ndof : int
+        The element's space dimension, i.e. the number of points on the
+        simplex lattice; the result is clamped to ``ndof - 1``.
+
+    Returns
+    -------
+    gem.Node
+        A scalar expression of dtype `gem.uint_type`, free in
+        ``multiindex``, equal to the flat Morton index, clamped to
+        ``ndof - 1``.
+
+    """
+    values = [_index_value(index) for index in multiindex]
+    if len(values) == 1:
+        p, = values
+        expr = p
+    elif len(values) == 2:
+        p, q = values
+        s = gem.Sum(p, q)
+        shell = gem.FloorDiv(gem.Product(s, gem.Sum(s, _one(1))), _one(2))
+        expr = gem.Sum(shell, q)
+    elif len(values) == 3:
+        p, q, r = values
+        s = gem.Sum(gem.Sum(p, q), r)
+        qr = gem.Sum(q, r)
+        shell = gem.FloorDiv(gem.Product(gem.Product(s, gem.Sum(s, _one(1))), gem.Sum(s, _one(2))), _one(6))
+        layer = gem.FloorDiv(gem.Product(qr, gem.Sum(qr, _one(1))), _one(2))
+        expr = gem.Sum(gem.Sum(shell, layer), r)
+    else:
+        raise NotImplementedError("Morton index arithmetic is only implemented up to dimension 3")
+    return gem.MinValue(expr, _one(ndof - 1))
 
 
 class DuffyElement:
@@ -27,10 +91,10 @@ class DuffyElement:
 
         The basis functions are enumerated by a lattice multi-index
         ``(i_1, ..., i_d)`` rather than the flat basis index; the flat index
-        of a member is its Morton index (`FIAT.expansions.morton_index2`,
-        `FIAT.expansions.morton_index3`).  The lattice indices range over the
-        rectangular bounding box of the simplex lattice; entries outside the
-        simplex lattice (``i_1 + ... + i_d > degree``) tabulate to zero.
+        of a member is its Morton index (`FIAT.expansions.morton_index`).
+        The lattice indices range over the rectangular bounding box of the
+        simplex lattice; entries outside the simplex lattice
+        (``i_1 + ... + i_d > degree``) tabulate to zero.
 
         Parameters
         ----------
@@ -158,10 +222,12 @@ class DuffyElement:
         The sum over the flat degree-of-freedom index is rewritten as a sum
         over the lattice multi-index, gathering the coefficient vector
         through the same Morton dof numbering FIAT already uses
-        (`FIAT.expansions.morton_index`).  `gem.optimise.contraction`
-        sum-factorizes the resulting nested sum over the lattice
-        multi-index, exploiting the same axis-separable structure that
-        makes `duffy_evaluation` itself O(p^d).
+        (`FIAT.expansions.morton_index2` / `morton_index3`), computed as
+        index arithmetic (`_morton_index_expr`) rather than a table
+        lookup.  `gem.optimise.contraction` sum-factorizes the resulting
+        nested sum over the lattice multi-index, exploiting the same
+        axis-separable structure that makes `duffy_evaluation` itself
+        O(p^d).
 
         Parameters
         ----------
@@ -192,10 +258,7 @@ class DuffyElement:
                   for alpha, table in result.items()
                   if sum(alpha) == order}
 
-        sd = len(multiindex)
-        fwd_table = morton_forward_table(sd, self.degree)
-        r_index = gem.VariableIndex(gem.Indexed(
-            gem.Literal(fwd_table, dtype=gem.uint_type), multiindex))
+        r_index = gem.VariableIndex(_morton_index_expr(multiindex, self.space_dimension()))
         vec_r, = gem.optimise.remove_componenttensors([gem.Indexed(vec, (r_index,))])
         zeta = self.get_value_indices()
         value_dict = {}

@@ -84,6 +84,11 @@ mathematical patterns rather than starting from ad hoc special cases:
   restriction, and tensor-product algebra agree with the element's continuity and approximation
   properties, not when one or two test cases happen to pass.
 
+Debugging notes specific to the GEM→loopy codegen pipeline (index arithmetic gotchas, loopy
+scheduling/caching behavior, and the methodology used to pin down a hard scheduling bug) live in
+`tsfc/AGENTS.md` in the firedrake repo, since TSFC/loopy are consumers of GEM rather than part of
+FIAT itself.
+
 ## Style and Conventions
 
 When writing Python code for FIAT, maintain the ecosystem's structural and stylistic integrity:

@@ -106,6 +106,8 @@ def flops_product(expr, temporaries):
 
 @flops.register(gem.Sum)
 @flops.register(gem.Division)
+@flops.register(gem.FloorDiv)
+@flops.register(gem.Remainder)
 @flops.register(gem.Comparison)
 @flops.register(gem.MathFunction)
 @flops.register(gem.MinValue)
