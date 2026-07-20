@@ -96,11 +96,12 @@ def _product_derivative(factor: numpy.ndarray,
 
     # result = F * D^alpha G
     result = factor * operands[order]
+    dtype = result.dtype
 
-    if dfactor is not None and order >= 1 and not numpy.allclose(dfactor, 0):
+    if dfactor is not None and order >= 1:
         alpha_minus1 = mis(dim, order - 1)
         idx_of_minus1 = {alpha: i for i, alpha in enumerate(alpha_minus1)}
-        DF = numpy.zeros((len(alphas), *dfactor.shape[1:], len(alpha_minus1)))
+        DF = numpy.zeros((len(alphas), *dfactor.shape[1:], len(alpha_minus1)), dtype=dtype)
         for j, alpha in enumerate(alphas):
             for d in range(dim):
                 if alpha[d] < 1:
@@ -112,10 +113,10 @@ def _product_derivative(factor: numpy.ndarray,
         # result += alpha * D F * D^(alpha-1) G
         result += numpy.einsum('...k,k...->...', DF, operands[order-1])
 
-    if ddfactor is not None and order >= 2 and not numpy.allclose(ddfactor, 0):
+    if ddfactor is not None and order >= 2:
         alpha_minus2 = mis(dim, order - 2)
         idx_of_minus2 = {alpha: i for i, alpha in enumerate(alpha_minus2)}
-        DDF = numpy.zeros((len(alphas), *ddfactor.shape[2:], len(alpha_minus2)))
+        DDF = numpy.zeros((len(alphas), *ddfactor.shape[2:], len(alpha_minus2)), dtype=dtype)
         for j, alpha in enumerate(alphas):
             for d1 in range(dim):
                 for d2 in range(d1, dim):
@@ -130,7 +131,7 @@ def _product_derivative(factor: numpy.ndarray,
                     else:
                         a2 = alpha[d1] * alpha[d2]
                     DDF[j, ..., i] += a2 * ddfactor[d1, d2]
-        # result += alpha*(alpha-1)/2 * D^2 F * D^(alpha-2) G
+        # result += alpha*(alpha-1) * D^2 F * D^(alpha-2) G
         result += numpy.einsum('i...k,k...->i...', DDF, operands[order-2])
 
     return result
@@ -181,8 +182,9 @@ def dubiner_recurrence(dim: int,
     dX = pad_jacobian(Jinv, pad_dim)
 
     phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
+    dtype = phi0.dtype
     results = [
-        numpy.zeros((num_members, math.comb(dim+k-1, k), *phi0.shape[1:]), dtype=phi0.dtype)
+        numpy.zeros((num_members, math.comb(dim+k-1, k), *phi0.shape[1:]), dtype=dtype)
         for k in range(order+1)
     ]
 
@@ -217,7 +219,7 @@ def dubiner_recurrence(dim: int,
                 b = 0.5 * (alpha - beta)
 
             fcur = a * fa - b * fb
-            phi[inext] = fcur * phi[icur]
+            phi[inext] = phi[icur] * fcur
             if order:
                 dfcur = a * dfa - b * dfb
                 cur = [result[icur] for result in results]
@@ -232,8 +234,8 @@ def dubiner_recurrence(dim: int,
 
                 fcur = a * fa - b * fb
                 fprev = -c * fc
-                phi[inext] = fcur * phi[icur]
-                phi[inext] += fprev * phi[iprev]
+                phi[inext] = phi[icur] * fcur
+                phi[inext] += phi[iprev] * fprev
 
                 dfcur = a * dfa - b * dfb
                 dfprev = -c * dfc
