@@ -97,25 +97,25 @@ def _product_derivative(factor: numpy.ndarray,
     # result = F * D^alpha G
     result = factor * operands[order]
 
-    if dfactor is not None and order >= 1:
+    if dfactor is not None and order >= 1 and not numpy.allclose(dfactor, 0):
         alpha_minus1 = mis(dim, order - 1)
         idx_of_minus1 = {alpha: i for i, alpha in enumerate(alpha_minus1)}
+        DF = numpy.zeros((len(alphas), *dfactor.shape[1:], len(alpha_minus1)))
         for j, alpha in enumerate(alphas):
             for d in range(dim):
                 if alpha[d] < 1:
                     continue
                 alpha_minus = list(alpha)
                 alpha_minus[d] -= 1
-                if order - 1 == 0:
-                    val = operands[0]
-                else:
-                    idx_minus = idx_of_minus1[tuple(alpha_minus)]
-                    val = operands[order-1][idx_minus]
-                result[j] += alpha[d] * dfactor[d] * val
+                i = idx_of_minus1[tuple(alpha_minus)]
+                DF[j, ..., i] += alpha[d] * dfactor[d]
+        # result += alpha * D F * D^(alpha-1) G
+        result += numpy.einsum('...k,k...->...', DF, operands[order-1])
 
-    if ddfactor is not None and order >= 2:
+    if ddfactor is not None and order >= 2 and not numpy.allclose(ddfactor, 0):
         alpha_minus2 = mis(dim, order - 2)
         idx_of_minus2 = {alpha: i for i, alpha in enumerate(alpha_minus2)}
+        DDF = numpy.zeros((len(alphas), *ddfactor.shape[2:], len(alpha_minus2)))
         for j, alpha in enumerate(alphas):
             for d1 in range(dim):
                 for d2 in range(d1, dim):
@@ -124,16 +124,14 @@ def _product_derivative(factor: numpy.ndarray,
                     alpha_minus = list(alpha)
                     alpha_minus[d1] -= 1
                     alpha_minus[d2] -= 1
-                    if order - 2 == 0:
-                        val = operands[0]
-                    else:
-                        idx_minus = idx_of_minus2[tuple(alpha_minus)]
-                        val = operands[order-2][idx_minus]
+                    i = idx_of_minus2[tuple(alpha_minus)]
                     if d1 == d2:
-                        coeff = alpha[d1] * (alpha[d1] - 1) // 2
+                        a2 = alpha[d1] * (alpha[d1] - 1) // 2
                     else:
-                        coeff = alpha[d1] * alpha[d2]
-                    result[j] += coeff * ddfactor[d1, d2] * val
+                        a2 = alpha[d1] * alpha[d2]
+                    DDF[j, ..., i] += a2 * ddfactor[d1, d2]
+        # result += alpha*(alpha-1)/2 * D^2 F * D^(alpha-2) G
+        result += numpy.einsum('i...k,k...->i...', DDF, operands[order-2])
 
     return result
 
@@ -184,7 +182,7 @@ def dubiner_recurrence(dim: int,
 
     phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
     results = [
-        numpy.zeros((num_members,) + (math.comb(dim+k-1, k),) * (k > 0) + phi0.shape[1:], dtype=phi0.dtype)
+        numpy.zeros((num_members, math.comb(dim+k-1, k), *phi0.shape[1:]), dtype=phi0.dtype)
         for k in range(order+1)
     ]
 
@@ -240,6 +238,7 @@ def dubiner_recurrence(dim: int,
                 dfcur = a * dfa - b * dfb
                 dfprev = -c * dfc
                 ddfprev = -c * ddfc
+
                 cur = [result[icur] for result in results]
                 prev = [result[iprev] for result in results]
                 deg = sum(sub_index) + 1 + i
@@ -318,7 +317,7 @@ def C0_basis(dim, n, tabulations):
 
         dofs.extend(idx(i, j, k) for k in range(1, n+1) for j in range(1, n-k+1) for i in range(2, n-j-k+1))
 
-    return tuple([phi[i] for i in dofs] for phi in tabulations)
+    return tuple(phi[dofs] for phi in tabulations)
 
 
 def xi_triangle(eta):
@@ -424,8 +423,7 @@ class ExpansionSet(object):
 
         # Pack linearly independent components into a dictionary
         result = {}
-        result[(0,) * sd] = numpy.asarray(phi[0])
-        for r in range(1, len(phi)):
+        for r in range(len(phi)):
             vr = numpy.asarray(phi[r])
             vr = vr.transpose(1, 0, *range(2, vr.ndim))
             for j, alpha in enumerate(mis(sd, r)):
