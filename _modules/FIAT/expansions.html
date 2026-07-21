@@ -122,25 +122,116 @@
 
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_product_derivative</span><span class="p">(</span><span class="n">factor</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+                        <span class="n">dfactor</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">ddfactor</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">operands</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">],</span>
+                        <span class="n">order</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Differentiate a recurrence factor times a basis derivative tensor.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    factor : numpy.ndarray</span>
+<span class="sd">        The recurrence factor.</span>
+<span class="sd">    dfactor : numpy.ndarray, optional</span>
+<span class="sd">        The first derivative of the recurrence factor.</span>
+<span class="sd">    ddfactor : numpy.ndarray, optional</span>
+<span class="sd">        The second derivative of the recurrence factor.</span>
+<span class="sd">    operands : list[numpy.ndarray]</span>
+<span class="sd">        List of basis derivative tensors up to order rank.</span>
+<span class="sd">    order : int</span>
+<span class="sd">        The derivative order of the output.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    numpy.ndarray</span>
+<span class="sd">        The differentiated product tensor of shape (len(mis(dim, rank)), num_points).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
+
+    <span class="n">dim</span> <span class="o">=</span> <span class="n">dfactor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">dfactor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">alphas</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+
+    <span class="c1"># result = F * D^alpha G</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">factor</span> <span class="o">*</span> <span class="n">operands</span><span class="p">[</span><span class="n">order</span><span class="p">]</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">dtype</span>
+
+    <span class="k">if</span> <span class="n">dfactor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">alpha_minus1</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">order</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">idx_of_minus1</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">j</span> <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alpha_minus1</span><span class="p">)}</span>
+        <span class="n">DF</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">alpha_minus1</span><span class="p">),</span> <span class="o">*</span><span class="n">dfactor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alphas</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dim</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">alpha</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="n">alpha_minus</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+                <span class="n">alpha_minus</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+                <span class="n">j</span> <span class="o">=</span> <span class="n">idx_of_minus1</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha_minus</span><span class="p">)]</span>
+                <span class="n">DF</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="n">alpha</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">*</span> <span class="n">dfactor</span><span class="p">[</span><span class="n">d</span><span class="p">]</span>
+        <span class="c1"># result += alpha * D F * D^(alpha-1) G</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;ij...,j...-&gt;i...&quot;</span><span class="p">,</span> <span class="n">DF</span><span class="p">,</span> <span class="n">operands</span><span class="p">[</span><span class="n">order</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="k">if</span> <span class="n">ddfactor</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">alpha_minus2</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">order</span> <span class="o">-</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="n">idx_of_minus2</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">j</span> <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alpha_minus2</span><span class="p">)}</span>
+        <span class="n">DDF</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">alphas</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">alpha_minus2</span><span class="p">),</span> <span class="o">*</span><span class="n">ddfactor</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">:]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">alphas</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">d1</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dim</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">d2</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">d1</span><span class="p">,</span> <span class="n">dim</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">alpha</span><span class="p">[</span><span class="n">d1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">d1</span> <span class="o">==</span> <span class="n">d2</span><span class="p">)</span> <span class="ow">or</span> <span class="n">alpha</span><span class="p">[</span><span class="n">d2</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">d1</span> <span class="o">==</span> <span class="n">d2</span><span class="p">):</span>
+                        <span class="k">continue</span>
+                    <span class="n">alpha_minus</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span>
+                    <span class="n">alpha_minus</span><span class="p">[</span><span class="n">d1</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+                    <span class="n">alpha_minus</span><span class="p">[</span><span class="n">d2</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+                    <span class="n">j</span> <span class="o">=</span> <span class="n">idx_of_minus2</span><span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">alpha_minus</span><span class="p">)]</span>
+                    <span class="k">if</span> <span class="n">d1</span> <span class="o">==</span> <span class="n">d2</span><span class="p">:</span>
+                        <span class="n">a2</span> <span class="o">=</span> <span class="n">alpha</span><span class="p">[</span><span class="n">d1</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">alpha</span><span class="p">[</span><span class="n">d1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">a2</span> <span class="o">=</span> <span class="n">alpha</span><span class="p">[</span><span class="n">d1</span><span class="p">]</span> <span class="o">*</span> <span class="n">alpha</span><span class="p">[</span><span class="n">d2</span><span class="p">]</span>
+                    <span class="n">DDF</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="n">a2</span> <span class="o">*</span> <span class="n">ddfactor</span><span class="p">[</span><span class="n">d1</span><span class="p">,</span> <span class="n">d2</span><span class="p">]</span>
+        <span class="c1"># result += alpha*(alpha-1) * D^2 F * D^(alpha-2) G</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s2">&quot;ij...,j...-&gt;i...&quot;</span><span class="p">,</span> <span class="n">DDF</span><span class="p">,</span> <span class="n">operands</span><span class="p">[</span><span class="n">order</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
 <div class="viewcode-block" id="dubiner_recurrence">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.expansions.dubiner_recurrence">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">dubiner_recurrence</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ref_pts</span><span class="p">,</span> <span class="n">Jinv</span><span class="p">,</span> <span class="n">scale</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">dubiner_recurrence</span><span class="p">(</span><span class="n">dim</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                       <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                       <span class="n">order</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                       <span class="n">ref_pts</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+                       <span class="n">Jinv</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+                       <span class="n">scale</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+                       <span class="n">variant</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).</span>
 
-<span class="sd">    :arg dim: The spatial dimension of the simplex.</span>
-<span class="sd">    :arg n: The polynomial degree.</span>
-<span class="sd">    :arg order: The maximum order of differentiation.</span>
-<span class="sd">    :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.</span>
-<span class="sd">    :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.</span>
-<span class="sd">    :arg scale: A scale factor that sets the first member of expansion set.</span>
-<span class="sd">    :arg variant: Choose between the default (None) orthogonal basis,</span>
-<span class="sd">                  &#39;bubble&#39; for integrated Jacobi polynomials,</span>
-<span class="sd">                  or &#39;dual&#39; for the L2-duals of the integrated Jacobi polynomials.</span>
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dim : int</span>
+<span class="sd">        The spatial dimension of the simplex.</span>
+<span class="sd">    n : int</span>
+<span class="sd">        The polynomial degree.</span>
+<span class="sd">    order : int</span>
+<span class="sd">        The maximum order of differentiation.</span>
+<span class="sd">    ref_pts : numpy.ndarray</span>
+<span class="sd">        An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.</span>
+<span class="sd">    Jinv : numpy.ndarray</span>
+<span class="sd">        The inverse of the Jacobian of the coordinate mapping from the default simplex.</span>
+<span class="sd">    scale : float</span>
+<span class="sd">        A scale factor that sets the first member of expansion set.</span>
+<span class="sd">    variant : str, optional</span>
+<span class="sd">        Choose between the default (None) orthogonal basis,</span>
+<span class="sd">        &#39;bubble&#39; for integrated Jacobi polynomials,</span>
+<span class="sd">        or &#39;dual&#39; for the L2-duals of the integrated Jacobi polynomials.</span>
 
-<span class="sd">    :returns: A tuple with tabulations of the expansion set and its derivatives.</span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list[numpy.ndarray]</span>
+<span class="sd">        A list of numpy arrays with tabulations of the expansion set and its derivatives.</span>
+
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Higher order derivatives not supported&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">variant</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;bubble&quot;</span><span class="p">,</span> <span class="s2">&quot;dual&quot;</span><span class="p">]:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid variant </span><span class="si">{</span><span class="n">variant</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;bubble&quot;</span><span class="p">:</span>
@@ -148,16 +239,17 @@
 
     <span class="n">num_members</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span>
 
-    <span class="n">outer</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">*</span> <span class="n">y</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
-
     <span class="n">pad_dim</span> <span class="o">=</span> <span class="n">dim</span> <span class="o">+</span> <span class="mi">2</span>
     <span class="n">dX</span> <span class="o">=</span> <span class="n">pad_jacobian</span><span class="p">(</span><span class="n">Jinv</span><span class="p">,</span> <span class="n">pad_dim</span><span class="p">)</span>
 
     <span class="n">phi0</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">sum</span><span class="p">((</span><span class="n">ref_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">-</span> <span class="n">ref_pts</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dim</span><span class="p">)),</span> <span class="mf">0.0</span><span class="p">)])</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_members</span><span class="p">,)</span> <span class="o">+</span> <span class="p">(</span><span class="n">dim</span><span class="p">,)</span><span class="o">*</span><span class="n">k</span> <span class="o">+</span> <span class="n">phi0</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">phi0</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
-               <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">phi0</span><span class="o">.</span><span class="n">dtype</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">num_members</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">dim</span><span class="o">+</span><span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">k</span><span class="p">),</span> <span class="o">*</span><span class="n">phi0</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">]</span>
 
-    <span class="n">phi</span><span class="p">,</span> <span class="n">dphi</span><span class="p">,</span> <span class="n">ddphi</span> <span class="o">=</span> <span class="n">results</span> <span class="o">+</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span><span class="o">-</span><span class="n">order</span><span class="p">)</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">scale</span>
     <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">results</span>
@@ -171,9 +263,9 @@
     <span class="k">for</span> <span class="n">codim</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dim</span><span class="p">):</span>
         <span class="c1"># Extend the basis from codim to codim + 1</span>
         <span class="n">fa</span><span class="p">,</span> <span class="n">fb</span><span class="p">,</span> <span class="n">fc</span><span class="p">,</span> <span class="n">dfa</span><span class="p">,</span> <span class="n">dfb</span><span class="p">,</span> <span class="n">dfc</span> <span class="o">=</span> <span class="n">jacobi_factors</span><span class="p">(</span><span class="o">*</span><span class="n">X</span><span class="p">[</span><span class="n">codim</span><span class="p">:</span><span class="n">codim</span><span class="o">+</span><span class="mi">3</span><span class="p">],</span> <span class="o">*</span><span class="n">dX</span><span class="p">[</span><span class="n">codim</span><span class="p">:</span><span class="n">codim</span><span class="o">+</span><span class="mi">3</span><span class="p">])</span>
-        <span class="n">ddfc</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">outer</span><span class="p">(</span><span class="n">dfb</span><span class="p">,</span> <span class="n">dfb</span><span class="p">)</span>
+        <span class="n">ddfc</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">numpy</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="n">dfb</span><span class="p">,</span> <span class="n">dfb</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">sub_index</span> <span class="ow">in</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">lattice_iter</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">codim</span><span class="p">):</span>
-            <span class="c1"># handle i = 1</span>
+            <span class="c1"># handle i = 0</span>
             <span class="n">icur</span> <span class="o">=</span> <span class="n">idx</span><span class="p">(</span><span class="o">*</span><span class="n">sub_index</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
             <span class="n">inext</span> <span class="o">=</span> <span class="n">idx</span><span class="p">(</span><span class="o">*</span><span class="n">sub_index</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
@@ -188,15 +280,13 @@
                 <span class="n">b</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">alpha</span> <span class="o">-</span> <span class="n">beta</span><span class="p">)</span>
 
             <span class="n">fcur</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">fa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">fb</span>
-            <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">fcur</span> <span class="o">*</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span>
-            <span class="k">if</span> <span class="n">dphi</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*</span> <span class="n">fcur</span>
+            <span class="k">if</span> <span class="n">order</span><span class="p">:</span>
                 <span class="n">dfcur</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">dfa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">dfb</span>
-                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*</span> <span class="n">dfcur</span>
-                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fcur</span> <span class="o">*</span> <span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span>
-                <span class="k">if</span> <span class="n">ddphi</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">outer</span><span class="p">(</span><span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">],</span> <span class="n">dfcur</span><span class="p">)</span>
-                    <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">outer</span><span class="p">(</span><span class="n">dfcur</span><span class="p">,</span> <span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">])</span>
-                    <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fcur</span> <span class="o">*</span> <span class="n">ddphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span>
+                <span class="n">cur</span> <span class="o">=</span> <span class="p">[</span><span class="n">result</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">results</span><span class="p">]</span>
+                <span class="n">deg</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">deg</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                    <span class="n">results</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">_product_derivative</span><span class="p">(</span><span class="n">fcur</span><span class="p">,</span> <span class="n">dfcur</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">cur</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
 
             <span class="c1"># general i by recurrence</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span> <span class="o">-</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)):</span>
@@ -205,28 +295,19 @@
 
                 <span class="n">fcur</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">fa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">fb</span>
                 <span class="n">fprev</span> <span class="o">=</span> <span class="o">-</span><span class="n">c</span> <span class="o">*</span> <span class="n">fc</span>
-                <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">fcur</span> <span class="o">*</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span>
-                <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fprev</span> <span class="o">*</span> <span class="n">phi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span>
-                <span class="k">if</span> <span class="n">dphi</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="k">continue</span>
+                <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*</span> <span class="n">fcur</span>
+                <span class="n">phi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">phi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="o">*</span> <span class="n">fprev</span>
 
                 <span class="n">dfcur</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">dfa</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">dfb</span>
                 <span class="n">dfprev</span> <span class="o">=</span> <span class="o">-</span><span class="n">c</span> <span class="o">*</span> <span class="n">dfc</span>
-                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="o">*</span> <span class="n">dfcur</span>
-                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">phi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="o">*</span> <span class="n">dfprev</span>
-                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fcur</span> <span class="o">*</span> <span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span>
-                <span class="n">dphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fprev</span> <span class="o">*</span> <span class="n">dphi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span>
-                <span class="k">if</span> <span class="n">ddphi</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="k">continue</span>
-
                 <span class="n">ddfprev</span> <span class="o">=</span> <span class="o">-</span><span class="n">c</span> <span class="o">*</span> <span class="n">ddfc</span>
-                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">phi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="o">*</span> <span class="n">ddfprev</span>
-                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">outer</span><span class="p">(</span><span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">],</span> <span class="n">dfcur</span><span class="p">)</span>
-                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">outer</span><span class="p">(</span><span class="n">dfcur</span><span class="p">,</span> <span class="n">dphi</span><span class="p">[</span><span class="n">icur</span><span class="p">])</span>
-                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">outer</span><span class="p">(</span><span class="n">dphi</span><span class="p">[</span><span class="n">iprev</span><span class="p">],</span> <span class="n">dfprev</span><span class="p">)</span>
-                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">outer</span><span class="p">(</span><span class="n">dfprev</span><span class="p">,</span> <span class="n">dphi</span><span class="p">[</span><span class="n">iprev</span><span class="p">])</span>
-                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fcur</span> <span class="o">*</span> <span class="n">ddphi</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span>
-                <span class="n">ddphi</span><span class="p">[</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">fprev</span> <span class="o">*</span> <span class="n">ddphi</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span>
+
+                <span class="n">cur</span> <span class="o">=</span> <span class="p">[</span><span class="n">result</span><span class="p">[</span><span class="n">icur</span><span class="p">]</span> <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">results</span><span class="p">]</span>
+                <span class="n">prev</span> <span class="o">=</span> <span class="p">[</span><span class="n">result</span><span class="p">[</span><span class="n">iprev</span><span class="p">]</span> <span class="k">for</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">results</span><span class="p">]</span>
+                <span class="n">deg</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">sub_index</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">i</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">deg</span><span class="p">)</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                    <span class="n">results</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">inext</span><span class="p">]</span> <span class="o">=</span> <span class="n">_product_derivative</span><span class="p">(</span><span class="n">fcur</span><span class="p">,</span> <span class="n">dfcur</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">cur</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+                    <span class="n">results</span><span class="p">[</span><span class="n">k</span><span class="p">][</span><span class="n">inext</span><span class="p">]</span> <span class="o">+=</span> <span class="n">_product_derivative</span><span class="p">(</span><span class="n">fprev</span><span class="p">,</span> <span class="n">dfprev</span><span class="p">,</span> <span class="n">ddfprev</span><span class="p">,</span> <span class="n">prev</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
 
         <span class="c1"># normalize</span>
         <span class="n">d</span> <span class="o">=</span> <span class="n">codim</span> <span class="o">+</span> <span class="mi">1</span>
@@ -302,7 +383,7 @@
 
         <span class="n">dofs</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">idx</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="n">j</span><span class="o">-</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
 
-    <span class="k">return</span> <span class="nb">tuple</span><span class="p">([</span><span class="n">phi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">dofs</span><span class="p">]</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">tabulations</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="n">dofs</span><span class="p">]</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">tabulations</span><span class="p">)</span></div>
 
 
 
@@ -365,7 +446,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="n">scale</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">variant</span> <span class="o">=</span> <span class="n">variant</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span> <span class="o">=</span> <span class="s2">&quot;C0&quot;</span> <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;bubble&quot;</span> <span class="k">else</span> <span class="kc">None</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">recurrence_order</span> <span class="o">=</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">recurrence_order</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dmats_cache</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_cell_node_map_cache</span> <span class="o">=</span> <span class="p">{}</span>
 
@@ -428,18 +509,17 @@
             <span class="n">phi</span> <span class="o">=</span> <span class="n">C0_basis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span>
 
         <span class="c1"># Pack linearly independent components into a dictionary</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="mi">0</span><span class="p">])}</span>
-        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">phi</span><span class="p">)):</span>
-            <span class="n">vr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span> <span class="o">+</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">r</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span>
-            <span class="k">for</span> <span class="n">indices</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">vr</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="n">r</span><span class="p">]):</span>
-                <span class="n">alpha</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">indices</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)))</span>
-                <span class="k">if</span> <span class="n">alpha</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-                    <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">vr</span><span class="p">[</span><span class="n">indices</span><span class="p">]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">phi</span><span class="p">)):</span>
+            <span class="n">vr</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">phi</span><span class="p">[</span><span class="n">r</span><span class="p">])</span>
+            <span class="n">vr</span> <span class="o">=</span> <span class="n">vr</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">*</span><span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">vr</span><span class="o">.</span><span class="n">ndim</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">r</span><span class="p">)):</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">vr</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">distance</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">):</span>
             <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">ai</span> <span class="o">!=</span> <span class="n">bi</span> <span class="k">for</span> <span class="n">ai</span><span class="p">,</span> <span class="n">bi</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">beta</span><span class="p">))</span>
 
-        <span class="c1"># Only use dmats if tabulate failed</span>
+        <span class="c1"># Use dmats only for derivatives above the configured recurrence order.</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">phi</span><span class="p">),</span> <span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
             <span class="n">dmats</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dmats</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">cell</span><span class="o">=</span><span class="n">cell</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">mis</span><span class="p">(</span><span class="n">sd</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
