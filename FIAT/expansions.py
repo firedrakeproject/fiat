@@ -100,24 +100,24 @@ def _product_derivative(factor: numpy.ndarray,
 
     if dfactor is not None and order >= 1:
         alpha_minus1 = mis(dim, order - 1)
-        idx_of_minus1 = {alpha: i for i, alpha in enumerate(alpha_minus1)}
-        DF = numpy.zeros((len(alphas), *dfactor.shape[1:], len(alpha_minus1)), dtype=dtype)
-        for j, alpha in enumerate(alphas):
+        idx_of_minus1 = {alpha: j for j, alpha in enumerate(alpha_minus1)}
+        DF = numpy.zeros((len(alphas), len(alpha_minus1), *dfactor.shape[1:]), dtype=dtype)
+        for i, alpha in enumerate(alphas):
             for d in range(dim):
                 if alpha[d] < 1:
                     continue
                 alpha_minus = list(alpha)
                 alpha_minus[d] -= 1
-                i = idx_of_minus1[tuple(alpha_minus)]
-                DF[j, ..., i] += alpha[d] * dfactor[d]
+                j = idx_of_minus1[tuple(alpha_minus)]
+                DF[i, j] += alpha[d] * dfactor[d]
         # result += alpha * D F * D^(alpha-1) G
-        result += numpy.einsum('...k,k...->...', DF, operands[order-1])
+        result += numpy.einsum("ij...,j...->i...", DF, operands[order-1])
 
     if ddfactor is not None and order >= 2:
         alpha_minus2 = mis(dim, order - 2)
-        idx_of_minus2 = {alpha: i for i, alpha in enumerate(alpha_minus2)}
-        DDF = numpy.zeros((len(alphas), *ddfactor.shape[2:], len(alpha_minus2)), dtype=dtype)
-        for j, alpha in enumerate(alphas):
+        idx_of_minus2 = {alpha: j for j, alpha in enumerate(alpha_minus2)}
+        DDF = numpy.zeros((len(alphas), len(alpha_minus2), *ddfactor.shape[2:]), dtype=dtype)
+        for i, alpha in enumerate(alphas):
             for d1 in range(dim):
                 for d2 in range(d1, dim):
                     if alpha[d1] < 1 + (d1 == d2) or alpha[d2] < 1 + (d1 == d2):
@@ -125,14 +125,14 @@ def _product_derivative(factor: numpy.ndarray,
                     alpha_minus = list(alpha)
                     alpha_minus[d1] -= 1
                     alpha_minus[d2] -= 1
-                    i = idx_of_minus2[tuple(alpha_minus)]
+                    j = idx_of_minus2[tuple(alpha_minus)]
                     if d1 == d2:
                         a2 = alpha[d1] * (alpha[d1] - 1) // 2
                     else:
                         a2 = alpha[d1] * alpha[d2]
-                    DDF[j, ..., i] += a2 * ddfactor[d1, d2]
+                    DDF[i, j] += a2 * ddfactor[d1, d2]
         # result += alpha*(alpha-1) * D^2 F * D^(alpha-2) G
-        result += numpy.einsum('i...k,k...->i...', DDF, operands[order-2])
+        result += numpy.einsum("ij...,j...->i...", DDF, operands[order-2])
 
     return result
 
