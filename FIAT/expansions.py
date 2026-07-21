@@ -347,23 +347,114 @@ def jacobi_factors(x, y, z, dx, dy, dz):
     return fa, fb, fc, dfa, dfb, dfc
 
 
-def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
+def _product_derivative(factor: numpy.ndarray,
+                        dfactor: numpy.ndarray | None,
+                        ddfactor: numpy.ndarray | None,
+                        operands: list[numpy.ndarray],
+                        order: int) -> numpy.ndarray:
+    """Differentiate a recurrence factor times a basis derivative tensor.
+
+    Parameters
+    ----------
+    factor : numpy.ndarray
+        The recurrence factor.
+    dfactor : numpy.ndarray, optional
+        The first derivative of the recurrence factor.
+    ddfactor : numpy.ndarray, optional
+        The second derivative of the recurrence factor.
+    operands : list[numpy.ndarray]
+        List of basis derivative tensors up to order rank.
+    order : int
+        The derivative order of the output.
+
+    Returns
+    -------
+    numpy.ndarray
+        The differentiated product tensor of shape (len(mis(dim, rank)), num_points).
+
+    """
+    from FIAT.polynomial_set import mis
+
+    dim = dfactor.shape[0] if dfactor is not None else 0
+    alphas = mis(dim, order)
+
+    # result = F * D^alpha G
+    result = factor * operands[order]
+    dtype = result.dtype
+
+    if dfactor is not None and order >= 1:
+        alpha_minus1 = mis(dim, order - 1)
+        idx_of_minus1 = {alpha: j for j, alpha in enumerate(alpha_minus1)}
+        DF = numpy.zeros((len(alphas), len(alpha_minus1), *dfactor.shape[1:]), dtype=dtype)
+        for i, alpha in enumerate(alphas):
+            for d in range(dim):
+                if alpha[d] < 1:
+                    continue
+                alpha_minus = list(alpha)
+                alpha_minus[d] -= 1
+                j = idx_of_minus1[tuple(alpha_minus)]
+                DF[i, j] += alpha[d] * dfactor[d]
+        # result += alpha * D F * D^(alpha-1) G
+        result += numpy.einsum("ij...,j...->i...", DF, operands[order-1])
+
+    if ddfactor is not None and order >= 2:
+        alpha_minus2 = mis(dim, order - 2)
+        idx_of_minus2 = {alpha: j for j, alpha in enumerate(alpha_minus2)}
+        DDF = numpy.zeros((len(alphas), len(alpha_minus2), *ddfactor.shape[2:]), dtype=dtype)
+        for i, alpha in enumerate(alphas):
+            for d1 in range(dim):
+                for d2 in range(d1, dim):
+                    if alpha[d1] < 1 + (d1 == d2) or alpha[d2] < 1 + (d1 == d2):
+                        continue
+                    alpha_minus = list(alpha)
+                    alpha_minus[d1] -= 1
+                    alpha_minus[d2] -= 1
+                    j = idx_of_minus2[tuple(alpha_minus)]
+                    if d1 == d2:
+                        a2 = alpha[d1] * (alpha[d1] - 1) // 2
+                    else:
+                        a2 = alpha[d1] * alpha[d2]
+                    DDF[i, j] += a2 * ddfactor[d1, d2]
+        # result += alpha*(alpha-1) * D^2 F * D^(alpha-2) G
+        result += numpy.einsum("ij...,j...->i...", DDF, operands[order-2])
+
+    return result
+
+
+def dubiner_recurrence(dim: int,
+                       n: int,
+                       order: int,
+                       ref_pts: numpy.ndarray,
+                       Jinv: numpy.ndarray,
+                       scale: float,
+                       variant: str | None = None) -> list[numpy.ndarray]:
     """Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).
 
-    :arg dim: The spatial dimension of the simplex.
-    :arg n: The polynomial degree.
-    :arg order: The maximum order of differentiation.
-    :arg ref_pts: An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.
-    :arg Jinv: The inverse of the Jacobian of the coordinate mapping from the default simplex.
-    :arg scale: A scale factor that sets the first member of expansion set.
-    :arg variant: Choose between the default (None) orthogonal basis,
-                  'bubble' for integrated Jacobi polynomials,
-                  or 'dual' for the L2-duals of the integrated Jacobi polynomials.
+    Parameters
+    ----------
+    dim : int
+        The spatial dimension of the simplex.
+    n : int
+        The polynomial degree.
+    order : int
+        The maximum order of differentiation.
+    ref_pts : numpy.ndarray
+        An ``ndarray`` with the coordinates on the default (-1, 1)^d simplex.
+    Jinv : numpy.ndarray
+        The inverse of the Jacobian of the coordinate mapping from the default simplex.
+    scale : float
+        A scale factor that sets the first member of expansion set.
+    variant : str, optional
+        Choose between the default (None) orthogonal basis,
+        'bubble' for integrated Jacobi polynomials,
+        or 'dual' for the L2-duals of the integrated Jacobi polynomials.
 
-    :returns: A tuple with tabulations of the expansion set and its derivatives.
+    Returns
+    -------
+    list[numpy.ndarray]
+        A list of numpy arrays with tabulations of the expansion set and its derivatives.
+
     """
-    if order > 2:
-        raise ValueError("Higher order derivatives not supported")
     if variant not in [None, "bubble", "dual"]:
         raise ValueError(f"Invalid variant {variant}")
     if variant == "bubble":
@@ -371,16 +462,17 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
     num_members = math.comb(n + dim, dim)
 
-    outer = lambda x, y: x[:, None, ...] * y[None, ...]
-
     pad_dim = dim + 2
     dX = pad_jacobian(Jinv, pad_dim)
 
     phi0 = numpy.array([sum((ref_pts[i] - ref_pts[i] for i in range(dim)), 0.0)])
-    results = [numpy.zeros((num_members,) + (dim,)*k + phi0.shape[1:], dtype=phi0.dtype)
-               for k in range(order+1)]
+    dtype = phi0.dtype
+    results = [
+        numpy.zeros((num_members, math.comb(dim+k-1, k), *phi0.shape[1:]), dtype=dtype)
+        for k in range(order+1)
+    ]
 
-    phi, dphi, ddphi = results + [None] * (2-order)
+    phi = results[0]
     phi[0] = scale
     if dim == 0 or n == 0:
         return results
@@ -393,24 +485,22 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     for codim in range(dim):
         # Extend the basis from codim to codim + 1
         fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
-        ddfc = 2 * outer(dfb, dfb)
+        ddfc = 2 * numpy.outer(dfb, dfb)
         for sub_index in reference_element.lattice_iter(0, n, codim):
-            # handle i = 1
+            # handle i = 0
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
 
             alpha, beta, a, b = dubiner_jacobi_parameters(codim, sum(sub_index), variant)
 
             fcur = a * fa - b * fb
-            phi[inext] = fcur * phi[icur]
-            if dphi is not None:
+            phi[inext] = phi[icur] * fcur
+            if order:
                 dfcur = a * dfa - b * dfb
-                dphi[inext] = phi[icur] * dfcur
-                dphi[inext] += fcur * dphi[icur]
-                if ddphi is not None:
-                    ddphi[inext] = outer(dphi[icur], dfcur)
-                    ddphi[inext] += outer(dfcur, dphi[icur])
-                    ddphi[inext] += fcur * ddphi[icur]
+                cur = [result[icur] for result in results]
+                deg = sum(sub_index) + 1
+                for k in range(1, min(order, deg)+1):
+                    results[k][inext] = _product_derivative(fcur, dfcur, None, cur, k)
 
             # general i by recurrence
             for i in range(1, n - sum(sub_index)):
@@ -419,28 +509,19 @@ def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
 
                 fcur = a * fa - b * fb
                 fprev = -c * fc
-                phi[inext] = fcur * phi[icur]
-                phi[inext] += fprev * phi[iprev]
-                if dphi is None:
-                    continue
+                phi[inext] = phi[icur] * fcur
+                phi[inext] += phi[iprev] * fprev
 
                 dfcur = a * dfa - b * dfb
                 dfprev = -c * dfc
-                dphi[inext] = phi[icur] * dfcur
-                dphi[inext] += phi[iprev] * dfprev
-                dphi[inext] += fcur * dphi[icur]
-                dphi[inext] += fprev * dphi[iprev]
-                if ddphi is None:
-                    continue
-
                 ddfprev = -c * ddfc
-                ddphi[inext] = phi[iprev] * ddfprev
-                ddphi[inext] += outer(dphi[icur], dfcur)
-                ddphi[inext] += outer(dfcur, dphi[icur])
-                ddphi[inext] += outer(dphi[iprev], dfprev)
-                ddphi[inext] += outer(dfprev, dphi[iprev])
-                ddphi[inext] += fcur * ddphi[icur]
-                ddphi[inext] += fprev * ddphi[iprev]
+
+                cur = [result[icur] for result in results]
+                prev = [result[iprev] for result in results]
+                deg = sum(sub_index) + 1 + i
+                for k in range(1, min(order, deg)+1):
+                    results[k][inext] = _product_derivative(fcur, dfcur, None, cur, k)
+                    results[k][inext] += _product_derivative(fprev, dfprev, ddfprev, prev, k)
 
         # normalize
         d = codim + 1
@@ -588,7 +669,7 @@ def C0_basis(dim, n, tabulations):
 
         dofs.extend(idx(i, j, k) for k in range(1, n+1) for j in range(1, n-k+1) for i in range(2, n-j-k+1))
 
-    return tuple([phi[i] for i in dofs] for phi in tabulations)
+    return tuple(phi[dofs] for phi in tabulations)
 
 
 def xi_triangle(eta):
@@ -642,7 +723,7 @@ class ExpansionSet(object):
         self.scale = scale
         self.variant = variant
         self.continuity = "C0" if variant == "bubble" else None
-        self.recurrence_order = 2
+        self.recurrence_order = math.inf
         self._dmats_cache = {}
         self._cell_node_map_cache = {}
 
@@ -693,18 +774,17 @@ class ExpansionSet(object):
             phi = C0_basis(sd, n, phi)
 
         # Pack linearly independent components into a dictionary
-        result = {(0,) * sd: numpy.asarray(phi[0])}
-        for r in range(1, len(phi)):
-            vr = numpy.transpose(phi[r], tuple(range(1, r+1)) + (0, r+1))
-            for indices in numpy.ndindex(vr.shape[:r]):
-                alpha = tuple(map(indices.count, range(sd)))
-                if alpha not in result:
-                    result[alpha] = vr[indices]
+        result = {}
+        for r in range(len(phi)):
+            vr = numpy.asarray(phi[r])
+            vr = vr.transpose(1, 0, *range(2, vr.ndim))
+            for j, alpha in enumerate(mis(sd, r)):
+                result[alpha] = vr[j]
 
         def distance(alpha, beta):
             return sum(ai != bi for ai, bi in zip(alpha, beta))
 
-        # Only use dmats if tabulate failed
+        # Use dmats only for derivatives above the configured recurrence order.
         for i in range(len(phi), order + 1):
             dmats = self.get_dmats(n, cell=cell)
             for alpha in mis(sd, i):
