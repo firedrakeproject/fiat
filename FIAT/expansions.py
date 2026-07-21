@@ -535,7 +535,7 @@ def C0_basis(dim, n, tabulations):
     return tuple(phi[dofs] for phi in tabulations)
 
 
-def _c0_recombination_matrix(dim, n):
+def c0_recombination_matrix(dim, n):
     """The dense matrix form of `C0_basis`'s row recombination + entity
     reorder, and the raw (continuity=None) lattice multi-index of each of
     its columns.
