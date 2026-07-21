@@ -22,65 +22,23 @@ def morton_index3(p, q=0, r=0):
 
 
 def morton_index(dim, n, *multiindex):
-    """Flat Morton index of a simplex lattice multi-index.
+    """Flat Morton (total-degree-major) index of a simplex lattice multi-index.
 
-    Parameters
-    ----------
-    dim : int
-        The spatial dimension, i.e. the length of ``multiindex``.
-    n : int
-        The polynomial degree; unused, kept for a uniform signature with
-        the other lattice-indexing helpers in this module.
-    *multiindex : int
-        The lattice multi-index ``(i_1, ..., i_dim)``.
-
-    Returns
-    -------
-    int
-        The flat expansion set index of ``multiindex``, as used to
-        enumerate the members of :class:`ExpansionSet` and, for elements
-        whose nodal basis coincides with the expansion set (e.g.
-        `FIAT.Legendre`), the degree of freedom index.
-
+    ``n`` is unused; kept for a uniform signature with the other
+    lattice-indexing helpers in this module.
     """
     idx = (lambda p: p, morton_index2, morton_index3)[dim - 1]
     return idx(*multiindex)
 
 
 def lexicographic_permutation(dim, n):
-    """Permutation from Morton (total-degree-major) order to lattice-lexicographic order.
+    """Permutation from Morton (total-degree-major) order to
+    lattice-lexicographic order (first coordinate slowest-varying, last
+    fastest-varying).
 
-    Lattice-lexicographic order enumerates the simplex lattice with the
-    first coordinate slowest-varying and the last coordinate
-    fastest-varying (``p`` outer, ..., innermost coordinate inner), the
-    same nesting `finat.duffy.DuffyElement.duffy_evaluation` builds via
-    nested `gem.JaggedIndex` (each with the previous coordinates as
-    parents). This is the dof order `FIAT.hierarchical.LegendreDual` uses,
-    so that the flat dof index is affine in the innermost coordinate for
-    each fixed value of the outer coordinates -- unlike the Morton
-    (total-degree-major) index, which mixes all coordinates
-    non-separably. See `finat/duffy.py` for how that affine structure is
-    exploited (`gem.FlexiblyIndexed`, offset a function of the outer
-    coordinates only).
-
-    Parameters
-    ----------
-    dim : int
-        The spatial dimension.
-    n : int
-        The polynomial degree.
-
-    Returns
-    -------
-    numpy.ndarray
-        An integer array of length ``ndof = math.comb(n + dim, dim)``
-        such that ``perm[j]`` is the Morton index of the ``j``-th lattice
-        point in lattice-lexicographic order. If ``phis`` is an array
-        whose rows enumerate the members of :class:`ExpansionSet` in
-        Morton order (as `ExpansionSet`/`ONPolynomialSet` tabulate them),
-        ``phis[perm]`` re-enumerates the same rows in
+    :returns: an integer array of length ``ndof`` such that ``perm[j]`` is
+        the Morton index of the ``j``-th lattice point in
         lattice-lexicographic order.
-
     """
     ndof = math.comb(n + dim, dim)
     return numpy.fromiter((morton_index(dim, n, *multiindex) for multiindex in _lex_iter(dim, n)),
@@ -105,23 +63,9 @@ def _lex_iter(dim, n):
 def lexicographic_multiindices(dim, n):
     """Lattice multi-index of each lattice-lexicographic dof position.
 
-    Parameters
-    ----------
-    dim : int
-        The spatial dimension.
-    n : int
-        The polynomial degree.
-
-    Returns
-    -------
-    numpy.ndarray
-        An integer array of shape ``(ndof, dim)`` such that row ``j`` is
-        the lattice multi-index ``(i_1, ..., i_dim)`` of dof ``j``, when
-        dofs are ordered lattice-lexicographically (see
-        `lexicographic_permutation`); the inverse of the mapping
-        `lexicographic_permutation` composes with `morton_index` to
-        express.
-
+    :returns: an integer array of shape ``(ndof, dim)`` such that row ``j``
+        is the lattice multi-index of dof ``j`` in lattice-lexicographic
+        order (see `lexicographic_permutation`).
     """
     ndof = math.comb(n + dim, dim)
     return numpy.fromiter((i for multiindex in _lex_iter(dim, n) for i in multiindex),
@@ -129,43 +73,17 @@ def lexicographic_multiindices(dim, n):
 
 
 def lexicographic_offsets(dim, n):
-    """Small per-axis-prefix offset tables for lattice-lexicographic order.
+    """Per-axis-prefix offset tables for lattice-lexicographic order: for
+    dof index ``j`` with lattice multi-index ``(i_1, ..., i_dim)``,
+    ``j == offsets[dim - 2][i_1, ..., i_{dim - 1}] + i_dim`` (the flat
+    index is affine, slope 1, in the innermost coordinate).
 
-    For a lattice-lexicographic-ordered dof index ``j`` with lattice
-    multi-index ``(i_1, ..., i_dim)``, ``j == offsets[dim - 2][i_1, ...,
-    i_{dim - 1}] + i_dim``: the flat index is affine (slope 1) in the
-    innermost coordinate for each fixed value of the outer coordinates.
-    This is what lets `finat/duffy.py` address the flat dof storage via
-    `gem.FlexiblyIndexed` (one small table lookup for the outer
-    coordinates, then a unit-stride term for the innermost one) instead
-    of the non-separable Morton index formula.
+    Prefixes off the simplex lattice are set to ``ndof``, not ``0``, so
+    they compare as unreachable by any real flat index rather than as a
+    valid (wrong) one.
 
-    Entries for a prefix that is not on the simplex lattice (i.e. whose
-    lattice point ``(i_1, ..., i_{t + 1}, 0, ..., 0)`` has ``sum > n``)
-    are set to ``ndof`` (one past the last valid flat index), not ``0``:
-    they must compare as "larger than any real flat index" so that a
-    step-sum search recovering a coordinate by counting how many table
-    entries a real ``r < ndof`` clears (see `finat/duffy.py`) does not
-    spuriously count an out-of-lattice entry, which a ``0`` default
-    would (comparing as smaller than, rather than unreachable by, every
-    real index).
-
-    Parameters
-    ----------
-    dim : int
-        The spatial dimension (1, 2, or 3).
-    n : int
-        The polynomial degree.
-
-    Returns
-    -------
-    tuple of numpy.ndarray
-        ``dim - 1`` integer arrays, the ``t``-th of shape ``(n + 1,) *
-        (t + 1)``, giving the flat dof index of ``(i_1, ..., i_{t + 1},
-        0, ..., 0)`` for each prefix ``(i_1, ..., i_{t + 1})``. Empty for
-        ``dim == 1`` (no offsetting needed: the flat index *is* the only
-        lattice coordinate).
-
+    :returns: ``dim - 1`` integer arrays, the ``t``-th of shape
+        ``(n + 1,) * (t + 1)``. Empty for ``dim == 1``.
     """
     ndof = math.comb(n + dim, dim)
     multiindices = lexicographic_multiindices(dim, n)
@@ -617,6 +535,27 @@ def C0_basis(dim, n, tabulations):
     return tuple(phi[dofs] for phi in tabulations)
 
 
+def _c0_recombination_matrix(dim, n):
+    """The dense matrix form of `C0_basis`'s row recombination + entity
+    reorder, and the raw (continuity=None) lattice multi-index of each of
+    its columns.
+
+    `C0_basis` operates by pure row operations on whatever array it is
+    given, so feeding it the identity recovers the combination it applies
+    to any other tabulation as an explicit matrix: ``C0_basis(dim, n,
+    [phi])[0] == R @ phi`` for the ``R`` returned here.
+    """
+    ndof = math.comb(n + dim, dim)
+    R, = C0_basis(dim, n, [numpy.eye(ndof)])
+    # `C0_basis` indexes its rows/columns by Morton position (via
+    # `morton_index`), not by `lattice_iter`'s enumeration order -- invert
+    # `morton_index` to get each Morton position's lattice multi-index.
+    raw_multiindices = [None] * ndof
+    for multiindex in reference_element.lattice_iter(0, n + 1, dim):
+        raw_multiindices[morton_index(dim, n, *multiindex)] = multiindex
+    return R, raw_multiindices
+
+
 def xi_triangle(eta):
     """Maps from [-1,1]^2 to the (-1,1) reference triangle."""
     eta1, eta2 = eta
@@ -746,41 +685,32 @@ class ExpansionSet(object):
         tensor-product points.
 
         The evaluation points are the image on the reference cell of the
-        tensor-product grid ``eta_pts``, collapsed onto the default simplex
-        by the Duffy map (`xi_triangle`, `xi_tetrahedron`).
+        tensor-product grid ``eta_pts`` (one ``(-1, 1)`` array per spatial
+        dimension), collapsed onto the default simplex by the Duffy map
+        (`xi_triangle`, `xi_tetrahedron`).
 
-        Parameters
-        ----------
-        n : int
-            The polynomial degree.
-        eta_pts : tuple of numpy.ndarray
-            One array of points on the ``(-1, 1)`` interval per spatial
-            dimension, holding the collapsed coordinates of each axis.
-        order : int
-            The maximum order of differentiation, currently up to 1.
-        cell : int
-            The subcell id.
+        :returns: a dict mapping each derivative multi-index alpha with
+            ``|alpha| <= order`` to a list of separable terms
+            ``(coeff, factors)``, with ``coeff`` a float and ``factors`` a
+            tuple of per-axis tables such that::
 
-        Returns
-        -------
-        dict
-            Mapping each derivative multi-index alpha with ``|alpha| <= order``
-            to a list of separable terms ``(coeff, factors)``, with ``coeff``
-            a float and ``factors`` a tuple of per-axis tables such that
-
-                ``D^alpha phi_(i_1..i_d) = sum_terms coeff * prod_t factors[t][m_t, i_t, pt_t]``
+                D^alpha phi_(i_1..i_d) = sum_terms coeff * prod_t factors[t][m_t, i_t, pt_t]
 
             on the lattice ``i_1 + ... + i_d <= n``, where ``m_1 = 0`` and
-            ``m_t = i_1 + ... + i_{t-1}``.  Members are enumerated by the
+            ``m_t = i_1 + ... + i_{t-1}``. Members are enumerated by the
             lattice multi-index through `morton_index2` / `morton_index3`.
             Tables are shared between terms, so consumers may deduplicate
             them by identity.
 
+            Always the *raw* (continuity=None) tabulation, even when
+            ``self.continuity == "C0"``: `C0_basis`'s recombination mixes
+            different lattice multi-indices together, which this
+            per-multi-index-uniform representation can't express. Callers
+            needing the C0 basis recombine the raw result themselves (see
+            `c0_recombination_row_terms` / `c0_recombination_col_terms`).
         """
         if order > 1:
             raise NotImplementedError("tabulate_duffy is limited to first derivatives")
-        if self.continuity is not None:
-            raise NotImplementedError("tabulate_duffy does not yet support C0 expansion sets")
         sd = self.ref_el.get_spatial_dimension()
         assert len(eta_pts) == sd
         A, b = self.affine_mappings[cell]

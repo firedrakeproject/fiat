@@ -74,7 +74,7 @@ class Legendre(DuffyElement, ScalarFiatElement):
         super().__init__(fiat_element)
 
 
-class IntegratedLegendre(ScalarFiatElement):
+class IntegratedLegendre(DuffyElement, ScalarFiatElement):
     """CG element with integrated Legendre polynomials."""
 
     def __init__(self, cell, degree, variant=None):
