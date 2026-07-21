@@ -61,6 +61,21 @@ def multiindex_equal(d, isum, imin=0):
     yield (imin,) * (d - 1) + (imax,)
 
 
+def lexicographical_iter(dim, n):
+    """Iterate the simplex lattice in lattice-lexicographic order.
+
+    The first coordinate is slowest-varying, the last fastest-varying;
+    see `lexicographic_permutation`.
+    """
+    if dim == 1:
+        for p in range(n + 1):
+            yield (p,)
+    else:
+        for p in range(n + 1):
+            for rest in lexicographical_iter(dim - 1, n - p):
+                yield (p,) + rest
+
+
 def lattice_iter(start, finish, depth):
     """Generator iterating over the depth-dimensional lattice of
     integers between start and (finish-1).  This works on simplices in

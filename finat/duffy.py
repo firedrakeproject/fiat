@@ -1,12 +1,15 @@
 from functools import reduce
 
+import math
 import numpy
 
 import gem
 from gem.node import MemoizerArg
 from gem.optimise import filtered_replace_indices
-from FIAT.expansions import (lexicographic_permutation, lexicographic_multiindices,
-                             c0_recombination_matrix)
+
+from FIAT.reference_element import lattice_iter, lexicographical_iter
+from FIAT.expansions import (lexicographic_permutation,
+                             morton_index, C0_basis)
 from finat.point_set import CollapsedTensorProductPointSet
 
 
@@ -97,17 +100,7 @@ class DuffyElement:
                                       "to coincide with the expansion set")
 
         if continuity_c0:
-            R, raw_multiindices = c0_recombination_matrix(sd, degree)
-            rows = [numpy.nonzero(R[r])[0] for r in range(ndof)]
-            k = max(len(cols) for cols in rows)
-            row_multiindex = numpy.zeros((ndof, k, sd), dtype=int)
-            row_coeff = numpy.zeros((ndof, k))
-            for r, cols in enumerate(rows):
-                pad = cols[-1]
-                for t in range(k):
-                    m = cols[t] if t < len(cols) else pad
-                    row_multiindex[r, t] = raw_multiindices[m]
-                    row_coeff[r, t] = R[r, m] if t < len(cols) else 0.0
+            row_multiindex, row_coeff = c0_recombination_matrix(sd, degree)
         else:
             row_multiindex = lexicographic_multiindices(sd, degree).reshape(ndof, 1, sd)
             row_coeff = numpy.ones((ndof, 1))
@@ -196,3 +189,77 @@ class DuffyElement:
         mapper = MemoizerArg(filtered_replace_indices)
         return {alpha: gem.ComponentTensor(gem.IndexSum(gem.Product(coeff_expr, mapper(expr, subst)), (k,)), (r,))
                 for alpha, expr in result.items()}
+
+
+def c0_recombination_matrix(dim, n):
+    """The dense matrix form of `C0_basis`'s row recombination + entity
+    reorder, and the raw (continuity=None) lattice multi-index of each of
+    its columns.
+
+    `C0_basis` operates by pure row operations on whatever array it is
+    given, so feeding it the identity recovers the combination it applies
+    to any other tabulation as an explicit matrix: ``C0_basis(dim, n,
+    [phi])[0] == R @ phi`` for the ``R`` returned here.
+    """
+    ndof = math.comb(n + dim, dim)
+    R, = C0_basis(dim, n, [numpy.eye(ndof)])
+    # `C0_basis` indexes its rows/columns by Morton position (via
+    # `morton_index`), not by `lattice_iter`'s enumeration order -- invert
+    # `morton_index` to get each Morton position's lattice multi-index.
+    raw_multiindices = [None] * ndof
+    for multiindex in lattice_iter(0, n + 1, dim):
+        raw_multiindices[morton_index(dim, n, *multiindex)] = multiindex
+
+    rows = [numpy.nonzero(R[r])[0] for r in range(ndof)]
+    k = max(len(cols) for cols in rows)
+    row_multiindex = numpy.zeros((ndof, k, dim), dtype=int)
+    row_coeff = numpy.zeros((ndof, k))
+    for r, cols in enumerate(rows):
+        pad = cols[-1]
+        for t in range(k):
+            m = cols[t] if t < len(cols) else pad
+            row_multiindex[r, t] = raw_multiindices[m]
+            if t < len(cols):
+                row_coeff[r, t] = R[r, m]
+    return row_multiindex, row_coeff
+
+
+def lexicographic_multiindices(dim, n):
+    """Lattice multi-index of each lattice-lexicographic dof position.
+
+    :returns: an integer array of shape ``(ndof, dim)`` such that row ``j``
+        is the lattice multi-index of dof ``j`` in lattice-lexicographic
+        order (see `lexicographic_permutation`).
+    """
+    ndof = math.comb(n + dim, dim)
+    return numpy.fromiter((i for multiindex in lexicographical_iter(dim, n) for i in multiindex),
+                          dtype=int, count=ndof * dim).reshape(ndof, dim)
+
+
+def lexicographic_offsets(dim, n):
+    """Per-axis-prefix offset tables for lattice-lexicographic order: for
+    dof index ``j`` with lattice multi-index ``(i_1, ..., i_dim)``,
+    ``j == offsets[dim - 2][i_1, ..., i_{dim - 1}] + i_dim`` (the flat
+    index is affine, slope 1, in the innermost coordinate).
+
+    Prefixes off the simplex lattice are set to ``ndof``, not ``0``, so
+    they compare as unreachable by any real flat index rather than as a
+    valid (wrong) one.
+
+    :returns: ``dim - 1`` integer arrays, the ``t``-th of shape
+        ``(n + 1,) * (t + 1)``. Empty for ``dim == 1``.
+    """
+    ndof = math.comb(n + dim, dim)
+    multiindices = lexicographic_multiindices(dim, n)
+    offsets = []
+    for t in range(dim - 1):
+        shape = (n + 1,) * (t + 1)
+        table = numpy.full(shape, ndof, dtype=int)
+        prefixes = multiindices[:, :t + 1]
+        seen = numpy.zeros(shape, dtype=bool)
+        for j, prefix in enumerate(map(tuple, prefixes)):
+            if not seen[prefix]:
+                table[prefix] = j
+                seen[prefix] = True
+        offsets.append(table)
+    return tuple(offsets)

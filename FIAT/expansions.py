@@ -41,64 +41,9 @@ def lexicographic_permutation(dim, n):
         lattice-lexicographic order.
     """
     ndof = math.comb(n + dim, dim)
-    return numpy.fromiter((morton_index(dim, n, *multiindex) for multiindex in _lex_iter(dim, n)),
+    return numpy.fromiter((morton_index(dim, n, *multiindex)
+                           for multiindex in reference_element.lexicographical_iter(dim, n)),
                           dtype=int, count=ndof)
-
-
-def _lex_iter(dim, n):
-    """Iterate the simplex lattice in lattice-lexicographic order.
-
-    The first coordinate is slowest-varying, the last fastest-varying;
-    see `lexicographic_permutation`.
-    """
-    if dim == 1:
-        for p in range(n + 1):
-            yield (p,)
-    else:
-        for p in range(n + 1):
-            for rest in _lex_iter(dim - 1, n - p):
-                yield (p,) + rest
-
-
-def lexicographic_multiindices(dim, n):
-    """Lattice multi-index of each lattice-lexicographic dof position.
-
-    :returns: an integer array of shape ``(ndof, dim)`` such that row ``j``
-        is the lattice multi-index of dof ``j`` in lattice-lexicographic
-        order (see `lexicographic_permutation`).
-    """
-    ndof = math.comb(n + dim, dim)
-    return numpy.fromiter((i for multiindex in _lex_iter(dim, n) for i in multiindex),
-                          dtype=int, count=ndof * dim).reshape(ndof, dim)
-
-
-def lexicographic_offsets(dim, n):
-    """Per-axis-prefix offset tables for lattice-lexicographic order: for
-    dof index ``j`` with lattice multi-index ``(i_1, ..., i_dim)``,
-    ``j == offsets[dim - 2][i_1, ..., i_{dim - 1}] + i_dim`` (the flat
-    index is affine, slope 1, in the innermost coordinate).
-
-    Prefixes off the simplex lattice are set to ``ndof``, not ``0``, so
-    they compare as unreachable by any real flat index rather than as a
-    valid (wrong) one.
-
-    :returns: ``dim - 1`` integer arrays, the ``t``-th of shape
-        ``(n + 1,) * (t + 1)``. Empty for ``dim == 1``.
-    """
-    ndof = math.comb(n + dim, dim)
-    multiindices = lexicographic_multiindices(dim, n)
-    offsets = []
-    for t in range(dim - 1):
-        shape = (n + 1,) * (t + 1)
-        table = numpy.full(shape, ndof, dtype=int)
-        prefixes = multiindices[:, :t + 1]
-        seen = numpy.zeros(shape, dtype=bool)
-        for j, prefix in enumerate(map(tuple, prefixes)):
-            if not seen[prefix]:
-                table[prefix] = j
-                seen[prefix] = True
-        offsets.append(table)
-    return tuple(offsets)
 
 
 def jrc(a, b, n):
@@ -533,27 +478,6 @@ def C0_basis(dim, n, tabulations):
         dofs.extend(idx(i, j, k) for k in range(1, n+1) for j in range(1, n-k+1) for i in range(2, n-j-k+1))
 
     return tuple(phi[dofs] for phi in tabulations)
-
-
-def c0_recombination_matrix(dim, n):
-    """The dense matrix form of `C0_basis`'s row recombination + entity
-    reorder, and the raw (continuity=None) lattice multi-index of each of
-    its columns.
-
-    `C0_basis` operates by pure row operations on whatever array it is
-    given, so feeding it the identity recovers the combination it applies
-    to any other tabulation as an explicit matrix: ``C0_basis(dim, n,
-    [phi])[0] == R @ phi`` for the ``R`` returned here.
-    """
-    ndof = math.comb(n + dim, dim)
-    R, = C0_basis(dim, n, [numpy.eye(ndof)])
-    # `C0_basis` indexes its rows/columns by Morton position (via
-    # `morton_index`), not by `lattice_iter`'s enumeration order -- invert
-    # `morton_index` to get each Morton position's lattice multi-index.
-    raw_multiindices = [None] * ndof
-    for multiindex in reference_element.lattice_iter(0, n + 1, dim):
-        raw_multiindices[morton_index(dim, n, *multiindex)] = multiindex
-    return R, raw_multiindices
 
 
 def xi_triangle(eta):
