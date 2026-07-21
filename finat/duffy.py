@@ -11,11 +11,12 @@ from finat.point_set import CollapsedTensorProductPointSet
 
 def _index_value(index):
     """GEM scalar expression for the numeric value of a `gem.Index`."""
+    # FIXME write proper codegen for this hack
     return gem.Indexed(gem.Literal(numpy.arange(index.extent, dtype=gem.uint_type),
                                    dtype=gem.uint_type), (index,))
 
 
-def _one(n):
+def _as_gem_uint(n):
     return gem.Literal(n, dtype=gem.uint_type)
 
 
@@ -64,17 +65,17 @@ def _flat_index_expr(multiindex, ndof, offsets):
     else:
         offset = gem.Indexed(gem.Literal(offsets[-1], dtype=gem.uint_type), multiindex[:-1])
         expr = gem.Sum(offset, _index_value(multiindex[-1]))
-    return gem.MinValue(expr, _one(ndof - 1))
+    return gem.MinValue(expr, _as_gem_uint(ndof - 1))
 
 
 def _step_ge(a, b):
     """1 if a >= b else 0, for gem uint scalar expressions a, b."""
-    return gem.Conditional(gem.Comparison(">=", a, b), _one(1), _one(0))
+    return gem.Conditional(gem.Comparison(">=", a, b), _as_gem_uint(1), _as_gem_uint(0))
 
 
 def _step_le(a, b):
     """1 if a <= b else 0, for gem uint scalar expressions a, b."""
-    return gem.Conditional(gem.Comparison("<=", a, b), _one(1), _one(0))
+    return gem.Conditional(gem.Comparison("<=", a, b), _as_gem_uint(1), _as_gem_uint(0))
 
 
 def _bounded_sub(a, b, bound):
@@ -86,8 +87,8 @@ def _bounded_sub(a, b, bound):
     ``0 < k <= bound``, whether ``b + k`` is still ``<= a``: exactly
     ``a - b`` of them are.
     """
-    terms = [_step_le(gem.Sum(b, _one(k)), a) for k in range(1, bound + 1)]
-    return reduce(gem.Sum, terms, _one(0))
+    terms = [_step_le(gem.Sum(b, _as_gem_uint(k)), a) for k in range(1, bound + 1)]
+    return reduce(gem.Sum, terms, _as_gem_uint(0))
 
 
 def _inverse_lex_index_exprs(r, sd, degree, offsets):
@@ -125,16 +126,16 @@ def _inverse_lex_index_exprs(r, sd, degree, offsets):
     """
     if sd == 2:
         table, = offsets
-        p = reduce(gem.Sum, (_step_ge(r, _one(int(table[k]))) for k in range(1, degree + 1)), _one(0))
+        p = reduce(gem.Sum, (_step_ge(r, _as_gem_uint(int(table[k]))) for k in range(1, degree + 1)), _as_gem_uint(0))
         offset_p = gem.Indexed(gem.Literal(table, dtype=gem.uint_type), (gem.VariableIndex(p),))
         q = _bounded_sub(r, offset_p, degree)
         return p, q
     elif sd == 3:
         table1, table2 = offsets
-        p = reduce(gem.Sum, (_step_ge(r, _one(int(table1[k]))) for k in range(1, degree + 1)), _one(0))
+        p = reduce(gem.Sum, (_step_ge(r, _as_gem_uint(int(table1[k]))) for k in range(1, degree + 1)), _as_gem_uint(0))
         p_idx = gem.VariableIndex(p)
         q = reduce(gem.Sum, (_step_ge(r, gem.Indexed(gem.Literal(table2, dtype=gem.uint_type), (p_idx, k)))
-                             for k in range(1, degree + 1)), _one(0))
+                             for k in range(1, degree + 1)), _as_gem_uint(0))
         offset_pq = gem.Indexed(gem.Literal(table2, dtype=gem.uint_type), (p_idx, gem.VariableIndex(q)))
         last = _bounded_sub(r, offset_pq, degree)
         return p, q, last
@@ -243,14 +244,13 @@ class DuffyElement:
         for alpha, terms in duffy.items():
             exprs = []
             for coeff, factors in terms:
-                expr = reduce(gem.Product,
-                              (gem.Indexed(as_gem(table), (m, i, pt))
-                               for table, m, i, pt in zip(factors, m_indices,
-                                                          multiindex, ps.indices)))
+                expr = gem.Product(*(gem.Indexed(as_gem(table), (m, i, pt))
+                                     for table, m, i, pt
+                                     in zip(factors, m_indices, multiindex, ps.indices)))
                 if coeff != 1.0:
                     expr = gem.Product(gem.Literal(coeff), expr)
                 exprs.append(expr)
-            result[alpha] = reduce(gem.Sum, exprs)
+            result[alpha] = gem.Sum(*exprs)
         return multiindex, result
 
     def _duffy_applies(self, ps, entity):

@@ -30,7 +30,7 @@ def morton_index(dim, n, *multiindex):
         The spatial dimension, i.e. the length of ``multiindex``.
     n : int
         The polynomial degree; unused, kept for a uniform signature with
-        :func:`morton_forward_table` / :func:`morton_inverse_table`.
+        the other lattice-indexing helpers in this module.
     *multiindex : int
         The lattice multi-index ``(i_1, ..., i_dim)``.
 
@@ -45,36 +45,6 @@ def morton_index(dim, n, *multiindex):
     """
     idx = (lambda p: p, morton_index2, morton_index3)[dim - 1]
     return idx(*multiindex)
-
-
-def morton_forward_table(dim, n):
-    """Table mapping a rectangular lattice multi-index to its Morton index.
-
-    Parameters
-    ----------
-    dim : int
-        The spatial dimension.
-    n : int
-        The polynomial degree.
-
-    Returns
-    -------
-    numpy.ndarray
-        An integer array of shape ``(n + 1,) * dim`` such that
-        ``table[i_1, ..., i_dim]`` is the Morton index of the lattice
-        point, for points on the simplex lattice (``sum(multiindex) <=
-        n``).  Entries outside the simplex lattice are clamped to a
-        valid (but otherwise meaningless) degree of freedom index; those
-        entries are only ever read where the corresponding tabulation is
-        exactly zero.
-
-    """
-    ndof = math.comb(n + dim, dim)
-    table = numpy.zeros((n + 1,) * dim, dtype=int)
-    for multiindex in reference_element.lattice_iter(0, n + 1, dim):
-        table[multiindex] = morton_index(dim, n, *multiindex)
-    # Out-of-lattice entries default to 0, already a valid dof index.
-    return numpy.minimum(table, ndof - 1)
 
 
 def lexicographic_permutation(dim, n):
@@ -211,31 +181,6 @@ def lexicographic_offsets(dim, n):
                 seen[prefix] = True
         offsets.append(table)
     return tuple(offsets)
-
-
-def morton_inverse_table(dim, n):
-    """Table mapping a Morton (flat) index to its lattice multi-index.
-
-    Parameters
-    ----------
-    dim : int
-        The spatial dimension.
-    n : int
-        The polynomial degree.
-
-    Returns
-    -------
-    numpy.ndarray
-        An integer array of shape ``(ndof, dim)``, the inverse of
-        :func:`morton_forward_table` restricted to the simplex lattice,
-        where ``ndof = math.comb(n + dim, dim)``.
-
-    """
-    ndof = math.comb(n + dim, dim)
-    table = numpy.zeros((ndof, dim), dtype=int)
-    for multiindex in reference_element.lattice_iter(0, n + 1, dim):
-        table[morton_index(dim, n, *multiindex)] = multiindex
-    return table
 
 
 def jrc(a, b, n):

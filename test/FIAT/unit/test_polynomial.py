@@ -224,31 +224,6 @@ def test_tabulate_duffy(make_cell, variant, degree):
                 assert numpy.allclose(vals, expected[alpha][idx(*index)], rtol=1E-10, atol=1E-10)
 
 
-@pytest.mark.parametrize("degree", [0, 1, 4])
-@pytest.mark.parametrize("dim", [1, 2, 3])
-def test_morton_tables(dim, degree):
-    """`expansions.morton_forward_table` / `expansions.morton_inverse_table`
-    must agree with `expansions.morton_index` on the simplex lattice, and
-    be mutual inverses there; this is the Morton dof numbering that
-    `tsfc.fem`'s sum-factorized argument/coefficient translation relies
-    on to gather/scatter without reordering FIAT's degrees of freedom.
-    """
-    import math
-    fwd = expansions.morton_forward_table(dim, degree)
-    inv = expansions.morton_inverse_table(dim, degree)
-    ndof = math.comb(degree + dim, dim)
-    assert fwd.shape == (degree + 1,) * dim
-    assert inv.shape == (ndof, dim)
-
-    seen = numpy.zeros(ndof, dtype=bool)
-    for multiindex in reference_element.lattice_iter(0, degree + 1, dim):
-        r = expansions.morton_index(dim, degree, *multiindex)
-        assert fwd[multiindex] == r
-        assert tuple(inv[r]) == multiindex
-        seen[r] = True
-    assert numpy.all(seen)
-
-
 @pytest.mark.parametrize("degree", [4])
 def test_principal_functions_bubble(cell, degree):
     dim = cell.get_spatial_dimension()
