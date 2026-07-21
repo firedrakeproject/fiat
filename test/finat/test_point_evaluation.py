@@ -71,7 +71,6 @@ def test_point_evaluation_zany(ref_to_phys, element, degree):
 
 @pytest.mark.parametrize('degree', [1, 4])
 def test_duffy_evaluation(cell, degree):
-    from FIAT.expansions import lexicographic_multiindices
     from finat.point_set import PointSet, CollapsedTensorProductPointSet
 
     dim = cell.get_spatial_dimension()
@@ -80,27 +79,23 @@ def test_duffy_evaluation(cell, degree):
     # Unequal point counts per axis, including the collapsed vertex eta=1
     factors = [PointSet(numpy.linspace(0, 1, 3 + axis)[:, None]) for axis in range(dim)]
     ps = CollapsedTensorProductPointSet(factors)
-    multiindex, duffy = element.duffy_evaluation(1, ps)
+    duffy = element.duffy_evaluation(1, ps)
 
     dense_ps = PointSet(ps.points)
     expected = element.basis_evaluation(1, dense_ps)
     assert expected.keys() == duffy.keys()
 
-    # dof j's lattice coordinates, per FIAT.hierarchical.LegendreDual's
-    # lattice-lexicographic dof order.
-    flat_of = {tuple(row): j for j, row in enumerate(lexicographic_multiindices(dim, degree))}
-    lattice_shape = (degree + 1,) * dim
+    # duffy_evaluation already returns the flat-dof-indexed tabulation
+    # (matching basis_evaluation's convention), so no lattice-multiindex
+    # bookkeeping is needed here: just compare the two dense (ndof,)-shaped
+    # tabulations point by point.
+    ndof = element.space_dimension()
     for alpha, table in expected.items():
         exp, = gem.interpreter.evaluate([table])
         exp = exp.broadcast(dense_ps.indices)
         act, = gem.interpreter.evaluate([duffy[alpha]])
-        act = act.broadcast(multiindex + ps.indices).reshape(*lattice_shape, -1)
-        for index in numpy.ndindex(lattice_shape):
-            if sum(index) > degree:
-                assert numpy.allclose(act[index], 0.0)
-            else:
-                assert numpy.allclose(act[index], exp[:, flat_of[index]],
-                                      rtol=1E-10, atol=1E-12)
+        act = act.broadcast(ps.indices).reshape(-1, ndof)
+        assert numpy.allclose(act, exp, rtol=1E-10, atol=1E-12)
 
 
 if __name__ == '__main__':

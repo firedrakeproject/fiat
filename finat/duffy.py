@@ -10,73 +10,6 @@ from FIAT.expansions import (lexicographic_permutation, lexicographic_multiindic
 from finat.point_set import CollapsedTensorProductPointSet
 
 
-def _element_scale(element):
-    """Per-dof rescaling relating ``element``'s nodal basis to its
-    expansion set's native `tabulate` ordering: dof ``r`` reads
-    expansion-set member ``col[r]`` with weight ``scale[r]``.
-
-    * continuity=None (`finat.spectral.Legendre`): the expansion set's
-      native order is raw Morton order, and the permutation reorders it
-      to lattice-lexicographic (`FIAT.expansions.lexicographic_permutation`).
-    * continuity="C0" (`finat.spectral.IntegratedLegendre`): the expansion
-      set's own `tabulate` is already entity-ordered by `FIAT.expansions.
-      C0_basis`, so the permutation is the identity.
-
-    :returns: ``(continuity_c0, scale)``.
-    """
-    degree = element.degree
-    sd = element.cell.get_spatial_dimension()
-    poly_set = element._element.get_nodal_basis()
-    coeffs = poly_set.get_coeffs()
-    expansion_set = poly_set.get_expansion_set()
-    continuity_c0 = expansion_set.continuity == "C0"
-    col = numpy.arange(len(coeffs)) if continuity_c0 else lexicographic_permutation(sd, degree)
-    scale = coeffs[numpy.arange(len(coeffs)), col]
-    expected = numpy.zeros_like(coeffs)
-    expected[numpy.arange(len(coeffs)), col] = scale
-    if not numpy.allclose(coeffs, expected):
-        raise NotImplementedError("duffy_evaluation requires the element basis "
-                                  "to coincide with the expansion set")
-    return continuity_c0, scale
-
-
-def _recombination_terms(element):
-    """Sparse recombination of ``element``'s nodal basis in terms of its
-    expansion set's raw (continuity=None) lattice tabulation: dof ``r``
-    reads ``sum_k row_coeff[r, k] * phi(row_multiindex[r, k])``, where
-    ``phi`` is the raw per-lattice-multi-index tabulation `duffy_evaluation`
-    computes.
-
-    For continuity=None each dof reads exactly one lattice point (``k``
-    has extent 1); for continuity="C0" each dof combines at most
-    ``dim + 1`` lattice points (`FIAT.expansions.c0_recombination_matrix`),
-    padded with zero-weight terms to a common extent.
-
-    :returns: ``(row_multiindex, row_coeff)``, integer/float arrays of
-        shape ``(ndof, k, dim)``/``(ndof, k)``.
-    """
-    degree = element.degree
-    sd = element.cell.get_spatial_dimension()
-    ndof = element.space_dimension()
-    continuity_c0, scale = _element_scale(element)
-    if continuity_c0:
-        R, raw_multiindices = c0_recombination_matrix(sd, degree)
-        rows = [numpy.nonzero(R[r])[0] for r in range(ndof)]
-        k = max(len(cols) for cols in rows)
-        row_multiindex = numpy.zeros((ndof, k, sd), dtype=int)
-        row_coeff = numpy.zeros((ndof, k))
-        for r, cols in enumerate(rows):
-            pad = cols[-1]
-            for t in range(k):
-                m = cols[t] if t < len(cols) else pad
-                row_multiindex[r, t] = raw_multiindices[m]
-                row_coeff[r, t] = R[r, m] if t < len(cols) else 0.0
-    else:
-        row_multiindex = lexicographic_multiindices(sd, degree).reshape(ndof, 1, sd)
-        row_coeff = numpy.ones((ndof, 1))
-    return row_multiindex, row_coeff * scale[:, None]
-
-
 class DuffyElement:
     """Mixin for simplicial elements whose nodal basis coincides with the
     Dubiner expansion set, enabling O(p^d) sum-factorized tabulation on
@@ -89,8 +22,96 @@ class DuffyElement:
     the dof order `FIAT.hierarchical.LegendreDual` uses. For continuity="C0"
     elements (`finat.spectral.IntegratedLegendre`) each flat dof index
     corresponds to a small, fixed number of lattice points, combined
-    per `FIAT.expansions.c0_recombination_matrix` (see `_recombination_terms`).
+    per `FIAT.expansions.c0_recombination_matrix` (see `get_sparse_coeffs`).
     """
+
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        """Return code for evaluating the element at known points on the
+        reference element, using `duffy_evaluation` when ``ps`` has
+        collapsed tensor-product structure, and falling back to the
+        standard dense tabulation otherwise (``coordinate_mapping`` is
+        ignored; `duffy_evaluation` only supports reference tabulation).
+
+        Since `duffy_evaluation` already returns a flat-dof-indexed
+        tabulation, no separate scatter step is needed here, and no
+        special-cased path is needed for `Coefficient` evaluation either
+        (`tsfc.fem.translate_coefficient`'s generic dense contraction
+        applies uniformly) -- both compose transparently with
+        `finat.tensorfiniteelement.TensorFiniteElement`
+        (`Vector`/`TensorElement`), which only ever delegates
+        `basis_evaluation` to the scalar base element.
+
+        :returns: a dict mapping each derivative multi-index alpha to a
+            `gem.ComponentTensor` of shape ``(self.space_dimension(),)``,
+            matching the standard (non-factorized) tabulation's convention.
+        """
+        sd = self.cell.get_dimension()
+        if not (isinstance(ps, CollapsedTensorProductPointSet)
+                and (entity is None or entity == (sd, 0))
+                and not self.complex.is_macrocell()):
+            return super().basis_evaluation(order, ps, entity=entity, coordinate_mapping=coordinate_mapping)
+        return self.duffy_evaluation(order, ps, entity)
+
+    def get_sparse_coeffs(self):
+        """Sparse recombination of this element's nodal basis in terms of
+        its expansion set's raw (continuity=None) lattice tabulation: dof
+        ``r`` reads ``sum_k row_coeff[r, k] * phi(row_multiindex[r, k])``,
+        where ``phi`` is the raw per-lattice-multi-index tabulation
+        `duffy_evaluation` computes.
+
+        * continuity=None (`finat.spectral.Legendre`): each dof reads
+          exactly one lattice point (``k`` has extent 1), at its
+          lattice-lexicographic position
+          (`FIAT.expansions.lexicographic_multiindices`); the expansion
+          set's native order is raw Morton order, so the per-dof weight
+          also undoes the lattice-lexicographic permutation
+          (`FIAT.expansions.lexicographic_permutation`).
+        * continuity="C0" (`finat.spectral.IntegratedLegendre`): each dof
+          combines at most ``dim + 1`` lattice points
+          (`FIAT.expansions.c0_recombination_matrix`), padded with
+          zero-weight terms to a common extent; the expansion set's own
+          `tabulate` is already entity-ordered by `FIAT.expansions.
+          C0_basis`, so no further reordering applies.
+
+        In both cases the per-dof weight also rescales the expansion set's
+        native tabulation to this element's actual nodal basis, and is
+        only valid when the nodal basis coincides with the expansion set
+        (up to that reordering/rescaling) -- checked explicitly below.
+
+        :returns: ``(row_multiindex, row_coeff)``, integer/float arrays of
+            shape ``(ndof, k, dim)``/``(ndof, k)``.
+        """
+        degree = self.degree
+        sd = self.cell.get_spatial_dimension()
+        ndof = self.space_dimension()
+        poly_set = self._element.get_nodal_basis()
+        coeffs = poly_set.get_coeffs()
+        expansion_set = poly_set.get_expansion_set()
+        continuity_c0 = expansion_set.continuity == "C0"
+        col = numpy.arange(ndof) if continuity_c0 else lexicographic_permutation(sd, degree)
+        scale = coeffs[numpy.arange(ndof), col]
+        expected = numpy.zeros_like(coeffs)
+        expected[numpy.arange(ndof), col] = scale
+        if not numpy.allclose(coeffs, expected):
+            raise NotImplementedError("duffy_evaluation requires the element basis "
+                                      "to coincide with the expansion set")
+
+        if continuity_c0:
+            R, raw_multiindices = c0_recombination_matrix(sd, degree)
+            rows = [numpy.nonzero(R[r])[0] for r in range(ndof)]
+            k = max(len(cols) for cols in rows)
+            row_multiindex = numpy.zeros((ndof, k, sd), dtype=int)
+            row_coeff = numpy.zeros((ndof, k))
+            for r, cols in enumerate(rows):
+                pad = cols[-1]
+                for t in range(k):
+                    m = cols[t] if t < len(cols) else pad
+                    row_multiindex[r, t] = raw_multiindices[m]
+                    row_coeff[r, t] = R[r, m] if t < len(cols) else 0.0
+        else:
+            row_multiindex = lexicographic_multiindices(sd, degree).reshape(ndof, 1, sd)
+            row_coeff = numpy.ones((ndof, 1))
+        return row_multiindex, row_coeff * scale[:, None]
 
     def duffy_evaluation(self, order, ps, entity=None):
         """Return the sum-factorized tabulation of the element on a
@@ -102,7 +123,7 @@ class DuffyElement:
         bounding box of the simplex lattice (entries outside the simplex
         lattice, ``i_1 + ... + i_d > degree``, tabulate to zero); each dof
         then reads the (small, fixed number of) lattice multi-index terms
-        `_recombination_terms` assigns it -- i.e. the returned tabulation
+        `get_sparse_coeffs` assigns it -- i.e. the returned tabulation
         is ``expansion_tabulation * coeffs``, with the recombination
         coefficients folded in here rather than left for callers to
         reapply.
@@ -161,7 +182,11 @@ class DuffyElement:
                 exprs.append(expr)
             result[alpha] = gem.Sum(*exprs)
 
-        row_multiindex, row_coeff = _recombination_terms(self)
+        # Substitute each dof r's k lattice-multi-index terms (row_multiindex)
+        # for `multiindex` in `result`, and contract with their weights
+        # (row_coeff) over k: result[alpha][r] = sum_k row_coeff[r, k] *
+        # result[alpha](multiindex=row_multiindex[r, k]).
+        row_multiindex, row_coeff = self.get_sparse_coeffs()
         r = gem.Index(extent=self.space_dimension())
         k = gem.Index(extent=row_coeff.shape[1])
         coeff_expr = gem.Indexed(gem.Literal(row_coeff), (r, k))
@@ -171,34 +196,3 @@ class DuffyElement:
         mapper = MemoizerArg(filtered_replace_indices)
         return {alpha: gem.ComponentTensor(gem.IndexSum(gem.Product(coeff_expr, mapper(expr, subst)), (k,)), (r,))
                 for alpha, expr in result.items()}
-
-    def _duffy_applies(self, ps, entity):
-        """Whether `duffy_evaluation` can tabulate on ``ps``/``entity``."""
-        cell_dim = self.cell.get_dimension()
-        return (isinstance(ps, CollapsedTensorProductPointSet)
-                and (entity is None or entity == (cell_dim, 0))
-                and not self.complex.is_macrocell())
-
-    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        """Return code for evaluating the element at known points on the
-        reference element, using `duffy_evaluation` when ``ps`` has
-        collapsed tensor-product structure, and falling back to the
-        standard dense tabulation otherwise (``coordinate_mapping`` is
-        ignored; `duffy_evaluation` only supports reference tabulation).
-
-        Since `duffy_evaluation` already returns a flat-dof-indexed
-        tabulation, no separate scatter step is needed here, and no
-        special-cased path is needed for `Coefficient` evaluation either
-        (`tsfc.fem.translate_coefficient`'s generic dense contraction
-        applies uniformly) -- both compose transparently with
-        `finat.tensorfiniteelement.TensorFiniteElement`
-        (`Vector`/`TensorElement`), which only ever delegates
-        `basis_evaluation` to the scalar base element.
-
-        :returns: a dict mapping each derivative multi-index alpha to a
-            `gem.ComponentTensor` of shape ``(self.space_dimension(),)``,
-            matching the standard (non-factorized) tabulation's convention.
-        """
-        if not self._duffy_applies(ps, entity):
-            return super().basis_evaluation(order, ps, entity=entity, coordinate_mapping=coordinate_mapping)
-        return self.duffy_evaluation(order, ps, entity)
