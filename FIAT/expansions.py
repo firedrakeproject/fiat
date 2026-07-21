@@ -9,7 +9,7 @@ to allow users to get coordinates that they want."""
 
 import numpy
 import math
-from FIAT import reference_element, jacobi
+from FIAT import precision, reference_element, jacobi
 from FIAT.precision import calibrate_tolerance
 
 
@@ -379,7 +379,9 @@ class ExpansionSet(object):
 
         if pts.dtype == object:
             # If binning is undefined, scale by the characteristic function of each subcell
-            tol = calibrate_tolerance(1E-12, numpy.array(self.ref_el.vertices).dtype)
+            ref_dtype = numpy.array(self.ref_el.vertices).dtype
+            dtype = ref_dtype if ref_dtype == numpy.dtype(numpy.float32) else precision.DEFAULT_SCALAR_DTYPE
+            tol = calibrate_tolerance(1E-12, dtype)
             Xi = compute_partition_of_unity(self.ref_el, pts, unique=unique, tol=tol)
             for cell, phi in phis.items():
                 for alpha in phi:
