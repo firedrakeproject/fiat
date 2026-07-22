@@ -13,9 +13,9 @@ from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
-                     Index, VariableIndex, Indexed, FlexiblyIndexed,
-                     IndexSum, ComponentTensor, ListTensor, Delta,
-                     partial_indexed, one)
+                     Index, JaggedIndex, VariableIndex, Indexed,
+                     FlexiblyIndexed, IndexSum, ComponentTensor, ListTensor,
+                     Delta, FlattenedTensor, partial_indexed, one, uint_type)
 
 
 @singledispatch
@@ -578,6 +578,140 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _clone_multiindex(multiindex):
+    """Fresh copies of a (possibly jagged) multiindex, rebuilding the
+    parent structure within the tuple."""
+    clones = {}
+    for index in multiindex:
+        if isinstance(index, JaggedIndex):
+            parents = tuple(clones.get(p, p) for p in index.parents)
+            clones[index] = JaggedIndex(extent=index.extent, parents=parents)
+        else:
+            clones[index] = Index(extent=index.extent)
+    return tuple(clones[index] for index in multiindex)
+
+
+def _replace_indices_unflatten(node, self, subst):
+    """`filtered_replace_indices` that additionally replaces one designated
+    `Indexed` node with a given expression."""
+    if node == self.gather:
+        return self.replacement
+    return filtered_replace_indices(node, self, subst)
+
+
+def _find_flat_gather(expression, r):
+    """The unique Indexed(FlattenedTensor, (r,)) in ``expression``, or None
+    if there is none or more than one."""
+    gathers = set(n for n in traversal((expression,))
+                  if isinstance(n, Indexed) and n.multiindex == (r,)
+                  and isinstance(n.children[0], FlattenedTensor))
+    if len(gathers) != 1:
+        return None
+    gather, = gathers
+    return gather
+
+
+def _unflatten_site(gather):
+    """Prepare the rewrite of one FlattenedTensor gather site: a mapper that
+    replaces the gather node with the tensor's expression at a fresh copy
+    ``alpha`` of the lattice multiindex (fresh because the tensor, and its
+    bound multiindex, may be shared between sites), and a `VariableIndex`
+    substitute for remaining uses of the flat index, gathering through the
+    ordering table."""
+    ft, = gather.children
+    alpha = _clone_multiindex(ft.multiindex)
+    index_replacer = MemoizerArg(filtered_replace_indices)
+    replacement = index_replacer(ft.children[0], tuple(zip(ft.multiindex, alpha)))
+    mapper = MemoizerArg(_replace_indices_unflatten)
+    mapper.gather = gather
+    mapper.replacement = replacement
+    return mapper, alpha, VariableIndex(Indexed(ft.ordering, alpha))
+
+
+def _unflatten(node, self):
+    node = reuse_if_untouched(node, self)
+    if not isinstance(node, IndexSum):
+        return node
+    summand, = node.children
+    for r in node.multiindex:
+        gather = _find_flat_gather(summand, r)
+        if gather is None:
+            continue
+        mapper, alpha, r_expr = _unflatten_site(gather)
+        summand = mapper(summand, ((r, r_expr),))
+        rest = tuple(i for i in node.multiindex if i != r)
+        return self(IndexSum(summand, rest + alpha))
+    return node
+
+
+def unflatten(expression):
+    """Rewrite contractions over the flat index of a `FlattenedTensor` as
+    loops over its jagged lattice multiindex.  The flat index disappears:
+    the tensor's expression is inlined at its lattice point, and remaining
+    uses of the flat index (e.g. a coefficient vector) gather through the
+    tensor's ordering table.  This recovers the separable per-axis factors
+    that sum factorisation needs, which the flat gather form hides."""
+    mapper = Memoizer(_unflatten)
+    return mapper(expression)
+
+
+def unflatten_returns(pairs):
+    """`unflatten` for the free (argument) indices of assignment pairs.
+
+    For each (return variable, expression) pair whose expression scatters a
+    `FlattenedTensor` along a free index of the variable, replace that flat
+    index by the jagged lattice multiindex in both: the variable's index
+    becomes an ordering-table gather, and the tensor's expression is inlined
+    at its lattice point.  Zero-padding makes the out-of-bounds lattice
+    iterations (if a consumer does not tighten the loops) accumulate zero.
+    Rewritten expressions are re-factorised with `contraction`, since the
+    factorised structure was built while the tensor was still atomic.
+    """
+    result = []
+    for variable, expression in pairs:
+        changed = False
+        rewrite = True
+        while rewrite:
+            rewrite = False
+            for j in variable.free_indices:
+                gather = _find_flat_gather(expression, j)
+                if gather is None:
+                    continue
+                mapper, alpha, r_expr = _unflatten_site(gather)
+                subst = ((j, r_expr),)
+                variable = MemoizerArg(filtered_replace_indices)(variable, subst)
+                expression = mapper(expression, subst)
+                changed = rewrite = True
+                break
+        if changed:
+            expression = make_sum([contraction(s) for s in traverse_sum(expression)])
+        result.append((variable, expression))
+    return result
+
+
+def _replace_flattened(node, self):
+    node = reuse_if_untouched(node, self)
+    if not isinstance(node, FlattenedTensor):
+        return node
+    expression, = node.children
+    points = node.lattice_points()
+    n, = node.shape
+    r = Index(extent=n)
+    subst = tuple(
+        (axis, VariableIndex(Indexed(Literal(points[:, t], dtype=uint_type), (r,))))
+        for t, axis in enumerate(node.multiindex))
+    body = MemoizerArg(filtered_replace_indices)(expression, subst)
+    return ComponentTensor(body, (r,))
+
+
+def replace_flattened(expressions):
+    """Lower remaining `FlattenedTensor`s to `ComponentTensor`s over a plain
+    flat index, substituting each lattice axis with a gather table on the
+    flat index -- jagged access instead of jagged loops."""
+    mapper = Memoizer(_replace_flattened)
+    return [mapper(expression) for expression in expressions]
+
+
 def contraction(expression, ignore=None):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
@@ -599,6 +733,9 @@ def contraction(expression, ignore=None):
 
     # Eliminate annoying ComponentTensors
     expression = index_replacer(expression, ())
+
+    # Rewrite flat FlattenedTensor contractions as jagged lattice loops
+    expression = unflatten(expression)
 
     # Flatten product tree, eliminate deltas, sum factorise
     def rebuild(expression):

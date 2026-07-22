@@ -75,20 +75,17 @@ class DuffyElement:
         """Sum-factorized tabulation on a collapsed point set, flat-dof-indexed
         (matching `get_indices()`).
 
-        Tabulates the raw expansion set over the rectangular lattice
-        bounding box (zero outside the simplex), then reads off each dof's
-        row from `get_sparse_coeffs`.
+        Tabulates the raw expansion set over the jagged lattice
+        (`gem.JaggedIndex`, zero outside the simplex), applies the diagonal
+        (home-point) weight, and flattens to the dof index with
+        `gem.FlattenedTensor`: coefficient contractions over the flat index
+        turn back into jagged lattice loops (`gem.optimise.unflatten`),
+        keeping the per-axis factors separable for sum factorisation; any
+        other use lowers to per-dof gather tables
+        (`gem.optimise.replace_flattened`).  C0 corrections (k >= 1 in
+        `get_sparse_coeffs`) stay in gather form.
 
-        No `gem.JaggedIndex`/jagged loop bound is needed: every index here
-        is a plain `gem.Index` of constant extent. Jagged *access* -- not
-        jagged *loop bounds* -- comes from `gem.VariableIndex`: wrapping a
-        table lookup as a `VariableIndex` makes the index itself an
-        expression of other free indices, so a constant-extent loop can
-        still land on a data-dependent table position each iteration.
-        `m_indices` and the row_multiindex substitution below both use this
-        to gather, never a jagged loop.
-
-        :returns: dict alpha -> `gem.ComponentTensor` of shape (ndof,).
+        :returns: dict alpha -> rank-1 gem expression of shape (ndof,).
         """
         assert isinstance(ps, CollapsedTensorProductPointSet)
         cell_dim = self.cell.get_dimension()
@@ -108,11 +105,14 @@ class DuffyElement:
             index_table = gem.Literal(index_table, dtype=gem.uint_type)
             return gem.VariableIndex(gem.Indexed(index_table, multiindex))
 
-        multiindex = tuple(gem.Index(extent=degree + 1) for _ in range(sd))
+        multiindex = []
+        for _ in range(sd):
+            multiindex.append(gem.JaggedIndex(extent=degree + 1, parents=tuple(multiindex)))
+        multiindex = tuple(multiindex)
         # m_t = i_1 + ... + i_{t-1}: affine for t <= 1, else a VariableIndex
-        # gather (jagged access, not a jagged loop) on a clamped table --
-        # clamping is safe since out-of-lattice entries already tabulate to
-        # zero via the factors of the previous axes.
+        # gather on a clamped table -- clamping only acts outside the jagged
+        # bounds, where the factors of the previous axes already tabulate to
+        # zero.
         duffy_indices = [0, *multiindex[:1]]
         for t in range(2, sd):
             index_table = reduce(numpy.add.outer, (numpy.arange(degree + 1),) * t)
@@ -140,19 +140,35 @@ class DuffyElement:
                 exprs.append(expr)
             result[alpha] = gem.Sum(*exprs)
 
-        # Each dof r contracts k lattice points: substitute every multiindex
-        # axis with a VariableIndex gather on (r, k) -- again jagged access,
-        # not a jagged loop -- then sum over k.
+        # Diagonal (home-point) part: per-dof weight and flat dof position,
+        # both as lattice tables (weight is zero off the simplex).
         row_multiindex, row_coeff = self.get_sparse_coeffs()
-        r = gem.Index(extent=self.space_dimension())
-        k = gem.Index(extent=row_coeff.shape[1])
-        coeff_expr = gem.Indexed(gem.Literal(row_coeff), (r, k))
-        subst = tuple(
-            (axis, lookup_index(row_multiindex[..., t], (r, k)))
-            for t, axis in enumerate(multiindex))
-        mapper = MemoizerArg(filtered_replace_indices)
-        return {alpha: gem.ComponentTensor(gem.IndexSum(gem.Product(coeff_expr, mapper(expr, subst)), (k,)), (r,))
-                for alpha, expr in result.items()}
+        ndof = self.space_dimension()
+        home = tuple(row_multiindex[:, 0, :].T)
+        weight = numpy.zeros((degree + 1,) * sd)
+        weight[home] = row_coeff[:, 0]
+        ordering = numpy.zeros((degree + 1,) * sd, dtype=int)
+        ordering[home] = numpy.arange(ndof)
+        ordering = gem.Literal(ordering, dtype=gem.uint_type)
+        weight = gem.Indexed(gem.Literal(weight), multiindex)
+        tables = {alpha: gem.FlattenedTensor(gem.Product(weight, expr), multiindex, ordering)
+                  for alpha, expr in result.items()}
+
+        if row_coeff.shape[1] > 1:
+            # C0 corrections: each dof contracts k further lattice points,
+            # substituted as VariableIndex gathers on (r, k) and added
+            # outside the flattened diagonal part.
+            r = gem.Index(extent=ndof)
+            k = gem.Index(extent=row_coeff.shape[1] - 1)
+            coeff_expr = gem.Indexed(gem.Literal(row_coeff[:, 1:]), (r, k))
+            subst = tuple(
+                (axis, lookup_index(row_multiindex[:, 1:, t], (r, k)))
+                for t, axis in enumerate(multiindex))
+            mapper = MemoizerArg(filtered_replace_indices)
+            tables = {alpha: gem.ComponentTensor(gem.Sum(gem.Indexed(tables[alpha], (r,)),
+                                                         gem.IndexSum(gem.Product(coeff_expr, mapper(result[alpha], subst)), (k,))), (r,))
+                      for alpha in result}
+        return tables
 
 
 def c0_recombination_matrix(dim, n):
@@ -166,7 +182,9 @@ def c0_recombination_matrix(dim, n):
     lattice point.
 
     :returns: (row_multiindex, row_coeff), shape (ndof, k, dim) / (ndof, k),
-        zero-padded to the largest row's nonzero count k.
+        zero-padded to the largest row's nonzero count k.  Each row's home
+        column (a bijective matching dof <-> lattice point with nonzero
+        weight) comes first.
     """
     ndof = math.comb(n + dim, dim)
     R, = C0_basis(dim, n, [numpy.eye(ndof)])
@@ -174,7 +192,23 @@ def c0_recombination_matrix(dim, n):
     for multiindex in lattice_iter(0, n + 1, dim):
         raw_multiindices[morton_index(dim, n, *multiindex)] = multiindex
 
-    rows = [numpy.nonzero(R[r])[0] for r in range(ndof)]
+    # Home column of each dof, by iteratively matching rows with a single
+    # remaining candidate.
+    candidates = {r: set(numpy.nonzero(R[r])[0]) for r in range(ndof)}
+    home = {}
+    while candidates:
+        for r, cols in candidates.items():
+            if len(cols) == 1:
+                break
+        else:
+            raise NotImplementedError("no bijective dof <-> lattice point matching")
+        c, = candidates.pop(r)
+        home[r] = c
+        for cols in candidates.values():
+            cols.discard(c)
+
+    rows = [[home[r], *(c for c in numpy.nonzero(R[r])[0] if c != home[r])]
+            for r in range(ndof)]
     k = max(len(cols) for cols in rows)
     row_multiindex = numpy.zeros((ndof, k, dim), dtype=int)
     row_coeff = numpy.zeros((ndof, k))

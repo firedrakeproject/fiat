@@ -30,6 +30,7 @@ class NoopError(Exception):
 
 def preprocess_gem(expressions, replace_delta=True, remove_componenttensors=True):
     """Lower GEM nodes that cannot be translated to C directly."""
+    expressions = optimise.replace_flattened(expressions)
     if remove_componenttensors:
         expressions = optimise.remove_componenttensors(expressions)
     if replace_delta:
@@ -97,9 +98,25 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
 def make_prefix_ordering(indices, prefix_ordering):
     """Creates an ordering of ``indices`` which starts with those
-    indices in ``prefix_ordering``."""
+    indices in ``prefix_ordering``.  A `gem.JaggedIndex` is placed after
+    its parents, so that its loop nests inside theirs and the jagged
+    bound can be tightened."""
     # Need to return deterministically ordered indices
-    return tuple(prefix_ordering) + tuple(k for k in indices if k not in prefix_ordering)
+    ordering = tuple(prefix_ordering) + tuple(k for k in indices if k not in prefix_ordering)
+    result = []
+    seen = set()
+
+    def visit(k):
+        if k not in seen:
+            seen.add(k)
+            for parent in getattr(k, 'parents', ()):
+                if parent in ordering:
+                    visit(parent)
+            result.append(k)
+
+    for k in ordering:
+        visit(k)
+    return tuple(result)
 
 
 def make_index_orderer(index_ordering):

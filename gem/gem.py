@@ -33,6 +33,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
            'Index', 'JaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
+           'FlattenedTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
@@ -929,6 +930,62 @@ class ComponentTensor(Node):
         self.free_indices = unique(set(expression.free_indices) - set(multiindex))
 
         return self
+
+
+class FlattenedTensor(Node):
+    """Vector view of a jagged lattice.
+
+    Binds ``multiindex`` -- whose trailing entries may be `JaggedIndex`es --
+    and exposes the in-bounds lattice points as a rank-1 tensor of shape
+    ``(n,)``.  ``ordering`` maps each in-bounds lattice point to its flat
+    position; out-of-bounds entries are ignored (but must stay below ``n``).
+    ``expression`` must evaluate to zero at out-of-bounds lattice points, so
+    consumers may iterate the rectangular bounding box.
+
+    `gem.optimise.unflatten` (via `gem.optimise.contraction`) turns
+    contractions over the flat index into jagged lattice loops; leftover
+    uses are lowered to per-flat-index gathers by
+    `gem.optimise.flatten_flattenedtensors` -- recovering jagged *access*
+    where jagged *loops* did not apply.
+    """
+
+    __slots__ = ('children', 'multiindex', 'ordering', 'shape')
+    __back__ = ('multiindex', 'ordering')
+
+    def __init__(self, expression, multiindex, ordering):
+        assert not expression.shape
+        multiindex = tuple(multiindex)
+        assert isinstance(ordering, Constant) and ordering.dtype == uint_type
+        assert ordering.shape == tuple(index.extent for index in multiindex)
+        assert set(multiindex) <= set(expression.free_indices)
+        self.children = (expression,)
+        self.multiindex = multiindex
+        self.ordering = ordering
+        points = _jagged_lattice(multiindex)
+        flat = ordering.array[tuple(numpy.transpose(points))]
+        assert sorted(flat) == list(range(len(points))), \
+            "ordering must map the in-bounds lattice points onto their flat positions"
+        self.shape = (len(points),)
+        self.free_indices = unique(set(expression.free_indices) - set(multiindex))
+
+    def lattice_points(self):
+        """In-bounds lattice points, in flat-index order: row r is the
+        lattice multi-index at flat position r."""
+        points = _jagged_lattice(self.multiindex)
+        flat = self.ordering.array[tuple(numpy.transpose(points))]
+        return points[numpy.argsort(flat)]
+
+
+def _jagged_lattice(multiindex):
+    """All lattice points of ``multiindex``'s iteration domain, honouring
+    `JaggedIndex` bounds, as an integer array of shape (npoint, dim)."""
+    points = []
+    for alpha in numpy.ndindex(*(index.extent for index in multiindex)):
+        values = dict(zip(multiindex, alpha))
+        if all(values[i] < i.extent - sum(values[p] for p in i.parents)
+               for i in multiindex if isinstance(i, JaggedIndex)):
+            points.append(alpha)
+    return numpy.asarray(points).reshape(len(points), len(multiindex))
 
 
 class IndexSum(Scalar):
