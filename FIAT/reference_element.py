@@ -64,8 +64,7 @@ def multiindex_equal(d, isum, imin=0):
 def lexicographical_iter(dim, n):
     """Iterate the simplex lattice in lattice-lexicographic order.
 
-    The first coordinate is slowest-varying, the last fastest-varying;
-    see `lexicographic_permutation`.
+    The first coordinate is slowest-varying, the last fastest-varying.
     """
     if dim == 1:
         for p in range(n + 1):
