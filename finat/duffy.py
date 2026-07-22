@@ -14,39 +14,19 @@ from finat.point_set import CollapsedTensorProductPointSet
 
 
 class DuffyElement:
-    """Mixin for simplicial elements whose nodal basis coincides with the
-    Dubiner expansion set, enabling O(p^d) sum-factorized tabulation on
-    collapsed (Duffy) tensor-product point sets.
+    """Mixin enabling O(p^d) sum-factorized tabulation on collapsed (Duffy)
+    coordinates, for simplicial elements whose nodal basis coincides with
+    the Dubiner expansion set.
 
-    The basis functions are enumerated by a lattice multi-index rather
-    than the flat degree-of-freedom index. For continuity=None elements
-    (`finat.spectral.Legendre`) the flat index of a lattice point is its
-    lattice-lexicographic index (`FIAT.expansions.lexicographic_permutation`),
-    the dof order `FIAT.hierarchical.LegendreDual` uses. For continuity="C0"
-    elements (`finat.spectral.IntegratedLegendre`) each flat dof index
-    corresponds to a small, fixed number of lattice points, combined
-    per `FIAT.expansions.c0_recombination_matrix` (see `get_sparse_coeffs`).
+    Dofs read off a lattice multi-index, not their flat index. continuity=None:
+    one lattice point per dof, lattice-lexicographic order. continuity="C0":
+    up to dim+1 points per dof, per `C0_basis`. See `get_sparse_coeffs`.
     """
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        """Return code for evaluating the element at known points on the
-        reference element, using `duffy_evaluation` when ``ps`` has
-        collapsed tensor-product structure, and falling back to the
-        standard dense tabulation otherwise (``coordinate_mapping`` is
-        ignored; `duffy_evaluation` only supports reference tabulation).
-
-        Since `duffy_evaluation` already returns a flat-dof-indexed
-        tabulation, no separate scatter step is needed here, and no
-        special-cased path is needed for `Coefficient` evaluation either
-        (`tsfc.fem.translate_coefficient`'s generic dense contraction
-        applies uniformly) -- both compose transparently with
-        `finat.tensorfiniteelement.TensorFiniteElement`
-        (`Vector`/`TensorElement`), which only ever delegates
-        `basis_evaluation` to the scalar base element.
-
-        :returns: a dict mapping each derivative multi-index alpha to a
-            `gem.ComponentTensor` of shape ``(self.space_dimension(),)``,
-            matching the standard (non-factorized) tabulation's convention.
+        """Dispatch to `duffy_evaluation` on collapsed point sets, else the
+        dense fallback. Both return flat-dof-indexed tabulations, so this
+        composes with `TensorFiniteElement` for free.
         """
         sd = self.cell.get_dimension()
         if not (isinstance(ps, CollapsedTensorProductPointSet)
@@ -56,33 +36,18 @@ class DuffyElement:
         return self.duffy_evaluation(order, ps, entity)
 
     def get_sparse_coeffs(self):
-        """Sparse recombination of this element's nodal basis in terms of
-        its expansion set's raw (continuity=None) lattice tabulation: dof
-        ``r`` reads ``sum_k row_coeff[r, k] * phi(row_multiindex[r, k])``,
-        where ``phi`` is the raw per-lattice-multi-index tabulation
-        `duffy_evaluation` computes.
+        """Sparse recombination weights from the raw (continuity=None)
+        lattice tabulation into this element's nodal basis:
+        dof r = sum_k row_coeff[r, k] * phi(row_multiindex[r, k]).
 
-        * continuity=None (`finat.spectral.Legendre`): each dof reads
-          exactly one lattice point (``k`` has extent 1), at its
-          lattice-lexicographic position
-          (`FIAT.expansions.lexicographic_multiindices`); the expansion
-          set's native order is raw Morton order, so the per-dof weight
-          also undoes the lattice-lexicographic permutation
-          (`FIAT.expansions.lexicographic_permutation`).
-        * continuity="C0" (`finat.spectral.IntegratedLegendre`): each dof
-          combines at most ``dim + 1`` lattice points
-          (`FIAT.expansions.c0_recombination_matrix`), padded with
-          zero-weight terms to a common extent; the expansion set's own
-          `tabulate` is already entity-ordered by `FIAT.expansions.
-          C0_basis`, so no further reordering applies.
+        continuity=None: k=1, at the dof's lattice-lexicographic point.
+        continuity="C0": up to dim+1 points per dof, from
+        `c0_recombination_matrix`, zero-padded to a common k.
 
-        In both cases the per-dof weight also rescales the expansion set's
-        native tabulation to this element's actual nodal basis, and is
-        only valid when the nodal basis coincides with the expansion set
-        (up to that reordering/rescaling) -- checked explicitly below.
+        Raises if the nodal basis doesn't coincide with the expansion set
+        up to this reordering/rescaling.
 
-        :returns: ``(row_multiindex, row_coeff)``, integer/float arrays of
-            shape ``(ndof, k, dim)``/``(ndof, k)``.
+        :returns: (row_multiindex, row_coeff), shape (ndof, k, dim) / (ndof, k).
         """
         degree = self.degree
         sd = self.cell.get_spatial_dimension()
@@ -107,22 +72,23 @@ class DuffyElement:
         return row_multiindex, row_coeff * scale[:, None]
 
     def duffy_evaluation(self, order, ps, entity=None):
-        """Return the sum-factorized tabulation of the element on a
-        collapsed tensor-product point set, indexed by the flat dof
-        index (matching `self.get_indices()`'s convention).
+        """Sum-factorized tabulation on a collapsed point set, flat-dof-indexed
+        (matching `get_indices()`).
 
-        Internally the raw expansion set is tabulated per lattice
-        multi-index ``(i_1, ..., i_d)``, ranging over the rectangular
-        bounding box of the simplex lattice (entries outside the simplex
-        lattice, ``i_1 + ... + i_d > degree``, tabulate to zero); each dof
-        then reads the (small, fixed number of) lattice multi-index terms
-        `get_sparse_coeffs` assigns it -- i.e. the returned tabulation
-        is ``expansion_tabulation * coeffs``, with the recombination
-        coefficients folded in here rather than left for callers to
-        reapply.
+        Tabulates the raw expansion set over the rectangular lattice
+        bounding box (zero outside the simplex), then reads off each dof's
+        row from `get_sparse_coeffs`.
 
-        :returns: a dict mapping each derivative multi-index alpha to a
-            `gem.ComponentTensor` of shape ``(self.space_dimension(),)``.
+        No `gem.JaggedIndex`/jagged loop bound is needed: every index here
+        is a plain `gem.Index` of constant extent. Jagged *access* -- not
+        jagged *loop bounds* -- comes from `gem.VariableIndex`: wrapping a
+        table lookup as a `VariableIndex` makes the index itself an
+        expression of other free indices, so a constant-extent loop can
+        still land on a data-dependent table position each iteration.
+        `m_indices` and the row_multiindex substitution below both use this
+        to gather, never a jagged loop.
+
+        :returns: dict alpha -> `gem.ComponentTensor` of shape (ndof,).
         """
         assert isinstance(ps, CollapsedTensorProductPointSet)
         cell_dim = self.cell.get_dimension()
@@ -138,21 +104,20 @@ class DuffyElement:
         etas = tuple(2.0 * f.points.ravel() - 1.0 for f in ps.factors)
         duffy = expansion_set.tabulate_duffy(degree, etas, order=order)
 
-        multiindex = []
-        for _ in range(sd):
-            multiindex.append(gem.JaggedIndex(extent=degree + 1, parents=tuple(multiindex)))
-        multiindex = tuple(multiindex)
-        # Index expressions for the weight exponents m_t = i_1 + ... + i_{t-1}:
-        # the first two are affine, the rest are looked up in an index table.
-        m_indices = [0, *multiindex[:1]]
+        def lookup_index(index_table, multiindex):
+            index_table = gem.Literal(index_table, dtype=gem.uint_type)
+            return gem.VariableIndex(gem.Indexed(index_table, multiindex))
+
+        multiindex = tuple(gem.Index(extent=degree + 1) for _ in range(sd))
+        # m_t = i_1 + ... + i_{t-1}: affine for t <= 1, else a VariableIndex
+        # gather (jagged access, not a jagged loop) on a clamped table --
+        # clamping is safe since out-of-lattice entries already tabulate to
+        # zero via the factors of the previous axes.
+        duffy_indices = [0, *multiindex[:1]]
         for t in range(2, sd):
-            # Clamp the exponent to stay in bounds on the rectangular bounding
-            # box of the lattice: out-of-lattice entries are already zeroed by
-            # the factors of the previous axes.
-            table = reduce(numpy.add.outer, (numpy.arange(degree + 1),) * t)
-            table = numpy.minimum(table, degree)
-            m_indices.append(gem.VariableIndex(
-                gem.Indexed(gem.Literal(table, dtype=gem.uint_type), multiindex[:t])))
+            index_table = reduce(numpy.add.outer, (numpy.arange(degree + 1),) * t)
+            index_table = numpy.minimum(index_table, degree)
+            duffy_indices.append(lookup_index(index_table, multiindex[:t]))
 
         literals = {}
 
@@ -167,24 +132,23 @@ class DuffyElement:
         for alpha, terms in duffy.items():
             exprs = []
             for coeff, factors in terms:
-                expr = gem.Product(*(gem.Indexed(as_gem(table), (m, i, pt))
-                                     for table, m, i, pt
-                                     in zip(factors, m_indices, multiindex, ps.indices)))
+                expr = gem.Product(*(gem.Indexed(as_gem(table), (index_expr, i, pt))
+                                     for table, index_expr, i, pt
+                                     in zip(factors, duffy_indices, multiindex, ps.indices)))
                 if coeff != 1.0:
                     expr = gem.Product(gem.Literal(coeff), expr)
                 exprs.append(expr)
             result[alpha] = gem.Sum(*exprs)
 
-        # Substitute each dof r's k lattice-multi-index terms (row_multiindex)
-        # for `multiindex` in `result`, and contract with their weights
-        # (row_coeff) over k: result[alpha][r] = sum_k row_coeff[r, k] *
-        # result[alpha](multiindex=row_multiindex[r, k]).
+        # Each dof r contracts k lattice points: substitute every multiindex
+        # axis with a VariableIndex gather on (r, k) -- again jagged access,
+        # not a jagged loop -- then sum over k.
         row_multiindex, row_coeff = self.get_sparse_coeffs()
         r = gem.Index(extent=self.space_dimension())
         k = gem.Index(extent=row_coeff.shape[1])
         coeff_expr = gem.Indexed(gem.Literal(row_coeff), (r, k))
         subst = tuple(
-            (axis, gem.VariableIndex(gem.Indexed(gem.Literal(row_multiindex[..., t], dtype=gem.uint_type), (r, k))))
+            (axis, lookup_index(row_multiindex[..., t], (r, k)))
             for t, axis in enumerate(multiindex))
         mapper = MemoizerArg(filtered_replace_indices)
         return {alpha: gem.ComponentTensor(gem.IndexSum(gem.Product(coeff_expr, mapper(expr, subst)), (k,)), (r,))
@@ -192,20 +156,20 @@ class DuffyElement:
 
 
 def c0_recombination_matrix(dim, n):
-    """The dense matrix form of `C0_basis`'s row recombination + entity
-    reorder, and the raw (continuity=None) lattice multi-index of each of
-    its columns.
+    """Dense `C0_basis` row recombination, decomposed into per-dof sparse
+    terms.
 
-    `C0_basis` operates by pure row operations on whatever array it is
-    given, so feeding it the identity recovers the combination it applies
-    to any other tabulation as an explicit matrix: ``C0_basis(dim, n,
-    [phi])[0] == R @ phi`` for the ``R`` returned here.
+    Feeding `C0_basis` the identity recovers its row operations as an
+    explicit matrix R: C0_basis(dim, n, [phi])[0] == R @ phi. `C0_basis`
+    indexes rows/columns by Morton position, not `lattice_iter`'s order, so
+    raw_multiindices inverts `morton_index` to recover each column's
+    lattice point.
+
+    :returns: (row_multiindex, row_coeff), shape (ndof, k, dim) / (ndof, k),
+        zero-padded to the largest row's nonzero count k.
     """
     ndof = math.comb(n + dim, dim)
     R, = C0_basis(dim, n, [numpy.eye(ndof)])
-    # `C0_basis` indexes its rows/columns by Morton position (via
-    # `morton_index`), not by `lattice_iter`'s enumeration order -- invert
-    # `morton_index` to get each Morton position's lattice multi-index.
     raw_multiindices = [None] * ndof
     for multiindex in lattice_iter(0, n + 1, dim):
         raw_multiindices[morton_index(dim, n, *multiindex)] = multiindex
@@ -225,41 +189,9 @@ def c0_recombination_matrix(dim, n):
 
 
 def lexicographic_multiindices(dim, n):
-    """Lattice multi-index of each lattice-lexicographic dof position.
-
-    :returns: an integer array of shape ``(ndof, dim)`` such that row ``j``
-        is the lattice multi-index of dof ``j`` in lattice-lexicographic
-        order (see `lexicographic_permutation`).
+    """Lattice multi-index of each lattice-lexicographic dof (see
+    `lexicographic_permutation`), shape (ndof, dim).
     """
     ndof = math.comb(n + dim, dim)
     return numpy.fromiter((i for multiindex in lexicographical_iter(dim, n) for i in multiindex),
                           dtype=int, count=ndof * dim).reshape(ndof, dim)
-
-
-def lexicographic_offsets(dim, n):
-    """Per-axis-prefix offset tables for lattice-lexicographic order: for
-    dof index ``j`` with lattice multi-index ``(i_1, ..., i_dim)``,
-    ``j == offsets[dim - 2][i_1, ..., i_{dim - 1}] + i_dim`` (the flat
-    index is affine, slope 1, in the innermost coordinate).
-
-    Prefixes off the simplex lattice are set to ``ndof``, not ``0``, so
-    they compare as unreachable by any real flat index rather than as a
-    valid (wrong) one.
-
-    :returns: ``dim - 1`` integer arrays, the ``t``-th of shape
-        ``(n + 1,) * (t + 1)``. Empty for ``dim == 1``.
-    """
-    ndof = math.comb(n + dim, dim)
-    multiindices = lexicographic_multiindices(dim, n)
-    offsets = []
-    for t in range(dim - 1):
-        shape = (n + 1,) * (t + 1)
-        table = numpy.full(shape, ndof, dtype=int)
-        prefixes = multiindices[:, :t + 1]
-        seen = numpy.zeros(shape, dtype=bool)
-        for j, prefix in enumerate(map(tuple, prefixes)):
-            if not seen[prefix]:
-                table[prefix] = j
-                seen[prefix] = True
-        offsets.append(table)
-    return tuple(offsets)
