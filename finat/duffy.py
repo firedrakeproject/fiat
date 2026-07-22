@@ -4,8 +4,6 @@ import math
 import numpy
 
 import gem
-from gem.node import MemoizerArg
-from gem.optimise import filtered_replace_indices
 
 from FIAT.reference_element import lattice_iter, lexicographical_iter
 from FIAT.expansions import (lexicographic_permutation,
@@ -83,7 +81,11 @@ class DuffyElement:
         keeping the per-axis factors separable for sum factorisation; any
         other use lowers to per-dof gather tables
         (`gem.optimise.replace_flattened`).  C0 corrections (k >= 1 in
-        `get_sparse_coeffs`) stay in gather form.
+        `get_sparse_coeffs`) are expressed as a `gem.SparseMatrix` mat-vec
+        against the diagonal tabulation: its delta expansion cancels
+        through the ordinary delta-elimination machinery into its own
+        genuinely small (nnz-sized) loop, since only an O(degree)-sized
+        subset of dofs need any correction.
 
         :returns: dict alpha -> rank-1 gem expression of shape (ndof,).
         """
@@ -147,27 +149,45 @@ class DuffyElement:
         home = tuple(row_multiindex[:, 0, :].T)
         weight = numpy.zeros((degree + 1,) * sd)
         weight[home] = row_coeff[:, 0]
-        ordering = numpy.zeros((degree + 1,) * sd, dtype=int)
-        ordering[home] = numpy.arange(ndof)
-        ordering = gem.Literal(ordering, dtype=gem.uint_type)
+        ordering_array = numpy.zeros((degree + 1,) * sd, dtype=int)
+        ordering_array[home] = numpy.arange(ndof)
+        ordering = gem.Literal(ordering_array, dtype=gem.uint_type)
         weight = gem.Indexed(gem.Literal(weight), multiindex)
         tables = {alpha: gem.FlattenedTensor(gem.Product(weight, expr), multiindex, ordering)
                   for alpha, expr in result.items()}
 
         if row_coeff.shape[1] > 1:
-            # C0 corrections: each dof contracts k further lattice points,
-            # substituted as VariableIndex gathers on (r, k) and added
-            # outside the flattened diagonal part.
-            r = gem.Index(extent=ndof)
-            k = gem.Index(extent=row_coeff.shape[1] - 1)
-            coeff_expr = gem.Indexed(gem.Literal(row_coeff[:, 1:]), (r, k))
-            subst = tuple(
-                (axis, lookup_index(row_multiindex[:, 1:, t], (r, k)))
-                for t, axis in enumerate(multiindex))
-            mapper = MemoizerArg(filtered_replace_indices)
-            tables = {alpha: gem.ComponentTensor(gem.Sum(gem.Indexed(tables[alpha], (r,)),
-                                                         gem.IndexSum(gem.Product(coeff_expr, mapper(result[alpha], subst)), (k,))), (r,))
-                      for alpha in result}
+            # C0 corrections: each further column of a corrected row is
+            # *some other dof's home point* (`home` is a bijection over all
+            # ndof columns of the recombination matrix), so no
+            # re-tabulation is needed -- correcting dof r is a sparse
+            # linear combination of the already-tabulated diagonal entries
+            # of the dofs owning those columns.  Only an O(degree)-sized
+            # subset of dofs need any correction at all; the SparseMatrix
+            # delta expansion cancels into a genuine nnz-sized loop rather
+            # than an O(ndof) or O(ndof * npts) one.
+            rows, cols, data = [], [], []
+            for r in range(ndof):
+                for t in range(1, row_coeff.shape[1]):
+                    coeff = row_coeff[r, t]
+                    if coeff == 0.0:
+                        continue
+                    j = ordering_array[tuple(row_multiindex[r, t, :])]
+                    rows.append(r)
+                    cols.append(j)
+                    data.append(coeff / row_coeff[j, 0])
+            if rows:
+                sparse = gem.SparseMatrix(gem.Literal(numpy.asarray(data)),
+                                          numpy.asarray(rows), numpy.asarray(cols),
+                                          (ndof, ndof))
+                r = gem.Index(extent=ndof)
+                j = gem.Index(extent=ndof)
+                tables = {alpha: gem.ComponentTensor(
+                    gem.Sum(gem.Indexed(tables[alpha], (r,)),
+                            gem.IndexSum(gem.Product(gem.Indexed(sparse, (r, j)),
+                                                     gem.Indexed(tables[alpha], (j,))), (j,))),
+                    (r,))
+                    for alpha in result}
         return tables
 
 

@@ -7,11 +7,11 @@ from itertools import product
 from sys import intern
 
 from gem.node import Memoizer, traversal
-from gem.gem import (Node, Conditional, Zero, Product, Sum, Indexed,
-                     ListTensor, one, MathFunction)
-from gem.optimise import (remove_componenttensors, sum_factorise,
-                          traverse_product, traverse_sum, unroll_indexsum,
-                          make_rename_map, make_renamer)
+from gem.gem import (Node, Conditional, VariableIndex, Zero,
+                     Product, Sum, Indexed, ListTensor, one, MathFunction)
+from gem.optimise import (delta_elimination, remove_componenttensors,
+                          sum_factorise, traverse_product, traverse_sum,
+                          unroll_indexsum, make_rename_map, make_renamer)
 
 
 # Refactorisation labels
@@ -148,6 +148,17 @@ def _collect_monomials(expression, self):
         # Break up compounds only
         return self.classifier(expr) != COMPOUND
     common_indices, terms = traverse_product(expression, stop_at=stop_at)
+    # Cancel contraction indices against Deltas gathering through a
+    # `VariableIndex` (e.g. a `SparseMatrix` column delta): no later stage
+    # can eliminate these (they carry no argument index, so they would be
+    # buried uncancelled in the monomial's ``rest``), and cancelling them
+    # here is O(1) per factor -- sum_j delta(j, cols[p]) * x[j] becomes
+    # x[cols[p]].  Deltas over plain indices are left for the caller's own
+    # cancellation machinery, exactly as before.
+    common_indices, terms = delta_elimination(
+        common_indices, terms,
+        predicate=lambda delta: isinstance(delta.i, VariableIndex) or isinstance(delta.j, VariableIndex))
+    terms = remove_componenttensors(terms)
     common_indices = tuple(common_indices)
 
     common_atomics = []

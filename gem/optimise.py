@@ -308,17 +308,22 @@ def select_expression(expressions, index):
     return ComponentTensor(selected, alpha)
 
 
-def delta_elimination(sum_indices, factors, index_replacer=None):
+def delta_elimination(sum_indices, factors, index_replacer=None, predicate=None):
     """IndexSum-Delta cancellation.
 
     :arg sum_indices: free indices for contractions
     :arg factors: product factors
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
+    :kwarg predicate: Optional predicate on `Delta` factors; if specified,
+        only Deltas for which it returns true are cancelled.
 
     :returns: optimised (sum_indices, factors)
     """
     if index_replacer is None:
         index_replacer = MemoizerArg(filtered_replace_indices)
+    if predicate is None:
+        def predicate(delta):
+            return True
 
     sum_indices = list(sum_indices)  # copy for modification
 
@@ -331,7 +336,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
 
     delta_queue = [(f, index)
-                   for f in factors if isinstance(f, Delta)
+                   for f in factors if isinstance(f, Delta) and predicate(f)
                    for index in (f.i, f.j) if index in sum_indices]
     while delta_queue:
         delta, from_ = delta_queue[0]
@@ -352,7 +357,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         factors = [substitute(f, from_, to_) for f in factors]
 
         delta_queue = [(f, index)
-                       for f in factors if isinstance(f, Delta)
+                       for f in factors if isinstance(f, Delta) and predicate(f)
                        for index in (f.i, f.j) if index in sum_indices]
 
     return sum_indices, factors
@@ -628,26 +633,122 @@ def _unflatten_site(gather):
     return mapper, alpha, VariableIndex(Indexed(ft.ordering, alpha))
 
 
+def _try_rewrite_term(term, i):
+    """Try to eliminate index ``i`` from ``term`` as a `FlattenedTensor`
+    gather site.  Returns ``(own_indices, i_expr, new_term)`` on success
+    -- ``own_indices``: the fresh lattice multiindex that replaces ``i``;
+    ``i_expr``: what to substitute for ``i`` elsewhere (e.g. in a return
+    variable, or a coefficient vector sharing the same contraction);
+    ``new_term``: ``term`` with ``i`` already eliminated -- or ``None`` if
+    the pattern does not match.
+
+    An index that also appears in a `Delta` is left alone: delta
+    cancellation eliminates it for free, whereas unflattening it would
+    expand e.g. a sparse gather ``sum_j delta(j, cols[p]) * FT[j]`` into a
+    full lattice loop against an uncancellable delta of two
+    `VariableIndex`es."""
+    gather = _find_flat_gather(term, i)
+    if gather is None:
+        return None
+    if any(isinstance(n, Delta) and i in n.free_indices
+           for n in traversal((term,))):
+        return None
+    mapper, alpha, i_expr = _unflatten_site(gather)
+    new_term = mapper(term, ((i, i_expr),))
+    return alpha, i_expr, new_term
+
+
+def _distribute_sum(expr):
+    """Distribute addition out through `IndexSum` and `Product` --
+    IndexSum(a + b, mi) == IndexSum(a, mi) + IndexSum(b, mi), and
+    Product(a, b) == Product(a1, b) + Product(a2, b) when a == a1 + a2 --
+    returning a flat list of terms (each with any IndexSum wrapping
+    re-applied, filtered to the indices actually free in that term).  A
+    plain `traverse_sum` only splits at the outermost level and
+    `traverse_product` cannot descend into a bare `Sum` at all (it is not
+    one of `IndexSum`/`Product`/`Division`, so a `Sum` used as a
+    multiplicative factor -- e.g. a diagonal tabulation plus a sparse
+    correction, both sharing a contracted or free index -- is left as one
+    opaque, un-cancellable term). Monomial rebuilding (e.g.
+    `tsfc.spectral`'s COFFEE-based factorisation) can also combine
+    originally-independent additive contributions (e.g. one per gradient
+    component) underneath a shared outer IndexSum (typically the
+    quadrature-point contraction), hiding them from a shallow split.
+
+    Traverses iteratively (post-order via an explicit stack), not by plain
+    Python recursion: real FEM expressions (e.g. after `associate()`
+    chains many terms into a long, one-sided binary tree) can nest
+    Sum/IndexSum/Product far deeper than Python's default recursion
+    limit."""
+    results = {}
+    stack = [(expr, False)]
+    while stack:
+        node, expanded = stack.pop()
+        if isinstance(node, (Sum, IndexSum, Product)):
+            if not expanded:
+                stack.append((node, True))
+                stack.extend((c, False) for c in node.children)
+                continue
+            if isinstance(node, Sum):
+                results[node] = [t for c in node.children for t in results[c]]
+            elif isinstance(node, IndexSum):
+                body, = node.children
+                results[node] = [IndexSum(t, tuple(i for i in node.multiindex if i in t.free_indices))
+                                 for t in results[body]]
+            else:  # Product
+                a, b = node.children
+                ta, tb = results[a], results[b]
+                results[node] = [node] if len(ta) == 1 and len(tb) == 1 \
+                    else [Product(x, y) for x in ta for y in tb]
+        else:
+            results[node] = [node]
+    return results[expr]
+
+
+def _unflatten_terms(summand, r):
+    """Split ``summand`` into additive terms and rewrite each one that has
+    an eliminable `FlattenedTensor` gather at the flat index ``r``
+    independently.  Returns
+    ``(rewritten, leftover)``: ``rewritten`` is a list of ``(own_indices,
+    term)`` pairs (``r`` already eliminated); ``leftover`` is a list of
+    terms in which ``r`` remains free (or that do not involve ``r`` at
+    all)."""
+    rewritten = []
+    leftover = []
+    for term in traverse_sum(summand):
+        site = _try_rewrite_term(term, r)
+        if site is None:
+            leftover.append(term)
+            continue
+        own_indices, _, new_term = site
+        rewritten.append((own_indices, new_term))
+    return rewritten, leftover
+
+
 def _unflatten(node, self):
     node = reuse_if_untouched(node, self)
     if not isinstance(node, IndexSum):
         return node
     summand, = node.children
     for r in node.multiindex:
-        gather = _find_flat_gather(summand, r)
-        if gather is None:
+        rewritten, leftover = _unflatten_terms(summand, r)
+        if not rewritten:
             continue
-        mapper, alpha, r_expr = _unflatten_site(gather)
-        summand = mapper(summand, ((r, r_expr),))
         rest = tuple(i for i in node.multiindex if i != r)
-        return self(IndexSum(summand, rest + alpha))
+        pieces = [self(IndexSum(term, own + tuple(i for i in rest if i in term.free_indices)))
+                  for own, term in rewritten]
+        if leftover:
+            residual = make_sum(leftover)
+            indices = tuple(i for i in (r,) + rest if i in residual.free_indices)
+            pieces.append(self(IndexSum(residual, indices)))
+        return make_sum(pieces)
     return node
 
 
 def unflatten(expression):
     """Rewrite contractions over the flat index of a `FlattenedTensor` as
-    loops over its jagged lattice multiindex.  The flat index disappears:
-    the tensor's expression is inlined at its lattice point, and remaining
+    loops over the tensor's own (jagged lattice) multiindex.  The flat
+    index disappears: the tensor's expression is inlined, and remaining
     uses of the flat index (e.g. a coefficient vector) gather through the
     tensor's ordering table.  This recovers the separable per-axis factors
     that sum factorisation needs, which the flat gather form hides."""
@@ -660,32 +761,46 @@ def unflatten_returns(pairs):
 
     For each (return variable, expression) pair whose expression scatters a
     `FlattenedTensor` along a free index of the variable, replace that flat
-    index by the jagged lattice multiindex in both: the variable's index
-    becomes an ordering-table gather, and the tensor's expression is inlined
-    at its lattice point.  Zero-padding makes the out-of-bounds lattice
-    iterations (if a consumer does not tighten the loops) accumulate zero.
-    Rewritten expressions are re-factorised with `contraction`, since the
-    factorised structure was built while the tensor was still atomic.
+    index by the tensor's own lattice multiindex in both: the variable's
+    index becomes a gather through the tensor's ordering table, and the
+    matched term is rewritten in place.  A term that additively combines
+    several such contributions (e.g. one per gradient component) splits
+    into several independent (variable, expression) pairs, all accumulating
+    into the same variable.  Rewritten expressions are re-factorised with
+    `contraction`, since the factorised structure was built while the
+    tensor was still atomic.
     """
     result = []
     for variable, expression in pairs:
+        pending = [(variable, expression)]
+        outputs = []
         changed = False
-        rewrite = True
-        while rewrite:
-            rewrite = False
-            for j in variable.free_indices:
-                gather = _find_flat_gather(expression, j)
-                if gather is None:
-                    continue
-                mapper, alpha, r_expr = _unflatten_site(gather)
-                subst = ((j, r_expr),)
-                variable = MemoizerArg(filtered_replace_indices)(variable, subst)
-                expression = mapper(expression, subst)
-                changed = rewrite = True
-                break
+        while pending:
+            var, expr = pending.pop()
+            terms = _distribute_sum(expr)
+            match = None
+            for idx, term in enumerate(terms):
+                for j in var.free_indices:
+                    site = _try_rewrite_term(term, j)
+                    if site is not None:
+                        _, j_expr, new_term = site
+                        new_var = MemoizerArg(filtered_replace_indices)(var, ((j, j_expr),))
+                        match = (idx, new_var, new_term)
+                        break
+                if match is not None:
+                    break
+            if match is None:
+                outputs.append((var, expr))
+                continue
+            changed = True
+            idx, new_var, new_term = match
+            rest_terms = terms[:idx] + terms[idx + 1:]
+            pending.append((new_var, new_term))
+            if rest_terms:
+                pending.append((var, make_sum(rest_terms)))
         if changed:
-            expression = make_sum([contraction(s) for s in traverse_sum(expression)])
-        result.append((variable, expression))
+            outputs = [(v, contraction(e)) for v, e in outputs]
+        result.extend(outputs)
     return result
 
 
@@ -738,7 +853,7 @@ def contraction(expression, ignore=None):
     expression = unflatten(expression)
 
     # Flatten product tree, eliminate deltas, sum factorise
-    def rebuild(expression):
+    def rebuild_one(expression):
         sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
@@ -751,6 +866,20 @@ def contraction(expression, ignore=None):
             return IndexSum(sum_factorise(to_factor, factors), extra)
         else:
             return sum_factorise(sum_indices, factors)
+
+    def rebuild(expression):
+        # A `Sum` used as a multiplicative factor (e.g. a diagonal
+        # tabulation plus a sparse correction) is invisible to
+        # `traverse_product` (it only knows how to flatten
+        # IndexSum/Product/Division) -- distribute it out first so each
+        # resulting term's Deltas are genuine top-level factors that
+        # `delta_elimination` can find and cancel.  Only bother when a
+        # Delta is actually present: distributing unconditionally would
+        # apply an expensive (and, for unrelated deeply-nested products,
+        # pointless) transformation to every coefficient contraction.
+        if not any(isinstance(n, Delta) for n in traversal((expression,))):
+            return rebuild_one(expression)
+        return make_sum([rebuild_one(term) for term in _distribute_sum(expression)])
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,

@@ -33,7 +33,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
            'Index', 'JaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
-           'FlattenedTensor',
+           'FlattenedTensor', 'SparseMatrix',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
@@ -746,6 +746,21 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
+        # Lower SparseMatrix through its delta expansion (see `SparseMatrix`):
+        # A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]).
+        # The deltas then cancel through the ordinary delta-elimination
+        # machinery wherever i or j meets a contraction or a return
+        # variable, so the node needs no traversal/codegen support of its
+        # own.
+        if isinstance(aggregate, SparseMatrix):
+            data, = aggregate.children
+            nnz, = aggregate.rows.shape
+            p = Index(extent=nnz)
+            i, j = multiindex
+            di = Delta(i, VariableIndex(Indexed(Literal(aggregate.rows, dtype=uint_type), (p,))))
+            dj = Delta(j, VariableIndex(Indexed(Literal(aggregate.cols, dtype=uint_type), (p,))))
+            return IndexSum(Product(Indexed(data, (p,)), Product(di, dj)), (p,))
+
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         # This pattern corresponds to an index replacement rule jj -> ii applied to
         # the innermost multiindex kk to produce ll.
@@ -757,7 +772,19 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                if not any((j in ff) for j in jj):
+                jj_set = set(jj)
+                # A VariableIndex entry of kk may itself be an expression
+                # wrapping one of jj as a free index (e.g. a lookup table
+                # gather built from jj); `rep.get(k, k)` below only ever
+                # matches k literally, so it would silently leave jj
+                # dangling free instead of substituting inside that
+                # expression -- skip the shortcut in that case and let the
+                # general (always-correct) ComponentTensor elimination in
+                # gem.optimise handle it instead.
+                safe = not any((j in ff) for j in jj) and not any(
+                    isinstance(k, VariableIndex) and jj_set & set(k.expression.free_indices)
+                    for k in kk)
+                if safe:
                     # Only replace indices that are not present in C
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
@@ -945,8 +972,8 @@ class FlattenedTensor(Node):
     `gem.optimise.unflatten` (via `gem.optimise.contraction`) turns
     contractions over the flat index into jagged lattice loops; leftover
     uses are lowered to per-flat-index gathers by
-    `gem.optimise.flatten_flattenedtensors` -- recovering jagged *access*
-    where jagged *loops* did not apply.
+    `gem.optimise.replace_flattened` -- recovering jagged *access* where
+    jagged *loops* did not apply.
     """
 
     __slots__ = ('children', 'multiindex', 'ordering', 'shape')
@@ -986,6 +1013,59 @@ def _jagged_lattice(multiindex):
                for i in multiindex if isinstance(i, JaggedIndex)):
             points.append(alpha)
     return numpy.asarray(points).reshape(len(points), len(multiindex))
+
+
+class SparseMatrix(Node):
+    """Sparse (M, N) matrix in coordinate (COO) format.
+
+    ``rows``, ``cols`` are parallel integer numpy arrays of length nnz;
+    ``data`` is a rank-1 `Node` of length nnz giving the value at each
+    (row, col) pair -- a `Literal` for plain numeric entries, or a
+    `ListTensor` for entries that carry free indices of their own (e.g.
+    depend on a quadrature-point index).  Implicitly zero elsewhere.
+
+    Never appears inside an expression DAG: `Indexed` eagerly lowers
+    ``A[i, j]`` through the delta expansion
+
+        A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]),
+
+    so any contraction against the matrix reduces to ordinary
+    IndexSum-Delta cancellation -- a mat-vec ``sum_j A[i, j] * x[j]``
+    (or a sparse-times-dense product over the shared axis) costs O(nnz)
+    rather than O(M*N), and a scatter along a free ``i`` cancels into
+    the return variable, ``y[rows[p]] += data[p] * x[cols[p]]``.
+    """
+
+    __slots__ = ('children', 'rows', 'cols', 'shape')
+    __back__ = ('rows', 'cols', 'shape')
+
+    def __init__(self, data, rows, cols, shape):
+        rows = numpy.asarray(rows)
+        cols = numpy.asarray(cols)
+        assert rows.shape == cols.shape and rows.ndim == 1
+        assert rows.size > 0
+        assert data.shape == (rows.shape[0],)
+        M, N = shape
+        assert 0 <= rows.min() and rows.max() < M
+        assert 0 <= cols.min() and cols.max() < N
+        self.children = (data,)
+        self.rows = rows
+        self.cols = cols
+        self.shape = (M, N)
+        self.free_indices = data.free_indices
+
+    def is_equal(self, other):
+        if type(self) is not type(other):
+            return False
+        if self.shape != other.shape:
+            return False
+        return (numpy.array_equal(self.rows, other.rows)
+                and numpy.array_equal(self.cols, other.cols)
+                and self.children == other.children)
+
+    def get_hash(self):
+        return hash((type(self), self.shape, self.children,
+                    tuple(self.rows.tolist()), tuple(self.cols.tolist())))
 
 
 class IndexSum(Scalar):
