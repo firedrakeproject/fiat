@@ -11,9 +11,134 @@ import numpy
 
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import DualSet
-from FIAT.polynomial_set import mis
+from FIAT.expansions import ExpansionSet, morton_index
+from FIAT.polynomial_set import PolynomialSet, mis
 from FIAT.pointwise_dual import compute_pointwise_dual
-from FIAT.reference_element import make_lattice
+from FIAT.reference_element import SimplicialComplex, make_lattice
+
+
+def _bernstein_factors(n: int, eta: numpy.ndarray) -> tuple[numpy.ndarray, ...]:
+    """Tabulate univariate Bernstein factors for a collapsed simplex axis.
+
+    Parameters
+    ----------
+    n : int
+        The total polynomial degree.
+    eta : numpy.ndarray
+        Points on ``[-1, 1]``.
+
+    Returns
+    -------
+    tuple
+        Value, degree-lowered, and degree-and-index-lowered tables.
+
+    """
+    eta = numpy.asarray(eta)
+    z = 0.5 * (1.0 + eta)
+    shape = (n + 1, n + 1, len(eta))
+    values = numpy.zeros(shape, dtype=z.dtype)
+    lower = numpy.zeros(shape, dtype=z.dtype)
+    shifted = numpy.zeros(shape, dtype=z.dtype)
+    for m in range(n + 1):
+        degree = n - m
+        for i in range(degree + 1):
+            values[m, i] = math.comb(degree, i) * z**i * (1.0 - z)**(degree-i)
+        for i in range(degree):
+            lower[m, i] = math.comb(degree - 1, i) * z**i * (1.0 - z)**(degree-1-i)
+            shifted[m, i+1] = lower[m, i]
+    return values, lower, shifted
+
+
+class BernsteinExpansionSet(ExpansionSet):
+    """Bernstein polynomial expansion set on a simplex."""
+
+    def __init__(self, ref_el: SimplicialComplex) -> None:
+        if not ref_el.is_simplex():
+            raise ValueError("Bernstein expansion sets require a simplex")
+        super().__init__(ref_el, scale=1.0)
+
+    @property
+    def duffy_axis_permutation(self) -> tuple[int, ...]:
+        """Return the reversed axis order of the Bernstein factorization."""
+        return tuple(reversed(range(self.ref_el.get_spatial_dimension())))
+
+    def _tabulate_on_cell(self, n: int, pts: numpy.ndarray, order: int = 0,
+                          cell: int = 0, direction: numpy.ndarray | None = None) -> dict:
+        """Tabulate the expansion set and its derivatives on one cell."""
+        if direction is not None:
+            raise NotImplementedError("directional Bernstein tabulation is not implemented")
+
+        ref_el = self.ref_el
+        dim = ref_el.get_spatial_dimension()
+        topology = ref_el.get_topology()
+        vertices = ref_el.get_vertices_of_subcomplex(topology[dim][cell])
+
+        B2R = numpy.vstack([numpy.asarray(vertices).T, numpy.ones(len(vertices))])
+        R2B = numpy.linalg.inv(B2R)
+        points = numpy.asarray(pts)
+        B = numpy.concatenate([points, numpy.ones((*points.shape[:-1], 1))],
+                              axis=-1).dot(R2B.T)
+
+        raw_result = {
+            (alpha, i): vec
+            for i, index in enumerate(mis(dim + 1, n))
+            for o in range(order + 1)
+            for alpha, vec in bernstein_Dx(
+                B, (index[0], *reversed(index[1:])), o, R2B
+            ).items()
+        }
+        num_members = math.comb(n + dim, dim)
+        dtype = numpy.array(list(raw_result.values())).dtype
+        result = {
+            alpha: numpy.zeros((num_members, *points.shape[:-1]), dtype=dtype)
+            for o in range(order + 1)
+            for alpha in mis(dim, o)
+        }
+        for (alpha, i), vec in raw_result.items():
+            result[alpha][i] = vec
+        return result
+
+    def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0,
+                       cell: int = 0) -> dict:
+        """Tabulate Bernstein polynomials in separable collapsed form.
+
+        The raw lattice multi-index ``j`` represents the barycentric
+        exponent tuple ``(n - sum(j), *reversed(j))``. Reversing the
+        collapsed axes gives the product from Ainsworth et al.,
+        ``prod_t B[j_t, n - sum(j[:t])]``.
+        """
+        if order > 1:
+            raise NotImplementedError("tabulate_duffy is limited to first derivatives")
+
+        dim = self.ref_el.get_spatial_dimension()
+        assert len(eta_pts) == dim
+        A, _ = self.affine_mappings[cell]
+        tables = tuple(_bernstein_factors(n, eta) for eta in eta_pts)
+        values = tuple(table[0] for table in tables)
+        result = {(0,) * dim: [(1.0, values)]}
+
+        if order:
+            lower = tuple(table[1] for table in tables)
+            # On the default (-1, 1) simplex,
+            # d/dxi_l B_alpha^n = n/2 * (B_{alpha-e_{l+1}}^{n-1}
+            #                            - B_{alpha-e_0}^{n-1}).
+            # Both degree-lowered terms retain the separable product form.
+            for k in range(dim):
+                terms = []
+                for ell in range(dim):
+                    coeff = 0.5 * n * A[ell, k]
+                    if coeff == 0.0:
+                        continue
+                    s = dim - 1 - ell
+                    shifted = tuple(table[1] if t < s else
+                                    table[2] if t == s else table[0]
+                                    for t, table in enumerate(tables))
+                    terms.extend(((coeff, shifted), (-coeff, lower)))
+                if not terms:
+                    terms.append((0.0, values))
+                alpha = tuple(int(i == k) for i in range(dim))
+                result[alpha] = terms
+        return result
 
 
 class BernsteinDualSet(DualSet):
@@ -51,10 +176,20 @@ class BernsteinDualSet(DualSet):
 class Bernstein(FiniteElement):
     """A finite element with Bernstein polynomials as basis functions."""
 
-    def __init__(self, ref_el, degree):
+    def __init__(self, ref_el: SimplicialComplex, degree: int) -> None:
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
         super().__init__(ref_el, dual, degree, k)
+
+        dim = ref_el.get_spatial_dimension()
+        expansion_set = BernsteinExpansionSet(ref_el)
+        indices = mis(dim + 1, degree)
+        columns = [morton_index(dim, degree, *reversed(index[1:]))
+                   for index in indices]
+        coeffs = numpy.zeros((len(indices), len(indices)))
+        coeffs[numpy.arange(len(indices)), columns] = 1.0
+        self.poly_set = PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
+
         pts = make_lattice(ref_el.vertices, degree, variant="gll")
         newdual = compute_pointwise_dual(self, pts)
         self.dual = newdual
@@ -62,6 +197,10 @@ class Bernstein(FiniteElement):
     def degree(self):
         """The degree of the polynomial space."""
         return self.get_order()
+
+    def get_nodal_basis(self) -> PolynomialSet:
+        """Return the Bernstein basis encoded as a polynomial set."""
+        return self.poly_set
 
     def value_shape(self):
         """The value shape of the finite element functions."""
@@ -90,30 +229,7 @@ class Bernstein(FiniteElement):
         points = numpy.asarray(points)
         cell_points = entity_transform(points)
 
-        # Construct Cartesian to Barycentric coordinate mapping
-        vs = numpy.asarray(ref_el.get_vertices())
-        B2R = numpy.vstack([vs.T, numpy.ones(len(vs))])
-        R2B = numpy.linalg.inv(B2R)
-
-        B = numpy.concatenate([cell_points, numpy.ones((*cell_points.shape[:-1], 1))
-                               ], axis=-1).dot(R2B.T)
-
-        # Evaluate everything
-        deg = self.degree()
-        raw_result = {(alpha, i): vec
-                      for i, ks in enumerate(mis(dim + 1, deg))
-                      for o in range(order + 1)
-                      for alpha, vec in bernstein_Dx(B, ks, o, R2B).items()}
-
-        # Rearrange result
-        space_dim = self.space_dimension()
-        dtype = numpy.array(list(raw_result.values())).dtype
-        result = {alpha: numpy.zeros((space_dim, *points.shape[:-1]), dtype=dtype)
-                  for o in range(order + 1)
-                  for alpha in mis(dim, o)}
-        for (alpha, i), vec in raw_result.items():
-            result[alpha][i] = vec
-        return result
+        return self.poly_set.tabulate(cell_points, order)
 
 
 def bernstein_db(points, ks, alpha=None):
@@ -140,9 +256,9 @@ def bernstein_db(points, ks, alpha=None):
 
     ls = ks - alpha
     if any(k < 0 for k in ls):
-        return numpy.zeros(len(points))
+        return numpy.zeros(points.shape[:-1])
     elif all(k == 0 for k in ls):
-        return numpy.ones(len(points))
+        return numpy.ones(points.shape[:-1])
     else:
         # Calculate coefficient
         coeff = math.factorial(ks.sum())

@@ -20,6 +20,7 @@ import numpy
 import sympy
 
 from FIAT import expansions, polynomial_set, reference_element
+from FIAT.bernstein import BernsteinExpansionSet
 from FIAT.quadrature_schemes import create_quadrature
 from itertools import chain
 
@@ -222,6 +223,33 @@ def test_tabulate_duffy(make_cell, variant, degree):
                 vals = sum(coeff * duffy_term_value(factors, index)
                            for coeff, factors in duffy[alpha])
                 assert numpy.allclose(vals, expected[alpha][idx(*index)], rtol=1E-10, atol=1E-10)
+
+
+@pytest.mark.parametrize("degree", [0, 1, 4])
+@pytest.mark.parametrize("make_cell", [reference_element.default_simplex,
+                                       reference_element.ufc_simplex])
+def test_bernstein_tabulate_duffy(make_cell, degree):
+    for dim in (1, 2, 3):
+        cell = make_cell(dim)
+        U = BernsteinExpansionSet(cell)
+        etas = [numpy.linspace(-1, 1, 3 + axis) for axis in range(dim)]
+        permutation = U.duffy_axis_permutation
+        A, b = U.affine_mappings[0]
+        pts = numpy.linalg.solve(A, (duffy_points(dim, etas) - b).T).T
+        expected = U._tabulate_on_cell(degree, pts, order=1)
+        duffy_etas = tuple(etas[t] for t in permutation)
+        duffy = U.tabulate_duffy(degree, duffy_etas, order=1)
+        assert expected.keys() == duffy.keys()
+
+        point_shape = tuple(len(etas[t]) for t in permutation)
+        transpose = numpy.argsort(permutation)
+        for alpha in expected:
+            for index in reference_element.lattice_iter(0, degree+1, dim):
+                vals = sum(coeff * duffy_term_value(factors, index)
+                           for coeff, factors in duffy[alpha])
+                vals = vals.reshape(point_shape).transpose(transpose).ravel()
+                row = expansions.morton_index(dim, degree, *index)
+                assert numpy.allclose(vals, expected[alpha][row], rtol=1E-10, atol=1E-10)
 
 
 @pytest.mark.parametrize("degree", [4])

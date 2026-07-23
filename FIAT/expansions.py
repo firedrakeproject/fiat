@@ -604,6 +604,18 @@ class ExpansionSet(object):
                 result[alpha] = vals
         return result
 
+    @property
+    def duffy_axis_permutation(self) -> tuple[int, ...]:
+        """Return the collapsed-coordinate axis order used by sum factorization.
+
+        Returns
+        -------
+        tuple
+            A permutation of the spatial axes.
+
+        """
+        return tuple(range(self.ref_el.get_spatial_dimension()))
+
     def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0, cell: int = 0) -> dict:
         """Tabulate the expansion set in separable form on collapsed
         tensor-product points.

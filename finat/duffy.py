@@ -5,9 +5,8 @@ import numpy
 
 import gem
 
-from FIAT.reference_element import lattice_iter, lexicographical_iter
-from FIAT.expansions import (lexicographic_permutation,
-                             morton_index, C0_basis)
+from FIAT.reference_element import lattice_iter
+from FIAT.expansions import morton_index, C0_basis
 from finat.point_set import CollapsedTensorProductPointSet
 
 
@@ -33,19 +32,20 @@ class DuffyElement:
             return super().basis_evaluation(order, ps, entity=entity, coordinate_mapping=coordinate_mapping)
         return self.duffy_evaluation(order, ps, entity)
 
-    def get_sparse_coeffs(self):
-        """Sparse recombination weights from the raw (continuity=None)
-        lattice tabulation into this element's nodal basis:
-        dof r = sum_k row_coeff[r, k] * phi(row_multiindex[r, k]).
+    def get_sparse_coeffs(self) -> tuple:
+        """Return sparse recombination weights for the element basis.
 
-        continuity=None: k=1, at the dof's lattice-lexicographic point.
-        continuity="C0": up to dim+1 points per dof, from
-        `c0_recombination_matrix`, zero-padded to a common k.
+        Each row is represented as a linear combination of raw expansion
+        members addressed by simplex lattice multi-indices. Discontinuous
+        expansion sets have one member per row, in any bijective ordering;
+        C0 expansion sets use the sparse recombination from `C0_basis`.
 
-        Raises if the nodal basis doesn't coincide with the expansion set
-        up to this reordering/rescaling.
+        Returns
+        -------
+        tuple
+            ``(row_multiindex, row_coeff)`` with shapes ``(ndof, k, dim)``
+            and ``(ndof, k)``.
 
-        :returns: (row_multiindex, row_coeff), shape (ndof, k, dim) / (ndof, k).
         """
         degree = self.degree
         sd = self.cell.get_spatial_dimension()
@@ -54,18 +54,24 @@ class DuffyElement:
         coeffs = poly_set.get_coeffs()
         expansion_set = poly_set.get_expansion_set()
         continuity_c0 = expansion_set.continuity == "C0"
-        col = numpy.arange(ndof) if continuity_c0 else lexicographic_permutation(sd, degree)
+
+        if continuity_c0:
+            col = numpy.arange(ndof)
+        else:
+            col = numpy.argmax(numpy.abs(coeffs), axis=1)
         scale = coeffs[numpy.arange(ndof), col]
         expected = numpy.zeros_like(coeffs)
         expected[numpy.arange(ndof), col] = scale
-        if not numpy.allclose(coeffs, expected):
+        if (not numpy.allclose(coeffs, expected)
+                or (not continuity_c0 and len(numpy.unique(col)) != ndof)):
             raise NotImplementedError("duffy_evaluation requires the element basis "
                                       "to coincide with the expansion set")
 
         if continuity_c0:
             row_multiindex, row_coeff = c0_recombination_matrix(sd, degree)
         else:
-            row_multiindex = lexicographic_multiindices(sd, degree).reshape(ndof, 1, sd)
+            raw_multiindices = morton_multiindices(sd, degree)
+            row_multiindex = raw_multiindices[col, None, :]
             row_coeff = numpy.ones((ndof, 1))
         return row_multiindex, row_coeff * scale[:, None]
 
@@ -100,7 +106,10 @@ class DuffyElement:
         sd = self.cell.get_spatial_dimension()
         poly_set = self._element.get_nodal_basis()
         expansion_set = poly_set.get_expansion_set()
-        etas = tuple(2.0 * f.points.ravel() - 1.0 for f in ps.factors)
+        axis_permutation = expansion_set.duffy_axis_permutation
+        assert sorted(axis_permutation) == list(range(sd))
+        etas = tuple(2.0 * ps.factors[t].points.ravel() - 1.0 for t in axis_permutation)
+        point_indices = tuple(ps.indices[t] for t in axis_permutation)
         duffy = expansion_set.tabulate_duffy(degree, etas, order=order)
 
         def lookup_index(index_table, multiindex):
@@ -136,7 +145,7 @@ class DuffyElement:
             for coeff, factors in terms:
                 expr = gem.Product(*(gem.Indexed(as_gem(table), (index_expr, i, pt))
                                      for table, index_expr, i, pt
-                                     in zip(factors, duffy_indices, multiindex, ps.indices)))
+                                     in zip(factors, duffy_indices, multiindex, point_indices)))
                 if coeff != 1.0:
                     expr = gem.Product(gem.Literal(coeff), expr)
                 exprs.append(expr)
@@ -191,6 +200,15 @@ class DuffyElement:
         return tables
 
 
+def morton_multiindices(dim: int, n: int) -> numpy.ndarray:
+    """Return each Morton-ordered simplex lattice multi-index."""
+    ndof = math.comb(n + dim, dim)
+    multiindices = [None] * ndof
+    for multiindex in lattice_iter(0, n + 1, dim):
+        multiindices[morton_index(dim, n, *multiindex)] = multiindex
+    return numpy.asarray(multiindices, dtype=int)
+
+
 def c0_recombination_matrix(dim, n):
     """Dense `C0_basis` row recombination, decomposed into per-dof sparse
     terms.
@@ -208,9 +226,7 @@ def c0_recombination_matrix(dim, n):
     """
     ndof = math.comb(n + dim, dim)
     R, = C0_basis(dim, n, [numpy.eye(ndof)])
-    raw_multiindices = [None] * ndof
-    for multiindex in lattice_iter(0, n + 1, dim):
-        raw_multiindices[morton_index(dim, n, *multiindex)] = multiindex
+    raw_multiindices = morton_multiindices(dim, n)
 
     # Home column of each dof, by iteratively matching rows with a single
     # remaining candidate.
@@ -240,12 +256,3 @@ def c0_recombination_matrix(dim, n):
             if t < len(cols):
                 row_coeff[r, t] = R[r, m]
     return row_multiindex, row_coeff
-
-
-def lexicographic_multiindices(dim, n):
-    """Lattice multi-index of each lattice-lexicographic dof (see
-    `lexicographic_permutation`), shape (ndof, dim).
-    """
-    ndof = math.comb(n + dim, dim)
-    return numpy.fromiter((i for multiindex in lexicographical_iter(dim, n) for i in multiindex),
-                          dtype=int, count=ndof * dim).reshape(ndof, dim)

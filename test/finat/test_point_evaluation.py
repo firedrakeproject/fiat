@@ -69,12 +69,17 @@ def test_point_evaluation_zany(ref_to_phys, element, degree):
         assert numpy.allclose(val, expected[alpha][:num_dof])
 
 
+@pytest.mark.parametrize("make_element", [
+    pytest.param(lambda cell, degree: finat.Legendre(cell, degree, variant="integral"),
+                 id="integral"),
+    pytest.param(finat.Bernstein, id="bernstein"),
+])
 @pytest.mark.parametrize('degree', [1, 4])
-def test_duffy_evaluation(cell, degree):
+def test_duffy_evaluation(cell, degree, make_element):
     from finat.point_set import PointSet, CollapsedTensorProductPointSet
 
     dim = cell.get_spatial_dimension()
-    element = finat.Legendre(cell, degree, variant="integral")
+    element = make_element(cell, degree)
 
     # Unequal point counts per axis, including the collapsed vertex eta=1
     factors = [PointSet(numpy.linspace(0, 1, 3 + axis)[:, None]) for axis in range(dim)]
