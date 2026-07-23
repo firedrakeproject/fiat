@@ -4,6 +4,7 @@ refactorisation."""
 from collections import Counter, OrderedDict, defaultdict, namedtuple
 from functools import singledispatch
 from itertools import product
+from numbers import Integral
 from sys import intern
 
 from gem.node import Memoizer, traversal
@@ -157,7 +158,8 @@ def _collect_monomials(expression, self):
     # cancellation machinery, exactly as before.
     common_indices, terms = delta_elimination(
         common_indices, terms,
-        predicate=lambda delta: isinstance(delta.i, VariableIndex) or isinstance(delta.j, VariableIndex))
+        predicate=lambda delta: isinstance(delta.i, (Integral, VariableIndex))
+        or isinstance(delta.j, (Integral, VariableIndex)))
     terms = remove_componenttensors(terms)
     common_indices = tuple(common_indices)
 

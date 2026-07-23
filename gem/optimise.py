@@ -597,11 +597,11 @@ def _clone_multiindex(multiindex):
 
 
 def _replace_indices_unflatten(node, self, subst):
-    """`filtered_replace_indices` that additionally replaces one designated
-    `Indexed` node with a given expression."""
-    if node == self.gather:
-        return self.replacement
-    return filtered_replace_indices(node, self, subst)
+    """`filtered_replace_indices` with designated gather replacements."""
+    try:
+        return self.replacements[node]
+    except KeyError:
+        return filtered_replace_indices(node, self, subst)
 
 
 def _find_flat_gather(expression, r):
@@ -616,21 +616,37 @@ def _find_flat_gather(expression, r):
     return gather
 
 
-def _unflatten_site(gather):
-    """Prepare the rewrite of one FlattenedTensor gather site: a mapper that
-    replaces the gather node with the tensor's expression at a fresh copy
-    ``alpha`` of the lattice multiindex (fresh because the tensor, and its
-    bound multiindex, may be shared between sites), and a `VariableIndex`
-    substitute for remaining uses of the flat index, gathering through the
-    ordering table."""
+def _flattened_layout(gather):
+    """Hashable description of a `FlattenedTensor` gather's lattice."""
     ft, = gather.children
+    positions = {index: n for n, index in enumerate(ft.multiindex)}
+    structure = tuple(
+        (type(index), index.extent,
+         tuple(positions[parent] for parent in getattr(index, "parents", ())))
+        for index in ft.multiindex)
+    return ft.ordering, structure
+
+
+def _unflatten_sites(gathers):
+    """Prepare a joint rewrite of compatible `FlattenedTensor` gathers."""
+    gather = gathers[0]
+    ft, = gather.children
+    assert all(_flattened_layout(g) == _flattened_layout(gather)
+               for g in gathers)
     alpha = _clone_multiindex(ft.multiindex)
     index_replacer = MemoizerArg(filtered_replace_indices)
-    replacement = index_replacer(ft.children[0], tuple(zip(ft.multiindex, alpha)))
     mapper = MemoizerArg(_replace_indices_unflatten)
-    mapper.gather = gather
-    mapper.replacement = replacement
+    mapper.replacements = {}
+    for gather in gathers:
+        ft, = gather.children
+        mapper.replacements[gather] = index_replacer(
+            ft.children[0], tuple(zip(ft.multiindex, alpha)))
     return mapper, alpha, VariableIndex(Indexed(ft.ordering, alpha))
+
+
+def _unflatten_site(gather):
+    """Prepare the rewrite of one `FlattenedTensor` gather site."""
+    return _unflatten_sites((gather,))
 
 
 def _try_rewrite_term(term, i):
@@ -658,7 +674,7 @@ def _try_rewrite_term(term, i):
     return alpha, i_expr, new_term
 
 
-def _distribute_sum(expr):
+def _distribute_sum(expr, predicate=None):
     """Distribute addition out through `IndexSum` and `Product` --
     IndexSum(a + b, mi) == IndexSum(a, mi) + IndexSum(b, mi), and
     Product(a, b) == Product(a1, b) + Product(a2, b) when a == a1 + a2 --
@@ -675,20 +691,31 @@ def _distribute_sum(expr):
     component) underneath a shared outer IndexSum (typically the
     quadrature-point contraction), hiding them from a shallow split.
 
+    If ``predicate`` is provided, only distribute operations containing a
+    matching node.  Other subexpressions remain intact.  This exposes, for
+    example, sparse-matrix deltas without expanding independent geometric
+    or derivative sums.
+
     Traverses iteratively (post-order via an explicit stack), not by plain
     Python recursion: real FEM expressions (e.g. after `associate()`
     chains many terms into a long, one-sided binary tree) can nest
     Sum/IndexSum/Product far deeper than Python's default recursion
     limit."""
+    if predicate is None:
+        def predicate(node):
+            return True
+
     results = {}
+    active = {}
     stack = [(expr, False)]
     while stack:
         node, expanded = stack.pop()
-        if isinstance(node, (Sum, IndexSum, Product)):
-            if not expanded:
-                stack.append((node, True))
-                stack.extend((c, False) for c in node.children)
-                continue
+        if not expanded:
+            stack.append((node, True))
+            stack.extend((c, False) for c in node.children)
+            continue
+        active[node] = predicate(node) or any(active[c] for c in node.children)
+        if active[node] and isinstance(node, (Sum, IndexSum, Product)):
             if isinstance(node, Sum):
                 results[node] = [t for c in node.children for t in results[c]]
             elif isinstance(node, IndexSum):
@@ -763,12 +790,11 @@ def unflatten_returns(pairs):
     `FlattenedTensor` along a free index of the variable, replace that flat
     index by the tensor's own lattice multiindex in both: the variable's
     index becomes a gather through the tensor's ordering table, and the
-    matched term is rewritten in place.  A term that additively combines
-    several such contributions (e.g. one per gradient component) splits
-    into several independent (variable, expression) pairs, all accumulating
-    into the same variable.  Rewritten expressions are re-factorised with
-    `contraction`, since the factorised structure was built while the
-    tensor was still atomic.
+    matched terms are rewritten in place.  Compatible tabulations (e.g.
+    reference derivatives of the same basis) share one lattice multiindex
+    and remain in a single expression.  Rewritten expressions are
+    re-factorised with `contraction`, since the factorised structure was
+    built while the tensor was still atomic.
     """
     result = []
     for variable, expression in pairs:
@@ -777,15 +803,42 @@ def unflatten_returns(pairs):
         changed = False
         while pending:
             var, expr = pending.pop()
-            terms = _distribute_sum(expr)
+
+            # A collection of tabulations over the same lattice (typically
+            # the reference derivatives of one basis) can share one jagged
+            # return loop.  Rewrite the compact, already-factorised DAG as a
+            # whole instead of distributing it into one assignment per
+            # derivative/geometric summand.
+            direct = None
+            for j in var.free_indices:
+                gathers = tuple(OrderedDict.fromkeys(
+                    node for node in traversal((expr,))
+                    if isinstance(node, Indexed) and node.multiindex == (j,)
+                    and isinstance(node.children[0], FlattenedTensor)))
+                if gathers and len({_flattened_layout(g) for g in gathers}) == 1 \
+                        and not any(isinstance(node, Delta) and j in node.free_indices
+                                    for node in traversal((expr,))):
+                    mapper, _, j_expr = _unflatten_sites(gathers)
+                    new_var = MemoizerArg(filtered_replace_indices)(var, ((j, j_expr),))
+                    direct = (new_var, mapper(expr, ((j, j_expr),)))
+                    break
+            if direct is not None:
+                changed = True
+                pending.append(direct)
+                continue
+
+            has_delta = any(isinstance(node, Delta)
+                            for node in traversal((expr,)))
+            predicate = (lambda node: isinstance(node, Delta)) if has_delta else None
+            terms = _distribute_sum(expr, predicate=predicate)
             match = None
-            for idx, term in enumerate(terms):
+            for term in terms:
                 for j in var.free_indices:
-                    site = _try_rewrite_term(term, j)
-                    if site is not None:
-                        _, j_expr, new_term = site
-                        new_var = MemoizerArg(filtered_replace_indices)(var, ((j, j_expr),))
-                        match = (idx, new_var, new_term)
+                    gather = _find_flat_gather(term, j)
+                    if gather is not None and not any(
+                            isinstance(node, Delta) and j in node.free_indices
+                            for node in traversal((term,))):
+                        match = (j, gather)
                         break
                 if match is not None:
                     break
@@ -793,12 +846,30 @@ def unflatten_returns(pairs):
                 outputs.append((var, expr))
                 continue
             changed = True
-            idx, new_var, new_term = match
-            rest_terms = terms[:idx] + terms[idx + 1:]
+            j, gather = match
+            layout = _flattened_layout(gather)
+            selected = []
+            rest_terms = []
+            gathers = []
+            for term in terms:
+                candidate = _find_flat_gather(term, j)
+                if candidate is not None and _flattened_layout(candidate) == layout \
+                        and not any(isinstance(node, Delta) and j in node.free_indices
+                                    for node in traversal((term,))):
+                    selected.append(term)
+                    if candidate not in gathers:
+                        gathers.append(candidate)
+                else:
+                    rest_terms.append(term)
+            mapper, _, j_expr = _unflatten_sites(gathers)
+            new_var = MemoizerArg(filtered_replace_indices)(var, ((j, j_expr),))
+            new_term = mapper(make_sum(selected), ((j, j_expr),))
             pending.append((new_var, new_term))
             if rest_terms:
                 pending.append((var, make_sum(rest_terms)))
-        if changed:
+        if changed or any(isinstance(node, Delta)
+                          for _, expr in outputs
+                          for node in traversal((expr,))):
             outputs = [(v, contraction(e)) for v, e in outputs]
         result.extend(outputs)
     return result
@@ -879,7 +950,9 @@ def contraction(expression, ignore=None):
         # pointless) transformation to every coefficient contraction.
         if not any(isinstance(n, Delta) for n in traversal((expression,))):
             return rebuild_one(expression)
-        return make_sum([rebuild_one(term) for term in _distribute_sum(expression)])
+        predicate = lambda node: isinstance(node, Delta)
+        return make_sum([rebuild_one(term)
+                         for term in _distribute_sum(expression, predicate=predicate)])
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,

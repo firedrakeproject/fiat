@@ -690,11 +690,16 @@ class VariableIndex(IndexBase):
 
     __slots__ = ('expression',)
 
-    def __init__(self, expression):
+    def __new__(cls, expression):
         assert isinstance(expression, Node)
         assert not expression.shape
         if expression.dtype != uint_type:
             raise ValueError(f"expression.dtype ({expression.dtype}) != uint_type ({uint_type})")
+        if isinstance(expression, Constant):
+            return int(expression.value)
+        return super().__new__(cls)
+
+    def __init__(self, expression):
         self.expression = expression
 
     def __eq__(self, other):

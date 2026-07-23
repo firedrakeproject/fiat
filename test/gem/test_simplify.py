@@ -2,6 +2,9 @@ import pytest
 import gem
 import numpy
 
+from gem.node import traversal
+from gem.optimise import _distribute_sum, unflatten_returns
+
 
 @pytest.fixture
 def A():
@@ -84,3 +87,57 @@ def test_flatten_indexsum(A):
     result = gem.IndexSum(gem.IndexSum(Aij, (i,)), (j,))
     expected = gem.IndexSum(Aij, (i, j))
     assert result == expected
+
+
+def test_selective_distribution():
+    a = gem.Variable("a", ())
+    b = gem.Variable("b", ())
+    c = gem.Variable("c", ())
+    i = gem.Index(extent=2)
+    p = gem.Index(extent=1)
+    row = gem.VariableIndex(gem.Indexed(
+        gem.Literal([0], dtype=gem.uint_type), (p,)))
+    delta = gem.Delta(i, row)
+    common = gem.Sum(a, b)
+    expression = gem.Product(common, gem.Sum(c, delta))
+
+    terms = _distribute_sum(
+        expression, predicate=lambda node: isinstance(node, gem.Delta))
+
+    assert len(terms) == 2
+    assert all(common in set(traversal((term,))) for term in terms)
+
+
+def test_constant_variable_index():
+    index = gem.VariableIndex(gem.Literal(1, dtype=gem.uint_type))
+    assert index == 1
+
+
+def test_unflatten_compatible_returns_together():
+    extent = 3
+    p = gem.Index(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    ordering = numpy.zeros((extent, extent), dtype=gem.uint_type)
+    ordering[0, :3] = [0, 1, 2]
+    ordering[1, :2] = [3, 4]
+    ordering[2, 0] = 5
+    ordering = gem.Literal(ordering, dtype=gem.uint_type)
+
+    X = gem.Variable("X", (extent, extent))
+    Y = gem.Variable("Y", (extent, extent))
+    ft_x = gem.FlattenedTensor(gem.Indexed(X, (p, q)), (p, q), ordering)
+    ft_y = gem.FlattenedTensor(gem.Indexed(Y, (p, q)), (p, q), ordering)
+
+    r = gem.Index(extent=6)
+    result = gem.Variable("result", (6,))
+    pairs = unflatten_returns([
+        (gem.Indexed(result, (r,)),
+         gem.Sum(gem.Indexed(ft_x, (r,)), gem.Indexed(ft_y, (r,))))
+    ])
+
+    assert len(pairs) == 1
+    variable, expression = pairs[0]
+    assert variable.free_indices == expression.free_indices
+    assert len(variable.free_indices) == 2
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((expression,)))
