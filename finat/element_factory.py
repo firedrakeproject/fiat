@@ -27,6 +27,7 @@ import finat.ufl
 import ufl
 
 from FIAT import ufc_cell
+from FIAT.reference_element import TensorProductCell
 
 __all__ = ("as_fiat_cell", "create_base_element",
            "create_element", "supported_elements")
@@ -115,9 +116,18 @@ def as_fiat_cell(cell):
     """Convert a ufl cell to a FIAT cell.
 
     :arg cell: the :class:`ufl.Cell` to convert."""
+    if isinstance(cell, str):
+        cell = finat.ufl.as_cell(cell)
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
-    return ufc_cell(cell)
+    if isinstance(cell, ufl.TensorProductCell) and any([hasattr(c, "to_fiat") for c in cell._cells]):
+        if not all([hasattr(c, "to_fiat") for c in cell._cells]):
+            raise NotImplementedError("FUSE defined cells cannot be tensor producted with FIAT defined cells")
+        return TensorProductCell(*[c.to_fiat() for c in cell._cells])
+    try:
+        return cell.to_fiat()
+    except AttributeError:
+        return ufc_cell(cell)
 
 
 @singledispatch
@@ -176,9 +186,14 @@ def convert_finiteelement(element, **kwargs):
     if make_finat_element is None:
         if element.cell.cellname == "quadrilateral":
             # Handle quadrilateral short names like RTCF and RTCE.
+            quadrilateral_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["use_fuse"]),
+                                                      finat.ufl.as_cell("interval", kwargs["use_fuse"]))
             element = element.reconstruct(cell=quadrilateral_tpc)
         elif element.cell.cellname == "hexahedron":
             # Handle hexahedron short names like NCF and NCE.
+            hexahedron_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["use_fuse"]),
+                                                   finat.ufl.as_cell("interval", kwargs["use_fuse"]),
+                                                   finat.ufl.as_cell("interval", kwargs["use_fuse"]))
             element = element.reconstruct(cell=hexahedron_tpc)
         else:
             raise ValueError("%s is supported, but handled incorrectly" %
@@ -305,13 +320,13 @@ def convert_tensorproductelement(element, **kwargs):
 @convert.register(finat.ufl.HDivElement)
 def convert_hdivelement(element, **kwargs):
     finat_elem, deps = _create_element(element._element, **kwargs)
-    return finat.HDivElement(finat_elem), deps
+    return finat.HDivElement(finat_elem, transform=element._transform), deps
 
 
 @convert.register(finat.ufl.HCurlElement)
 def convert_hcurlelement(element, **kwargs):
     finat_elem, deps = _create_element(element._element, **kwargs)
-    return finat.HCurlElement(finat_elem), deps
+    return finat.HCurlElement(finat_elem, transform=element._transform), deps
 
 
 @convert.register(finat.ufl.WithMapping)
@@ -325,12 +340,23 @@ def convert_restrictedelement(element, **kwargs):
     return finat.RestrictedElement(finat_elem, element.restriction_domain()), deps
 
 
-hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
-quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
+@convert.register(finat.ufl.FuseElement)
+def convert_fuse_element(element, **kwargs):
+    if element.triple.flat:
+        new_elem = element.triple.unflatten()
+        if hasattr(new_elem, "base_element"):
+            # If element is wrapped, exclude the wrapping from this creation
+            # it is handled elsewhere in the converter.
+            new_elem = new_elem.base_element
+        finat_elem, deps = _create_element(new_elem.to_ufl(), **kwargs)
+        return finat.FlattenedDimensions(finat_elem), deps
+    return finat.fiat_elements.FuseElement(element.triple), set()
+
+
 _cache = weakref.WeakKeyDictionary()
 
 
-def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None):
+def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None, use_fuse=False):
     """Create a FInAT element (suitable for tabulating with) given a UFL element.
 
     :arg ufl_element: The UFL element to create a FInAT element from.
@@ -341,7 +367,8 @@ def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=
     finat_element, deps = _create_element(ufl_element,
                                           shape_innermost=shape_innermost,
                                           shift_axes=shift_axes,
-                                          restriction=restriction)
+                                          restriction=restriction,
+                                          use_fuse=use_fuse)
     return finat_element
 
 

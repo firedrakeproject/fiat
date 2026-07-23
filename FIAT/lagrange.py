@@ -40,7 +40,7 @@ class LagrangeDualSet(dual_set.DualSet):
         entities = [(dim, entity) for dim in sorted(top) for entity in sorted(top[dim])]
         if sort_entities:
             # sort the entities by support vertex ids
-            support = [top[dim][entity] for dim, entity in entities]
+            support = [sorted(top[dim][entity]) for dim, entity in entities]
             entities = [entity for verts, entity in sorted(zip(support, entities))]
 
         # make nodes by getting points
