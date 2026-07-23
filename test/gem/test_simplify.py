@@ -3,7 +3,7 @@ import gem
 import numpy
 
 from gem.node import traversal
-from gem.optimise import _distribute_sum, unflatten_returns
+from gem.optimise import _distribute_sum, contraction, unflatten_returns
 
 
 @pytest.fixture
@@ -141,3 +141,38 @@ def test_unflatten_compatible_returns_together():
     assert len(variable.free_indices) == 2
     assert not any(isinstance(node, gem.FlattenedTensor)
                    for node in traversal((expression,)))
+
+
+def test_unflatten_factorises_local_sum():
+    extent = 3
+    p = gem.JaggedIndex(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    ordering = numpy.zeros((extent, extent), dtype=gem.uint_type)
+    ordering[0, :3] = [0, 1, 2]
+    ordering[1, :2] = [3, 4]
+    ordering[2, 0] = 5
+    ordering = gem.Literal(ordering, dtype=gem.uint_type)
+
+    ip, iq = gem.indices(2)
+    A = gem.Variable("A", (extent, 2))
+    B = gem.Variable("B", (extent, extent, 2))
+    C = gem.Variable("C", (extent, 2))
+    D = gem.Variable("D", (extent, extent, 2))
+    lattice = gem.Sum(
+        gem.Product(gem.Indexed(A, (p, ip)), gem.Indexed(B, (p, q, iq))),
+        gem.Product(gem.Indexed(C, (p, ip)), gem.Indexed(D, (p, q, iq))),
+    )
+    table = gem.FlattenedTensor(lattice, (p, q), ordering)
+
+    r = gem.Index(extent=6)
+    w = gem.Variable("w", (6,))
+    expression = gem.IndexSum(
+        gem.Product(gem.Indexed(table, (r,)), gem.Indexed(w, (r,))), (r,))
+    result = contraction(expression)
+
+    sums = [node for node in traversal((result,))
+            if isinstance(node, gem.IndexSum)]
+    assert sums
+    assert all(len(node.multiindex) == 1 for node in sums)
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((result,)))

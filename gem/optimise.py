@@ -748,7 +748,15 @@ def _unflatten_terms(summand, r):
             leftover.append(term)
             continue
         own_indices, _, new_term = site
-        rewritten.append((own_indices, new_term))
+        own_indices_set = frozenset(own_indices)
+        # Duffy derivatives are short sums of products separable by axis.
+        # Expose only sums involving this lattice, keeping surrounding
+        # geometry and sparse corrections intact.
+        predicate = lambda node: isinstance(node, Sum) \
+            and not own_indices_set.isdisjoint(node.free_indices)
+        rewritten.extend(
+            (own_indices, piece)
+            for piece in _distribute_sum(new_term, predicate=predicate))
     return rewritten, leftover
 
 
@@ -762,8 +770,13 @@ def _unflatten(node, self):
         if not rewritten:
             continue
         rest = tuple(i for i in node.multiindex if i != r)
-        pieces = [self(IndexSum(term, own + tuple(i for i in rest if i in term.free_indices)))
-                  for own, term in rewritten]
+        pieces = []
+        for own, term in rewritten:
+            term = self(IndexSum(
+                term, own + tuple(i for i in rest if i in term.free_indices)))
+            indices, factors = traverse_product(term)
+            indices, factors = delta_elimination(indices, factors)
+            pieces.append(sum_factorise(indices, factors))
         if leftover:
             residual = make_sum(leftover)
             indices = tuple(i for i in (r,) + rest if i in residual.free_indices)
@@ -870,7 +883,8 @@ def unflatten_returns(pairs):
         if changed or any(isinstance(node, Delta)
                           for _, expr in outputs
                           for node in traversal((expr,))):
-            outputs = [(v, contraction(e)) for v, e in outputs]
+            outputs = [(v, contraction(e, argument_indices=v.free_indices))
+                       for v, e in outputs]
         result.extend(outputs)
     return result
 
@@ -898,7 +912,7 @@ def replace_flattened(expressions):
     return [mapper(expression) for expression in expressions]
 
 
-def contraction(expression, ignore=None):
+def contraction(expression, ignore=None, argument_indices=()):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
 
@@ -909,6 +923,9 @@ def contraction(expression, ignore=None):
         factorisation (otherwise all summation indices will be
         considered). Use this if your expression has many contraction
         indices.
+    :arg argument_indices: Optional free indices identifying argument
+        tabulations.  Sums of separable products involving these indices
+        are split before sum factorisation.
 
     This routine was designed with finite element coefficient
     evaluation in mind.
@@ -924,7 +941,33 @@ def contraction(expression, ignore=None):
     expression = unflatten(expression)
 
     # Flatten product tree, eliminate deltas, sum factorise
+    argument_indices = frozenset(argument_indices)
+
+    def factorise(sum_indices, factors):
+        contraction_indices = frozenset(sum_indices)
+        for n, factor in enumerate(factors):
+            summands = traverse_sum(factor)
+            involved = contraction_indices.intersection(factor.free_indices)
+            # Split an argument tabulation only when its summands expose
+            # strictly smaller contraction-index dependencies.
+            if len(summands) > 1 \
+                    and argument_indices.intersection(factor.free_indices) \
+                    and involved \
+                    and any(
+                        any(contraction_indices.intersection(term.free_indices) < involved
+                            for term in traverse_product(summand)[1])
+                        for summand in summands):
+                expressions = []
+                for summand in summands:
+                    extra_indices, summand_factors = traverse_product(summand)
+                    expressions.append(factorise(
+                        tuple(sum_indices) + tuple(extra_indices),
+                        factors[:n] + summand_factors + factors[n + 1:]))
+                return make_sum(expressions)
+        return sum_factorise(sum_indices, factors)
+
     def rebuild_one(expression):
+        expression = unflatten(expression)
         sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
@@ -934,9 +977,9 @@ def contraction(expression, ignore=None):
             # the inside rather than the outside.
             extra = tuple(i for i in sum_indices if i in ignore)
             to_factor = tuple(i for i in sum_indices if i not in ignore)
-            return IndexSum(sum_factorise(to_factor, factors), extra)
+            return IndexSum(factorise(to_factor, factors), extra)
         else:
-            return sum_factorise(sum_indices, factors)
+            return factorise(sum_indices, factors)
 
     def rebuild(expression):
         # A `Sum` used as a multiplicative factor (e.g. a diagonal
