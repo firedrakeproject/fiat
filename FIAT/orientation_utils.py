@@ -97,7 +97,7 @@ def _make_axis_perms_tensorproduct(cells, dim):
     This is the single sources of extrinsic orientations and corresponding axis permutations.
 
     """
-    from FIAT.reference_element import UFCInterval
+    from FIAT.reference_element import LINE
 
     # Handle extrinsic orientations.
     # This is complex and we need to think to make this function more general.
@@ -116,8 +116,8 @@ def _make_axis_perms_tensorproduct(cells, dim):
         #          dim == (2, 1) ->
         #          triangle x interval (1 possible extrinsic orientation).
         axis_perms = (tuple(range(nprod)), )  # Identity: no permutations
-    elif len(set(cells)) == 1 and isinstance(cells[0], UFCInterval):
-        # Tensor product of intervals.
+    elif len(set(cells)) == 1 and cells[0].get_shape() == LINE:
+        # Tensor product of intervals (any 1D reference cell implementation)
         # Example: interval x interval x interval x interval
         #          dim == (0, 1, 1, 1) ->
         #          point x interval x interval x interval  (1! * 3! possible extrinsic orientations).

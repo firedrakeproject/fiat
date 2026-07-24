@@ -16,7 +16,7 @@ dependencies = [
   "sympy",
   "fuse-element @ git+https://github.com/firedrakeproject/fuse.git",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
   {name = "Robert C. Kirby et al.", email = "fenics-dev@googlegroups.com"},
   {name = "Imperial College London and others", email = "david.ham@imperial.ac.uk"},
