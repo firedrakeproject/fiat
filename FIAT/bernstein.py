@@ -11,10 +11,11 @@ import numpy
 
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import DualSet
-from FIAT.expansions import ExpansionSet, morton_index
+from FIAT.expansions import ExpansionSet
 from FIAT.polynomial_set import PolynomialSet, mis
 from FIAT.pointwise_dual import compute_pointwise_dual
-from FIAT.reference_element import SimplicialComplex, make_lattice
+from FIAT.reference_element import (SimplicialComplex, lexicographical_iter,
+                                    make_lattice)
 
 
 def _bernstein_factors(n: int, eta: numpy.ndarray) -> tuple[numpy.ndarray, ...]:
@@ -57,10 +58,10 @@ class BernsteinExpansionSet(ExpansionSet):
             raise ValueError("Bernstein expansion sets require a simplex")
         super().__init__(ref_el, scale=1.0)
 
-    @property
-    def duffy_axis_permutation(self) -> tuple[int, ...]:
-        """Return the reversed axis order of the Bernstein factorization."""
-        return tuple(reversed(range(self.ref_el.get_spatial_dimension())))
+    def get_duffy_permutation(self, n: int) -> numpy.ndarray:
+        """Map Duffy lattice positions to Bernstein expansion members."""
+        dim = self.ref_el.get_spatial_dimension()
+        return numpy.arange(math.comb(n + dim, dim))
 
     def _tabulate_on_cell(self, n: int, pts: numpy.ndarray, order: int = 0,
                           cell: int = 0, direction: numpy.ndarray | None = None) -> dict:
@@ -80,11 +81,11 @@ class BernsteinExpansionSet(ExpansionSet):
                               axis=-1).dot(R2B.T)
 
         raw_result = {
-            (alpha, i): vec
-            for i, index in enumerate(mis(dim + 1, n))
+            (derivative, i): vec
+            for i, lattice_index in enumerate(lexicographical_iter(dim, n))
             for o in range(order + 1)
-            for alpha, vec in bernstein_Dx(
-                B, (index[0], *reversed(index[1:])), o, R2B
+            for derivative, vec in bernstein_Dx(
+                B, (n - sum(lattice_index), *reversed(lattice_index)), o, R2B
             ).items()
         }
         num_members = math.comb(n + dim, dim)
@@ -113,9 +114,10 @@ class BernsteinExpansionSet(ExpansionSet):
         dim = self.ref_el.get_spatial_dimension()
         assert len(eta_pts) == dim
         A, _ = self.affine_mappings[cell]
-        tables = tuple(_bernstein_factors(n, eta) for eta in eta_pts)
+        axes = tuple(reversed(range(dim)))
+        tables = tuple(_bernstein_factors(n, eta_pts[axis]) for axis in axes)
         values = tuple(table[0] for table in tables)
-        result = {(0,) * dim: [(1.0, values)]}
+        result = {(0,) * dim: [(1.0, tuple(zip(axes, values)))]}
 
         if order:
             lower = tuple(table[1] for table in tables)
@@ -133,9 +135,10 @@ class BernsteinExpansionSet(ExpansionSet):
                     shifted = tuple(table[1] if t < s else
                                     table[2] if t == s else table[0]
                                     for t, table in enumerate(tables))
-                    terms.extend(((coeff, shifted), (-coeff, lower)))
+                    terms.extend(((coeff, tuple(zip(axes, shifted))),
+                                  (-coeff, tuple(zip(axes, lower)))))
                 if not terms:
-                    terms.append((0.0, values))
+                    terms.append((0.0, tuple(zip(axes, values))))
                 alpha = tuple(int(i == k) for i in range(dim))
                 result[alpha] = terms
         return result
@@ -158,7 +161,8 @@ class BernsteinDualSet(DualSet):
 
         # Generate triangular barycentric indices
         dim = ref_el.get_spatial_dimension()
-        kss = mis(dim + 1, degree)
+        kss = [(degree - sum(alpha), *reversed(alpha))
+               for alpha in lexicographical_iter(dim, degree)]
 
         # Fill data structures
         nodes = []
@@ -181,13 +185,10 @@ class Bernstein(FiniteElement):
         k = 0  # 0-form
         super().__init__(ref_el, dual, degree, k)
 
-        dim = ref_el.get_spatial_dimension()
         expansion_set = BernsteinExpansionSet(ref_el)
-        indices = mis(dim + 1, degree)
-        columns = [morton_index(dim, degree, *reversed(index[1:]))
-                   for index in indices]
-        coeffs = numpy.zeros((len(indices), len(indices)))
-        coeffs[numpy.arange(len(indices)), columns] = 1.0
+        size = math.comb(degree + ref_el.get_spatial_dimension(),
+                         ref_el.get_spatial_dimension())
+        coeffs = numpy.eye(size)
         self.poly_set = PolynomialSet(ref_el, degree, degree, expansion_set, coeffs)
 
         pts = make_lattice(ref_el.vertices, degree, variant="gll")

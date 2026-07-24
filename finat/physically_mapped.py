@@ -34,10 +34,10 @@ class MappedTabulation(Mapping):
         csr = [[j for j in range(M.shape[1])
                 if not isinstance(M.array[i, j], gem.Zero)]
                for i in indices]
-        rows = [i for i, js in enumerate(csr) for j in js]
+        rows = [i for i, js in enumerate(csr) for _ in js]
         cols = [j for i, js in enumerate(csr) for j in js]
         data = [M.array[indices[i], j] for i, j in zip(rows, cols)]
-        self.M = gem.SparseMatrix((len(indices), M.shape[1]), rows, cols, data)
+        self.M = gem.sparse_matrix((len(indices), M.shape[1]), rows, cols, data)
         self._tabulation_cache = {}
 
     def __getitem__(self, alpha):

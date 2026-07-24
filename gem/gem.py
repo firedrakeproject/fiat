@@ -16,7 +16,7 @@ indices.
 
 from abc import ABCMeta
 from itertools import chain, repeat
-from functools import partial, reduce
+from functools import lru_cache, partial, reduce
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -33,7 +33,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
            'Index', 'JaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
-           'FlattenedTensor', 'SparseMatrix',
+           'FlattenedTensor', 'sparse_matrix',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
@@ -725,6 +725,15 @@ class VariableIndex(IndexBase):
         return type(self), (self.expression,)
 
 
+def _index_free_indices(index):
+    """Return the free indices represented by an index expression."""
+    if isinstance(index, Index):
+        return (index,)
+    if isinstance(index, VariableIndex):
+        return index.expression.free_indices
+    return ()
+
+
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')
     __back__ = ('multiindex',)
@@ -762,18 +771,10 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                jj_set = set(jj)
-                # A VariableIndex entry of kk may itself be an expression
-                # wrapping one of jj as a free index (e.g. a lookup table
-                # gather built from jj); `rep.get(k, k)` below only ever
-                # matches k literally, so it would silently leave jj
-                # dangling free instead of substituting inside that
-                # expression -- skip the shortcut in that case and let the
-                # general (always-correct) ComponentTensor elimination in
-                # gem.optimise handle it instead.
-                safe = not any((j in ff) for j in jj) and not any(
-                    isinstance(k, VariableIndex) and jj_set & set(k.expression.free_indices)
-                    for k in kk)
+                nested = set(chain.from_iterable(
+                    k.expression.free_indices
+                    for k in kk if isinstance(k, VariableIndex)))
+                safe = not set(jj).intersection(set(ff) | nested)
                 if safe:
                     # Only replace indices that are not present in C
                     rep = dict(zip(jj, ii))
@@ -793,25 +794,14 @@ class Indexed(Scalar):
         self.multiindex = multiindex
         self.indirect_children = tuple(i.expression for i in self.multiindex if isinstance(i, VariableIndex))
 
-        new_indices = []
-        for i in multiindex:
-            if isinstance(i, Index):
-                new_indices.append(i)
-            elif isinstance(i, VariableIndex):
-                new_indices.extend(i.expression.free_indices)
+        new_indices = tuple(chain.from_iterable(map(_index_free_indices, multiindex)))
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
         return self
 
     def index_ordering(self):
         """Running indices in the order of indexing in this node."""
-        free_indices = []
-        for i in self.multiindex:
-            if isinstance(i, Index):
-                free_indices.append(i)
-            elif isinstance(i, VariableIndex):
-                free_indices.extend(i.expression.free_indices)
-        return tuple(free_indices)
+        return tuple(chain.from_iterable(map(_index_free_indices, self.multiindex)))
 
 
 class FlexiblyIndexed(Scalar):
@@ -950,123 +940,197 @@ class ComponentTensor(Node):
 
 
 class FlattenedTensor(Node):
-    """Vector view of a jagged lattice.
+    """Lexicographically flattened view of a jagged tensor.
 
-    Binds ``multiindex`` -- whose trailing entries may be `JaggedIndex`es --
-    and exposes the in-bounds lattice points as a rank-1 tensor of shape
-    ``(n,)``.  ``ordering`` maps each in-bounds lattice point to its flat
-    position; out-of-bounds entries are ignored (but must stay below ``n``).
-    ``expression`` must evaluate to zero at out-of-bounds lattice points, so
-    consumers may iterate the rectangular bounding box.
+    Parameters
+    ----------
+    expression : Node
+        Scalar expression indexed by ``multiindex``.
+    multiindex : tuple of Index
+        Rectangular or jagged tensor axes, in flattening order.
 
-    `gem.optimise.unflatten` (via `gem.optimise.contraction`) turns
-    contractions over the flat index into jagged lattice loops; leftover
-    uses are lowered to per-flat-index gathers by
-    `gem.optimise.replace_flattened` -- recovering jagged *access* where
-    jagged *loops* did not apply.
     """
 
-    __slots__ = ('children', 'multiindex', 'ordering', 'shape')
-    __back__ = ('multiindex', 'ordering')
+    __slots__ = ('children', 'multiindex', 'shape')
+    __back__ = ('multiindex',)
 
-    def __init__(self, expression, multiindex, ordering):
+    def __init__(self, expression: Node,
+                 multiindex: tuple[Index, ...]) -> None:
         assert not expression.shape
         multiindex = tuple(multiindex)
-        assert isinstance(ordering, Constant) and ordering.dtype == uint_type
-        assert ordering.shape == tuple(index.extent for index in multiindex)
         assert set(multiindex) <= set(expression.free_indices)
         self.children = (expression,)
         self.multiindex = multiindex
-        self.ordering = ordering
-        points = _jagged_lattice(multiindex)
-        flat = ordering.array[tuple(numpy.transpose(points))]
-        assert sorted(flat) == list(range(len(points))), \
-            "ordering must map the in-bounds lattice points onto their flat positions"
-        self.shape = (len(points),)
+        self.shape = (len(_jagged_lattice(multiindex)),)
         self.free_indices = unique(set(expression.free_indices) - set(multiindex))
 
-    def lattice_points(self):
-        """In-bounds lattice points, in flat-index order: row r is the
-        lattice multi-index at flat position r."""
-        points = _jagged_lattice(self.multiindex)
-        flat = self.ordering.array[tuple(numpy.transpose(points))]
-        return points[numpy.argsort(flat)]
+    def lattice_points(self) -> numpy.ndarray:
+        """Return the in-bounds lattice multi-indices in flat order."""
+        return _jagged_lattice(self.multiindex)
 
 
-def _jagged_lattice(multiindex):
+def _jagged_layout(multiindex: tuple[Index, ...]) -> tuple:
+    """Return a structural description of a jagged iteration domain."""
+    positions = {}
+    layout = []
+    for position, index in enumerate(multiindex):
+        parents = tuple(positions[parent]
+                        for parent in getattr(index, "parents", ()))
+        layout.append((index.extent, parents))
+        positions[index] = position
+    return tuple(layout)
+
+
+@lru_cache(maxsize=128)
+def _lattice_points(layout: tuple) -> numpy.ndarray:
+    """Enumerate one structural jagged iteration domain."""
+    points = []
+    for alpha in numpy.ndindex(*(extent for extent, _ in layout)):
+        if all(alpha[position] < extent
+               - sum(alpha[parent] for parent in parents)
+               for position, (extent, parents) in enumerate(layout)):
+            points.append(alpha)
+    points = numpy.asarray(points).reshape(len(points), len(layout))
+    points.flags.writeable = False
+    return points
+
+
+def _jagged_lattice(multiindex: tuple[Index, ...]) -> numpy.ndarray:
     """All lattice points of ``multiindex``'s iteration domain, honouring
     `JaggedIndex` bounds, as an integer array of shape (npoint, dim)."""
-    points = []
-    for alpha in numpy.ndindex(*(index.extent for index in multiindex)):
-        values = dict(zip(multiindex, alpha))
-        if all(values[i] < i.extent - sum(values[p] for p in i.parents)
-               for i in multiindex if isinstance(i, JaggedIndex)):
-            points.append(alpha)
-    return numpy.asarray(points).reshape(len(points), len(multiindex))
+    return _lattice_points(_jagged_layout(multiindex))
 
 
-class SparseMatrix(Node):
-    """Sparse (M, N) matrix in coordinate (COO) format.
+def _sparse_delta(index: Index, entries: numpy.ndarray,
+                  nonzero_index: Index) -> Node:
+    """Construct a sparse coordinate delta without trivial indirection."""
+    if len(entries) == index.extent and numpy.array_equal(
+            entries, numpy.arange(index.extent)):
+        return Delta(index, nonzero_index)
+    entry = VariableIndex(Indexed(Literal(entries, dtype=uint_type),
+                                  (nonzero_index,)))
+    return Delta(index, entry)
 
-    ``rows``, ``cols`` are parallel integer numpy arrays of length nnz;
-    ``data`` is an array of length nnz giving the value at each
-    (row, col) pair. Implicitly zero elsewhere.
 
-    Never appears inside an expression DAG: It is eagerly lowered
-    through the delta expansion
+def _coordinate_matrix(shape: tuple[int, int], rows: numpy.ndarray,
+                       cols: numpy.ndarray, data: numpy.ndarray) -> Node:
+    """Construct a nonempty COO matrix from coordinate deltas."""
+    m, n = shape
+    i = Index(extent=m)
+    j = Index(extent=n)
+    nnz, = rows.shape
+    p = Index(extent=nnz)
+    deltas = Product(_sparse_delta(i, rows, p),
+                     _sparse_delta(j, cols, p))
 
-        A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]),
+    if data.dtype == object:
+        constant = all(value == data[0] for value in data)
+        unique_data = data[:1] if constant else data
+        positions = numpy.zeros(nnz, dtype=int) if constant \
+            else numpy.arange(nnz)
+    else:
+        unique_data, positions = numpy.unique(data, return_inverse=True)
 
-    so any contraction against the matrix reduces to ordinary
-    IndexSum-Delta cancellation -- a mat-vec ``sum_j A[i, j] * x[j]``
-    (or a sparse-times-dense product over the shared axis) costs O(nnz)
-    rather than O(M*N), and a scatter along a free ``i`` cancels into
-    the return variable, ``y[rows[p]] += data[p] * x[cols[p]]``.
+    if len(unique_data) == 1:
+        value = as_gem(unique_data[0])
+    elif len(unique_data) == nnz:
+        value = Indexed(as_gem(data), (p,))
+    else:
+        values = as_gem(numpy.asarray(unique_data, dtype=data.dtype))
+        position = VariableIndex(Indexed(
+            Literal(positions, dtype=uint_type), (p,)))
+        value = Indexed(values, (position,))
+
+    return ComponentTensor(IndexSum(Product(value, deltas), (p,)), (i, j))
+
+
+def _perfect_matching(rows: numpy.ndarray, cols: numpy.ndarray,
+                      size: int) -> numpy.ndarray | None:
+    """Find one COO entry in every row and column, ordered by column."""
+    entries = [[] for _ in range(size)]
+    for position, row in enumerate(rows):
+        entries[row].append(position)
+
+    column_positions = numpy.full(size, -1, dtype=int)
+
+    def augment(row: int, seen: numpy.ndarray) -> bool:
+        for position in entries[row]:
+            column = cols[position]
+            if seen[column]:
+                continue
+            seen[column] = True
+            previous = column_positions[column]
+            if previous < 0 or augment(rows[previous], seen):
+                column_positions[column] = position
+                return True
+        return False
+
+    for row in range(size):
+        if not augment(row, numpy.zeros(size, dtype=bool)):
+            return None
+    return column_positions
+
+
+def sparse_matrix(shape: tuple[int, int], rows: numpy.ndarray,
+                  cols: numpy.ndarray, data: numpy.ndarray) -> Node:
+    """Construct a sparse GEM matrix from COO data.
+
+    The returned expression represents
+    ``A[i, j] = sum_p data[p] delta(i, rows[p]) delta(j, cols[p])``.
+
+    Parameters
+    ----------
+    shape : tuple of int
+        Matrix dimensions.
+    rows, cols : array_like
+        Row and column coordinates of the nonzeros.
+    data : array_like
+        Nonzero values.
+
+    Returns
+    -------
+    Node
+        Rank-two GEM expression.
+
     """
+    rows = numpy.asarray(rows)
+    cols = numpy.asarray(cols)
+    data = numpy.asarray(data)
+    assert rows.shape == cols.shape and rows.ndim == 1
+    assert rows.size > 0
+    assert data.shape == rows.shape
+    m, n = shape
+    assert 0 <= rows.min() and rows.max() < m
+    assert 0 <= cols.min() and cols.max() < n
 
-    def __new__(cls, shape, rows, cols, data):
-        rows = numpy.asarray(rows)
-        cols = numpy.asarray(cols)
-        data = numpy.asarray(data)
-        assert rows.shape == cols.shape and rows.ndim == 1
-        assert rows.size > 0
-        assert len(data) == rows.shape[0]
-        M, N = shape
-        assert 0 <= rows.min() and rows.max() < M
-        assert 0 <= cols.min() and cols.max() < N
-        # Lower SparseMatrix through its compound delta expansion:
-        # A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]).
-        # The deltas then cancel through the ordinary delta-elimination machinery.
-        nnz, = rows.shape
-        p = Index(extent=nnz)
-        i = Index(extent=M)
-        j = Index(extent=N)
-        di = Delta(i, VariableIndex(Indexed(
-            Literal(rows, dtype=uint_type), (p,))))
-        dj = Delta(j, VariableIndex(Indexed(
-            Literal(cols, dtype=uint_type), (p,))))
-        # Compress nonzeros
-        scatter = []
-        data_unique = []
-        seen = {}
-        for val in data:
-            if val not in seen:
-                seen[val] = len(seen)
-                data_unique.append(val)
-            scatter.append(seen[val])
+    if (m == n and len(rows) == m
+            and numpy.array_equal(numpy.sort(rows), numpy.arange(m))
+            and numpy.array_equal(numpy.sort(cols), numpy.arange(n))):
+        matching = numpy.argsort(cols)
+    else:
+        matching = _perfect_matching(rows, cols, m) if m == n else None
+    if matching is None:
+        return _coordinate_matrix(shape, rows, cols, data)
 
-        if len(data_unique) == 1:
-            data = data_unique[0]
-            data_index = ()
-        elif len(data_unique) == nnz:
-            data_index = (p,)
-        else:
-            data = numpy.asarray(data_unique, dtype=data.dtype)
-            data_index = (VariableIndex(Indexed(Literal(scatter, dtype=uint_type), (p,))),)
+    matched_rows = rows[matching]
+    matched_data = data[matching]
+    i = Index(extent=m)
+    j = Index(extent=n)
+    if numpy.array_equal(matched_rows, numpy.arange(m)):
+        constant = all(value == matched_data[0] for value in matched_data)
+        value = as_gem(matched_data[0]) if constant \
+            else Indexed(as_gem(matched_data), (i,))
+        matched_matrix = ComponentTensor(Product(value, Delta(i, j)), (i, j))
+    else:
+        matched_matrix = _coordinate_matrix(
+            shape, matched_rows, numpy.arange(n), matched_data)
 
-        expression = IndexSum(
-            Product(Indexed(as_gem(data), data_index), Product(di, dj)), (p,))
-        return ComponentTensor(expression, (i, j))
+    if len(matching) == len(rows):
+        return matched_matrix
+    remainder = numpy.ones(len(rows), dtype=bool)
+    remainder[matching] = False
+    return matched_matrix + sparse_matrix(
+        shape, rows[remainder], cols[remainder], data[remainder])
 
 
 class IndexSum(Scalar):
@@ -1249,13 +1313,8 @@ class Delta(Scalar, Terminal):
         # index, but its wrapped expression may be free in other indices
         # (e.g. a Morton index computed from a lattice multiindex); those
         # need to propagate here too, exactly as Indexed/FlexiblyIndexed do.
-        free_indices = []
-        for index in (i, j):
-            if isinstance(index, Index):
-                free_indices.append(index)
-            elif isinstance(index, VariableIndex):
-                free_indices.extend(index.expression.free_indices)
-        self.free_indices = tuple(unique(free_indices))
+        self.free_indices = tuple(unique(chain.from_iterable(
+            _index_free_indices(index) for index in (i, j))))
         self._dtype = dtype
         return self
 

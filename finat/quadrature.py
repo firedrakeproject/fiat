@@ -1,6 +1,6 @@
 import hashlib
 from abc import ABCMeta, abstractmethod
-from functools import cached_property, reduce
+from functools import cached_property
 from math import factorial
 
 import gem
@@ -255,4 +255,4 @@ class CollapsedTensorProductQuadratureRule(AbstractQuadratureRule):
 
     @cached_property
     def weight_expression(self):
-        return reduce(gem.Product, (q.weight_expression for q in self.factors))
+        return gem.Product(*(q.weight_expression for q in self.factors))

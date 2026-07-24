@@ -1,7 +1,8 @@
 import abc
 import hashlib
-from functools import cached_property
+from functools import cached_property, reduce
 from itertools import chain, product
+from operator import mul
 
 import numpy
 
@@ -233,15 +234,21 @@ class TensorPointSet(AbstractPointSet):
                 for s, o in zip(self.factors, other.factors))
 
 
-class CollapsedTensorProductPointSet(AbstractPointSet):
-    """A point set with tensor-product structure in collapsed (Duffy)
-    coordinates, mapped onto the reference simplex.
+def _collapsed_coordinates(eta):
+    """Map unit tensor-product coordinates to the unit simplex."""
+    return tuple(
+        eta[t] * reduce(
+            mul, (1 - eta[u] for u in range(t + 1, len(eta))), 1)
+        for t in range(len(eta)))
+
+
+class CollapsedTensorProductPointSet(TensorPointSet):
+    r"""A tensor point set mapped to the simplex by collapsed coordinates.
 
     The factors are one-dimensional point sets on the ``[0, 1]`` reference
-    interval holding the collapsed coordinates ``eta_t``; the represented
-    points are their image under the Duffy map on the reference simplex,
+    interval. Their tensor product is mapped by
 
-        ``x_t = eta_t * prod(u > t) (1 - eta_u)``.
+    .. math:: x_t = \eta_t \prod_{u=t+1}^{d-1}(1 - \eta_u).
 
     Parameters
     ----------
@@ -251,50 +258,21 @@ class CollapsedTensorProductPointSet(AbstractPointSet):
 
     """
 
-    def __init__(self, factors):
-        self.factors = tuple(factors)
+    def __init__(self, factors: tuple[AbstractPointSet, ...]) -> None:
+        super().__init__(factors)
         assert all(ps.dimension == 1 for ps in self.factors)
-
-    def __repr__(self):
-        return f"{type(self).__name__}({self.factors!r})"
-
-    @property
-    def dimension(self):
-        return len(self.factors)
 
     @cached_property
     def points(self):
         etas = [ps.points.ravel() for ps in self.factors]
         grids = list(numpy.meshgrid(*etas, indexing="ij"))
-        dim = len(grids)
-        for u in range(1, dim):
-            weight = 1.0 - grids[u]
-            for t in range(u):
-                grids[t] = grids[t] * weight
-        return numpy.stack([grid.ravel() for grid in grids], axis=-1)
-
-    @cached_property
-    def indices(self):
-        return tuple(chain(*[ps.indices for ps in self.factors]))
+        return numpy.stack([x.ravel() for x in _collapsed_coordinates(grids)],
+                           axis=-1)
 
     @cached_property
     def expression(self):
         etas = [gem.Indexed(ps.expression, (0,)) for ps in self.factors]
-        dim = len(etas)
-        result = []
-        for t in range(dim):
-            expr = etas[t]
-            for u in range(t + 1, dim):
-                expr = gem.Product(expr, gem.Sum(gem.one, gem.Product(gem.Literal(-1.0), etas[u])))
-            result.append(expr)
-        return gem.ListTensor(result)
-
-    def almost_equal(self, other, tolerance=1e-12):
-        """Approximate numerical equality of point sets"""
-        return type(self) is type(other) and \
-            len(self.factors) == len(other.factors) and \
-            all(s.almost_equal(o, tolerance=tolerance)
-                for s, o in zip(self.factors, other.factors))
+        return gem.ListTensor(_collapsed_coordinates(etas))
 
 
 class FacetPointSet(AbstractPointSet):

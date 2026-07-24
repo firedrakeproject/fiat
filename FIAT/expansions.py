@@ -21,31 +21,6 @@ def morton_index3(p, q=0, r=0):
     return (p + q + r)*(p + q + r + 1)*(p + q + r + 2)//6 + (q + r)*(q + r + 1)//2 + r
 
 
-def morton_index(dim, n, *multiindex):
-    """Flat Morton (total-degree-major) index of a simplex lattice multi-index.
-
-    ``n`` is unused; kept for a uniform signature with the other
-    lattice-indexing helpers in this module.
-    """
-    idx = (lambda p: p, morton_index2, morton_index3)[dim - 1]
-    return idx(*multiindex)
-
-
-def lexicographic_permutation(dim, n):
-    """Permutation from Morton (total-degree-major) order to
-    lattice-lexicographic order (first coordinate slowest-varying, last
-    fastest-varying).
-
-    :returns: an integer array of length ``ndof`` such that ``perm[j]`` is
-        the Morton index of the ``j``-th lattice point in
-        lattice-lexicographic order.
-    """
-    ndof = math.comb(n + dim, dim)
-    return numpy.fromiter((morton_index(dim, n, *multiindex)
-                           for multiindex in reference_element.lexicographical_iter(dim, n)),
-                          dtype=int, count=ndof)
-
-
 def jrc(a, b, n):
     """Jacobi recurrence coefficients"""
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
@@ -77,25 +52,7 @@ def pad_jacobian(A, embedded_dim):
 
 
 def dubiner_jacobi_parameters(codim: int, m: int, variant: str | None) -> tuple:
-    """Jacobi parameters for one axis of the Dubiner recurrence.
-
-    Parameters
-    ----------
-    codim : int
-        The number of already-extended axes, ``len(sub_index)``.
-    m : int
-        The sum of the lattice indices of the already-extended axes.
-    variant : str or None
-        The expansion set variant.
-
-    Returns
-    -------
-    tuple
-        ``(alpha, beta, a, b)`` where ``(alpha, beta)`` are the Jacobi
-        parameters and ``(a, b)`` are the degree-one recurrence
-        coefficients.
-
-    """
+    """Return Jacobi and degree-one coefficients for one Dubiner axis."""
     if variant == "bubble":
         alpha = 2 * m
         beta = 0
@@ -112,26 +69,7 @@ def dubiner_jacobi_parameters(codim: int, m: int, variant: str | None) -> tuple:
 
 
 def dubiner_norm2(d: int, m: int, i: int, variant: str | None) -> float:
-    """Squared normalization factor applied when the Dubiner recurrence
-    extends a basis member to dimension ``d``.
-
-    Parameters
-    ----------
-    d : int
-        The dimension being extended to, ``codim + 1``.
-    m : int
-        The sum of the lattice indices of the previous axes.
-    i : int
-        The lattice index along the axis being extended.
-    variant : str or None
-        The expansion set variant.
-
-    Returns
-    -------
-    float
-        The squared scaling factor for the extended member.
-
-    """
+    """Return the squared normalization for one Dubiner principal function."""
     if variant is not None:
         shift = 1 if variant == "dual" else 0
         p = i + shift
@@ -343,52 +281,12 @@ def dubiner_recurrence(dim: int,
 
 def principal_functions(n: int, eta: numpy.ndarray, axis: int, order: int = 0,
                         variant: str | None = None) -> dict:
-    """Tabulate the one-dimensional principal functions of the Dubiner
-    expansion along one collapsed axis.
+    """Tabulate one axis of the Dubiner basis in collapsed coordinates.
 
-    On collapsed tensor-product coordinates ``eta`` in ``[-1, 1]^d``, the
-    Dubiner expansion member with lattice multi-index ``(i_1, ..., i_d)``
-    factorizes into a product over axes of one-dimensional principal
-    functions (Karniadakis and Sherwin),
-
-        ``phi_(i_1..i_d)(xi(eta)) = scale * prod_t G_t[m_t, i_t](eta_t)``,
-
-    where ``m_t = i_1 + ... + i_{t-1}`` and
-
-        ``G_t[m, i](eta) = sqrt(dubiner_norm2(t, m, i)) * w(eta)^m * g_(m,i)(eta)``
-
-    with ``w(eta) = (1 - eta)/2`` and ``g_(m,i)`` a degree-``i`` Jacobi-type
-    polynomial satisfying the single-axis restriction of the recurrence of
-    `dubiner_recurrence`.
-
-    Parameters
-    ----------
-    n : int
-        The polynomial degree.
-    eta : numpy.ndarray
-        Points on the ``(-1, 1)`` interval of the collapsed axis.
-    axis : int
-        The one-based axis number ``t``.
-    order : int
-        The maximum order of differentiation in ``eta``.
-    variant : str or None
-        The expansion set variant, see `dubiner_recurrence`.
-
-    Returns
-    -------
-    dict
-        Mapping mode names to tables ``T[m, i, pt]`` of shape
-        ``(num_m, n+1, len(eta))``, where ``num_m = 1`` for the first axis
-        and ``n+1`` otherwise, with zeros for ``m + i > n``.  Modes:
-        ``'V'``: values ``G[m, i]``; and for ``order >= 1``:
-        ``'D'``: ``d/deta G[m, i]``;
-        ``'tD'``: ``(1+eta)/2 * d/deta G[m, i]``; and
-        ``'W'``: ``G[m, i] / w``, zeroed for ``m == 0``, which is the
-        weight-shifted table produced by the chain rule of the Duffy map.
-
+    Returns value (``V``), derivative (``D``), affine derivative (``tD``),
+    and one-power-lowered (``W``) tables indexed by ``(m, i, point)``.
     """
     eta = numpy.asarray(eta)
-    coefficients = integrated_jrc if variant == "bubble" else jrc
     w = 0.5 * (1.0 - eta)
     npts = eta.shape[0]
     num_m = 1 if axis == 1 else n + 1
@@ -401,17 +299,27 @@ def principal_functions(n: int, eta: numpy.ndarray, axis: int, order: int = 0,
         g = tables["V"][m, :count]
         dg = numpy.zeros_like(g) if order else None
         alpha, beta, a, b = dubiner_jacobi_parameters(axis - 1, m, variant)
-        g[0] = 1.0
-        if count > 1:
-            g[1] = a * eta + b
-            if order:
-                dg[1] = a
-            for i in range(1, count - 1):
-                a, b, c = coefficients(alpha, beta, i)
-                factor = a * eta + b
-                g[i + 1] = factor * g[i] - c * g[i - 1]
+        if variant != "bubble":
+            g[:] = jacobi.eval_jacobi_batch(
+                alpha, beta, count - 1, eta[:, None])
+            if order and count > 1:
+                degrees = numpy.arange(1, count)
+                dg[1:] = jacobi.eval_jacobi_batch(
+                    alpha + 1, beta + 1, count - 2, eta[:, None])
+                dg[1:] *= (0.5 * (alpha + beta + degrees + 1))[:, None]
+        else:
+            g[0] = 1.0
+            if count > 1:
+                g[1] = a * eta + b
                 if order:
-                    dg[i + 1] = factor * dg[i] + a * g[i] - c * dg[i - 1]
+                    dg[1] = a
+                for i in range(1, count - 1):
+                    a, b, c = integrated_jrc(alpha, beta, i)
+                    factor = a * eta + b
+                    g[i + 1] = factor * g[i] - c * g[i - 1]
+                    if order:
+                        dg[i + 1] = (factor * dg[i] + a * g[i]
+                                     - c * dg[i - 1])
 
         if n > 0:
             normalisation = numpy.fromiter(
@@ -630,17 +538,14 @@ class ExpansionSet(object):
                 result[alpha] = vals
         return result
 
-    @property
-    def duffy_axis_permutation(self) -> tuple[int, ...]:
-        """Return the collapsed-coordinate axis order used by sum factorization.
-
-        Returns
-        -------
-        tuple
-            A permutation of the spatial axes.
-
-        """
-        return tuple(range(self.ref_el.get_spatial_dimension()))
+    def get_duffy_permutation(self, n: int) -> numpy.ndarray:
+        """Map lexicographic Duffy lattice positions to expansion members."""
+        dim = self.ref_el.get_spatial_dimension()
+        index = (lambda p: p, morton_index2, morton_index3)[dim - 1]
+        return numpy.fromiter(
+            (index(*alpha)
+             for alpha in reference_element.lexicographical_iter(dim, n)),
+            dtype=int, count=math.comb(n + dim, dim))
 
     def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0, cell: int = 0) -> dict:
         """Tabulate the expansion set in separable form on collapsed
@@ -653,23 +558,22 @@ class ExpansionSet(object):
 
         :returns: a dict mapping each derivative multi-index alpha with
             ``|alpha| <= order`` to a list of separable terms
-            ``(coeff, factors)``, with ``coeff`` a float and ``factors`` a
-            tuple of per-axis tables such that::
+            ``(coeff, factors)``, with ``coeff`` a float and ``factors`` an
+            ordered tuple of ``(axis, table)`` pairs such that::
 
-                D^alpha phi_(i_1..i_d) = sum_terms coeff * prod_t factors[t][m_t, i_t, pt_t]
+                D^alpha phi_(i_1..i_d) = sum_terms coeff * prod_q F_q[m_q, i_q, pt_axis_q]
 
             on the lattice ``i_1 + ... + i_d <= n``, where ``m_1 = 0`` and
-            ``m_t = i_1 + ... + i_{t-1}``. Members are enumerated by the
-            lattice multi-index through `morton_index2` / `morton_index3`.
-            Tables are shared between terms, so consumers may deduplicate
-            them by identity.
+            ``m_t = i_1 + ... + i_{t-1}``. Factor order determines the
+            lattice axes; each axis label selects the corresponding point
+            coordinate. Members are enumerated by the lattice multi-index
+            through `morton_index2` / `morton_index3`. Tables are shared
+            between terms, so consumers may deduplicate them by identity.
 
             Always the *raw* (continuity=None) tabulation, even when
             ``self.continuity == "C0"``: `C0_basis`'s recombination mixes
-            different lattice multi-indices together, which this
-            per-multi-index-uniform representation can't express. Callers
-            needing the C0 basis recombine the raw result themselves (see
-            `c0_recombination_row_terms` / `c0_recombination_col_terms`).
+            lattice multi-indices. Callers needing the C0 basis compose that
+            recombination with their expansion coefficients.
         """
         if order > 1:
             raise NotImplementedError("tabulate_duffy is limited to first derivatives")
@@ -682,14 +586,16 @@ class ExpansionSet(object):
         tables = [principal_functions(n, eta_pts[t], t + 1, order=order, variant=self.variant)
                   for t in range(sd)]
 
-        result = {(0,) * sd: [(scale, tuple(table["V"] for table in tables))]}
+        result = {(0,) * sd: [
+            (scale, tuple(enumerate(table["V"] for table in tables)))
+        ]}
         if order > 0:
             xi_terms = tuple(_duffy_derivative_factors(tables, k)
                              for k in range(sd))
             # Push forward to the cell coordinates: d/dx_k = sum_l A[l, k] d/dxi_l.
             for k in range(sd):
                 alpha = tuple(int(u == k) for u in range(sd))
-                result[alpha] = [(scale * A[l, k], factors)
+                result[alpha] = [(scale * A[l, k], tuple(enumerate(factors)))
                                  for l in range(sd) if A[l, k] != 0.0
                                  for factors in xi_terms[l]]
         return result

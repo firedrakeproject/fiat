@@ -16,8 +16,10 @@
 # along with FIAT. If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
+import gem
 import numpy
 import sympy
+from gem.interpreter import evaluate
 
 from FIAT import expansions, polynomial_set, reference_element
 from FIAT.bernstein import BernsteinExpansionSet
@@ -195,7 +197,8 @@ def duffy_term_value(factors, index):
     term for a given lattice multi-index."""
     vals = numpy.ones(())
     m = 0
-    for table, i in zip(factors, index):
+    for factor, i in zip(factors, index):
+        table = factor[1] if isinstance(factor, tuple) else factor
         vals = numpy.multiply.outer(vals, table[m, i])
         m += i
     return vals.ravel()
@@ -233,23 +236,39 @@ def test_bernstein_tabulate_duffy(make_cell, degree):
         cell = make_cell(dim)
         U = BernsteinExpansionSet(cell)
         etas = [numpy.linspace(-1, 1, 3 + axis) for axis in range(dim)]
-        permutation = U.duffy_axis_permutation
         A, b = U.affine_mappings[0]
         pts = numpy.linalg.solve(A, (duffy_points(dim, etas) - b).T).T
         expected = U._tabulate_on_cell(degree, pts, order=1)
-        duffy_etas = tuple(etas[t] for t in permutation)
-        duffy = U.tabulate_duffy(degree, duffy_etas, order=1)
+        duffy = U.tabulate_duffy(degree, etas, order=1)
         assert expected.keys() == duffy.keys()
 
-        point_shape = tuple(len(etas[t]) for t in permutation)
-        transpose = numpy.argsort(permutation)
         for alpha in expected:
-            for index in reference_element.lattice_iter(0, degree+1, dim):
+            axes = tuple(axis for axis, _ in duffy[alpha][0][1])
+            point_shape = tuple(len(etas[axis]) for axis in axes)
+            transpose = numpy.argsort(axes)
+            for row, index in enumerate(
+                    reference_element.lexicographical_iter(dim, degree)):
                 vals = sum(coeff * duffy_term_value(factors, index)
                            for coeff, factors in duffy[alpha])
                 vals = vals.reshape(point_shape).transpose(transpose).ravel()
-                row = expansions.morton_index(dim, degree, *index)
                 assert numpy.allclose(vals, expected[alpha][row], rtol=1E-10, atol=1E-10)
+
+
+@pytest.mark.parametrize("dim", [1, 2, 3])
+def test_bernstein_symbolic_tabulation(dim):
+    cell = reference_element.ufc_simplex(dim)
+    expansion = BernsteinExpansionSet(cell)
+    degree = 2
+    point = gem.Variable("point", (dim,))
+    coordinates = tuple(gem.Indexed(point, (axis,)) for axis in range(dim))
+    symbolic = expansion._tabulate_on_cell(degree, coordinates, order=1)
+
+    value = numpy.linspace(0.1, 0.2, dim)
+    expected = expansion._tabulate_on_cell(degree, value, order=1)
+    for alpha in symbolic:
+        actual = [evaluate([gem.as_gem(entry)], bindings={point: value})[0].arr
+                  for entry in symbolic[alpha]]
+        assert numpy.allclose(actual, expected[alpha])
 
 
 @pytest.mark.parametrize("degree", [4])

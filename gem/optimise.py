@@ -13,9 +13,9 @@ from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
-                     Index, JaggedIndex, VariableIndex, Indexed,
-                     FlexiblyIndexed, IndexSum, ComponentTensor, ListTensor,
-                     Delta, FlattenedTensor, partial_indexed, one, uint_type)
+                     Index, VariableIndex, Indexed, FlexiblyIndexed,
+                     IndexSum, ComponentTensor, ListTensor, Delta,
+                     partial_indexed, one)
 
 
 @singledispatch
@@ -308,22 +308,17 @@ def select_expression(expressions, index):
     return ComponentTensor(selected, alpha)
 
 
-def delta_elimination(sum_indices, factors, index_replacer=None, predicate=None):
+def delta_elimination(sum_indices, factors, index_replacer=None):
     """IndexSum-Delta cancellation.
 
     :arg sum_indices: free indices for contractions
     :arg factors: product factors
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
-    :kwarg predicate: Optional predicate on `Delta` factors; if specified,
-        only Deltas for which it returns true are cancelled.
 
     :returns: optimised (sum_indices, factors)
     """
     if index_replacer is None:
         index_replacer = MemoizerArg(filtered_replace_indices)
-    if predicate is None:
-        def predicate(delta):
-            return True
 
     sum_indices = list(sum_indices)  # copy for modification
 
@@ -336,7 +331,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None, predicate=None)
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
 
     delta_queue = [(f, index)
-                   for f in factors if isinstance(f, Delta) and predicate(f)
+                   for f in factors if isinstance(f, Delta)
                    for index in (f.i, f.j) if index in sum_indices]
     while delta_queue:
         delta, from_ = delta_queue[0]
@@ -344,12 +339,8 @@ def delta_elimination(sum_indices, factors, index_replacer=None, predicate=None)
 
         sum_indices.remove(from_)
         if isinstance(to_, VariableIndex):
-            # `from_` is not simply dropped: the substitution below
-            # exposes `to_`'s wrapped free indices (e.g. a lattice
-            # multiindex inside a Morton index expression) wherever
-            # `from_` used to appear, so they must join the sum indices
-            # too, or later free-index bookkeeping (e.g. the recomputed
-            # ``variable.free_indices``) will no longer match.
+            # The indirect target's free indices become quantified by the
+            # substitution.
             for index in to_.expression.free_indices:
                 if index not in sum_indices:
                     sum_indices.append(index)
@@ -357,7 +348,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None, predicate=None)
         factors = [substitute(f, from_, to_) for f in factors]
 
         delta_queue = [(f, index)
-                       for f in factors if isinstance(f, Delta) and predicate(f)
+                       for f in factors if isinstance(f, Delta)
                        for index in (f.i, f.j) if index in sum_indices]
 
     return sum_indices, factors
@@ -397,11 +388,13 @@ def associate(operator, operands):
     return result, flops
 
 
-def sum_factorise(sum_indices, factors):
+def sum_factorise(sum_indices, factors, distribute=False):
     """Optimise a tensor product through sum factorisation.
 
     :arg sum_indices: free indices for contractions
     :arg factors: product factors
+    :arg distribute: split sums when this exposes contractions over fewer
+        indices
     :returns: optimised GEM expression
     """
     if len(factors) == 0 and len(sum_indices) == 0:
@@ -410,6 +403,26 @@ def sum_factorise(sum_indices, factors):
 
     if len(sum_indices) > 6:
         raise NotImplementedError("Too many indices for sum factorisation!")
+
+    if distribute:
+        contraction_indices = frozenset(sum_indices)
+        for position, factor in enumerate(factors):
+            summands = traverse_sum(factor)
+            involved = contraction_indices.intersection(factor.free_indices)
+            if (len(summands) > 1 and involved
+                    and any(any(
+                        contraction_indices.intersection(term.free_indices)
+                        < involved
+                        for term in traverse_product(summand)[1])
+                        for summand in summands)):
+                expressions = []
+                for summand in summands:
+                    extra, summand_factors = traverse_product(summand)
+                    expressions.append(sum_factorise(
+                        tuple(sum_indices) + tuple(extra),
+                        factors[:position] + summand_factors
+                        + factors[position + 1:]))
+                return make_sum(expressions)
 
     # Form groups by free indices
     groups = groupby(factors, key=lambda f: f.free_indices)
@@ -583,111 +596,13 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
-def _clone_multiindex(multiindex):
-    """Fresh copies of a (possibly jagged) multiindex, rebuilding the
-    parent structure within the tuple."""
-    clones = {}
-    for index in multiindex:
-        if isinstance(index, JaggedIndex):
-            parents = tuple(clones.get(p, p) for p in index.parents)
-            clones[index] = JaggedIndex(extent=index.extent, parents=parents)
-        else:
-            clones[index] = Index(extent=index.extent)
-    return tuple(clones[index] for index in multiindex)
-
-
-def _replace_indices_unflatten(node, self, subst):
-    """`filtered_replace_indices` with designated gather replacements."""
-    try:
-        return self.replacements[node]
-    except KeyError:
-        return filtered_replace_indices(node, self, subst)
-
-
-def _flattened_layout(gather):
-    """Hashable description of a `FlattenedTensor` gather's lattice."""
-    ft, = gather.children
-    positions = {index: n for n, index in enumerate(ft.multiindex)}
-    structure = tuple(
-        (type(index), index.extent,
-         tuple(positions[parent] for parent in getattr(index, "parents", ())))
-        for index in ft.multiindex)
-    return ft.ordering, structure
-
-
-def _unflatten_candidate(nodes, indices):
-    """Find a coordinate lattice that can replace one flat index.
-
-    A candidate consists of all ``FlattenedTensor`` gathers at an index,
-    provided they describe the same lattice and the index is not constrained
-    by a delta.  In that case the flat sum is exactly a change of coordinates
-    to the tensor's jagged multiindex.
-    """
-    indices = tuple(indices)
-    index_set = frozenset(indices)
-    delta_indices = set()
-    gathers = defaultdict(OrderedDict)
-    for node in nodes:
-        if isinstance(node, Delta):
-            delta_indices.update(node.free_indices)
-        elif isinstance(node, Indexed) and len(node.multiindex) == 1 \
-                and node.multiindex[0] in index_set \
-                and isinstance(node.children[0], FlattenedTensor):
-            gathers[node.multiindex[0]].setdefault(node)
-
-    for index in indices:
-        candidates = tuple(gathers[index])
-        layouts = {_flattened_layout(gather) for gather in candidates}
-        if candidates and len(layouts) == 1 and index not in delta_indices:
-            layout, = layouts
-            return index, layout, candidates
-    return None
-
-
-def _unflatten_sites(gathers):
-    """Prepare a joint rewrite of compatible `FlattenedTensor` gathers."""
-    gather = gathers[0]
-    ft, = gather.children
-    assert all(_flattened_layout(g) == _flattened_layout(gather)
-               for g in gathers)
-    alpha = _clone_multiindex(ft.multiindex)
-    index_replacer = MemoizerArg(filtered_replace_indices)
-    mapper = MemoizerArg(_replace_indices_unflatten)
-    mapper.replacements = {}
-    for gather in gathers:
-        ft, = gather.children
-        mapper.replacements[gather] = index_replacer(
-            ft.children[0], tuple(zip(ft.multiindex, alpha)))
-    return mapper, alpha, VariableIndex(Indexed(ft.ordering, alpha))
-
-
 def _distribute_sum(expr, predicate=None):
-    """Distribute addition out through `IndexSum` and `Product` --
-    IndexSum(a + b, mi) == IndexSum(a, mi) + IndexSum(b, mi), and
-    Product(a, b) == Product(a1, b) + Product(a2, b) when a == a1 + a2 --
-    returning a flat list of terms (each with any IndexSum wrapping
-    re-applied, filtered to the indices actually free in that term).  A
-    plain `traverse_sum` only splits at the outermost level and
-    `traverse_product` cannot descend into a bare `Sum` at all (it is not
-    one of `IndexSum`/`Product`/`Division`, so a `Sum` used as a
-    multiplicative factor -- e.g. a diagonal tabulation plus a sparse
-    correction, both sharing a contracted or free index -- is left as one
-    opaque, un-cancellable term). Monomial rebuilding (e.g.
-    `tsfc.spectral`'s COFFEE-based factorisation) can also combine
-    originally-independent additive contributions (e.g. one per gradient
-    component) underneath a shared outer IndexSum (typically the
-    quadrature-point contraction), hiding them from a shallow split.
+    """Distribute selected sums through products and contractions.
 
-    If ``predicate`` is provided, only distribute operations containing a
-    matching node.  Other subexpressions remain intact.  This exposes, for
-    example, sparse-matrix deltas without expanding independent geometric
-    or derivative sums.
-
-    Traverses iteratively (post-order via an explicit stack), not by plain
-    Python recursion: real FEM expressions (e.g. after `associate()`
-    chains many terms into a long, one-sided binary tree) can nest
-    Sum/IndexSum/Product far deeper than Python's default recursion
-    limit."""
+    If ``predicate`` is provided, only operations containing a matching
+    node are distributed.  An iterative post-order traversal avoids the
+    recursion depth depending on expression-tree association.
+    """
     if predicate is None:
         def predicate(node):
             return True
@@ -719,176 +634,53 @@ def _distribute_sum(expr, predicate=None):
     return results[expr]
 
 
-def _unflatten_terms(summand, r):
-    """Split ``summand`` into additive terms and rewrite each one that has
-    an eliminable `FlattenedTensor` gather at the flat index ``r``
-    independently.  Returns
-    ``(rewritten, leftover)``: ``rewritten`` is a list of ``(own_indices,
-    term)`` pairs (``r`` already eliminated); ``leftover`` is a list of
-    terms in which ``r`` remains free (or that do not involve ``r`` at
-    all)."""
-    rewritten = []
-    leftover = []
-    for term in traverse_sum(summand):
-        candidate = _unflatten_candidate(traversal((term,)), (r,))
-        if candidate is None:
-            leftover.append(term)
-            continue
-        _, _, gathers = candidate
-        mapper, own_indices, r_expr = _unflatten_sites(gathers)
-        new_term = mapper(term, ((r, r_expr),))
-        own_indices_set = frozenset(own_indices)
-        # Duffy derivatives are short sums of products separable by axis.
-        # Expose only sums involving this lattice, keeping surrounding
-        # geometry and sparse corrections intact.
-        predicate = lambda node: isinstance(node, Sum) \
-            and not own_indices_set.isdisjoint(node.free_indices)
-        rewritten.extend(
-            (own_indices, piece)
-            for piece in _distribute_sum(new_term, predicate=predicate))
-    return rewritten, leftover
+def eliminate_deltas(expression):
+    """Cancel contracted deltas without changing other contractions."""
+    replacer = MemoizerArg(filtered_replace_indices)
+    expression = replacer(expression, ())
+    nodes = tuple(traversal((expression,)))
+    contracted = frozenset(
+        index
+        for node in nodes if isinstance(node, IndexSum)
+        for index in node.multiindex)
 
+    def cancellable(node):
+        return isinstance(node, Delta) \
+            and bool({node.i, node.j} & contracted)
 
-def _unflatten(node, self):
-    node = reuse_if_untouched(node, self)
-    if not isinstance(node, IndexSum):
-        return node
-    summand, = node.children
-    for r in node.multiindex:
-        rewritten, leftover = _unflatten_terms(summand, r)
-        if not rewritten:
-            continue
-        rest = tuple(i for i in node.multiindex if i != r)
-        pieces = []
-        for own, term in rewritten:
-            term = self(IndexSum(
-                term, own + tuple(i for i in rest if i in term.free_indices)))
-            indices, factors = traverse_product(term)
-            indices, factors = delta_elimination(indices, factors)
-            pieces.append(sum_factorise(indices, factors))
-        if leftover:
-            residual = make_sum(leftover)
-            indices = tuple(i for i in (r,) + rest if i in residual.free_indices)
-            pieces.append(self(IndexSum(residual, indices)))
-        return make_sum(pieces)
-    return node
+    if not any(isinstance(node, Delta) and cancellable(node)
+               for node in nodes):
+        return expression
+
+    terms = []
+    for term in _distribute_sum(expression, predicate=cancellable):
+        indices, factors = traverse_product(term, index_replacer=replacer)
+        indices, factors = delta_elimination(
+            indices, factors, index_replacer=replacer)
+        factors = [replacer(factor, ()) for factor in factors]
+        terms.append(IndexSum(Product(*factors), indices))
+    return make_sum(terms)
 
 
 def unflatten(expression):
-    """Rewrite contractions over the flat index of a `FlattenedTensor` as
-    loops over the tensor's own (jagged lattice) multiindex.  The flat
-    index disappears: the tensor's expression is inlined, and remaining
-    uses of the flat index (e.g. a coefficient vector) gather through the
-    tensor's ordering table.  This recovers the separable per-axis factors
-    that sum factorisation needs, which the flat gather form hides."""
-    if not any(isinstance(node, FlattenedTensor)
-               for node in traversal((expression,))):
-        return expression
-    mapper = Memoizer(_unflatten)
-    return mapper(expression)
+    """Compatibility wrapper for :func:`gem.unflatten.unflatten`."""
+    from gem.unflatten import unflatten as impl
+    return impl(expression)
 
 
 def unflatten_returns(pairs):
-    """`unflatten` for the free (argument) indices of assignment pairs.
-
-    For each (return variable, expression) pair whose expression scatters a
-    `FlattenedTensor` along a free index of the variable, replace that flat
-    index by the tensor's own lattice multiindex in both: the variable's
-    index becomes a gather through the tensor's ordering table, and the
-    matched terms are rewritten in place.  Compatible tabulations (e.g.
-    reference derivatives of the same basis) share one lattice multiindex
-    and remain in a single expression.  Rewritten expressions are
-    re-factorised with `contraction`, since the factorised structure was
-    built while the tensor was still atomic.
-    """
-    pairs = list(pairs)
-    if not any(
-            isinstance(node, FlattenedTensor)
-            for _, expression in pairs
-            for node in traversal((expression,))):
-        return pairs
-
-    result = []
-    for variable, expression in pairs:
-        pending = [(variable, expression)]
-        outputs = []
-        changed = False
-        while pending:
-            var, expr = pending.pop()
-            nodes = tuple(traversal((expr,)))
-            candidate = _unflatten_candidate(nodes, var.free_indices)
-            if candidate is not None:
-                index, layout, gathers = candidate
-                groups = OrderedDict((
-                    ((index, layout), ([expr], list(gathers))),
-                ))
-            elif not any(
-                    isinstance(node, Indexed)
-                    and len(node.multiindex) == 1
-                    and node.multiindex[0] in var.free_indices
-                    and isinstance(node.children[0], FlattenedTensor)
-                    for node in nodes):
-                outputs.append((var, expr))
-                continue
-            else:
-                predicate = None
-                if any(isinstance(node, Delta) for node in nodes):
-                    predicate = lambda node: isinstance(node, Delta)
-                groups = OrderedDict()
-                for term in _distribute_sum(expr, predicate=predicate):
-                    candidate = _unflatten_candidate(
-                        traversal((term,)), var.free_indices)
-                    key = candidate[:2] if candidate is not None else None
-                    terms, gathers = groups.setdefault(key, ([], []))
-                    terms.append(term)
-                    if candidate is not None:
-                        gathers.extend(candidate[2])
-
-            for key, (terms, gathers) in groups.items():
-                term = make_sum(terms)
-                if key is None:
-                    outputs.append((var, term))
-                    continue
-                changed = True
-                index, _ = key
-                gathers = tuple(OrderedDict.fromkeys(gathers))
-                mapper, _, index_expr = _unflatten_sites(gathers)
-                subst = ((index, index_expr),)
-                new_var = MemoizerArg(filtered_replace_indices)(var, subst)
-                pending.append((new_var, mapper(term, subst)))
-        if changed or any(isinstance(node, Delta)
-                          for _, expr in outputs
-                          for node in traversal((expr,))):
-            outputs = [(v, contraction(e, argument_indices=v.free_indices))
-                       for v, e in outputs]
-        result.extend(outputs)
-    return result
-
-
-def _replace_flattened(node, self):
-    node = reuse_if_untouched(node, self)
-    if not isinstance(node, FlattenedTensor):
-        return node
-    expression, = node.children
-    points = node.lattice_points()
-    n, = node.shape
-    r = Index(extent=n)
-    subst = tuple(
-        (axis, VariableIndex(Indexed(Literal(points[:, t], dtype=uint_type), (r,))))
-        for t, axis in enumerate(node.multiindex))
-    body = MemoizerArg(filtered_replace_indices)(expression, subst)
-    return ComponentTensor(body, (r,))
+    """Compatibility wrapper for :func:`gem.unflatten.unflatten_returns`."""
+    from gem.unflatten import unflatten_returns as impl
+    return impl(pairs)
 
 
 def replace_flattened(expressions):
-    """Lower remaining `FlattenedTensor`s to `ComponentTensor`s over a plain
-    flat index, substituting each lattice axis with a gather table on the
-    flat index -- jagged access instead of jagged loops."""
-    mapper = Memoizer(_replace_flattened)
-    return [mapper(expression) for expression in expressions]
+    """Compatibility wrapper for :func:`gem.unflatten.replace_flattened`."""
+    from gem.unflatten import replace_flattened as impl
+    return impl(expressions)
 
 
-def contraction(expression, ignore=None, argument_indices=()):
+def contraction(expression, ignore=None):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
 
@@ -899,9 +691,6 @@ def contraction(expression, ignore=None, argument_indices=()):
         factorisation (otherwise all summation indices will be
         considered). Use this if your expression has many contraction
         indices.
-    :arg argument_indices: Optional free indices identifying argument
-        tabulations.  Sums of separable products involving these indices
-        are split before sum factorisation.
 
     This routine was designed with finite element coefficient
     evaluation in mind.
@@ -913,39 +702,17 @@ def contraction(expression, ignore=None, argument_indices=()):
     # Eliminate annoying ComponentTensors
     expression = index_replacer(expression, ())
 
-    # Rewrite flat FlattenedTensor contractions as jagged lattice loops
-    expression = unflatten(expression)
-
     # Flatten product tree, eliminate deltas, sum factorise
-    argument_indices = frozenset(argument_indices)
-
-    def factorise(sum_indices, factors):
-        contraction_indices = frozenset(sum_indices)
-        for n, factor in enumerate(factors):
-            summands = traverse_sum(factor)
-            involved = contraction_indices.intersection(factor.free_indices)
-            # Split an argument tabulation only when its summands expose
-            # strictly smaller contraction-index dependencies.
-            if len(summands) > 1 \
-                    and argument_indices.intersection(factor.free_indices) \
-                    and involved \
-                    and any(
-                        any(contraction_indices.intersection(term.free_indices) < involved
-                            for term in traverse_product(summand)[1])
-                        for summand in summands):
-                expressions = []
-                for summand in summands:
-                    extra_indices, summand_factors = traverse_product(summand)
-                    expressions.append(factorise(
-                        tuple(sum_indices) + tuple(extra_indices),
-                        factors[:n] + summand_factors + factors[n + 1:]))
-                return make_sum(expressions)
-        return sum_factorise(sum_indices, factors)
-
-    def rebuild_one(expression):
-        expression = unflatten(expression)
+    def rebuild(expression):
+        expression = eliminate_deltas(expression)
         sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
+        factors = [index_replacer(f, ()) for f in factors]
+        expression = IndexSum(Product(*factors), sum_indices)
+        expression = unflatten(expression)
+        sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+        sum_indices, factors = delta_elimination(sum_indices, factors,
+                                                 index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         if ignore is not None:
             # TODO: This is a really blunt instrument and one might
@@ -953,25 +720,10 @@ def contraction(expression, ignore=None, argument_indices=()):
             # the inside rather than the outside.
             extra = tuple(i for i in sum_indices if i in ignore)
             to_factor = tuple(i for i in sum_indices if i not in ignore)
-            return IndexSum(factorise(to_factor, factors), extra)
+            return IndexSum(sum_factorise(to_factor, factors,
+                                          distribute=True), extra)
         else:
-            return factorise(sum_indices, factors)
-
-    def rebuild(expression):
-        # A `Sum` used as a multiplicative factor (e.g. a diagonal
-        # tabulation plus a sparse correction) is invisible to
-        # `traverse_product` (it only knows how to flatten
-        # IndexSum/Product/Division) -- distribute it out first so each
-        # resulting term's Deltas are genuine top-level factors that
-        # `delta_elimination` can find and cancel.  Only bother when a
-        # Delta is actually present: distributing unconditionally would
-        # apply an expensive (and, for unrelated deeply-nested products,
-        # pointless) transformation to every coefficient contraction.
-        if not any(isinstance(n, Delta) for n in traversal((expression,))):
-            return rebuild_one(expression)
-        predicate = lambda node: isinstance(node, Delta)
-        return make_sum([rebuild_one(term)
-                         for term in _distribute_sum(expression, predicate=predicate)])
+            return sum_factorise(sum_indices, factors, distribute=True)
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,

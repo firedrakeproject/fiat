@@ -72,6 +72,7 @@ def test_point_evaluation_zany(ref_to_phys, element, degree):
 @pytest.mark.parametrize("make_element", [
     pytest.param(lambda cell, degree: finat.Legendre(cell, degree, variant="integral"),
                  id="integral"),
+    pytest.param(finat.IntegratedLegendre, id="integrated"),
     pytest.param(finat.Bernstein, id="bernstein"),
 ])
 @pytest.mark.parametrize('degree', [1, 4])
@@ -90,10 +91,7 @@ def test_duffy_evaluation(cell, degree, make_element):
     expected = element.basis_evaluation(1, dense_ps)
     assert expected.keys() == duffy.keys()
 
-    # duffy_evaluation already returns the flat-dof-indexed tabulation
-    # (matching basis_evaluation's convention), so no lattice-multiindex
-    # bookkeeping is needed here: just compare the two dense (ndof,)-shaped
-    # tabulations point by point.
+    # Both tabulations use a flat dof axis.
     ndof = element.space_dimension()
     for alpha, table in expected.items():
         exp, = gem.interpreter.evaluate([table])
@@ -101,6 +99,16 @@ def test_duffy_evaluation(cell, degree, make_element):
         act, = gem.interpreter.evaluate([duffy[alpha]])
         act = act.broadcast(ps.indices).reshape(-1, ndof)
         assert numpy.allclose(act, exp, rtol=1E-10, atol=1E-12)
+
+        coefficients = numpy.random.default_rng(1).random(ndof)
+        index = gem.Index(extent=ndof)
+        contraction = gem.IndexSum(
+            gem.Product(gem.Indexed(gem.Literal(coefficients), (index,)),
+                        gem.Indexed(duffy[alpha], (index,))), (index,))
+        value, = gem.interpreter.evaluate([contraction])
+        value = value.broadcast(ps.indices)
+        assert numpy.allclose(value.reshape(-1), exp @ coefficients,
+                              rtol=1E-10, atol=1E-12)
 
 
 if __name__ == '__main__':
