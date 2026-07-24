@@ -34,6 +34,10 @@ class MappedTabulation(Mapping):
         csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
                for i in indices]
         self.csr = csr
+        rows = [i for i, js in enumerate(self.csr) for j in js]
+        cols = [j for i, js in enumerate(self.csr) for j in js]
+        data = gem.ListTensor([M.array[i, j] for i, j in zip(rows, cols)])
+        self.M = gem.SparseMatrix(data, rows, cols, M.shape)
         self._tabulation_cache = {}
 
     def matvec(self, table):
@@ -53,7 +57,7 @@ class MappedTabulation(Mapping):
         try:
             return self._tabulation_cache[alpha]
         except KeyError:
-            result = self.matvec(self.ref_tabulation[alpha])
+            result = self.M @ self.ref_tabulation[alpha]
             return self._tabulation_cache.setdefault(alpha, result)
 
     def __iter__(self):
