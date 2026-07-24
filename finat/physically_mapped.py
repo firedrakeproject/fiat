@@ -31,27 +31,14 @@ class MappedTabulation(Mapping):
         self.indices = indices
         # we expect M to be sparse with O(1) nonzeros per row
         # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
+        csr = [[j for j in range(M.shape[1])
+                if not isinstance(M.array[i, j], gem.Zero)]
                for i in indices]
-        self.csr = csr
-        rows = [i for i, js in enumerate(self.csr) for j in js]
-        cols = [j for i, js in enumerate(self.csr) for j in js]
+        rows = [i for i, js in enumerate(csr) for j in js]
+        cols = [j for i, js in enumerate(csr) for j in js]
         data = gem.ListTensor([M.array[i, j] for i, j in zip(rows, cols)])
         self.M = gem.SparseMatrix(data, rows, cols, M.shape)
         self._tabulation_cache = {}
-
-    def matvec(self, table):
-        # basis recombination using hand-rolled sparse-dense matrix multiplication
-        ii = gem.indices(len(table.shape)-1)
-        phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
-        # the sum approach is faster than calling numpy.dot or gem.IndexSum
-        exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
-                 for i, js in zip(self.indices, self.csr)]
-
-        result = gem.ListTensor(exprs)
-        result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
-        # result = gem.optimise.aggressive_unroll(self.M @ table)
-        return result
 
     def __getitem__(self, alpha):
         try:

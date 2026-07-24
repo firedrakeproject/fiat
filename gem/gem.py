@@ -1035,16 +1035,35 @@ class SparseMatrix(Node):
         M, N = shape
         assert 0 <= rows.min() and rows.max() < M
         assert 0 <= cols.min() and cols.max() < N
-        # Lower SparseMatrix through its delta expansion:
+        # Lower SparseMatrix through its compound delta expansion:
         # A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]).
-        # The deltas then cancel through the ordinary delta-elimination machinery
+        # The deltas then cancel through the ordinary delta-elimination machinery.
         nnz, = rows.shape
         p = Index(extent=nnz)
         i = Index(extent=M)
         j = Index(extent=N)
-        di = Delta(i, VariableIndex(Indexed(Literal(rows, dtype=uint_type), (p,))))
-        dj = Delta(j, VariableIndex(Indexed(Literal(cols, dtype=uint_type), (p,))))
-        return ComponentTensor(IndexSum(Product(Indexed(data, (p,)), Product(di, dj)), (p,)), (i, j))
+        di = Delta(i, VariableIndex(Indexed(
+            Literal(rows, dtype=uint_type), (p,))))
+        dj = Delta(j, VariableIndex(Indexed(
+            Literal(cols, dtype=uint_type), (p,))))
+        # Compress nonzeros
+        scatter = []
+        data_unique = []
+        seen = {}
+        for val in data.array:
+            if val not in seen:
+                seen[val] = len(seen)
+                data_unique.append(val)
+            scatter.append(seen[val])
+        if len(data_unique) == nnz:
+            data_index = p
+        else:
+            data = ListTensor(data_unique)
+            data_index = VariableIndex(Indexed(Literal(scatter, dtype=uint_type), (p,)))
+
+        expression = IndexSum(
+            Product(Indexed(data, (data_index,)), Product(di, dj)), (p,))
+        return ComponentTensor(expression, (i, j))
 
 
 class IndexSum(Scalar):

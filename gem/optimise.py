@@ -781,6 +781,9 @@ def unflatten(expression):
     uses of the flat index (e.g. a coefficient vector) gather through the
     tensor's ordering table.  This recovers the separable per-axis factors
     that sum factorisation needs, which the flat gather form hides."""
+    if not any(isinstance(node, FlattenedTensor)
+               for node in traversal((expression,))):
+        return expression
     mapper = Memoizer(_unflatten)
     return mapper(expression)
 
@@ -798,6 +801,13 @@ def unflatten_returns(pairs):
     re-factorised with `contraction`, since the factorised structure was
     built while the tensor was still atomic.
     """
+    pairs = list(pairs)
+    if not any(
+            isinstance(node, FlattenedTensor)
+            for _, expression in pairs
+            for node in traversal((expression,))):
+        return pairs
+
     result = []
     for variable, expression in pairs:
         pending = [(variable, expression)]
