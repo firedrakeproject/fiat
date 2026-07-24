@@ -390,39 +390,65 @@ def principal_functions(n: int, eta: numpy.ndarray, axis: int, order: int = 0,
     eta = numpy.asarray(eta)
     coefficients = integrated_jrc if variant == "bubble" else jrc
     w = 0.5 * (1.0 - eta)
-    dw = -0.5
     npts = eta.shape[0]
     num_m = 1 if axis == 1 else n + 1
     modes = ("V",) if order == 0 else ("V", "D", "W", "tD")
-    tables = {mode: numpy.zeros((num_m, n+1, npts), dtype=eta.dtype) for mode in modes}
+    tables = {mode: numpy.zeros((num_m, n + 1, npts), dtype=eta.dtype)
+              for mode in modes}
+    powers = w[None, :] ** numpy.arange(num_m)[:, None]
     for m in range(num_m):
+        count = n + 1 - m
+        g = tables["V"][m, :count]
+        dg = numpy.zeros_like(g) if order else None
         alpha, beta, a, b = dubiner_jacobi_parameters(axis - 1, m, variant)
-        # Single-axis restriction of the Dubiner recurrence: the factors
-        # (fa, fb, fc) reduce to (eta, -1, 1) times powers of the weights of
-        # the subsequent axes, which are tabulated separately.
-        g = numpy.zeros((n + 1 - m, npts), dtype=eta.dtype)
-        dg = numpy.zeros_like(g)
         g[0] = 1.0
-        if n - m > 0:
+        if count > 1:
             g[1] = a * eta + b
-            dg[1] = a
-            for i in range(1, n - m):
+            if order:
+                dg[1] = a
+            for i in range(1, count - 1):
                 a, b, c = coefficients(alpha, beta, i)
-                g[i+1] = (a * eta + b) * g[i] - c * g[i-1]
-                dg[i+1] = (a * eta + b) * dg[i] + a * g[i] - c * dg[i-1]
-        wm = w ** m
-        # Zero rule: the weight-shifted tables at m == 0 only ever multiply
-        # derivative factors that vanish identically, so w^(-1) never appears.
-        wm1 = w ** (m-1) if m > 0 else numpy.zeros(npts, dtype=eta.dtype)
-        for i in range(n + 1 - m):
-            # dubiner_recurrence applies no normalization for n == 0
-            scale = math.sqrt(dubiner_norm2(axis, m, i, variant)) if n > 0 else 1.0
-            tables["V"][m, i] = scale * wm * g[i]
-            if order > 0:
-                tables["W"][m, i] = scale * wm1 * g[i]
-                tables["D"][m, i] = scale * (wm * dg[i] + m * dw * wm1 * g[i])
-                tables["tD"][m, i] = 0.5 * (1.0 + eta) * tables["D"][m, i]
+                factor = a * eta + b
+                g[i + 1] = factor * g[i] - c * g[i - 1]
+                if order:
+                    dg[i + 1] = factor * dg[i] + a * g[i] - c * dg[i - 1]
+
+        if n > 0:
+            normalisation = numpy.fromiter(
+                (math.sqrt(dubiner_norm2(axis, m, i, variant))
+                 for i in range(count)), dtype=float, count=count)
+            g *= normalisation[:, None]
+            if order:
+                dg *= normalisation[:, None]
+
+        if order and m:
+            tables["W"][m, :count] = powers[m - 1] * g
+        if order:
+            tables["D"][m, :count] = (
+                powers[m] * dg - 0.5 * m * tables["W"][m, :count])
+            tables["tD"][m, :count] = (
+                0.5 * (1.0 + eta) * tables["D"][m, :count])
+        g *= powers[m]
     return tables
+
+
+def _duffy_derivative_factors(tables: tuple, direction: int) -> tuple:
+    """Factorize one physical derivative of the Duffy pullback.
+
+    For the lower-triangular Duffy map, ``d/dxi_direction`` is a sum over
+    collapsed axes up to ``direction``.  Axes before the differentiated one
+    contribute values, axes after it contribute one lower power of their
+    collapse weight, and a non-final differentiated axis also contributes its
+    affine collapsed coordinate.
+    """
+    terms = []
+    for axis in range(direction + 1):
+        derivative = "D" if axis == direction else "tD"
+        factors = tuple(table["V"] for table in tables[:axis])
+        factors += (tables[axis][derivative],)
+        factors += tuple(table["W"] for table in tables[axis + 1:])
+        terms.append(factors)
+    return tuple(terms)
 
 
 def C0_basis(dim, n, tabulations):
@@ -658,13 +684,8 @@ class ExpansionSet(object):
 
         result = {(0,) * sd: [(scale, tuple(table["V"] for table in tables))]}
         if order > 0:
-            # Chain rule of the Duffy map:
-            # d/dxi_k = sum(t <= k) ((1+eta_t)/2)^{t < k} prod(u > t) (1/w_u) d/deta_t.
-            def eta_term(k, t):
-                modes = ("V",)*t + ("tD" if t < k else "D",) + ("W",)*(sd-1-t)
-                return tuple(table[mode] for table, mode in zip(tables, modes))
-
-            xi_terms = [[eta_term(k, t) for t in range(k + 1)] for k in range(sd)]
+            xi_terms = tuple(_duffy_derivative_factors(tables, k)
+                             for k in range(sd))
             # Push forward to the cell coordinates: d/dx_k = sum_l A[l, k] d/dxi_l.
             for k in range(sd):
                 alpha = tuple(int(u == k) for u in range(sd))
