@@ -4,7 +4,6 @@ from FIAT.reference_element import LINE
 import gem
 from gem.utils import cached_property
 from finat.finiteelementbase import FiniteElementBase
-from finat.tensor_product import TensorProductElement
 
 
 class WrapperElementBase(FiniteElementBase):
@@ -124,13 +123,13 @@ class HCurlElement(WrapperElementBase):
     """H(curl) wrapper element for tensor product elements."""
 
     def __init__(self, wrappee, transform=None):
-        #assert isinstance(wrappee, TensorProductElement)
-        #if any(fe.formdegree is None for fe in wrappee.factors):
-        #    raise ValueError("Form degree of subelement is None, cannot H(curl)!")
+        # assert isinstance(wrappee, TensorProductElement)
+        # if any(fe.formdegree is None for fe in wrappee.factors):
+        #     raise ValueError("Form degree of subelement is None, cannot H(curl)!")
 
-        #formdegree = sum(fe.formdegree for fe in wrappee.factors)
-        #if formdegree != 1:
-        #    raise ValueError("H(curl) requires 1-form element!")
+        # formdegree = sum(fe.formdegree for fe in wrappee.factors)
+        # if formdegree != 1:
+        #     raise ValueError("H(curl) requires 1-form element!")
 
         if transform is None:
             transform = select_hcurl_transformer(wrappee)

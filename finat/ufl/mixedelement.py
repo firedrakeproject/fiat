@@ -13,7 +13,7 @@
 
 import numpy as np
 
-from ufl.cell import CellSequence, as_cell
+from ufl.cell import CellSequence
 from ufl.domain import MeshSequence
 from finat.ufl.finiteelement import FiniteElement
 from finat.ufl.finiteelementbase import FiniteElementBase, as_cell
