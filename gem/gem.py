@@ -751,21 +751,6 @@ class Indexed(Scalar):
         if isinstance(aggregate, Zero):
             return Zero(dtype=aggregate.dtype)
 
-        # Lower SparseMatrix through its delta expansion (see `SparseMatrix`):
-        # A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]).
-        # The deltas then cancel through the ordinary delta-elimination
-        # machinery wherever i or j meets a contraction or a return
-        # variable, so the node needs no traversal/codegen support of its
-        # own.
-        if isinstance(aggregate, SparseMatrix):
-            data, = aggregate.children
-            nnz, = aggregate.rows.shape
-            p = Index(extent=nnz)
-            i, j = multiindex
-            di = Delta(i, VariableIndex(Indexed(Literal(aggregate.rows, dtype=uint_type), (p,))))
-            dj = Delta(j, VariableIndex(Indexed(Literal(aggregate.cols, dtype=uint_type), (p,))))
-            return IndexSum(Product(Indexed(data, (p,)), Product(di, dj)), (p,))
-
         # Simplify Indexed(ComponentTensor(Indexed(C, kk), jj), ii) -> Indexed(C, ll)
         # This pattern corresponds to an index replacement rule jj -> ii applied to
         # the innermost multiindex kk to produce ll.
@@ -1041,10 +1026,7 @@ class SparseMatrix(Node):
     the return variable, ``y[rows[p]] += data[p] * x[cols[p]]``.
     """
 
-    __slots__ = ('children', 'rows', 'cols', 'shape')
-    __back__ = ('rows', 'cols', 'shape')
-
-    def __init__(self, data, rows, cols, shape):
+    def __new__(cls, data, rows, cols, shape):
         rows = numpy.asarray(rows)
         cols = numpy.asarray(cols)
         assert rows.shape == cols.shape and rows.ndim == 1
@@ -1053,24 +1035,16 @@ class SparseMatrix(Node):
         M, N = shape
         assert 0 <= rows.min() and rows.max() < M
         assert 0 <= cols.min() and cols.max() < N
-        self.children = (data,)
-        self.rows = rows
-        self.cols = cols
-        self.shape = (M, N)
-        self.free_indices = data.free_indices
-
-    def is_equal(self, other):
-        if type(self) is not type(other):
-            return False
-        if self.shape != other.shape:
-            return False
-        return (numpy.array_equal(self.rows, other.rows)
-                and numpy.array_equal(self.cols, other.cols)
-                and self.children == other.children)
-
-    def get_hash(self):
-        return hash((type(self), self.shape, self.children,
-                    tuple(self.rows.tolist()), tuple(self.cols.tolist())))
+        # Lower SparseMatrix through its delta expansion:
+        # A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]).
+        # The deltas then cancel through the ordinary delta-elimination machinery
+        nnz, = rows.shape
+        p = Index(extent=nnz)
+        i = Index(extent=M)
+        j = Index(extent=N)
+        di = Delta(i, VariableIndex(Indexed(Literal(rows, dtype=uint_type), (p,))))
+        dj = Delta(j, VariableIndex(Indexed(Literal(cols, dtype=uint_type), (p,))))
+        return ComponentTensor(IndexSum(Product(Indexed(data, (p,)), Product(di, dj)), (p,)), (i, j))
 
 
 class IndexSum(Scalar):
