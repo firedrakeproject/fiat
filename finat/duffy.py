@@ -186,9 +186,7 @@ class DuffyElement:
                     cols.append(j)
                     data.append(coeff / row_coeff[j, 0])
             if rows:
-                sparse = gem.SparseMatrix(gem.Literal(numpy.asarray(data)),
-                                          numpy.asarray(rows), numpy.asarray(cols),
-                                          (ndof, ndof))
+                sparse = gem.SparseMatrix((ndof, ndof), rows, cols, data)
                 r = gem.Index(extent=ndof)
                 j = gem.Index(extent=ndof)
                 tables = {alpha: gem.ComponentTensor(

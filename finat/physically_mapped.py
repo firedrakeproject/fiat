@@ -36,8 +36,8 @@ class MappedTabulation(Mapping):
                for i in indices]
         rows = [i for i, js in enumerate(csr) for j in js]
         cols = [j for i, js in enumerate(csr) for j in js]
-        data = gem.ListTensor([M.array[i, j] for i, j in zip(rows, cols)])
-        self.M = gem.SparseMatrix(data, rows, cols, M.shape)
+        data = [M.array[i, j] for i, j in zip(rows, cols)]
+        self.M = gem.SparseMatrix(M.shape, rows, cols, data)
         self._tabulation_cache = {}
 
     def __getitem__(self, alpha):

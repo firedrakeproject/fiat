@@ -1009,13 +1009,11 @@ class SparseMatrix(Node):
     """Sparse (M, N) matrix in coordinate (COO) format.
 
     ``rows``, ``cols`` are parallel integer numpy arrays of length nnz;
-    ``data`` is a rank-1 `Node` of length nnz giving the value at each
-    (row, col) pair -- a `Literal` for plain numeric entries, or a
-    `ListTensor` for entries that carry free indices of their own (e.g.
-    depend on a quadrature-point index).  Implicitly zero elsewhere.
+    ``data`` is an array of length nnz giving the value at each
+    (row, col) pair. Implicitly zero elsewhere.
 
-    Never appears inside an expression DAG: `Indexed` eagerly lowers
-    ``A[i, j]`` through the delta expansion
+    Never appears inside an expression DAG: It is eagerly lowered
+    through the delta expansion
 
         A[i, j] == sum_p data[p] * delta(i, rows[p]) * delta(j, cols[p]),
 
@@ -1026,12 +1024,13 @@ class SparseMatrix(Node):
     the return variable, ``y[rows[p]] += data[p] * x[cols[p]]``.
     """
 
-    def __new__(cls, data, rows, cols, shape):
+    def __new__(cls, shape, rows, cols, data):
         rows = numpy.asarray(rows)
         cols = numpy.asarray(cols)
+        data = numpy.asarray(data)
         assert rows.shape == cols.shape and rows.ndim == 1
         assert rows.size > 0
-        assert data.shape == (rows.shape[0],)
+        assert len(data) == rows.shape[0]
         M, N = shape
         assert 0 <= rows.min() and rows.max() < M
         assert 0 <= cols.min() and cols.max() < N
@@ -1050,7 +1049,7 @@ class SparseMatrix(Node):
         scatter = []
         data_unique = []
         seen = {}
-        for val in data.array:
+        for val in data:
             if val not in seen:
                 seen[val] = len(seen)
                 data_unique.append(val)
@@ -1058,11 +1057,11 @@ class SparseMatrix(Node):
         if len(data_unique) == nnz:
             data_index = p
         else:
-            data = ListTensor(data_unique)
+            data = numpy.asarray(data_unique)
             data_index = VariableIndex(Indexed(Literal(scatter, dtype=uint_type), (p,)))
 
         expression = IndexSum(
-            Product(Indexed(data, (data_index,)), Product(di, dj)), (p,))
+            Product(Indexed(as_gem(data), (data_index,)), Product(di, dj)), (p,))
         return ComponentTensor(expression, (i, j))
 
 
