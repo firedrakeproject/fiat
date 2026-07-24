@@ -1054,14 +1054,18 @@ class SparseMatrix(Node):
                 seen[val] = len(seen)
                 data_unique.append(val)
             scatter.append(seen[val])
-        if len(data_unique) == nnz:
-            data_index = p
+
+        if len(data_unique) == 1:
+            data = data_unique[0]
+            data_index = ()
+        elif len(data_unique) == nnz:
+            data_index = (p,)
         else:
-            data = numpy.asarray(data_unique)
-            data_index = VariableIndex(Indexed(Literal(scatter, dtype=uint_type), (p,)))
+            data = numpy.asarray(data_unique, dtype=data.dtype)
+            data_index = (VariableIndex(Indexed(Literal(scatter, dtype=uint_type), (p,))),)
 
         expression = IndexSum(
-            Product(Indexed(as_gem(data), (data_index,)), Product(di, dj)), (p,))
+            Product(Indexed(as_gem(data), data_index), Product(di, dj)), (p,))
         return ComponentTensor(expression, (i, j))
 
 
