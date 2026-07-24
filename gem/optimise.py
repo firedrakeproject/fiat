@@ -14,7 +14,7 @@ from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
-                     IndexSum, ComponentTensor, ListTensor, Delta,
+                     IndexSum, ComponentTensor, ListTensor, FlattenedTensor, Delta,
                      partial_indexed, one)
 
 
@@ -269,6 +269,15 @@ def _select_expression(expressions, index):
         elif all(e.j == k and e.i == expr.i for k, e in enumerate(expressions)):
             return expr.reconstruct(expr.i, index)
 
+    if types == {IndexSum}:
+        extents = {tuple(i.extent for i in e.multiindex) for e in expressions}
+        if len(extents) == 1:
+            multiindex = tuple(Index(extent=extent) for extent in extents.pop())
+            summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
+                                multiindex)
+                        for e in expressions]
+            return IndexSum(_select_expression(summands, index), multiindex)
+
     if len(types) == 1:
         cls, = types
         if cls.__front__ or cls.__back__:
@@ -338,13 +347,6 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         to_, = list({delta.i, delta.j} - {from_})
 
         sum_indices.remove(from_)
-        if isinstance(to_, VariableIndex):
-            # The indirect target's free indices become quantified by the
-            # substitution.
-            for index in to_.expression.free_indices:
-                if index not in sum_indices:
-                    sum_indices.append(index)
-
         factors = [substitute(f, from_, to_) for f in factors]
 
         delta_queue = [(f, index)
@@ -418,11 +420,15 @@ def sum_factorise(sum_indices, factors, distribute=False):
                 expressions = []
                 for summand in summands:
                     extra, summand_factors = traverse_product(summand)
+                    indices = tuple(OrderedDict.fromkeys((*sum_indices, *extra)))
+                    if len(indices) > 6:
+                        break
                     expressions.append(sum_factorise(
-                        tuple(sum_indices) + tuple(extra),
+                        indices,
                         factors[:position] + summand_factors
                         + factors[position + 1:]))
-                return make_sum(expressions)
+                else:
+                    return make_sum(expressions)
 
     # Form groups by free indices
     groups = groupby(factors, key=lambda f: f.free_indices)
@@ -696,6 +702,9 @@ def contraction(expression, ignore=None):
     evaluation in mind.
     """
 
+    distribute = any(isinstance(node, FlattenedTensor)
+                     for node in traversal((expression,)))
+
     # Common memoizer to remove ComponentTensors
     index_replacer = MemoizerArg(filtered_replace_indices)
 
@@ -721,9 +730,9 @@ def contraction(expression, ignore=None):
             extra = tuple(i for i in sum_indices if i in ignore)
             to_factor = tuple(i for i in sum_indices if i not in ignore)
             return IndexSum(sum_factorise(to_factor, factors,
-                                          distribute=True), extra)
+                                          distribute=distribute), extra)
         else:
-            return sum_factorise(sum_indices, factors, distribute=True)
+            return sum_factorise(sum_indices, factors, distribute=distribute)
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,

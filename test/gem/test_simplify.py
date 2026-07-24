@@ -4,7 +4,12 @@ import numpy
 
 from gem.node import traversal
 from gem.interpreter import evaluate
-from gem.optimise import _distribute_sum, contraction
+from gem.optimise import (
+    _distribute_sum,
+    contraction,
+    eliminate_deltas,
+    sum_factorise,
+)
 from gem.refactorise import ATOMIC, COMPOUND, OTHER, collect_monomials
 from gem.unflatten import unflatten_returns
 
@@ -146,6 +151,35 @@ def test_sparse_matrix_direct_indices():
     assert len(indirect) == 1
 
 
+def test_delta_permutation_bijection():
+    i = gem.Index(extent=3)
+    j = gem.Index(extent=3)
+    entries = numpy.array([2, 0, 1], dtype=gem.uint_type)
+    pi = gem.VariableIndex(gem.Indexed(gem.Literal(entries, dtype=gem.uint_type), (i,)))
+    pj = gem.VariableIndex(gem.Indexed(
+        gem.Literal(entries.copy(), dtype=gem.uint_type), (j,)))
+
+    delta = gem.Delta(pi, pj)
+    assert isinstance(delta, gem.Delta)
+    assert (delta.i, delta.j) == (i, j)
+
+
+def test_delta_elimination_preserves_indirect_free_index():
+    i = gem.Index(extent=4)
+    k = gem.Index(extent=2)
+    entries = numpy.array([1, 3], dtype=gem.uint_type)
+    indirect = gem.VariableIndex(gem.Indexed(
+        gem.Literal(entries, dtype=gem.uint_type), (k,)))
+    values = gem.Literal([2.0, 3.0, 5.0, 7.0])
+    expression = gem.IndexSum(
+        gem.Delta(i, indirect) * gem.Indexed(values, (i,)), (i,))
+
+    result = eliminate_deltas(expression)
+    assert result.free_indices == (k,)
+    actual, = evaluate([result])
+    assert numpy.array_equal(actual.arr, values.array[entries])
+
+
 def test_unflatten_compatible_returns_together():
     extent = 3
     p = gem.Index(extent=extent)
@@ -197,6 +231,22 @@ def test_unflatten_factorises_local_sum():
     assert all(len(node.multiindex) == 1 for node in sums)
     assert not any(isinstance(node, gem.FlattenedTensor)
                    for node in traversal((result,)))
+
+
+def test_sum_factorise_bounded_distribution():
+    indices = tuple(gem.Index(extent=2) for _ in range(6))
+    extra = gem.Index(extent=2)
+
+    def unit(index):
+        return gem.Indexed(gem.Literal(numpy.ones(2)), (index,))
+
+    factor = gem.Sum(gem.IndexSum(unit(indices[0]) * unit(extra), (extra,)),
+                     unit(indices[1]))
+    expression = sum_factorise(
+        indices, [factor, *(unit(index) for index in indices[2:])],
+        distribute=True)
+    value, = evaluate([expression])
+    assert value.arr == 192
 
 
 def test_refactorise_sum_of_sparse_matvecs():
