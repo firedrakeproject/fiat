@@ -230,7 +230,8 @@ class Bernstein(FiniteElement):
         points = numpy.asarray(points)
         cell_points = entity_transform(points)
 
-        return self.poly_set.tabulate(cell_points, order)
+        return self.poly_set.get_expansion_set()._tabulate(
+            self.degree(), cell_points, order=order)
 
 
 def bernstein_db(points, ks, alpha=None):
