@@ -14,11 +14,10 @@ from FIAT.dual_set import DualSet
 from FIAT.expansions import ExpansionSet
 from FIAT.polynomial_set import PolynomialSet, mis
 from FIAT.pointwise_dual import compute_pointwise_dual
-from FIAT.reference_element import (SimplicialComplex, make_lattice,
-                                    multiindex_equal)
+from FIAT.reference_element import make_lattice, multiindex_equal
 
 
-def _bernstein_factors(n: int, eta: numpy.ndarray):
+def _bernstein_factors(n, eta):
     """Tabulate univariate Bernstein factors for a collapsed simplex axis.
 
     Parameters
@@ -53,7 +52,7 @@ def _bernstein_factors(n: int, eta: numpy.ndarray):
 class BernsteinExpansionSet(ExpansionSet):
     """Bernstein polynomial expansion set on a simplex."""
 
-    def __init__(self, ref_el: SimplicialComplex):
+    def __init__(self, ref_el):
         if not ref_el.is_simplex():
             raise ValueError("Bernstein expansion sets require a simplex")
         super().__init__(ref_el, scale=1.0)
@@ -177,7 +176,7 @@ class BernsteinDualSet(DualSet):
 class Bernstein(FiniteElement):
     """A finite element with Bernstein polynomials as basis functions."""
 
-    def __init__(self, ref_el: SimplicialComplex, degree):
+    def __init__(self, ref_el, degree):
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
         super().__init__(ref_el, dual, degree, k)

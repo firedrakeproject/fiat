@@ -24,20 +24,41 @@ def morton_index3(p, q=0, r=0):
 def jrc(a, b, n):
     """Jacobi recurrence coefficients"""
     an = (2*n+1+a+b)*(2*n+2+a+b) / (2*(n+1)*(n+1+a+b))
-    bn = (a+b)*(a-b)*(2*n+1+a+b) / (2*(n+1)*(n+1+a+b)*(2*n+a+b))
-    cn = (n+a)*(n+b)*(2*n+2+a+b) / ((n+1)*(n+1+a+b)*(2*n+a+b))
+    if n == 0:
+        bn = 0.5 * (a - b)
+        cn = 0.0
+    else:
+        bn = (a+b)*(a-b)*(2*n+1+a+b) / (2*(n+1)*(n+1+a+b)*(2*n+a+b))
+        cn = (n+a)*(n+b)*(2*n+2+a+b) / ((n+1)*(n+1+a+b)*(2*n+a+b))
     return an, bn, cn
 
 
 def integrated_jrc(a, b, n):
     """Integrated Jacobi recurrence coefficients"""
-    if n == 1:
+    if n == 0:
+        an = bn = -0.5
+        cn = 0.0
+    elif n == 1:
         an = (a + b + 2) / 2
         bn = (a - 3*b - 2) / 2
         cn = 0.0
     else:
         an, bn, cn = jrc(a-1, b+1, n-1)
     return an, bn, cn
+
+
+def dubiner_jacobi_weights(axis, m, variant):
+    """Return the Jacobi weights for a given Dubiner axis."""
+    if variant == "bubble":
+        alpha = 2 * m
+        beta = 0
+    else:
+        alpha = 2 * m + axis
+        beta = 0
+        if variant == "dual":
+            alpha += 1 + axis
+            beta = 1
+    return alpha, beta
 
 
 def pad_coordinates(ref_pts, embedded_dim):
@@ -49,23 +70,6 @@ def pad_jacobian(A, embedded_dim):
     """Pad coordinate mapping Jacobian by appending zero rows."""
     A = numpy.pad(A, [(0, embedded_dim - A.shape[0]), (0, 0)])
     return tuple(row[..., None] for row in A)
-
-
-def dubiner_jacobi_parameters(codim: int, m: int, variant: str | None) -> tuple:
-    """Return Jacobi and degree-one coefficients for one Dubiner axis."""
-    if variant == "bubble":
-        alpha = 2 * m
-        beta = 0
-        a = b = -0.5
-    else:
-        alpha = 2 * m + codim
-        beta = 0
-        if variant == "dual":
-            alpha += 1 + codim
-            beta = 1
-        a = 0.5 * (alpha + beta) + 1.0
-        b = 0.5 * (alpha - beta)
-    return alpha, beta, a, b
 
 
 def dubiner_norm2(d: int, m: int, i: int, variant: str | None) -> float:
@@ -167,13 +171,7 @@ def _product_derivative(factor: numpy.ndarray,
     return result
 
 
-def dubiner_recurrence(dim: int,
-                       n: int,
-                       order: int,
-                       ref_pts: numpy.ndarray,
-                       Jinv: numpy.ndarray,
-                       scale: float,
-                       variant: str | None = None) -> list[numpy.ndarray]:
+def dubiner_recurrence(dim, n, order, ref_pts, Jinv, scale, variant=None):
     """Tabulate a Dubiner expansion set using the recurrence from (Kirby 2010).
 
     Parameters
@@ -228,17 +226,17 @@ def dubiner_recurrence(dim: int,
     coefficients = integrated_jrc if variant == "bubble" else jrc
     X = pad_coordinates(ref_pts, pad_dim)
     idx = (lambda p: p, morton_index2, morton_index3)[dim-1]
-    for codim in range(dim):
-        # Extend the basis from codim to codim + 1
-        fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[codim:codim+3], *dX[codim:codim+3])
+    for axis in range(dim):
+        # Extend the basis from axis to axis + 1
+        fa, fb, fc, dfa, dfb, dfc = jacobi_factors(*X[axis:axis+3], *dX[axis:axis+3])
         ddfc = 2 * numpy.outer(dfb, dfb)
-        for sub_index in reference_element.lattice_iter(0, n, codim):
+        for sub_index in reference_element.lattice_iter(0, n, axis):
             # handle i = 0
             icur = idx(*sub_index, 0)
             inext = idx(*sub_index, 1)
 
-            alpha, beta, a, b = dubiner_jacobi_parameters(codim, sum(sub_index), variant)
-
+            alpha, beta = dubiner_jacobi_weights(axis, sum(sub_index), variant)
+            a, b, c = coefficients(alpha, beta, 0)
             fcur = a * fa - b * fb
             phi[inext] = phi[icur] * fcur
             if order:
@@ -270,7 +268,7 @@ def dubiner_recurrence(dim: int,
                     results[k][inext] += _product_derivative(fprev, dfprev, ddfprev, prev, k)
 
         # normalize
-        d = codim + 1
+        d = axis + 1
         for index in reference_element.lattice_iter(0, n+1, d):
             icur = idx(*index)
             scale = math.sqrt(dubiner_norm2(d, sum(index[:-1]), index[-1], variant))
@@ -279,13 +277,13 @@ def dubiner_recurrence(dim: int,
     return results
 
 
-def principal_functions(n: int, eta: numpy.ndarray, axis: int, order: int = 0,
-                        variant: str | None = None) -> dict:
+def principal_functions(n, eta, axis, order=0, variant=None):
     """Tabulate one axis of the Dubiner basis in collapsed coordinates.
 
     Returns value (``V``), derivative (``D``), affine derivative (``tD``),
     and one-power-lowered (``W``) tables indexed by ``(m, i, point)``.
     """
+    coefficients = integrated_jrc if variant == "bubble" else jrc
     eta = numpy.asarray(eta)
     w = 0.5 * (1.0 - eta)
     npts = eta.shape[0]
@@ -298,28 +296,20 @@ def principal_functions(n: int, eta: numpy.ndarray, axis: int, order: int = 0,
         count = n + 1 - m
         g = tables["V"][m, :count]
         dg = numpy.zeros_like(g) if order else None
-        alpha, beta, a, b = dubiner_jacobi_parameters(axis - 1, m, variant)
-        if variant != "bubble":
-            g[:] = jacobi.eval_jacobi_batch(
-                alpha, beta, count - 1, eta[:, None])
-            if order and count > 1:
-                degrees = numpy.arange(1, count)
-                dg[1:] = jacobi.eval_jacobi_batch(
-                    alpha + 1, beta + 1, count - 2, eta[:, None])
-                dg[1:] *= (0.5 * (alpha + beta + degrees + 1))[:, None]
-        else:
-            g[0] = 1.0
-            if count > 1:
-                g[1] = a * eta + b
+        alpha, beta = dubiner_jacobi_weights(axis-1, m, variant)
+        a, b, c = coefficients(alpha, beta, 0)
+        g[0] = 1.0
+        if count > 1:
+            g[1] = a * eta + b
+            if order:
+                dg[1] = a
+            for i in range(1, count - 1):
+                a, b, c = coefficients(alpha, beta, i)
+                factor = a * eta + b
+                g[i + 1] = factor * g[i] - c * g[i - 1]
                 if order:
-                    dg[1] = a
-                for i in range(1, count - 1):
-                    a, b, c = integrated_jrc(alpha, beta, i)
-                    factor = a * eta + b
-                    g[i + 1] = factor * g[i] - c * g[i - 1]
-                    if order:
-                        dg[i + 1] = (factor * dg[i] + a * g[i]
-                                     - c * dg[i - 1])
+                    dg[i + 1] = (factor * dg[i] + a * g[i]
+                                 - c * dg[i - 1])
 
         if n > 0:
             normalisation = numpy.fromiter(
@@ -340,7 +330,7 @@ def principal_functions(n: int, eta: numpy.ndarray, axis: int, order: int = 0,
     return tables
 
 
-def _duffy_derivative_factors(tables: tuple, direction: int) -> tuple:
+def _duffy_derivative_factors(tables, direction):
     """Factorize one physical derivative of the Duffy pullback.
 
     For the lower-triangular Duffy map, ``d/dxi_direction`` is a sum over
