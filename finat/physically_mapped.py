@@ -203,8 +203,8 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                         continue
                     owners[i] = (dim, entity)
                     try:
-                        ells[i] = PhysicallyMappedFunctional.from_fiat(
-                            nodes[i], mapping=mappings[i])
+                        ells[i] = self._functional_from_node(
+                            nodes[i], i, mappings[i])
                     except NotImplementedError:
                         if i < ndof:
                             raise
@@ -281,6 +281,22 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
                 row, den = res
                 B[i] = row / den
         return B
+
+    def _functional_from_node(self, node, index: int, mapping: str):
+        """Build the symbolic functional of one dof of the dual basis.
+
+        By default the point locations, derivative order and direction are
+        recovered numerically from the FIAT functional. Elements whose dofs
+        are known symbolically may override this to supply them exactly.
+
+        :arg node: The FIAT functional of the dof.
+        :arg index: Its index in the dual basis.
+        :arg mapping: The FIAT mapping string of the basis functions this
+            functional is dual to.
+        :returns: The corresponding
+            :class:`~finat.functional.PhysicallyMappedFunctional`.
+        """
+        return PhysicallyMappedFunctional.from_fiat(node, mapping=mapping)
 
     def _check_mapping(self, fiat_element: FiniteElement) -> None:
         """Verify that this class knows how to transform this element's pullback.

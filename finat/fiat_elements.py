@@ -4,6 +4,7 @@ import numpy as np
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
+from finat.functional import PhysicallyMappedFunctional, multiindices
 from finat.point_set import PointSet, PointSingleton
 from finat.zany import ScalarPhysicallyMappedElement
 
@@ -444,6 +445,7 @@ class NedelecSecondKind(VectorFiatElement):
 
 class FuseElement(FiatElement):
     def __init__(self, triple):
+        self.triple = triple
         super(FuseElement, self).__init__(triple.to_fiat())
 
 
@@ -455,6 +457,63 @@ class ScalarZanyFuseElement(ScalarPhysicallyMappedElement, FuseElement):
     generically from the dual basis by
     :meth:`~finat.physically_mapped.PhysicallyMappedElement.basis_transformation`.
     """
+
+    @cached_property
+    def _fuse_dofs(self):
+        """Map from dual basis index to the FUSE dof it was built from."""
+        return {self.triple.dof_id_to_fiat_id[dof.id]: dof
+                for dof in self.triple.generate()}
+
+    def _functional_from_node(self, node, index, mapping):
+        """Take the derivative direction from the FUSE trace that defines it.
+
+        FUSE states the direction of a derivative dof symbolically, so it can
+        be used as it stands instead of being recovered from the derivative
+        weights by the factorization in
+        :meth:`~finat.functional.PhysicallyMappedFunctional.from_fiat`.
+        """
+        direction = self._fuse_direction(node, index)
+        if direction is None:
+            return super()._functional_from_node(node, index, mapping)
+
+        sd = node.ref_el.get_spatial_dimension()
+        order = node.max_deriv_order
+        alphas = multiindices(sd, order)
+        lookup = {alpha: k for k, alpha in enumerate(alphas)}
+        points = tuple(node.deriv_dict)
+        weights = np.zeros((len(points), len(alphas)))
+        for q, pt in enumerate(points):
+            for w, alpha, comp in node.deriv_dict[pt]:
+                weights[q, lookup[tuple(alpha)]] += w
+
+        # the weights are the direction scaled point by point
+        scale = weights @ direction / (direction @ direction)
+        if not np.allclose(np.outer(scale, direction), weights):
+            return super()._functional_from_node(node, index, mapping)
+        return PhysicallyMappedFunctional(points, scale, order=order,
+                                          direction=direction, mapping=mapping)
+
+    def _fuse_direction(self, node, index):
+        """The exact derivative direction of a dof, or None if it has none."""
+        if not node.deriv_dict or node.get_point_dict():
+            return None
+        dof = self._fuse_dofs.get(index)
+        if dof is None or dof.target_space is None:
+            return None
+        terms = dof.target_space.tabulate_derivs(None, dof.cell_defined_on)
+        if not terms:
+            return None
+        sd = node.ref_el.get_spatial_dimension()
+        alphas = multiindices(sd, node.max_deriv_order)
+        lookup = {alpha: k for k, alpha in enumerate(alphas)}
+        direction = np.zeros(len(alphas))
+        for coeff, alpha in terms:
+            if tuple(alpha) not in lookup:
+                return None
+            direction[lookup[tuple(alpha)]] += coeff
+        if not direction.any():
+            return None
+        return direction
 
 
 def is_scalar_zany(fiat_element):
