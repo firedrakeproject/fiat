@@ -23,7 +23,7 @@ import pytest
 from FIAT.bernstein import Bernstein
 from FIAT.polynomial_set import mis
 from FIAT.quadrature_schemes import create_quadrature
-from FIAT.reference_element import lexicographical_iter, ufc_simplex
+from FIAT.reference_element import multiindex_equal, ufc_simplex
 
 
 D02 = numpy.array([
@@ -76,8 +76,8 @@ def test_bernstein_2nd_derivatives():
 
     actual = elem.tabulate(2, points)
     barycentric_indices = list(mis(3, degree))
-    ordering = [barycentric_indices.index((degree - sum(alpha), *reversed(alpha)))
-                for alpha in lexicographical_iter(2, degree)]
+    ordering = [barycentric_indices.index(alpha)
+                for alpha in multiindex_equal(3, degree)]
 
     assert numpy.allclose(D02[ordering], actual[(0, 2)])
     assert numpy.allclose(D11[ordering], actual[(1, 1)])

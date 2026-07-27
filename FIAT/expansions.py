@@ -543,8 +543,8 @@ class ExpansionSet(object):
         dim = self.ref_el.get_spatial_dimension()
         index = (lambda p: p, morton_index2, morton_index3)[dim - 1]
         return numpy.fromiter(
-            (index(*alpha)
-             for alpha in reference_element.lexicographical_iter(dim, n)),
+            (index(*alpha[::-1])
+             for alpha in reference_element.lattice_iter(0, n+1, dim)),
             dtype=int, count=math.comb(n + dim, dim))
 
     def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0, cell: int = 0) -> dict:

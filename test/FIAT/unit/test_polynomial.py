@@ -247,8 +247,8 @@ def test_bernstein_tabulate_duffy(make_cell, degree):
             point_shape = tuple(len(etas[axis]) for axis in axes)
             transpose = numpy.argsort(axes)
             for row, index in enumerate(
-                    reference_element.lexicographical_iter(dim, degree)):
-                vals = sum(coeff * duffy_term_value(factors, index)
+                    reference_element.lattice_iter(0, degree+1, dim)):
+                vals = sum(coeff * duffy_term_value(factors, index[::-1])
                            for coeff, factors in duffy[alpha])
                 vals = vals.reshape(point_shape).transpose(transpose).ravel()
                 assert numpy.allclose(vals, expected[alpha][row], rtol=1E-10, atol=1E-10)

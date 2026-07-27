@@ -14,11 +14,11 @@ from FIAT.dual_set import DualSet
 from FIAT.expansions import ExpansionSet
 from FIAT.polynomial_set import PolynomialSet, mis
 from FIAT.pointwise_dual import compute_pointwise_dual
-from FIAT.reference_element import (SimplicialComplex, lexicographical_iter,
-                                    make_lattice)
+from FIAT.reference_element import (SimplicialComplex, make_lattice,
+                                    multiindex_equal)
 
 
-def _bernstein_factors(n: int, eta: numpy.ndarray) -> tuple[numpy.ndarray, ...]:
+def _bernstein_factors(n: int, eta: numpy.ndarray):
     """Tabulate univariate Bernstein factors for a collapsed simplex axis.
 
     Parameters
@@ -30,7 +30,7 @@ def _bernstein_factors(n: int, eta: numpy.ndarray) -> tuple[numpy.ndarray, ...]:
 
     Returns
     -------
-    tuple
+    tuple[numpy.ndarray, ...]
         Value, degree-lowered, and degree-and-index-lowered tables.
 
     """
@@ -53,18 +53,17 @@ def _bernstein_factors(n: int, eta: numpy.ndarray) -> tuple[numpy.ndarray, ...]:
 class BernsteinExpansionSet(ExpansionSet):
     """Bernstein polynomial expansion set on a simplex."""
 
-    def __init__(self, ref_el: SimplicialComplex) -> None:
+    def __init__(self, ref_el: SimplicialComplex):
         if not ref_el.is_simplex():
             raise ValueError("Bernstein expansion sets require a simplex")
         super().__init__(ref_el, scale=1.0)
 
-    def get_duffy_permutation(self, n: int) -> numpy.ndarray:
+    def get_duffy_permutation(self, n):
         """Map Duffy lattice positions to Bernstein expansion members."""
         dim = self.ref_el.get_spatial_dimension()
         return numpy.arange(math.comb(n + dim, dim))
 
-    def _tabulate_on_cell(self, n: int, pts: numpy.ndarray, order: int = 0,
-                          cell: int = 0, direction: numpy.ndarray | None = None) -> dict:
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
         """Tabulate the expansion set and its derivatives on one cell."""
         if direction is not None:
             raise NotImplementedError("directional Bernstein tabulation is not implemented")
@@ -82,10 +81,10 @@ class BernsteinExpansionSet(ExpansionSet):
 
         raw_result = {
             (derivative, i): vec
-            for i, lattice_index in enumerate(lexicographical_iter(dim, n))
+            for i, alpha in enumerate(multiindex_equal(dim+1, n))
             for o in range(order + 1)
             for derivative, vec in bernstein_Dx(
-                B, (n - sum(lattice_index), *reversed(lattice_index)), o, R2B
+                B, alpha, o, R2B
             ).items()
         }
         num_members = math.comb(n + dim, dim)
@@ -99,8 +98,7 @@ class BernsteinExpansionSet(ExpansionSet):
             result[alpha][i] = vec
         return result
 
-    def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0,
-                       cell: int = 0) -> dict:
+    def tabulate_duffy(self, n, eta_pts, order=0, cell=0):
         """Tabulate Bernstein polynomials in separable collapsed form.
 
         The raw lattice multi-index ``j`` represents the barycentric
@@ -161,8 +159,7 @@ class BernsteinDualSet(DualSet):
 
         # Generate triangular barycentric indices
         dim = ref_el.get_spatial_dimension()
-        kss = [(degree - sum(alpha), *reversed(alpha))
-               for alpha in lexicographical_iter(dim, degree)]
+        kss = multiindex_equal(dim+1, degree)
 
         # Fill data structures
         nodes = []
@@ -180,7 +177,7 @@ class BernsteinDualSet(DualSet):
 class Bernstein(FiniteElement):
     """A finite element with Bernstein polynomials as basis functions."""
 
-    def __init__(self, ref_el: SimplicialComplex, degree: int) -> None:
+    def __init__(self, ref_el: SimplicialComplex, degree):
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
         super().__init__(ref_el, dual, degree, k)
@@ -199,7 +196,7 @@ class Bernstein(FiniteElement):
         """The degree of the polynomial space."""
         return self.get_order()
 
-    def get_nodal_basis(self) -> PolynomialSet:
+    def get_nodal_basis(self):
         """Return the Bernstein basis encoded as a polynomial set."""
         return self.poly_set
 
