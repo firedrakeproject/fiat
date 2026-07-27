@@ -5,6 +5,7 @@ from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
 from finat.point_set import PointSet, PointSingleton
+from finat.zany import ScalarPhysicallyMappedElement
 
 
 class FiatElement(FiniteElementBase):
@@ -444,3 +445,27 @@ class NedelecSecondKind(VectorFiatElement):
 class FuseElement(FiatElement):
     def __init__(self, triple):
         super(FuseElement, self).__init__(triple.to_fiat())
+
+
+class ScalarZanyFuseElement(ScalarPhysicallyMappedElement, FuseElement):
+    """A FUSE element whose dofs involve derivatives.
+
+    Such an element is not affinely equivalent, so its reference basis must
+    be transformed on each physical cell. The transformation is derived
+    generically from the dual basis by
+    :meth:`~finat.physically_mapped.PhysicallyMappedElement.basis_transformation`.
+    """
+
+
+def is_scalar_zany(fiat_element):
+    """Whether a FUSE-generated FIAT element needs an affine zany transformation.
+
+    True for affinely pulled back elements carrying at least one derivative
+    dof. Elements whose dofs are all point values or moments (Lagrange,
+    Raviart-Thomas, Nedelec) are affinely equivalent and need no transformation.
+
+    :arg fiat_element: The FIAT element defined on the reference cell.
+    """
+    if set(fiat_element.mapping()) != {"affine"}:
+        return False
+    return any(node.max_deriv_order > 0 for node in fiat_element.dual_basis())
