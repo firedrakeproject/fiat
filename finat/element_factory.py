@@ -24,6 +24,7 @@ from functools import singledispatch, cache
 
 import finat
 import finat.ufl
+import finat.zany
 import ufl
 
 from FIAT import ufc_cell
@@ -109,15 +110,24 @@ FInAT-equivalent constructors.  If the value is ``None``, the UFL
 element is supported, but must be handled specially because it doesn't
 have a direct FInAT equivalent."""
 
+hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
+quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
+
 
 @cache
 def as_fiat_cell(cell):
     """Convert a ufl cell to a FIAT cell.
 
     :arg cell: the :class:`ufl.Cell` to convert."""
+    if isinstance(cell, str):
+        cell = finat.ufl.as_cell(cell)
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
-    return ufc_cell(cell)
+
+    if hasattr(cell, "to_fiat"):
+        return cell.to_fiat()
+    else:
+        return ufc_cell(cell)
 
 
 @singledispatch
@@ -325,12 +335,25 @@ def convert_restrictedelement(element, **kwargs):
     return finat.RestrictedElement(finat_elem, element.restriction_domain()), deps
 
 
-hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
-quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
+@convert.register(finat.ufl.FuseElement)
+def convert_fuse_element(element, **kwargs):
+    if element.triple.flat:
+        new_elem = element.triple.unflatten()
+        if hasattr(new_elem, "base_element"):
+            # If element is wrapped, exclude the wrapping from this creation
+            # it is handled elsewhere in the converter.
+            new_elem = new_elem.base_element
+        finat_elem, deps = _create_element(new_elem.to_ufl(), **kwargs)
+        return finat.FlattenedDimensions(finat_elem), deps
+    if finat.zany.is_scalar_zany(element.triple.to_fiat()):
+        return finat.zany.ScalarZanyFuseElement(element.triple), set()
+    return finat.fiat_elements.FuseElement(element.triple), set()
+
+
 _cache = weakref.WeakKeyDictionary()
 
 
-def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None):
+def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None, use_fuse=False):
     """Create a FInAT element (suitable for tabulating with) given a UFL element.
 
     :arg ufl_element: The UFL element to create a FInAT element from.
@@ -341,7 +364,8 @@ def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=
     finat_element, deps = _create_element(ufl_element,
                                           shape_innermost=shape_innermost,
                                           shift_axes=shift_axes,
-                                          restriction=restriction)
+                                          restriction=restriction,
+                                          use_fuse=use_fuse)
     return finat_element
 
 
