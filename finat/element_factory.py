@@ -24,6 +24,7 @@ from functools import singledispatch, cache
 
 import finat
 import finat.ufl
+import finat.zany
 import ufl
 
 from FIAT import ufc_cell
@@ -344,8 +345,8 @@ def convert_fuse_element(element, **kwargs):
             new_elem = new_elem.base_element
         finat_elem, deps = _create_element(new_elem.to_ufl(), **kwargs)
         return finat.FlattenedDimensions(finat_elem), deps
-    if finat.fiat_elements.is_scalar_zany(element.triple.to_fiat()):
-        return finat.fiat_elements.ScalarZanyFuseElement(element.triple), set()
+    if finat.zany.is_scalar_zany(element.triple.to_fiat()):
+        return finat.zany.ScalarZanyFuseElement(element.triple), set()
     return finat.fiat_elements.FuseElement(element.triple), set()
 
 
