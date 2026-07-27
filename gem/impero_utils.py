@@ -11,7 +11,6 @@ from itertools import chain, groupby
 
 from gem.node import traversal, collect_refcount
 from gem import gem, impero as imp, optimise, scheduling
-from gem.unflatten import replace_flattened
 
 
 # ImperoC is named tuple for C code generation.
@@ -31,7 +30,7 @@ class NoopError(Exception):
 
 def preprocess_gem(expressions, replace_delta=True, remove_componenttensors=True):
     """Lower GEM nodes that cannot be translated to C directly."""
-    expressions = replace_flattened(expressions)
+    expressions = optimise.replace_flattened(expressions)
     if remove_componenttensors:
         expressions = optimise.remove_componenttensors(expressions)
     if replace_delta:

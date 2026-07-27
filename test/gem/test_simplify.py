@@ -9,9 +9,9 @@ from gem.optimise import (
     contraction,
     eliminate_deltas,
     sum_factorise,
+    unflatten_returns,
 )
 from gem.refactorise import ATOMIC, COMPOUND, OTHER, collect_monomials
-from gem.unflatten import unflatten_returns
 
 
 @pytest.fixture
