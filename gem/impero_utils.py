@@ -208,11 +208,18 @@ def place_declarations(tree, temporaries, get_indices):
     numbering = {t: n for n, t in enumerate(temporaries)}
     assert len(numbering) == len(temporaries)
 
-    # Collect the total number of temporary references
+    # Collect the total number of temporary references.  Impero is a
+    # tree, so structurally equal subtrees still represent distinct
+    # executions and every occurrence must be visited.  The generic GEM
+    # traversal is DAG-oriented and deliberately skips equal nodes.
     total_refcount = collections.Counter()
-    for node in traversal((tree,)):
+    pending = [tree]
+    while pending:
+        node = pending.pop()
         if isinstance(node, imp.Terminal):
             total_refcount.update(temp_refcount(numbering, node))
+        else:
+            pending.extend(reversed(node.children))
     assert set(total_refcount) == set(temporaries)
 
     # Result

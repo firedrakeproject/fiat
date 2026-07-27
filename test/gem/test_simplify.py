@@ -2,6 +2,8 @@ import pytest
 import gem
 import numpy
 
+from gem import impero
+from gem.impero_utils import collect_temporaries, place_declarations
 from gem.node import traversal
 from gem.interpreter import evaluate
 from gem.optimise import (
@@ -121,6 +123,23 @@ def test_constant_variable_index():
     assert index == 1
 
 
+def test_place_declarations_counts_equal_impero_subtrees():
+    """Equal Impero nodes are distinct occurrences in the loop tree."""
+    expression = gem.Variable("a", ()) * gem.Variable("b", ())
+    tree = impero.Block([
+        impero.Evaluate(expression),
+        impero.Evaluate(expression),
+    ])
+    temporaries = collect_temporaries(tree)
+
+    declare, indices = place_declarations(
+        tree, temporaries, lambda node: node.free_indices)
+
+    assert declare[tree] == []
+    assert indices[expression] == ()
+    assert all(declare[statement] for statement in tree.children)
+
+
 @pytest.mark.parametrize("rows,cols,data", [
     ([0, 1, 2], [0, 1, 2], [2.0, 2.0, 2.0]),
     ([0, 1, 2], [0, 1, 2], [2.0, 2.0 + 1.0e-10, 2.0]),
@@ -231,6 +250,91 @@ def test_unflatten_factorises_local_sum():
     assert all(len(node.multiindex) == 1 for node in sums)
     assert not any(isinstance(node, gem.FlattenedTensor)
                    for node in traversal((result,)))
+
+
+def test_unflatten_factorises_bilinear_arguments_together():
+    """Two argument lattices are exposed before their local sums expand."""
+    extent = 3
+    p = gem.JaggedIndex(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    r = gem.JaggedIndex(extent=extent)
+    s = gem.JaggedIndex(extent=extent, parents=(r,))
+    ip, iq = gem.indices(2)
+
+    variables = tuple(
+        gem.Variable(name, shape)
+        for name, shape in [
+            ("A", (extent, 2)),
+            ("B", (extent, extent, 2)),
+            ("C", (extent, 2)),
+            ("D", (extent, extent, 2)),
+            ("E", (extent, 2)),
+            ("F", (extent, extent, 2)),
+            ("G", (extent, 2)),
+            ("H", (extent, extent, 2)),
+        ])
+    A, B, C, D, E, F, G, H = variables
+    left = gem.FlattenedTensor(gem.Sum(
+        gem.Product(gem.Indexed(A, (p, ip)),
+                    gem.Indexed(B, (p, q, iq))),
+        gem.Product(gem.Indexed(C, (p, ip)),
+                    gem.Indexed(D, (p, q, iq))),
+    ), (p, q))
+    right = gem.FlattenedTensor(gem.Sum(
+        gem.Product(gem.Indexed(E, (r, ip)),
+                    gem.Indexed(F, (r, s, iq))),
+        gem.Product(gem.Indexed(G, (r, ip)),
+                    gem.Indexed(H, (r, s, iq))),
+    ), (r, s))
+
+    i, j = gem.indices(2)
+    output = gem.Variable("output", (6, 6))
+    expression = gem.IndexSum(
+        gem.Product(gem.Indexed(left, (i,)),
+                    gem.Indexed(right, (j,))),
+        (ip, iq))
+    pairs = unflatten_returns([
+        (gem.Indexed(output, (i, j)), expression)
+    ])
+
+    assert len(pairs) == 1
+    variable, optimized = pairs[0]
+    assert len(variable.free_indices) == 4
+    assert all(isinstance(index, gem.JaggedIndex)
+               for index in variable.free_indices)
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((optimized,)))
+    assert all(len(node.multiindex) == 1
+               for node in traversal((optimized,))
+               if isinstance(node, gem.IndexSum))
+
+    rng = numpy.random.default_rng(2)
+    bindings = {
+        variable_: rng.random(variable_.shape)
+        for variable_ in variables
+    }
+    expected, = evaluate([expression], bindings)
+    actual, = evaluate([optimized], bindings)
+    points = left.lattice_points()
+    row_map, column_map = evaluate([
+        index.expression for index in variable.multiindex
+    ])
+    row = row_map.arr[points[:, 0], points[:, 1]]
+    column = column_map.arr[points[:, 0], points[:, 1]]
+    row_indices = {
+        index: points[:, position, None]
+        for position, index in enumerate(row_map.fids)
+    }
+    column_indices = {
+        index: points[None, :, position]
+        for position, index in enumerate(column_map.fids)
+    }
+    indices = tuple((row_indices | column_indices)[index]
+                    for index in actual.fids)
+    values = actual.arr[indices]
+    dense = numpy.empty((6, 6))
+    dense[row[:, None], column[None, :]] = values
+    assert numpy.allclose(dense, expected.broadcast((i, j)))
 
 
 def test_sum_factorise_bounded_distribution():

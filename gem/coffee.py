@@ -4,18 +4,19 @@ algorithm operating on a GEM representation.
 This file is NOT for code generation as a COFFEE AST.
 """
 
+from collections import OrderedDict, defaultdict
 from itertools import chain, repeat
 import logging
 
 import numpy
 
-from gem.gem import IndexSum, one
+from gem.gem import IndexSum, Node, one
 from gem.optimise import make_sum, make_product
-from gem.refactorise import Monomial
+from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
 
 
-__all__ = ['optimise_monomial_sum']
+__all__ = ['optimise_monomial_sum', 'sum_factorise_monomial_sum']
 
 
 def monomial_sum_to_expression(monomial_sum):
@@ -211,6 +212,64 @@ def optimise_monomial_sum(monomial_sum, linear_indices):
     for _, monomials in groups:
         new_monomials.extend(optimise_monomials(monomials, linear_indices))
     return monomial_sum_to_expression(new_monomials)
+
+
+def sum_factorise_monomial_sum(
+        monomial_sum: MonomialSum, sum_indices: tuple,
+        linear_indices: tuple) -> Node:
+    """Apply sum factorisation and COFFEE optimisation to monomials.
+
+    The indices in ``sum_indices`` are contracted one at a time.  At each
+    stage, monomials are grouped by the factors that do not involve the
+    remaining contraction indices.  The remaining part is optimized
+    recursively, making each contraction as local as its tensor-product
+    structure permits.  Once every contraction index has been placed,
+    COFFEE extracts common argument factors.
+
+    Parameters
+    ----------
+    monomial_sum : MonomialSum
+        Sum-of-products representation to optimize.
+    sum_indices : tuple of Index
+        Contraction indices, from outermost to innermost factorization stage.
+    linear_indices : tuple of Index
+        Free indices identifying argument tabulations.
+
+    Returns
+    -------
+    Node
+        Sum-factorized GEM expression.
+
+    """
+    if not sum_indices:
+        return optimise_monomial_sum(monomial_sum, linear_indices)
+
+    grouped_monomials = defaultdict(MonomialSum)
+    group_order = OrderedDict()
+    remaining_indices = frozenset(sum_indices)
+    for monomial in monomial_sum:
+        tail_indices = tuple(index for index in monomial.sum_indices
+                             if index in remaining_indices)
+        tail_index_set = frozenset(tail_indices)
+        tail_atomics = tuple(
+            atomic for atomic in monomial.atomics
+            if tail_index_set.intersection(atomic.free_indices))
+        head_indices = tuple(index for index in monomial.sum_indices
+                             if index not in remaining_indices)
+        head_atomics = tuple(atomic for atomic in monomial.atomics
+                             if atomic not in tail_atomics)
+        key = (head_indices, head_atomics)
+        group_order.setdefault(key)
+        grouped_monomials[key].add(
+            tail_indices, tail_atomics, monomial.rest)
+
+    outer_sum = MonomialSum()
+    for head_indices, head_atomics in group_order:
+        inner_sum = grouped_monomials[(head_indices, head_atomics)]
+        inner_expression = sum_factorise_monomial_sum(
+            inner_sum, sum_indices[1:], linear_indices)
+        outer_sum.add(head_indices, head_atomics, inner_expression)
+    return optimise_monomial_sum(outer_sum, linear_indices)
 
 
 def optimise_monomials(monomials, linear_indices):

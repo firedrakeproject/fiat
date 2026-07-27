@@ -2,6 +2,7 @@
 expressions."""
 
 from collections import OrderedDict, defaultdict
+from collections.abc import Iterable
 from functools import singledispatch, partial
 from itertools import combinations, permutations, zip_longest
 from numbers import Integral
@@ -840,7 +841,8 @@ def aggressive_unroll(expression):
     return expression
 
 
-def _clone_multiindex(multiindex):
+def _clone_multiindex(multiindex: Iterable[Index]) -> tuple[Index, ...]:
+    """Clone an index tuple while preserving its internal jagged parents."""
     clones = {}
     for index in multiindex:
         if isinstance(index, JaggedIndex):
@@ -851,14 +853,16 @@ def _clone_multiindex(multiindex):
     return tuple(clones[index] for index in multiindex)
 
 
-def _replace_indices(node, self, subst):
+def _replace_gathers(node: Node, self, subst: tuple) -> Node:
+    """Replace selected flat gathers, then apply ordinary index substitution."""
     try:
         return self.replacements[node]
     except KeyError:
         return filtered_replace_indices(node, self, subst)
 
 
-def _layout(gather):
+def _flattened_layout(gather: Indexed) -> tuple:
+    """Return a structural key for a flattened tensor's iteration lattice."""
     tensor, = gather.children
     positions = {index: position
                  for position, index in enumerate(tensor.multiindex)}
@@ -868,7 +872,15 @@ def _layout(gather):
                  for index in tensor.multiindex)
 
 
-def _candidate(nodes, indices):
+def _find_unflattenable_index(
+        nodes: Iterable[Node],
+        indices: Iterable[Index]) -> tuple | None:
+    """Find compatible flat gathers at one unconstrained index.
+
+    An index occurring in a :class:`Delta` is not a candidate.  Cancelling
+    that delta is cheaper than replacing the flat index with a full lattice
+    loop and an indirect comparison.
+    """
     indices = tuple(indices)
     index_set = frozenset(indices)
     constrained = set()
@@ -884,20 +896,28 @@ def _candidate(nodes, indices):
 
     for index in indices:
         candidates = tuple(gathers[index])
-        layouts = {_layout(gather) for gather in candidates}
+        layouts = {_flattened_layout(gather) for gather in candidates}
         if candidates and len(layouts) == 1 and index not in constrained:
             layout, = layouts
             return index, layout, candidates
     return None
 
 
-def _sites(gathers):
+def _prepare_unflattening(
+        gathers: tuple[Indexed, ...]) -> tuple[MemoizerArg, tuple, VariableIndex]:
+    """Prepare one joint rewrite of compatible flat gathers.
+
+    Each flattened tensor is inlined on the same fresh lattice multiindex.
+    ``flat_index`` maps that lattice point back to the original flat ordering
+    wherever the old index is still needed, notably in the return variable.
+    """
     gather = gathers[0]
     tensor, = gather.children
-    assert all(_layout(other) == _layout(gather) for other in gathers)
+    assert all(_flattened_layout(other) == _flattened_layout(gather)
+               for other in gathers)
     multiindex = _clone_multiindex(tensor.multiindex)
     replacer = MemoizerArg(filtered_replace_indices)
-    mapper = MemoizerArg(_replace_indices)
+    mapper = MemoizerArg(_replace_gathers)
     mapper.replacements = {}
     for other in gathers:
         tensor, = other.children
@@ -908,12 +928,12 @@ def _sites(gathers):
     points = gather.children[0].lattice_points()
     ordering = numpy.zeros(shape, dtype=uint_type)
     ordering[tuple(points.T)] = numpy.arange(len(points))
-    flat = VariableIndex(Indexed(Literal(ordering, dtype=uint_type),
-                                 multiindex))
-    return mapper, multiindex, flat
+    flat_index = VariableIndex(Indexed(
+        Literal(ordering, dtype=uint_type), multiindex))
+    return mapper, multiindex, flat_index
 
 
-def _separable_sum(node, indices):
+def _separable_sum(node: Node, indices: frozenset[Index]) -> bool:
     """Whether distributing a sum exposes smaller index dependencies."""
     if not isinstance(node, Sum):
         return False
@@ -924,17 +944,20 @@ def _separable_sum(node, indices):
         for summand in traverse_sum(node))
 
 
-def _terms(summand, index):
+def _unflatten_contracted_terms(
+        summand: Node, index: Index) -> tuple[list, list[Node]]:
+    """Unflatten additive terms containing a gather at a contracted index."""
     rewritten = []
     leftover = []
     for term in traverse_sum(summand):
-        candidate = _candidate(traversal((term,)), (index,))
+        candidate = _find_unflattenable_index(
+            traversal((term,)), (index,))
         if candidate is None:
             leftover.append(term)
             continue
         _, _, gathers = candidate
-        mapper, multiindex, flat = _sites(gathers)
-        term = mapper(term, ((index, flat),))
+        mapper, multiindex, flat_index = _prepare_unflattening(gathers)
+        term = mapper(term, ((index, flat_index),))
         own = frozenset(multiindex)
         predicate = lambda node: _separable_sum(node, own)
         rewritten.extend(
@@ -943,13 +966,14 @@ def _terms(summand, index):
     return rewritten, leftover
 
 
-def _unflatten(node, self):
+def _unflatten_contractions(node: Node, self) -> Node:
+    """Memoizer callback for flat indices bound by an :class:`IndexSum`."""
     node = reuse_if_untouched(node, self)
     if not isinstance(node, IndexSum):
         return node
     summand, = node.children
     for index in node.multiindex:
-        rewritten, leftover = _terms(summand, index)
+        rewritten, leftover = _unflatten_contracted_terms(summand, index)
         if not rewritten:
             continue
         rest = tuple(other for other in node.multiindex if other != index)
@@ -969,16 +993,181 @@ def _unflatten(node, self):
     return node
 
 
-def unflatten(expression):
-    """Replace flat contractions by loops over their jagged lattices."""
+def unflatten(expression: Node) -> Node:
+    """Replace flat contractions by loops over their jagged lattices.
+
+    A contraction over the flat axis of a :class:`FlattenedTensor` hides its
+    tensor-product factors.  This rewrite substitutes the tensor's own
+    (possibly jagged) multiindex for that flat axis, enabling the ordinary
+    contraction optimizer to recover sum factorisation.
+    """
     if not any(isinstance(node, FlattenedTensor)
                for node in traversal((expression,))):
         return expression
-    return Memoizer(_unflatten)(expression)
+    return Memoizer(_unflatten_contractions)(expression)
 
 
-def unflatten_returns(pairs):
-    """Unflatten free argument indices in assignment pairs."""
+def _has_flat_gather(nodes: Iterable[Node],
+                     indices: Iterable[Index]) -> bool:
+    """Whether ``nodes`` gather a flattened tensor at one of ``indices``."""
+    indices = frozenset(indices)
+    return any(isinstance(node, Indexed)
+               and len(node.multiindex) == 1
+               and node.multiindex[0] in indices
+               and isinstance(node.children[0], FlattenedTensor)
+               for node in nodes)
+
+
+def _unflatten_free_indices(
+        variable: Node, expression: Node, *,
+        split_separable_sums: bool) -> tuple[list[tuple[Node, Node]], bool]:
+    """Replace flattened gathers at free indices of one assignment.
+
+    Compatible gathers are rewritten together.  Distribution is restricted
+    to deltas until a lattice has been exposed; the optional legacy path then
+    splits separable sums immediately.
+    """
+    pending = [(variable, expression)]
+    outputs = []
+    changed = False
+    while pending:
+        current_variable, current_expression = pending.pop()
+        nodes = tuple(traversal((current_expression,)))
+        candidate = _find_unflattenable_index(
+            nodes, current_variable.free_indices)
+        if candidate is not None:
+            index, layout, gathers = candidate
+            groups = OrderedDict([
+                ((index, layout), ([current_expression], list(gathers)))])
+        elif not _has_flat_gather(nodes, current_variable.free_indices):
+            outputs.append((current_variable, current_expression))
+            continue
+        else:
+            predicate = (lambda node: isinstance(node, Delta)) \
+                if any(isinstance(node, Delta) for node in nodes) else None
+            groups = OrderedDict()
+            for term in _distribute_sum(
+                    current_expression, predicate=predicate):
+                candidate = _find_unflattenable_index(
+                    traversal((term,)), current_variable.free_indices)
+                key = candidate[:2] if candidate is not None else None
+                terms, gathers = groups.setdefault(key, ([], []))
+                terms.append(term)
+                if candidate is not None:
+                    gathers.extend(candidate[2])
+
+        for key, (terms, gathers) in groups.items():
+            term = make_sum(terms)
+            if key is None:
+                outputs.append((current_variable, term))
+                continue
+
+            changed = True
+            index, _ = key
+            gathers = tuple(OrderedDict.fromkeys(gathers))
+            mapper, multiindex, flat_index = _prepare_unflattening(gathers)
+            substitution = ((index, flat_index),)
+            new_variable = MemoizerArg(filtered_replace_indices)(
+                current_variable, substitution)
+            new_expression = mapper(term, substitution)
+            if split_separable_sums:
+                lattice_indices = frozenset(multiindex)
+                predicate = lambda node: _separable_sum(
+                    node, lattice_indices)
+                pending.extend(
+                    (new_variable, piece)
+                    for piece in _distribute_sum(
+                        new_expression, predicate=predicate))
+            else:
+                pending.append((new_variable, new_expression))
+    return outputs, changed
+
+
+def _refactor_unflattened_outputs(
+        outputs: list[tuple[Node, Node]]) -> list[tuple[Node, Node]] | None:
+    r"""Recover sum factorisation after exposing every argument lattice.
+
+    Consider a bilinear form whose argument tabulations are transformed by
+    sparse matrices,
+
+    .. math::
+
+        A_{ij} = \sum_q (S B(q))_i\,G(q)\,(T C(q))_j.
+
+    Sparse-delta cancellation moves rows of ``S`` and ``T`` into the return
+    scatter.  Both flat argument indices must then be replaced by their
+    jagged lattice multiindices *before* expanding derivative sums.  Expanding
+    after only one replacement duplicates the second lattice once per
+    summand, producing many equivalent loop nests.
+
+    The refactorisation is valid when the non-tabulation part of every
+    monomial is independent of the argument indices.  This condition says
+    exactly that the sparse transforms have been absorbed by the scatter.
+    Dense or otherwise residual transforms use the conservative legacy path.
+    """
+    # Local imports avoid a module cycle: refactorise and coffee both use
+    # primitive transformations defined in this module.
+    from gem.coffee import sum_factorise_monomial_sum
+    from gem.refactorise import (
+        ATOMIC, COMPOUND, OTHER, FactorisationError, collect_monomials,
+    )
+
+    candidates = []
+    has_nontrivial_sum = False
+    for variable, expression in outputs:
+        argument_indices = frozenset(variable.free_indices)
+        contraction_indices = frozenset(
+            index
+            for node in traversal((expression,))
+            if isinstance(node, IndexSum)
+            for index in node.multiindex)
+
+        def classify(node):
+            involved = argument_indices.intersection(node.free_indices)
+            if not involved:
+                return OTHER
+            if isinstance(node, Indexed):
+                return ATOMIC if contraction_indices.intersection(
+                    node.free_indices) else OTHER
+            return COMPOUND
+
+        try:
+            monomial_sum, = collect_monomials([expression], classify)
+        except FactorisationError:
+            return None
+
+        monomials = tuple(monomial_sum)
+        if any(argument_indices.intersection(monomial.rest.free_indices)
+               for monomial in monomials):
+            return None
+        has_nontrivial_sum |= len(monomials) > 1
+        sum_indices = tuple(OrderedDict.fromkeys(
+            index
+            for monomial in monomials
+            for index in monomial.sum_indices))
+        candidates.append(
+            (variable, monomial_sum, sum_indices))
+
+    if not has_nontrivial_sum:
+        return None
+    return [
+        (variable, sum_factorise_monomial_sum(
+            monomial_sum, sum_indices, variable.index_ordering()))
+        for variable, monomial_sum, sum_indices in candidates
+    ]
+
+
+def unflatten_returns(
+        pairs: Iterable[tuple[Node, Node]]) -> list[tuple[Node, Node]]:
+    """Unflatten free argument indices in assignment pairs.
+
+    Every compatible argument lattice is exposed jointly.  Bilinear
+    expressions are then refactorised as monomial sums so that sparse
+    argument transforms remain in the output scatter while quadrature
+    contractions recover their one-dimensional factors.  Expressions with
+    residual argument-dependent transforms retain the established local
+    distribution strategy.
+    """
     pairs = list(pairs)
     if not any(isinstance(node, FlattenedTensor)
                for _, expression in pairs
@@ -987,58 +1176,22 @@ def unflatten_returns(pairs):
 
     result = []
     for variable, expression in pairs:
-        pending = [(variable, eliminate_deltas(expression))]
-        outputs = []
-        changed = False
-        while pending:
-            var, expr = pending.pop()
-            nodes = tuple(traversal((expr,)))
-            candidate = _candidate(nodes, var.free_indices)
-            if candidate is not None:
-                index, layout, gathers = candidate
-                groups = OrderedDict([
-                    ((index, layout), ([expr], list(gathers)))])
-            elif not any(isinstance(node, Indexed)
-                         and len(node.multiindex) == 1
-                         and node.multiindex[0] in var.free_indices
-                         and isinstance(node.children[0], FlattenedTensor)
-                         for node in nodes):
-                outputs.append((var, expr))
-                continue
-            else:
-                predicate = (lambda node: isinstance(node, Delta)) \
-                    if any(isinstance(node, Delta) for node in nodes) else None
-                groups = OrderedDict()
-                for term in _distribute_sum(expr, predicate=predicate):
-                    candidate = _candidate(traversal((term,)),
-                                           var.free_indices)
-                    key = candidate[:2] if candidate is not None else None
-                    terms, gathers = groups.setdefault(key, ([], []))
-                    terms.append(term)
-                    if candidate is not None:
-                        gathers.extend(candidate[2])
+        expression = eliminate_deltas(expression)
+        joint_outputs, changed = _unflatten_free_indices(
+            variable, expression, split_separable_sums=False)
+        refactored = _refactor_unflattened_outputs(
+            joint_outputs) if changed else None
+        if refactored is not None:
+            result.extend(refactored)
+            continue
 
-            for key, (terms, gathers) in groups.items():
-                term = make_sum(terms)
-                if key is None:
-                    outputs.append((var, term))
-                    continue
-                changed = True
-                index, _ = key
-                gathers = tuple(OrderedDict.fromkeys(gathers))
-                mapper, multiindex, flat = _sites(gathers)
-                subst = ((index, flat),)
-                new_var = MemoizerArg(filtered_replace_indices)(var, subst)
-                new_term = mapper(term, subst)
-                own = frozenset(multiindex)
-                predicate = lambda node: _separable_sum(node, own)
-                pending.extend((new_var, piece)
-                               for piece in _distribute_sum(
-                                   new_term, predicate=predicate))
+        outputs, changed = _unflatten_free_indices(
+            variable, expression, split_separable_sums=True)
         if changed or any(isinstance(node, Delta)
-                          for _, expr in outputs
-                          for node in traversal((expr,))):
-            outputs = [(var, contraction(expr)) for var, expr in outputs]
+                          for _, output in outputs
+                          for node in traversal((output,))):
+            outputs = [(output_variable, contraction(output))
+                       for output_variable, output in outputs]
         result.extend(outputs)
     return result
 
