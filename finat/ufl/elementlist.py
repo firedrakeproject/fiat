@@ -419,7 +419,7 @@ def canonical_element_description(family, cell, order, form_degree):
     # Check that the element family exists
     if family not in ufl_elements:
         if repr(family).startswith("FuseTriple"):
-            raise ValueError(f"Recieved unconverted FUSE triple - did you forget to call to_ufl()?")
+            raise ValueError("Recieved unconverted FUSE triple - did you forget to call to_ufl()?")
         raise ValueError(f"Unknown finite element '{family}'.")
 
     # Check that element data is valid (and also get common family

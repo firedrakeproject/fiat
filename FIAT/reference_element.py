@@ -152,35 +152,18 @@ class Cell:
             # Given the topology, work out for each entity in the cell,
             # which other entities it contains.
             self.sub_entities = {}
-            self.sub_entities_old = {}
             for dim, entities in topology.items():
                 self.sub_entities[dim] = {}
-                self.sub_entities_old[dim] = {}
 
                 for e, v in entities.items():
                     vertices = frozenset(v)
                     sub_entities = []
-                    sub_entities_old = []
                     for dim_, entities_ in topology.items():
                         for e_, vertices_ in entities_.items():
                             if vertices.issuperset(vertices_):
-                                sub_entities_old.append((dim_, e_))
+                                sub_entities.append((dim_, e_))
 
-                        # in order to maintain ordering, extract subentities from vertex numbering
-                        entities_of_dim_ = list(entities_.values())
-
-                        from itertools import permutations
-                        # generate all possible sub entities
-                        sub_list = permutations(v, len(entities_of_dim_[0]))
-                        for s in sub_list:
-                            # add the sub entities in the same order as in topology
-                            for i, val in entities_.items():
-                                if set(s) == set(val) and (dim_, i) not in sub_entities:
-                                    sub_entities.append((dim_, i))
-
-                    self.sub_entities[dim][e] = list(sub_entities)
-                    self.sub_entities_old[dim][e] = list(sub_entities_old)
-                self.sub_entities = self.sub_entities_old
+                    self.sub_entities[dim][e] = sorted(list(sub_entities))
         # Build super-entity dictionary by inverting the sub-entity dictionary
         self.super_entities = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
         for dim0 in topology:

@@ -110,6 +110,9 @@ FInAT-equivalent constructors.  If the value is ``None``, the UFL
 element is supported, but must be handled specially because it doesn't
 have a direct FInAT equivalent."""
 
+hexahedron_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval, ufl.interval)
+quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
+
 
 @cache
 def as_fiat_cell(cell):
@@ -120,6 +123,7 @@ def as_fiat_cell(cell):
         cell = finat.ufl.as_cell(cell)
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
+<<<<<<< HEAD
     if isinstance(cell, ufl.TensorProductCell) and any([hasattr(c, "to_fiat") for c in cell._cells]):
         if not all([hasattr(c, "to_fiat") for c in cell._cells]):
             raise NotImplementedError("FUSE defined cells cannot be tensor producted with FIAT defined cells")
@@ -127,6 +131,12 @@ def as_fiat_cell(cell):
     try:
         return cell.to_fiat()
     except AttributeError:
+=======
+
+    if hasattr(cell, "to_fiat"):
+        return cell.to_fiat()
+    else:
+>>>>>>> indiamai/fuse
         return ufc_cell(cell)
 
 
@@ -342,6 +352,7 @@ def convert_restrictedelement(element, **kwargs):
 
 @convert.register(finat.ufl.FuseElement)
 def convert_fuse_element(element, **kwargs):
+<<<<<<< HEAD
     if element.triple.flat:
         new_elem = element.triple.unflatten()
         if hasattr(new_elem, "base_element"):
@@ -352,6 +363,8 @@ def convert_fuse_element(element, **kwargs):
         return finat.FlattenedDimensions(finat_elem), deps
     if finat.fiat_elements.is_scalar_zany(element.triple.to_fiat()):
         return finat.fiat_elements.ScalarZanyFuseElement(element.triple), set()
+=======
+>>>>>>> indiamai/fuse
     return finat.fiat_elements.FuseElement(element.triple), set()
 
 
