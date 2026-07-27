@@ -133,7 +133,7 @@ class Cell:
     """Abstract class for a reference cell.  Provides accessors for
     geometry (vertex coordinates) as well as topology (orderings of
     vertices that make up edges, faces, etc."""
-    def __init__(self, shape, vertices, topology):
+    def __init__(self, shape, vertices, topology, sub_entities=None):
         """The constructor takes a shape code, the physical vertices expressed
         as a list of tuples of numbers, and the topology of a cell.
 
@@ -145,24 +145,25 @@ class Cell:
         self.vertices = vertices
         self.topology = topology
 
-        # Given the topology, work out for each entity in the cell,
-        # which other entities it contains.
-        self.sub_entities = {}
-        for dim, entities in topology.items():
-            self.sub_entities[dim] = {}
+        if sub_entities:
+            self.sub_entities = sub_entities
+        else:
+            # If sub entity list not provided
+            # Given the topology, work out for each entity in the cell,
+            # which other entities it contains.
+            self.sub_entities = {}
+            for dim, entities in topology.items():
+                self.sub_entities[dim] = {}
 
-            for e, v in entities.items():
-                vertices = frozenset(v)
-                sub_entities = []
+                for e, v in entities.items():
+                    vertices = frozenset(v)
+                    sub_entities = []
+                    for dim_, entities_ in topology.items():
+                        for e_, vertices_ in entities_.items():
+                            if vertices.issuperset(vertices_):
+                                sub_entities.append((dim_, e_))
 
-                for dim_, entities_ in topology.items():
-                    for e_, vertices_ in entities_.items():
-                        if vertices.issuperset(vertices_):
-                            sub_entities.append((dim_, e_))
-
-                # Sort for the sake of determinism and by UFC conventions
-                self.sub_entities[dim][e] = sorted(sub_entities)
-
+                    self.sub_entities[dim][e] = sorted(list(sub_entities))
         # Build super-entity dictionary by inverting the sub-entity dictionary
         self.super_entities = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
         for dim0 in topology:
@@ -183,7 +184,6 @@ class Cell:
                     neighbors = children if dim1 < dim0 else parents
                     d01_entities = tuple(e for d, e in neighbors if d == dim1)
                     self.connectivity[(dim0, dim1)].append(d01_entities)
-
         # Dictionary with derived cells
         self._split_cache = {}
 
@@ -387,14 +387,14 @@ class SimplicialComplex(Cell):
 
     This consists of list of vertex locations and a topology map defining facets.
     """
-    def __init__(self, shape, vertices, topology):
+    def __init__(self, shape, vertices, topology, sub_ents=None):
         # Make sure that every facet has the right number of vertices to be
         # a simplex.
         for dim in topology:
             for entity in topology[dim]:
                 assert len(topology[dim][entity]) == dim + 1
 
-        super().__init__(shape, vertices, topology)
+        super().__init__(shape, vertices, topology, sub_ents)
 
     def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
@@ -528,7 +528,8 @@ class SimplicialComplex(Cell):
         facet of dimension dim.  Order indicates how many points to
         include in each direction."""
         if dim == 0:
-            return (self.get_vertices()[entity_id], )
+            return (self.get_vertices()[self.get_topology()[dim][entity_id][0]],)
+            # return (self.get_vertices()[entity_id], )
         elif 0 < dim <= self.get_spatial_dimension():
             entity_verts = \
                 self.get_vertices_of_subcomplex(
@@ -1155,7 +1156,7 @@ class UFCTetrahedron(UFCSimplex):
 class TensorProductCell(Cell):
     """A cell that is the product of FIAT cells."""
 
-    def __init__(self, *cells):
+    def __init__(self, *cells, sub_entities=None):
         # Vertices
         vertices = tuple(tuple(chain(*coords))
                          for coords in product(*[cell.get_vertices()
@@ -1178,7 +1179,7 @@ class TensorProductCell(Cell):
             topology[dim] = dict(enumerate(topology[dim][key]
                                            for key in sorted(topology[dim])))
 
-        super().__init__(TENSORPRODUCT, vertices, topology)
+        super().__init__(TENSORPRODUCT, vertices, topology, sub_entities)
         self.cells = tuple(cells)
 
     def __repr__(self):
@@ -1328,10 +1329,14 @@ class TensorProductCell(Cell):
         This is done dimension by dimension."""
         if hasattr(other, "product"):
             other = other.product
-        if isinstance(other, type(self)):
+        if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
-            return op(self, other)
+            if op == operator.gt or op == operator.lt or operator.ne:
+                return not op(other, self)
+            if op == operator.ge or op == operator.le:
+                return not op(other, self) or operator.eq(self, other)
+            raise ValueError("Unknown operator in cell comparison")
 
     def __gt__(self, other):
         return self.compare(operator.gt, other)
@@ -1421,7 +1426,7 @@ class TensorProductCell(Cell):
 class Hypercube(Cell):
     """Abstract class for a reference hypercube"""
 
-    def __init__(self, dimension, product):
+    def __init__(self, dimension, product, sub_entities=None):
         self.dimension = dimension
         self.shape = hypercube_shapes[dimension]
 
@@ -1429,7 +1434,7 @@ class Hypercube(Cell):
         verts = product.get_vertices()
         topology = flatten_entities(pt)
 
-        super().__init__(self.shape, verts, topology)
+        super().__init__(self.shape, verts, topology, sub_entities)
 
         self.product = product
         self.unflattening_map = compute_unflattening_map(pt)
@@ -1872,3 +1877,10 @@ def max_complex(complexes):
         return max_cell
     else:
         raise ValueError("Cannot find the maximal complex")
+
+
+def cell_to_simplex(cell):
+    if cell.is_simplex():
+        return cell
+    else:
+        return ufc_simplex(cell.get_dimension())
