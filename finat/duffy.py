@@ -11,7 +11,7 @@ from finat.point_set import CollapsedTensorProductPointSet
 class DuffyElement:
     """Mixin for sum-factorized tabulation on collapsed simplex coordinates."""
 
-    def basis_evaluation(self, order: int, ps, entity=None, coordinate_mapping=None):
+    def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
         """Tabulate on a collapsed point set when the element supports it."""
         sd = self.cell.get_dimension()
         if not (isinstance(ps, CollapsedTensorProductPointSet)
@@ -41,7 +41,7 @@ class DuffyElement:
             raise ValueError("empty Duffy coefficient matrix")
         return gem.sparse_matrix(coeffs.shape, rows, cols, coeffs[rows, cols])
 
-    def duffy_evaluation(self, order: int, ps: CollapsedTensorProductPointSet, entity=None):
+    def duffy_evaluation(self, order, ps, entity=None):
         """Return a sum-factorized, dof-indexed tabulation."""
         assert isinstance(ps, CollapsedTensorProductPointSet)
         cell_dim = self.cell.get_dimension()
