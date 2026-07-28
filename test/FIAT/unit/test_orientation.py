@@ -69,3 +69,23 @@ def test_orientation_cell_orientation_reflection_map(cell):
                      (1, 0, 1): 0,
                      (1, 1, 0): 0,
                      (1, 1, 1): 1}
+
+
+@pytest.mark.parametrize("degree", [3, 4, 5])
+def test_orientation_restricted_element(degree):
+    # A restriction keeps the relative order of the dofs on the entities it
+    # keeps, so those entities must permute exactly as they did before it.
+    from FIAT import Lagrange, RestrictedElement
+
+    element = Lagrange(UFCTriangle(), degree)
+    restricted = RestrictedElement(element, restriction_domain="facet")
+
+    permutations = element.dual.get_entity_permutations()
+    restricted_permutations = restricted.dual.get_entity_permutations()
+
+    for dim in (0, 1):
+        for entity in permutations[dim]:
+            assert restricted_permutations[dim][entity] == permutations[dim][entity]
+    # The cell is dropped, so it has no dofs left to permute.
+    for orientation, perm in restricted_permutations[2][0].items():
+        assert perm == []
