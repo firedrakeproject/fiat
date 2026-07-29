@@ -160,34 +160,20 @@ class EnrichedElement(FiniteElementBase):
             result, = mappings
             return result
 
-    def dual_evaluation(self, argument, coordinate_mapping=None):
+    @property
+    def sub_elements(self):
+        """The elements this element enriches.
+
+        An enriched element is the direct sum of them, each evaluating its
+        dual basis on its own points, and the basis index it stacks them
+        along is the one :meth:`_compose_evaluations` already concatenates
+        over.
+        """
         if not self.is_nodal_enriched:
             raise NotImplementedError(
-                f"Dual evaluation not defined for element {type(self).__name__}"
+                f"Dual basis not defined for non-nodal {type(self).__name__}"
             )
-        # Gather results from all sub-elements
-        # Each sub_result is (eval_expr, point_indices, local_indices)
-        sub_results = [sub.dual_evaluation(argument, coordinate_mapping=coordinate_mapping)
-                       for sub in self.elements]
-
-        # Extract the evaluation sub-expressions, contracting each over its own points.
-        # We must ensure that all subindices are in the free indices of subexpr
-        # before wrapping in ComponentTensor. If some are missing (e.g. if the
-        # expression simplified to a constant), we multiply by a dummy ones tensor.
-        evals = []
-        for subexpr, point_indices, subindices in sub_results:
-            subexpr = gem.IndexSum(subexpr, point_indices)
-            missing_indices = tuple(idx for idx in subindices if idx not in subexpr.free_indices)
-            if missing_indices:
-                shape = tuple(idx.extent for idx in missing_indices)
-                ones = gem.Literal(numpy.ones(shape))
-                dummy = gem.Indexed(ones, missing_indices)
-                subexpr = gem.Product(subexpr, dummy)
-            evals.append(gem.ComponentTensor(subexpr, subindices))
-
-        beta = self.get_indices()
-        expr = gem.Indexed(gem.Concatenate(*evals), beta)
-        return expr, (), beta
+        return self.elements
 
 
 def tree_map(f, *args):

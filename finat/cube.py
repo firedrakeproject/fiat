@@ -89,6 +89,16 @@ class FlattenedDimensions(FiniteElementBase):
         return self.product.dual_basis
 
     @property
+    def sub_elements(self):
+        elements = self.product.sub_elements
+        if len(elements) == 1:
+            return (self,)
+        return elements
+
+    def _compose_dual_evaluations(self, results):
+        return self.product._compose_dual_evaluations(results)
+
+    @property
     def index_shape(self):
         return self.product.index_shape
 
