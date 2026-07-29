@@ -12,7 +12,7 @@ import gem
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSingleton, PointSet, TensorPointSet
+from finat.point_set import PointSingleton, PointSet, TensorPointSet, UnionPointSet
 
 
 class TensorProductElement(FiniteElementBase):
@@ -133,6 +133,12 @@ class TensorProductElement(FiniteElementBase):
         return result
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
+        if isinstance(ps, UnionPointSet):
+            # A union of points does not factor, so tabulate on each of its
+            # point sets, where the product structure survives to be sum
+            # factorised.
+            return self._stack_tabulations(order, ps, entity, coordinate_mapping)
+
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
 
@@ -182,65 +188,16 @@ class TensorProductElement(FiniteElementBase):
         )
         return Q, ps
 
-    @cached_property
-    def _summed_factor(self):
-        """The position of the factor that is a direct sum, if any.
+    def dual_evaluation(self, fn, coordinate_mapping=None):
+        # A product with a summed factor is a direct sum, and only a direct
+        # sum can evaluate its summands on their own points.
+        # Avoid circular import dependency
+        from finat.enriched import as_enriched
 
-        A tensor product distributes over the direct sum, so one summed
-        factor makes the whole element a direct sum.
-        """
-        summed = [i for i, factor in enumerate(self.factors)
-                  if len(factor.sub_elements) > 1]
-        if len(summed) > 1:
-            raise NotImplementedError(
-                "Cannot decompose a TensorProductElement with more than one"
-                " factor that is a direct sum"
-            )
-        return summed[0] if summed else None
-
-    @property
-    def sub_elements(self):
-        """The products of one factor's sub-elements with the other factors.
-
-        A tensor product distributes over the direct sum, so a summed factor
-        makes the whole element the sum of the products of that factor's
-        sub-elements with the factors either side of it.
-        """
-        split = self._summed_factor
-        if split is None:
-            return (self,)
-        return tuple(TensorProductElement(self.factors[:split] + (element,)
-                                          + self.factors[split+1:])
-                     for element in self.factors[split].sub_elements)
-
-    def _compose_dual_evaluations(self, results):
-        """Stack the dual evaluations of the sub-elements along the basis
-        index of the factor they decompose.
-
-        A sub-element owns a slice of that factor's basis index and the whole
-        of every other, so they stack along that index alone, with the others
-        left free.  A factor deeper in is stacked by the recursive call that
-        built each sub-element's evaluation.
-        """
-        split = self._summed_factor
-        alphas = [factor.get_indices() for factor in self.factors]
-        alpha, = alphas[split]
-
-        branches = []
-        for element, (expr, point_indices, indices) in zip(self.factors[split].sub_elements, results):
-            # The blocks are never brought onto common points.
-            expr = gem.IndexSum(expr, point_indices)
-            # Index the sub-element's evaluation by this element's own
-            # indices, except along the summed factor, where it keeps its own.
-            own = element.get_indices()
-            multiindex = tuple(chain(*(own if i == split else alphas[i]
-                                       for i in range(len(self.factors)))))
-            expr, = gem.optimise.remove_componenttensors(
-                [gem.Indexed(gem.ComponentTensor(expr, indices), multiindex)])
-            branches.append(gem.ComponentTensor(expr, own))
-
-        beta = tuple(chain(*alphas))
-        return gem.Indexed(gem.Concatenate(*branches), (alpha,)), (), beta
+        summands = as_enriched(self)
+        if summands is None:
+            return super().dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+        return summands.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
 
     @cached_property
     def mapping(self):

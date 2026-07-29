@@ -6,8 +6,37 @@ import numpy
 from gem.interpreter import evaluate
 from gem.utils import cached_property
 
-from finat.point_set import UnionPointSet
 from finat.quadrature import make_quadrature
+
+
+def broadcast_tensor(expression, multiindex):
+    """Turn a multiindex into a shape, broadcasting over the indices it lacks.
+
+    Parameters
+    ----------
+    expression : gem.Node
+        A scalar expression.
+    multiindex : tuple
+        The indices to turn into a shape.
+
+    Returns
+    -------
+    gem.Node
+        ``expression`` as a tensor of the extents of ``multiindex``.
+
+    Notes
+    -----
+    An expression need not depend on every index it ranges over -- a cellwise
+    constant does not depend on the point index, for one -- while
+    :class:`gem.ComponentTensor` demands that it does.  Broadcast over any
+    index the expression dropped by multiplying by one over it.
+
+    """
+    missing = tuple(i for i in multiindex if i not in expression.free_indices)
+    if missing:
+        ones = gem.Literal(numpy.ones(tuple(i.extent for i in missing)))
+        expression = gem.Product(expression, gem.Indexed(ones, missing))
+    return gem.ComponentTensor(expression, multiindex)
 
 
 class FiniteElementBase(metaclass=ABCMeta):
@@ -164,6 +193,53 @@ class FiniteElementBase(metaclass=ABCMeta):
            provides physical geometry callbacks (may be None).
         '''
 
+    def _stack_tabulations(self, order, ps, entity=None, coordinate_mapping=None):
+        """Tabulate on each point set of a union, stacking on the point index.
+
+        Parameters
+        ----------
+        order : int
+            As :meth:`basis_evaluation`.
+        ps : ~finat.point_set.UnionPointSet
+            The union of points to tabulate on.
+        entity : tuple or None
+            As :meth:`basis_evaluation`.
+        coordinate_mapping : PhysicalGeometry or None
+            As :meth:`basis_evaluation`.
+
+        Returns
+        -------
+        dict
+            The tabulation on the whole of ``ps``, as
+            :meth:`basis_evaluation` returns.
+
+        Notes
+        -----
+        A union of points has no structure of its own, so an element that
+        needs structure to tabulate -- a tensor product, which cannot factor
+        the union, or a macroelement, whose points lie on several sub-cells --
+        tabulates on each point set of the union in turn, keeping whatever
+        structure each of them has, and joins the tables here.
+
+        """
+        tables = [self.basis_evaluation(order, sub, entity,
+                                        coordinate_mapping=coordinate_mapping)
+                  for sub in ps.point_sets]
+        keys, = set(map(frozenset, tables))
+        p, = ps.indices
+        multiindex = tuple(chain(self.get_indices(), self.get_value_indices()))
+
+        def concatenate(alpha):
+            # The point indices are free in each table, so promote them to a
+            # shape before concatenating the tables along it.
+            pieces = [broadcast_tensor(gem.Indexed(table[alpha], multiindex),
+                                       sub.indices)
+                      for table, sub in zip(tables, ps.point_sets)]
+            return gem.ComponentTensor(
+                gem.Indexed(gem.Concatenate(*pieces), (p,)), multiindex)
+
+        return {alpha: concatenate(alpha) for alpha in keys}
+
     @abstractmethod
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
         '''Return code for evaluating the element at an arbitrary points on
@@ -242,71 +318,6 @@ class FiniteElementBase(metaclass=ABCMeta):
             f"Dual basis not defined for element {type(self).__name__}"
         )
 
-    @property
-    def sub_elements(self):
-        """The elements this element is the direct sum of.
-
-        An element is its own single sub-element unless it is a direct sum:
-        the sub-elements of an :class:`~finat.enriched.EnrichedElement` are
-        the elements it enriches, and a
-        :class:`~finat.tensor_product.TensorProductElement` with a summed
-        factor is the sum of the products of that factor's sub-elements with
-        the other factors.  This decomposes only one level; a sub-element may
-        be a direct sum in turn.
-
-        Each sub-element evaluates its dual basis on its own points, so dual
-        evaluation contracts each on its own points and stacks the results
-        along the basis index the direct sum occupies, which the assignment
-        carries and :func:`~gem.unconcatenate.unconcatenate` can therefore
-        split.
-        """
-        return (self,)
-
-    @cached_property
-    def dual_point_set(self):
-        """The points at which the dual basis evaluates, covering every
-        sub-element."""
-        elements = self.sub_elements
-        if len(elements) == 1:
-            element, = elements
-            _, x = element.dual_basis
-            return x
-        return UnionPointSet([element.dual_point_set for element in elements])
-
-    def _compose_dual_evaluations(self, results):
-        """Stack the dual evaluations of the sub-elements along the basis
-        index.
-
-        Parameters
-        ----------
-        results : list
-            The ``(expression, point_indices, basis_indices)`` triple each
-            sub-element's :meth:`dual_evaluation` returned.
-
-        Returns
-        -------
-        tuple
-            A single ``(expression, point_indices, basis_indices)`` triple, as
-            :meth:`dual_evaluation` returns.  No point index is left free: the
-            sub-elements evaluate on different points, so each is contracted
-            on its own.
-        """
-        evals = []
-        for expr, point_indices, indices in results:
-            # The blocks are never brought onto common points.
-            expr = gem.IndexSum(expr, point_indices)
-            # A sub-element's evaluation need not depend on every one of its
-            # basis indices, and ComponentTensor demands that it does;
-            # reintroduce any it dropped with a dummy multiplication by 1.
-            missing = tuple(i for i in indices if i not in expr.free_indices)
-            if missing:
-                ones = gem.Literal(numpy.ones(tuple(i.extent for i in missing)))
-                expr = gem.Product(expr, gem.Indexed(ones, missing))
-            evals.append(gem.ComponentTensor(expr, indices))
-
-        beta = self.get_indices()
-        return gem.Indexed(gem.Concatenate(*evals), beta), (), beta
-
     def dual_evaluation(self, fn, coordinate_mapping=None):
         '''Get a GEM expression for performing the dual basis evaluation at
         the nodes of the reference element. Currently only works for flat
@@ -328,14 +339,6 @@ class FiniteElementBase(metaclass=ABCMeta):
                   is compiled from ``evaluation`` (alongside any argument
                   multiindices already encoded within ``fn``)
         '''
-        elements = self.sub_elements
-        if len(elements) > 1:
-            # Each sub-element evaluates on its own points and owns its own
-            # slice of the basis index, so stack their evaluations along it.
-            return self._compose_dual_evaluations(
-                [element.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
-                 for element in elements])
-
         Q, x = self.dual_basis
         Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
 
@@ -371,18 +374,13 @@ class FiniteElementBase(metaclass=ABCMeta):
     def has_pointwise_dual_basis(self):
         '''Whether this element's dual basis consists only of point
         evaluation functionals.'''
-        elements = self.sub_elements
-        if len(elements) > 1:
-            # The sub-elements evaluate on different points, so the points
-            # are not a single set this element evaluates on.
-            return False
         try:
-            Qs = [element.dual_basis[0] for element in elements]
+            Q, ps = self.dual_basis
         except NotImplementedError:
             return False
         # Check whether the weight matrix is a product of identity matrices
         # A pointwise dual basis has gem.Delta as the only terminal node
-        children = list(Qs)
+        children = [Q]
         while children:
             nodes = []
             for c in children:
