@@ -75,15 +75,8 @@ class DiscontinuousElement(FiniteElementBase):
     def dual_basis(self):
         return self.element.dual_basis
 
-    @property
-    def sub_elements(self):
-        elements = self.element.sub_elements
-        if len(elements) == 1:
-            return (self,)
-        return elements
-
-    def _compose_dual_evaluations(self, results):
-        return self.element._compose_dual_evaluations(results)
+    def dual_evaluation(self, fn, coordinate_mapping=None):
+        return self.element.dual_evaluation(fn, coordinate_mapping)
 
     @property
     def mapping(self):

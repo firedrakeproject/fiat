@@ -233,13 +233,14 @@ class TensorPointSet(AbstractPointSet):
                 for s, o in zip(self.factors, other.factors))
 
 
-class UnionPointSet(AbstractPointSet):
+class UnionPointSet(PointSet):
     """All of the points of several point sets, along a single point index.
 
-    This names the points of a dual basis that evaluates block by block, so
-    that a function space can be built on them.  It carries no structure
-    across the blocks: contracting against the blocks is the business of
-    the blocks themselves, each of which keeps its own indices.
+    This names the points of a dual basis that evaluates summand by summand,
+    so that a function space can be built on them.  Beyond the points
+    themselves it records only where each summand's points begin, so that a
+    summand can be tabulated on its own: contracting against a summand is the
+    business of that summand, and each keeps its own indices.
 
     A union of unions is a union, so nested unions are flattened.
     """
@@ -248,30 +249,11 @@ class UnionPointSet(AbstractPointSet):
         self.point_sets = tuple(chain(*(
             ps.point_sets if isinstance(ps, UnionPointSet) else (ps,)
             for ps in point_sets)))
+        super().__init__(numpy.concatenate([ps.points
+                                            for ps in self.point_sets]))
 
     def __repr__(self):
         return f"{type(self).__name__}({self.point_sets!r})"
-
-    @cached_property
-    def points(self):
-        return numpy.concatenate([ps.points for ps in self.point_sets])
-
-    @cached_property
-    def indices(self):
-        extent = sum(ps.points.shape[0] for ps in self.point_sets)
-        return (gem.Index(extent=extent),)
-
-    @cached_property
-    def expression(self):
-        i, = self.indices
-        return gem.partial_indexed(gem.Literal(self.points), (i,))
-
-    def almost_equal(self, other, tolerance=1e-12):
-        """Approximate numerical equality of point sets"""
-        return type(self) is type(other) and \
-            len(self.point_sets) == len(other.point_sets) and \
-            all(s.almost_equal(o, tolerance=tolerance)
-                for s, o in zip(self.point_sets, other.point_sets))
 
 
 class FacetPointSet(AbstractPointSet):

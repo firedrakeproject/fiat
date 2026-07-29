@@ -7,6 +7,8 @@ import gem
 import ufl
 import finat.ufl
 from finat.element_factory import create_element
+from finat.enriched import as_enriched
+from finat.point_set import UnionPointSet
 from gem.interpreter import evaluate
 from FIAT import ufc_simplex
 
@@ -54,6 +56,53 @@ def check_nodal(element):
     assert numpy.allclose(result.arr.reshape(n, n), numpy.eye(n))
 
 
+def check_dual_basis(element):
+    """Assert that contracting the dual weights with the primal basis is the identity."""
+    Q, x = element.dual_basis
+    assert Q.shape == element.index_shape + element.value_shape
+    assert set(Q.free_indices) == set(x.indices)
+    summands = as_enriched(element)
+    if summands is not None:
+        assert len(x.points) == sum(len(e.dual_basis[1].points)
+                                    for e in summands._summands)
+
+    i = element.get_indices()
+    j = element.get_indices()
+    zeta = element.get_value_indices()
+    dim = element.cell.get_spatial_dimension()
+    table = element.basis_evaluation(0, x)[(0,) * dim]
+    expr = gem.IndexSum(gem.Product(gem.Indexed(Q, i + zeta),
+                                    gem.Indexed(table, j + zeta)),
+                        x.indices + zeta)
+    result, = evaluate([gem.ComponentTensor(expr, i + j)])
+    n = element.space_dimension()
+    assert numpy.allclose(result.arr.reshape(n, n), numpy.eye(n))
+
+
+def test_enriched_element_dual_basis():
+    # The weights of a direct sum are block diagonal: each summand's weights
+    # sit at its own offset in the union of the points, and are zero against
+    # every other summand's points.
+    cell = ufc_simplex(2)
+    fe = finat.Lagrange(cell, 3)
+    enriched = finat.EnrichedElement(
+        [finat.RestrictedElement(fe, restriction_domain=domain)
+         for domain in ("interior", "facet")], is_nodal_enriched=True)
+
+    assert isinstance(enriched.dual_basis[1], UnionPointSet)
+    check_dual_basis(enriched)
+
+
+@pytest.mark.parametrize("family", ("RTCE", "RTCF", "NCE", "NCF"))
+@pytest.mark.parametrize("degree", (1, 2))
+def test_hdivcurl_dual_basis(family, degree):
+    # A union of points is a point set like any other, so a tensor product
+    # tabulates on it by splitting the coordinates and sharing the point
+    # index, and the weights contract against that tabulation.
+    element = create_element(finat.ufl.FiniteElement(family, hdivcurl_cell(family), degree))
+    check_dual_basis(element)
+
+
 def test_enriched_element_dual_evaluation():
     cell = ufc_simplex(2)
     fe = finat.Lagrange(cell, 3)
@@ -76,15 +125,16 @@ def test_enriched_element_as_tensor_product_factor():
     # Restricting an element on a tensor product cell to its facets makes
     # the restriction of each factor a factor of the result.  Those factors
     # are themselves EnrichedElements, so the tensor product is the direct
-    # sum of the products of their blocks.
+    # sum of the products of their summands.
     interval = ufc_simplex(1)
     square = finat.TensorProductElement([finat.Lagrange(interval, 3)] * 2)
     restricted = finat.RestrictedElement(square, restriction_domain="facet")
     assert isinstance(restricted, finat.EnrichedElement)
 
     cube = finat.TensorProductElement([restricted, finat.Lagrange(interval, 3)])
-    assert len(cube.sub_elements) == len(restricted.sub_elements) > 1
-    assert sum(element.space_dimension() for element in cube.sub_elements) \
+    expanded = as_enriched(cube)
+    assert len(expanded.elements) == len(restricted.elements) > 1
+    assert sum(element.space_dimension() for element in expanded.elements) \
         == cube.space_dimension()
     check_nodal(cube)
 
@@ -156,11 +206,38 @@ def test_dual_evaluation_of_coupled_evaluations(hexahedron):
     assert numpy.allclose(nodal_values(element, cubed), expected)
 
 
+def test_direct_sum_must_be_the_first_factor():
+    # A sum in a later factor interleaves with the factors before it, so its
+    # summands do not stack along the flat basis index.
+    interval = ufc_simplex(1)
+    line = finat.Lagrange(interval, 3)
+    restricted = finat.RestrictedElement(
+        finat.TensorProductElement([line] * 2), restriction_domain="facet")
+    with pytest.raises(NotImplementedError):
+        as_enriched(finat.TensorProductElement([line, restricted]))
+
+
+def hdivcurl_cell(family):
+    if family.startswith("RTC"):
+        return ufl.quadrilateral
+    return ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
+
+
+@pytest.mark.parametrize("family", ("RTCE", "RTCF", "NCE", "NCF"))
+@pytest.mark.parametrize("degree", (1, 2, 3))
+def test_hdivcurl_dual_evaluation(family, degree):
+    # On a hexahedron one factor of a summand is itself a direct sum, which
+    # only stacks once the sum is brought out through the product and the
+    # pullback around it.
+    element = create_element(finat.ufl.FiniteElement(family, hdivcurl_cell(family), degree))
+    check_nodal(element)
+
+
 @pytest.mark.parametrize("family", ("RTCE", "RTCF", "NCE", "NCF"))
 @pytest.mark.parametrize("domain", ("interior", "facet"))
 def test_restricted_hdivcurl_dual_basis(family, domain):
     # Restriction selects disjoint subsets of the DoFs, so a restricted
-    # H(div)/H(curl) element stays nodal even where the blocks are not
+    # H(div)/H(curl) element stays nodal even where the summands are not
     # orthogonal to each other, as several of them map to the same component.
     if family.startswith("RTC"):
         cell = ufl.quadrilateral
@@ -169,21 +246,21 @@ def test_restricted_hdivcurl_dual_basis(family, domain):
     element = create_element(finat.ufl.FiniteElement(family, cell, 2)[domain])
     check_nodal(element)
 
-    # Each sub-element has a dual basis on its own points, and together they
-    # account for every functional: this is the path a TensorProductElement
-    # takes to reach its factors.  An element decomposes one level at a time,
-    # so recurse to the ones that are not themselves a direct sum.
+    # Each summand has a dual basis on its own points, and together they
+    # account for every functional.  Bringing the sum outermost rewrites one
+    # level at a time, so recurse to the summands that are not sums themselves.
     def summands(e):
-        if e.sub_elements == (e,):
+        expanded = as_enriched(e)
+        if expanded is None:
             return (e,)
-        return tuple(chain.from_iterable(map(summands, e.sub_elements)))
+        return tuple(chain.from_iterable(map(summands, expanded.elements)))
 
-    sub_elements = summands(element)
-    assert len(sub_elements) > 1
-    assert sum(e.space_dimension() for e in sub_elements) == element.space_dimension()
-    for e in sub_elements:
+    elements = summands(element)
+    assert len(elements) > 1
+    assert sum(e.space_dimension() for e in elements) == element.space_dimension()
+    for e in elements:
         Q, x = e.dual_basis
         assert Q.shape == e.index_shape + e.value_shape
         assert set(Q.free_indices) <= set(x.indices)
-    assert len(element.dual_point_set.points) \
-        == sum(len(e.dual_basis[1].points) for e in sub_elements)
+    assert len(element.dual_basis[1].points) \
+        == sum(len(e.dual_basis[1].points) for e in elements)
