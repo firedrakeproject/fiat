@@ -66,7 +66,7 @@ from gem.interpreter import evaluate
 __all__ = ['flatten', 'unconcatenate']
 
 
-def find_group(expressions):
+def find_group(expressions, free_indices):
     """Finds a full set of indexed Concatenate nodes with the same
     free index, if any such node exists.
 
@@ -74,10 +74,13 @@ def find_group(expressions):
     must be removed.
 
     :arg expressions: a multi-root GEM expression DAG
+    :arg free_indices: the set of indices that may be split along, i.e.
+                       those carried by the assignment variables.
+                       Concatenate nodes indexed by anything else are
+                       left alone, as there is nothing to split them
+                       against.
     :returns: a list of GEM nodes, or None
     """
-    free_indices = set().union(chain(*[e.free_indices for e in expressions]))
-
     # Result variables
     index = None
     nodes = []
@@ -100,8 +103,7 @@ def find_group(expressions):
             child, = node.children
             if isinstance(child, Concatenate):
                 i, = node.multiindex
-                assert i in free_indices
-                if (index or i) == i:
+                if i in free_indices and (index or i) == i:
                     index = i
                     nodes.append(node)
                     # Skip adding children
@@ -178,7 +180,12 @@ def replace_node(expression, mapping, cut=None):
 def _unconcatenate(cache, pairs):
     # Tail-call recursive core of unconcatenate.
     # Assumes that input has already been sanitised.
-    concat_group = find_group([e for v, e in pairs])
+    # Only indices carried by an assignment variable can be split; a
+    # Concatenate indexed by anything else (e.g. an index that has already
+    # been contracted away) has nothing to be split against, and is left
+    # for a later pass to deal with.
+    splittable = set().union(chain(*[v.free_indices for v, e in pairs]))
+    concat_group = find_group([e for v, e in pairs], splittable)
     if concat_group is None:
         return pairs
 
