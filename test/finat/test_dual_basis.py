@@ -2,6 +2,7 @@ import pytest
 import numpy
 import finat
 import gem
+from gem.interpreter import evaluate
 from FIAT import ufc_simplex
 
 
@@ -30,6 +31,22 @@ def test_collapse_repeated_points(dim):
     assert len(points) == expected
 
 
+def check_nodal(element):
+    """Assert that applying the dual basis to the primal basis is the identity."""
+    j = element.get_indices()
+    zeta = element.get_value_indices()
+    dim = element.cell.get_spatial_dimension()
+
+    def tabulate(ps):
+        table = element.basis_evaluation(0, ps)[(0,) * dim]
+        return gem.ComponentTensor(gem.Indexed(table, j + zeta), zeta)
+
+    expr, indices = element.dual_evaluation(tabulate)
+    result, = evaluate([gem.ComponentTensor(expr, indices + j)])
+    n = element.space_dimension()
+    assert numpy.allclose(result.arr.reshape(n, n), numpy.eye(n))
+
+
 def test_enriched_element_dual_evaluation():
     cell = ufc_simplex(2)
     fe = finat.Lagrange(cell, 3)
@@ -38,10 +55,26 @@ def test_enriched_element_dual_evaluation():
     fe2 = finat.RestrictedElement(fe, restriction_domain="facet")
     enriched = finat.EnrichedElement([fe1, fe2], is_nodal_enriched=True)
 
-    # Check that calling dual_evaluation returns a valid Indexed expression
     fn = lambda x: gem.Literal(1.0)
     expr, indices = enriched.dual_evaluation(fn)
-    assert isinstance(expr, gem.Indexed)
-    assert isinstance(expr.children[0], gem.Concatenate)
     assert len(indices) == 1
     assert indices[0].extent == enriched.space_dimension()
+
+    check_nodal(enriched)
+
+
+def test_enriched_element_as_tensor_product_factor():
+    # Restricting an element on a tensor product cell to its facets makes
+    # the restriction of each factor a factor of the result.  Those factors
+    # are themselves EnrichedElements, so the tensor product is the direct
+    # sum of the products of their blocks.
+    interval = ufc_simplex(1)
+    square = finat.TensorProductElement([finat.Lagrange(interval, 3)] * 2)
+    restricted = finat.RestrictedElement(square, restriction_domain="facet")
+    assert isinstance(restricted, finat.EnrichedElement)
+
+    cube = finat.TensorProductElement([restricted, finat.Lagrange(interval, 3)])
+    assert len(cube.sub_elements) == len(restricted.sub_elements) > 1
+    assert sum(element.space_dimension() for element in cube.sub_elements) \
+        == cube.space_dimension()
+    check_nodal(cube)

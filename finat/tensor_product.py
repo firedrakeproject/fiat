@@ -183,6 +183,64 @@ class TensorProductElement(FiniteElementBase):
         return Q, ps
 
     @cached_property
+    def _summed_factor(self):
+        """The position of the factor that is a direct sum, if any.
+
+        A tensor product distributes over the direct sum, so one summed
+        factor makes the whole element a direct sum.
+        """
+        summed = [i for i, factor in enumerate(self.factors)
+                  if len(factor.sub_elements) > 1]
+        if len(summed) > 1:
+            raise NotImplementedError(
+                "Cannot decompose a TensorProductElement with more than one"
+                " factor that is a direct sum"
+            )
+        return summed[0] if summed else None
+
+    @property
+    def sub_elements(self):
+        """The products of one factor's sub-elements with the other factors.
+
+        A tensor product distributes over the direct sum, so a summed factor
+        makes the whole element the sum of the products of that factor's
+        sub-elements with the factors either side of it.
+        """
+        split = self._summed_factor
+        if split is None:
+            return (self,)
+        return tuple(TensorProductElement(self.factors[:split] + (element,)
+                                          + self.factors[split+1:])
+                     for element in self.factors[split].sub_elements)
+
+    def _compose_dual_evaluations(self, results):
+        """Stack the dual evaluations of the sub-elements along the basis
+        index of the factor they decompose.
+
+        A sub-element owns a slice of that factor's basis index and the whole
+        of every other, so they stack along that index alone, with the others
+        left free.  A factor deeper in is stacked by the recursive call that
+        built each sub-element's evaluation.
+        """
+        split = self._summed_factor
+        alphas = [factor.get_indices() for factor in self.factors]
+        alpha, = alphas[split]
+
+        branches = []
+        for element, (expr, indices) in zip(self.factors[split].sub_elements, results):
+            # Index the sub-element's evaluation by this element's own
+            # indices, except along the summed factor, where it keeps its own.
+            own = element.get_indices()
+            multiindex = tuple(chain(*(own if i == split else alphas[i]
+                                       for i in range(len(self.factors)))))
+            expr, = gem.optimise.remove_componenttensors(
+                [gem.Indexed(gem.ComponentTensor(expr, indices), multiindex)])
+            branches.append(gem.ComponentTensor(expr, own))
+
+        beta = tuple(chain(*alphas))
+        return gem.Indexed(gem.Concatenate(*branches), (alpha,)), beta
+
+    @cached_property
     def mapping(self):
         mappings = [fe.mapping for fe in self.factors if fe.mapping != "affine"]
         if len(mappings) == 0:
