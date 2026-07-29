@@ -160,15 +160,15 @@ class QuadratureElement(FiniteElementBase):
             delta = gem.Delta(point_indices, basis_indices)
             return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
 
-        # The rule's points may be the union of the points of several blocks,
-        # in which case `ps` is one of them: tabulate onto the rows of the
-        # identity that block owns, and zero onto the rows of the others.
+        # The rule's points may be the union of the points of several
+        # summands, in which case `ps` is one of them: tabulate onto the rows
+        # of the identity that summand owns, and zero onto the others.
         # The basis index is the one the coefficient carries, so the
         # Concatenate splits when the coefficient is contracted against it.
         if not isinstance(whole, UnionPointSet):
             raise ValueError("Mismatch of quadrature points!")
-        for k, block in enumerate(whole.point_sets):
-            if block.almost_equal(ps):
+        for k, summand in enumerate(whole.point_sets):
+            if summand.almost_equal(ps):
                 break
         else:
             raise ValueError("Mismatch of quadrature points!")
