@@ -126,35 +126,48 @@ def restrict_enriched(element, domain, take_closure):
 
     elements = tuple(e for e in elements if e is not null_element)
     if elements:
+        if reconstruct is finat.EnrichedElement:
+            # Restriction selects disjoint subsets of the DoFs, so the
+            # restricted subelements are nodal whenever the original ones are.
+            return reconstruct(elements,
+                               is_nodal_enriched=element.is_nodal_enriched)
         return reconstruct(elements)
     else:
         return null_element
 
 
-@restrict.register(finat.HCurlElement)
-def restrict_hcurl(element, domain, take_closure):
+def restrict_wrapped(element, domain, take_closure, wrapper):
+    """Restrict an element that wraps another with a pullback.
+
+    The pullback acts on each subelement separately, so it preserves
+    whichever subelements the restriction selects, and with them the
+    nodality of the restricted element.
+
+    :arg element: the wrapping :class:`finat.FiniteElementBase`
+    :arg domain: which entities to restrict to
+    :arg take_closure: whether to take the closure of the entities
+    :arg wrapper: the class to wrap the restricted element with
+    :returns: a new element, or ``null_element``
+    """
     restricted = restrict(element.wrappee, domain, take_closure)
     if restricted is null_element:
         return null_element
+    elif isinstance(restricted, finat.EnrichedElement):
+        return finat.EnrichedElement(
+            [wrapper(e) for e in restricted.elements],
+            is_nodal_enriched=restricted.is_nodal_enriched)
     else:
-        if isinstance(restricted, finat.EnrichedElement):
-            return finat.EnrichedElement(finat.HCurlElement(e)
-                                         for e in restricted.elements)
-        else:
-            return finat.HCurlElement(restricted)
+        return wrapper(restricted)
+
+
+@restrict.register(finat.HCurlElement)
+def restrict_hcurl(element, domain, take_closure):
+    return restrict_wrapped(element, domain, take_closure, finat.HCurlElement)
 
 
 @restrict.register(finat.HDivElement)
 def restrict_hdiv(element, domain, take_closure):
-    restricted = restrict(element.wrappee, domain, take_closure)
-    if restricted is null_element:
-        return null_element
-    else:
-        if isinstance(restricted, finat.EnrichedElement):
-            return finat.EnrichedElement(finat.HDivElement(e)
-                                         for e in restricted.elements)
-        else:
-            return finat.HDivElement(restricted)
+    return restrict_wrapped(element, domain, take_closure, finat.HDivElement)
 
 
 @restrict.register(finat.mixed.MixedSubElement)
