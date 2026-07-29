@@ -1,4 +1,4 @@
-from finat.point_set import UnknownPointSet, FacetPointSet
+from finat.point_set import UnknownPointSet, FacetPointSet, UnionPointSet
 
 import numpy
 
@@ -148,17 +148,36 @@ class QuadratureElement(FiniteElementBase):
         if order:
             raise ValueError("Derivatives are not defined on a QuadratureElement.")
 
-        if not self._rule.point_set.almost_equal(ps):
+        whole = self._rule.point_set
+        basis_indices = self.get_indices()
+        sd = self.cell.get_spatial_dimension()
+
+        if whole.almost_equal(ps):
+            # Return an outer product of identity matrices
+            point_indices = ps.indices
+            if len(basis_indices) > len(point_indices):
+                point_indices = (entity_id, *point_indices)
+            delta = gem.Delta(point_indices, basis_indices)
+            return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
+
+        # The rule's points may be the union of the points of several blocks,
+        # in which case `ps` is one of them: tabulate onto the rows of the
+        # identity that block owns, and zero onto the rows of the others.
+        # The basis index is the one the coefficient carries, so the
+        # Concatenate splits when the coefficient is contracted against it.
+        if not isinstance(whole, UnionPointSet):
+            raise ValueError("Mismatch of quadrature points!")
+        for k, block in enumerate(whole.point_sets):
+            if block.almost_equal(ps):
+                break
+        else:
             raise ValueError("Mismatch of quadrature points!")
 
-        # Return an outer product of identity matrices
-        basis_indices = self.get_indices()
-        point_indices = ps.indices
-        if len(basis_indices) > len(point_indices):
-            point_indices = (entity_id, *point_indices)
-        delta = gem.Delta(point_indices, basis_indices)
-
-        sd = self.cell.get_spatial_dimension()
+        slot = tuple(gem.Index(extent=index.extent) for index in ps.indices)
+        own = gem.ComponentTensor(gem.Delta(slot, ps.indices), slot)
+        branches = [own if j == k else gem.Zero(tuple(index.extent for index in other.indices))
+                    for j, other in enumerate(whole.point_sets)]
+        delta = gem.Indexed(gem.Concatenate(*branches), basis_indices)
         return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):

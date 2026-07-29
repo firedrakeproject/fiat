@@ -95,6 +95,19 @@ class WrapperElementBase(FiniteElementBase):
         # value_shape indices)
         return gem.ComponentTensor(Q, beta + zeta), x
 
+    @property
+    def sub_elements(self):
+        """The wrapped element's sub-elements, each mapped in the same way."""
+        elements = self.wrappee.sub_elements
+        if len(elements) == 1:
+            return (self,)
+        return tuple(type(self)(element) for element in elements)
+
+    def _compose_dual_evaluations(self, results):
+        # The mapping does not touch the basis index, so the sub-elements
+        # stack along it exactly as the wrapped element's do.
+        return self.wrappee._compose_dual_evaluations(results)
+
 
 class HDivElement(WrapperElementBase):
     """H(div) wrapper element for tensor product elements."""
