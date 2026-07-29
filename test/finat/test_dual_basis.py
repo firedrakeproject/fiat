@@ -1,7 +1,12 @@
+from itertools import chain
+
 import pytest
 import numpy
 import finat
 import gem
+import ufl
+import finat.ufl
+from finat.element_factory import create_element
 from gem.interpreter import evaluate
 from FIAT import ufc_simplex
 
@@ -78,3 +83,36 @@ def test_enriched_element_as_tensor_product_factor():
     assert sum(element.space_dimension() for element in cube.sub_elements) \
         == cube.space_dimension()
     check_nodal(cube)
+
+
+@pytest.mark.parametrize("family", ("RTCE", "RTCF", "NCE", "NCF"))
+@pytest.mark.parametrize("domain", ("interior", "facet"))
+def test_restricted_hdivcurl_dual_basis(family, domain):
+    # Restriction selects disjoint subsets of the DoFs, so a restricted
+    # H(div)/H(curl) element stays nodal even where the blocks are not
+    # orthogonal to each other, as several of them map to the same component.
+    if family.startswith("RTC"):
+        cell = ufl.quadrilateral
+    else:
+        cell = ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
+    element = create_element(finat.ufl.FiniteElement(family, cell, 2)[domain])
+    check_nodal(element)
+
+    # Each sub-element has a dual basis on its own points, and together they
+    # account for every functional: this is the path a TensorProductElement
+    # takes to reach its factors.  An element decomposes one level at a time,
+    # so recurse to the ones that are not themselves a direct sum.
+    def summands(e):
+        if e.sub_elements == (e,):
+            return (e,)
+        return tuple(chain.from_iterable(map(summands, e.sub_elements)))
+
+    sub_elements = summands(element)
+    assert len(sub_elements) > 1
+    assert sum(e.space_dimension() for e in sub_elements) == element.space_dimension()
+    for e in sub_elements:
+        Q, x = e.dual_basis
+        assert Q.shape == e.index_shape + e.value_shape
+        assert set(Q.free_indices) <= set(x.indices)
+    assert len(element.dual_point_set.points) \
+        == sum(len(e.dual_basis[1].points) for e in sub_elements)
