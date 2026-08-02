@@ -29,25 +29,63 @@ class MappedTabulation(Mapping):
         if indices is None:
             indices = list(range(M.shape[0]))
         self.indices = indices
-        # we expect M to be sparse with O(1) nonzeros per row
-        # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
-               for i in indices]
-        self.csr = csr
+        rows = [[j for j in range(M.shape[1])
+                 if not isinstance(M.array[i, j], gem.Zero)]
+                for i in indices]
+        width = max(map(len, rows))
+        nrows = len(indices)
+        columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
+        data = numpy.full((nrows, width), zero, dtype=object)
+        for row, entries in enumerate(rows):
+            columns[row, :len(entries)] = entries
+            data[row, :len(entries)] = M.array[indices[row], entries]
+
+        def unit_action(values):
+            active_values = [value for value in values
+                             if not isinstance(value, gem.Zero)]
+            if all(value == one for value in active_values):
+                return "all"
+            if any(value == one for value in active_values):
+                return "some"
+            return None
+
+        row_numbers = numpy.arange(nrows, dtype=gem.uint_type)
+        self.columns = tuple(
+            None if numpy.array_equal(column, row_numbers)
+            else gem.Literal(column, dtype=gem.uint_type)
+            for column in columns.T)
+        self.data = tuple(gem.ListTensor(values) for values in data.T)
+        self.unit_actions = tuple(map(unit_action, data.T))
         self._tabulation_cache = {}
 
     def matvec(self, table):
-        # basis recombination using hand-rolled sparse-dense matrix multiplication
-        ii = gem.indices(len(table.shape)-1)
-        phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
-        # the sum approach is faster than calling numpy.dot or gem.IndexSum
-        exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
-                 for i, js in zip(self.indices, self.csr)]
+        row = gem.Index(extent=len(self.indices))
+        tail = gem.indices(len(table.shape) - 1)
 
-        result = gem.ListTensor(exprs)
-        result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
-        # result = gem.optimise.aggressive_unroll(self.M @ table)
-        return result
+        def term(entry):
+            column_table = self.columns[entry]
+            column = row if column_table is None \
+                else gem.VariableIndex(gem.Indexed(column_table, (row,)))
+            value = gem.Indexed(self.data[entry], (row,))
+            basis = gem.Indexed(table, (column, *tail))
+            unit_action = self.unit_actions[entry]
+            if unit_action == "all":
+                mapped = basis
+            elif unit_action == "some":
+                unit = gem.Comparison("==", value, one)
+                mapped = gem.Conditional(
+                    unit, basis, gem.Product(value, basis))
+            else:
+                mapped = gem.Product(value, basis)
+            return value, mapped
+
+        _, mapped = term(0)
+        for entry in range(1, len(self.columns)):
+            value, correction = term(entry)
+            active = gem.Comparison("!=", value, zero)
+            mapped = gem.Conditional(
+                active, gem.Sum(mapped, correction), mapped)
+        return gem.ComponentTensor(mapped, (row, *tail))
 
     def __getitem__(self, alpha):
         try:

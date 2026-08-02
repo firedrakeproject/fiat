@@ -235,15 +235,27 @@ def _collect_monomials_mathfunction(expression, self):
 
 
 @_collect_monomials.register(Conditional)
-def _collect_monomials_conditional(expression, self):
-    """Refactorises a conditional expression into a sum-of-products form,
-    pulling only "atomics" out of conditional expressions.
+def _collect_monomials_conditional(
+        expression: Conditional, self) -> MonomialSum:
+    """Refactorize a compound conditional expression.
 
-    :arg expression: a GEM expression to refactorise
-    :arg self: function for recursive calls
+    Parameters
+    ----------
+    expression
+        Conditional GEM expression.
+    self
+        Memoized recursive mapper carrying the classifier.
 
-    :returns: :py:class:`MonomialSum`
+    Returns
+    -------
+    MonomialSum
+        Sum-of-products representation with argument atomics pulled out of
+        the branches.
     """
+    if self.classifier(expression) != COMPOUND:
+        return _collect_monomials.dispatch(Node.mro()[0])(
+            expression, self)
+
     condition, then, else_ = expression.children
     # Recursively refactorise both branches to `MonomialSum`s
     then_ms = self(then)

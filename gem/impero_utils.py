@@ -30,6 +30,7 @@ class NoopError(Exception):
 
 def preprocess_gem(expressions, replace_delta=True, remove_componenttensors=True):
     """Lower GEM nodes that cannot be translated to C directly."""
+    expressions = optimise.replace_flattened(expressions)
     if remove_componenttensors:
         expressions = optimise.remove_componenttensors(expressions)
     if replace_delta:
@@ -97,9 +98,25 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
 def make_prefix_ordering(indices, prefix_ordering):
     """Creates an ordering of ``indices`` which starts with those
-    indices in ``prefix_ordering``."""
+    indices in ``prefix_ordering``.  A `gem.JaggedIndex` is placed after
+    its parents, so that its loop nests inside theirs and the jagged
+    bound can be tightened."""
     # Need to return deterministically ordered indices
-    return tuple(prefix_ordering) + tuple(k for k in indices if k not in prefix_ordering)
+    ordering = tuple(prefix_ordering) + tuple(k for k in indices if k not in prefix_ordering)
+    result = []
+    seen = set()
+
+    def visit(k):
+        if k not in seen:
+            seen.add(k)
+            for parent in getattr(k, 'parents', ()):
+                if parent in ordering:
+                    visit(parent)
+            result.append(k)
+
+    for k in ordering:
+        visit(k)
+    return tuple(result)
 
 
 def make_index_orderer(index_ordering):
@@ -124,11 +141,21 @@ def inline_temporaries(expressions, ops):
     """
     refcount = collect_refcount(expressions)
 
+    exclusive = set()
+    for node in traversal(expressions):
+        if isinstance(node, gem.Conditional):
+            _, then, else_ = node.children
+            if else_ in then.children and refcount[else_] == 2:
+                exclusive.add(else_)
+            elif then in else_.children and refcount[then] == 2:
+                exclusive.add(then)
+
     candidates = set()  # candidates for inlining
     for op in ops:
         if isinstance(op, imp.Evaluate):
             expr = op.expression
-            if expr.shape == () and refcount[expr] == 1:
+            if (expr.shape == ()
+                    and (refcount[expr] == 1 or expr in exclusive)):
                 candidates.add(expr)
 
     # Prevent inlining that pulls expressions into inner loops
@@ -191,11 +218,18 @@ def place_declarations(tree, temporaries, get_indices):
     numbering = {t: n for n, t in enumerate(temporaries)}
     assert len(numbering) == len(temporaries)
 
-    # Collect the total number of temporary references
+    # Collect the total number of temporary references.  Impero is a
+    # tree, so structurally equal subtrees still represent distinct
+    # executions and every occurrence must be visited.  The generic GEM
+    # traversal is DAG-oriented and deliberately skips equal nodes.
     total_refcount = collections.Counter()
-    for node in traversal((tree,)):
+    pending = [tree]
+    while pending:
+        node = pending.pop()
         if isinstance(node, imp.Terminal):
             total_refcount.update(temp_refcount(numbering, node))
+        else:
+            pending.extend(reversed(node.children))
     assert set(total_refcount) == set(temporaries)
 
     # Result

@@ -5,7 +5,9 @@ total number of floating point operations for a given script.
 
 import gem.gem as gem
 import gem.impero as imp
+from contextvars import ContextVar
 from functools import singledispatch
+from gem.node import traversal
 import numpy
 import math
 
@@ -25,7 +27,20 @@ def statement_block(tree, temporaries):
 def statement_for(tree, temporaries):
     extent = tree.index.extent
     assert extent is not None
+    index_values = _index_values.get()
+    if isinstance(tree.index, gem.JaggedIndex) and all(
+            parent in index_values for parent in tree.index.parents):
+        extent -= sum(index_values[parent] for parent in tree.index.parents)
     child, = tree.children
+    if tree.index in _control_indices.get():
+        flops = 0
+        for value in range(extent):
+            token = _index_values.set(index_values | {tree.index: value})
+            try:
+                flops += statement(child, temporaries)
+            finally:
+                _index_values.reset(token)
+        return flops
     flops = statement(child, temporaries)
     return flops * extent
 
@@ -85,6 +100,7 @@ def flops_zero(expr, temporaries):
 @flops.register(gem.LogicalAnd)
 @flops.register(gem.LogicalOr)
 @flops.register(gem.ListTensor)
+@flops.register(gem.Comparison)
 def flops_zeroplus(expr, temporaries):
     # These nodes contribute 0 floating point operations, but their children may not.
     return 0 + sum(expression_flops(child, temporaries)
@@ -106,7 +122,6 @@ def flops_product(expr, temporaries):
 
 @flops.register(gem.Sum)
 @flops.register(gem.Division)
-@flops.register(gem.Comparison)
 @flops.register(gem.MathFunction)
 @flops.register(gem.MinValue)
 @flops.register(gem.MaxValue)
@@ -131,9 +146,15 @@ def flops_power(expr, temporaries):
 
 @flops.register(gem.Conditional)
 def flops_conditional(expr, temporaries):
-    condition, then, else_ = (expression_flops(child, temporaries)
-                              for child in expr.children)
-    return condition + max(then, else_)
+    condition, then, else_ = expr.children
+    condition_flops = expression_flops(condition, temporaries)
+    value = _static_value(condition)
+    if value is not _UNKNOWN:
+        branch = then if value else else_
+        return condition_flops + expression_flops(branch, temporaries)
+    then_flops = expression_flops(then, temporaries)
+    else_flops = expression_flops(else_, temporaries)
+    return condition_flops + max(then_flops, else_flops)
 
 
 @flops.register(gem.Indexed)
@@ -192,6 +213,112 @@ def count_flops(impero_c):
     :returns: approximate flop count for the tree.
     """
     try:
-        return statement(impero_c.tree, set(impero_c.temporaries))
+        control_token = _control_indices.set(
+            frozenset(_find_control_indices(impero_c.tree)))
+        index_token = _index_values.set({})
+        try:
+            return statement(impero_c.tree, set(impero_c.temporaries))
+        finally:
+            _index_values.reset(index_token)
+            _control_indices.reset(control_token)
     except (ValueError, NotImplementedError):
         return 0
+
+_UNKNOWN = object()
+_index_values = ContextVar("flop_count_index_values", default={})
+_control_indices = ContextVar("flop_count_control_indices",
+                              default=frozenset())
+
+
+def _static_index(index):
+    """Evaluate an index from the current statically known loop values."""
+    if isinstance(index, (int, numpy.integer)):
+        return int(index)
+    if isinstance(index, gem.Index):
+        return _index_values.get().get(index, _UNKNOWN)
+    if isinstance(index, gem.VariableIndex):
+        value = _static_value(index.expression)
+        return _UNKNOWN if value is _UNKNOWN else int(value)
+    return _UNKNOWN
+
+
+def _static_value(expression):
+    """Partially evaluate compile-time data in a scalar expression."""
+    if isinstance(expression, gem.Zero):
+        return 0
+    if isinstance(expression, gem.Literal) and not expression.shape:
+        return expression.value
+    if isinstance(expression, gem.Index):
+        return _static_index(expression)
+    if isinstance(expression, gem.Indexed):
+        aggregate, = expression.children
+        multiindex = tuple(map(_static_index, expression.multiindex))
+        if any(index is _UNKNOWN for index in multiindex):
+            return _UNKNOWN
+        if isinstance(aggregate, gem.Literal):
+            return aggregate.array[multiindex]
+        if isinstance(aggregate, gem.ListTensor):
+            return _static_value(aggregate.array[multiindex])
+        return _UNKNOWN
+    if isinstance(expression, gem.Comparison):
+        left, right = map(_static_value, expression.children)
+        if left is _UNKNOWN or right is _UNKNOWN:
+            return _UNKNOWN
+        if expression.operator == "==":
+            return left == right
+        if expression.operator == "!=":
+            return left != right
+        if expression.operator == "<":
+            return left < right
+        if expression.operator == "<=":
+            return left <= right
+        if expression.operator == ">":
+            return left > right
+        if expression.operator == ">=":
+            return left >= right
+    if isinstance(expression, gem.LogicalNot):
+        value = _static_value(expression.children[0])
+        return _UNKNOWN if value is _UNKNOWN else not value
+    if isinstance(expression, (gem.LogicalAnd, gem.LogicalOr)):
+        left, right = map(_static_value, expression.children)
+        if isinstance(expression, gem.LogicalAnd):
+            if left is False or right is False:
+                return False
+            return _UNKNOWN if left is _UNKNOWN or right is _UNKNOWN else True
+        if left is True or right is True:
+            return True
+        return _UNKNOWN if left is _UNKNOWN or right is _UNKNOWN else False
+    return _UNKNOWN
+
+
+def _terminal_expressions(tree):
+    """Return GEM expressions evaluated by an Impero terminal."""
+    if isinstance(tree, imp.Evaluate):
+        return (tree.expression,)
+    if isinstance(tree, imp.Accumulate):
+        return tree.indexsum.children
+    if isinstance(tree, imp.Return):
+        return (tree.expression,)
+    if isinstance(tree, imp.ReturnAccumulate):
+        return tree.indexsum.children
+    if isinstance(tree, imp.Noop):
+        return (tree.expression,)
+    return ()
+
+
+def _find_control_indices(tree):
+    """Find loop indices controlling jagged bounds or static branches."""
+    result = set()
+    if isinstance(tree, imp.For):
+        if isinstance(tree.index, gem.JaggedIndex):
+            result.update(tree.index.parents)
+        result.update(_find_control_indices(tree.children[0]))
+    elif isinstance(tree, imp.Block):
+        for child in tree.children:
+            result.update(_find_control_indices(child))
+    else:
+        for expression in _terminal_expressions(tree):
+            for node in traversal((expression,)):
+                if isinstance(node, gem.Conditional):
+                    result.update(node.children[0].free_indices)
+    return result
