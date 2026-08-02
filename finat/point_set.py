@@ -1,7 +1,8 @@
 import abc
 import hashlib
-from functools import cached_property
+from functools import cached_property, reduce
 from itertools import chain, product
+from operator import mul
 
 import numpy
 
@@ -231,6 +232,47 @@ class TensorPointSet(AbstractPointSet):
             len(self.factors) == len(other.factors) and \
             all(s.almost_equal(o, tolerance=tolerance)
                 for s, o in zip(self.factors, other.factors))
+
+
+def _collapsed_coordinates(eta):
+    """Map unit tensor-product coordinates to the unit simplex."""
+    return tuple(
+        eta[t] * reduce(
+            mul, (1 - eta[u] for u in range(t + 1, len(eta))), 1)
+        for t in range(len(eta)))
+
+
+class CollapsedTensorProductPointSet(TensorPointSet):
+    r"""A tensor point set mapped to the simplex by collapsed coordinates.
+
+    The factors are one-dimensional point sets on the ``[0, 1]`` reference
+    interval. Their tensor product is mapped by
+
+    .. math:: x_t = \eta_t \prod_{u=t+1}^{d-1}(1 - \eta_u).
+
+    Parameters
+    ----------
+    factors : tuple of AbstractPointSet
+        One-dimensional point sets of collapsed coordinates, one per
+        spatial dimension of the simplex.
+
+    """
+
+    def __init__(self, factors: tuple[AbstractPointSet, ...]) -> None:
+        super().__init__(factors)
+        assert all(ps.dimension == 1 for ps in self.factors)
+
+    @cached_property
+    def points(self):
+        etas = [ps.points.ravel() for ps in self.factors]
+        grids = list(numpy.meshgrid(*etas, indexing="ij"))
+        return numpy.stack([x.ravel() for x in _collapsed_coordinates(grids)],
+                           axis=-1)
+
+    @cached_property
+    def expression(self):
+        etas = [gem.Indexed(ps.expression, (0,)) for ps in self.factors]
+        return gem.ListTensor(_collapsed_coordinates(etas))
 
 
 class FacetPointSet(AbstractPointSet):
