@@ -313,6 +313,41 @@ def factorise_atomics(monomials, optimal_atomics, linear_indices):
     return new_monomials
 
 
+def collect_common_rests(monomials):
+    """Group monomials with a common scalar coefficient.
+
+    This applies ``r*a + r*b = r*(a + b)`` after argument-factor
+    extraction, allowing the scalar part of a finite element contraction to
+    participate in COFFEE factorisation.
+
+    Parameters
+    ----------
+    monomials : iterable of Monomial
+        Monomials with equal contraction indices.
+
+    Returns
+    -------
+    list of Monomial
+        Monomials after common coefficients have been collected.
+    """
+    def group_key(monomial):
+        linear = frozenset(chain.from_iterable(
+            atomic.free_indices for atomic in monomial.atomics))
+        return frozenset(monomial.sum_indices), linear, monomial.rest
+
+    result = []
+    for (_, _, rest), group in groupby(monomials, key=group_key):
+        if len(group) > 1 and rest != one and all(
+                monomial.atomics for monomial in group):
+            sum_indices = group[0].sum_indices
+            node = make_sum(tuple(
+                make_product(monomial.atomics) for monomial in group))
+            result.append(Monomial(sum_indices, (node,), rest))
+        else:
+            result.extend(group)
+    return result
+
+
 def optimise_monomial_sum(monomial_sum, linear_indices):
     """Choose optimal common atomic subexpressions and factorise a
     :class:`MonomialSum` object to create a GEM expression.
@@ -325,7 +360,11 @@ def optimise_monomial_sum(monomial_sum, linear_indices):
     groups = groupby(monomial_sum, key=lambda m: frozenset(m.sum_indices))
     new_monomials = []
     for _, monomials in groups:
-        new_monomials.extend(optimise_monomials(monomials, linear_indices))
+        old_size = len(monomials) + 1
+        while len(monomials) < old_size:
+            old_size = len(monomials)
+            monomials = optimise_monomials(monomials, linear_indices)
+        new_monomials.extend(monomials)
     return monomial_sum_to_expression(new_monomials)
 
 
@@ -423,4 +462,4 @@ def optimise_monomials(monomials, linear_indices):
         # Discard the connected component
         active_monomials = [m for m in active_monomials if m not in subset]
 
-    return result
+    return collect_common_rests(result)

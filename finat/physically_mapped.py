@@ -29,62 +29,64 @@ class MappedTabulation(Mapping):
         if indices is None:
             indices = list(range(M.shape[0]))
         self.indices = indices
-        rows = [[j for j in range(M.shape[1])
-                 if not isinstance(M.array[i, j], gem.Zero)]
-                for i in indices]
-        width = max(map(len, rows))
-        nrows = len(indices)
-        columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
-        data = numpy.full((nrows, width), zero, dtype=object)
-        for row, entries in enumerate(rows):
-            columns[row, :len(entries)] = entries
-            data[row, :len(entries)] = M.array[indices[row], entries]
-
-        def unit_action(values):
-            active_values = [value for value in values
-                             if not isinstance(value, gem.Zero)]
-            if all(value == one for value in active_values):
-                return "all"
-            if any(value == one for value in active_values):
-                return "some"
-            return None
-
-        row_numbers = numpy.arange(nrows, dtype=gem.uint_type)
-        self.columns = tuple(
-            None if numpy.array_equal(column, row_numbers)
-            else gem.Literal(column, dtype=gem.uint_type)
-            for column in columns.T)
-        self.data = tuple(gem.ListTensor(values) for values in data.T)
-        self.unit_actions = tuple(map(unit_action, data.T))
+        row_columns = tuple(
+            tuple(column for column in range(M.shape[1])
+                  if not isinstance(M.array[row, column], gem.Zero))
+            for row in indices)
+        active_rows = tuple(
+            row for row, columns in enumerate(row_columns)
+            if not (columns == (indices[row],)
+                    and M.array[indices[row], indices[row]] == one))
+        self.identity_columns = gem.Literal(
+            indices, dtype=gem.uint_type)
+        if active_rows:
+            width = max(len(row_columns[row]) for row in active_rows)
+            columns = numpy.zeros(
+                (len(active_rows), width), dtype=gem.uint_type)
+            data = numpy.full(
+                (len(active_rows), width), zero, dtype=object)
+            numbers = numpy.zeros(len(indices), dtype=gem.uint_type)
+            mask = numpy.zeros(len(indices), dtype=bool)
+            for number, row in enumerate(active_rows):
+                entries = row_columns[row]
+                columns[number, :len(entries)] = entries
+                data[number, :len(entries)] = M.array[
+                    indices[row], entries]
+                numbers[row] = number
+                mask[row] = True
+            self.active_columns = gem.Literal(
+                columns, dtype=gem.uint_type)
+            self.active_data = gem.ListTensor(data)
+            self.active_numbers = gem.Literal(
+                numbers, dtype=gem.uint_type)
+            self.active_mask = gem.Literal(mask)
+        else:
+            self.active_columns = None
+            self.active_data = None
+            self.active_numbers = None
+            self.active_mask = None
         self._tabulation_cache = {}
 
     def matvec(self, table):
         row = gem.Index(extent=len(self.indices))
         tail = gem.indices(len(table.shape) - 1)
+        identity_column = gem.VariableIndex(gem.Indexed(
+            self.identity_columns, (row,)))
+        basis = gem.Indexed(table, (identity_column, *tail))
+        if self.active_mask is None:
+            return gem.ComponentTensor(basis, (row, *tail))
 
-        def term(entry):
-            column_table = self.columns[entry]
-            column = row if column_table is None \
-                else gem.VariableIndex(gem.Indexed(column_table, (row,)))
-            value = gem.Indexed(self.data[entry], (row,))
-            basis = gem.Indexed(table, (column, *tail))
-            unit_action = self.unit_actions[entry]
-            if unit_action == "all":
-                mapped = basis
-            elif unit_action == "some":
-                unit = gem.Comparison("==", value, one)
-                mapped = gem.Conditional(
-                    unit, basis, gem.Product(value, basis))
-            else:
-                mapped = gem.Product(value, basis)
-            return value, mapped
-
-        _, mapped = term(0)
-        for entry in range(1, len(self.columns)):
-            value, correction = term(entry)
-            active = gem.Comparison("!=", value, zero)
-            mapped = gem.Conditional(
-                active, gem.Sum(mapped, correction), mapped)
+        active_row = gem.VariableIndex(gem.Indexed(
+            self.active_numbers, (row,)))
+        entry = gem.Index(extent=self.active_columns.shape[1])
+        active_column = gem.VariableIndex(gem.Indexed(
+            self.active_columns, (active_row, entry)))
+        value = gem.Indexed(self.active_data, (active_row, entry))
+        active_basis = gem.Indexed(table, (active_column, *tail))
+        transformed = gem.IndexSum(
+            gem.Product(value, active_basis), (entry,))
+        active = gem.Indexed(self.active_mask, (row,))
+        mapped = gem.Conditional(active, transformed, basis)
         return gem.ComponentTensor(mapped, (row, *tail))
 
     def __getitem__(self, alpha):

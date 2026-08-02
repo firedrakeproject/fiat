@@ -124,6 +124,12 @@ def replace_indices_indexed(node, self, subst):
     child, = node.children
 
     if isinstance(child, ComponentTensor):
+        stop_at = getattr(self, "stop_at", None)
+        if stop_at is not None and stop_at(node):
+            child = self(child, subst)
+            return node if child == node.children[0] \
+                and multiindex == node.multiindex \
+                else Indexed(child, multiindex)
         # Indexing into ComponentTensor
         # Inline ComponentTensor and augment the substitution rules
         substitute = dict(subst)
@@ -181,9 +187,10 @@ def filtered_replace_indices(node, self, subst):
     return replace_indices(node, self, filtered_subst)
 
 
-def remove_componenttensors(expressions, subst=()):
-    """Removes all ComponentTensors in multi-root expression DAG."""
+def remove_componenttensors(expressions, subst=(), stop_at=None):
+    """Removes ComponentTensors in a multi-root expression DAG."""
     mapper = MemoizerArg(filtered_replace_indices)
+    mapper.stop_at = stop_at
     return [mapper(expression, subst) for expression in expressions]
 
 
