@@ -189,7 +189,32 @@ def flops_solve(expr, temporaries):
 
 @flops.register(gem.ComponentTensor)
 def flops_componenttensor(expr, temporaries):
-    raise ValueError("Not expecting ComponentTensor")
+    body, = expr.children
+    multiindex = expr.multiindex
+    control = _control_indices.get().intersection(multiindex)
+    if not control and not any(
+            isinstance(index, gem.JaggedIndex) for index in multiindex):
+        return numpy.prod(expr.shape, dtype=int) * expression_flops(
+            body, temporaries)
+
+    def count(position):
+        if position == len(multiindex):
+            return expression_flops(body, temporaries)
+        index = multiindex[position]
+        values = _index_values.get()
+        extent = index.extent
+        if isinstance(index, gem.JaggedIndex):
+            extent -= sum(values[parent] for parent in index.parents)
+        total = 0
+        for value in range(extent):
+            token = _index_values.set(values | {index: value})
+            try:
+                total += count(position + 1)
+            finally:
+                _index_values.reset(token)
+        return total
+
+    return count(0)
 
 
 def expression_flops(expression, temporaries, top=False):
