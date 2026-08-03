@@ -18,7 +18,8 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Power, MathFunction, MinValue, MaxValue, Inverse, Solve,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, JaggedIndex, ComponentTensor, ListTensor,
-                     FlattenedTensor, Delta, partial_indexed, uint_type, one)
+                     FlattenedTensor, Delta, _jagged_lattice,
+                     partial_indexed, uint_type, one)
 
 
 @singledispatch
@@ -861,6 +862,45 @@ def sum_factorise(
         # Empty product
         return one
 
+    factor_indices = set().union(*(factor.free_indices for factor in factors))
+    jagged_domain = set().union(*(
+        _index_closure((index,))
+        for index in sum_indices if isinstance(index, JaggedIndex)))
+    if jagged_domain - factor_indices:
+        domain_indices = tuple(index for index in sum_indices
+                               if index in jagged_domain)
+        active = _index_closure(factor_indices & jagged_domain) \
+            & jagged_domain
+        active_indices = tuple(index for index in domain_indices
+                               if index in active)
+        points = _jagged_lattice(domain_indices)
+        if active_indices:
+            positions = [domain_indices.index(index)
+                         for index in active_indices]
+            multiplicity = numpy.zeros(
+                tuple(index.extent for index in active_indices))
+            numpy.add.at(
+                multiplicity,
+                tuple(points[:, position] for position in positions), 1)
+            domain_factor = Indexed(
+                Literal(multiplicity), active_indices)
+        else:
+            domain_factor = Literal(len(points))
+        factors += (domain_factor,)
+        factor_indices.update(active_indices)
+        marginalised = jagged_domain - active
+        sum_indices = tuple(index for index in sum_indices
+                            if index not in marginalised)
+
+    missing = set(sum_indices) - factor_indices
+    if missing:
+        # A rectangular sum of an index-independent expression is its extent
+        # times that expression.
+        factors += tuple(Literal(index.extent)
+                         for index in sum_indices if index in missing)
+        sum_indices = tuple(index for index in sum_indices
+                            if index not in missing)
+
     if distribute:
         contraction_indices = frozenset(sum_indices)
         for position, factor in enumerate(factors):
@@ -880,7 +920,7 @@ def sum_factorise(
                         break
                     expressions.append(sum_factorise(
                         indices,
-                        factors[:position] + summand_factors
+                        factors[:position] + tuple(summand_factors)
                         + factors[position + 1:]))
                 else:
                     return make_sum(expressions)

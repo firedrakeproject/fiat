@@ -401,6 +401,50 @@ def test_sum_factorise_bounded_distribution():
     assert value.arr == 192
 
 
+def test_sum_factorise_distribution():
+    """Preserve rectangular contraction multiplicity after distribution."""
+    indices = tuple(gem.Index(extent=2) for _ in range(2))
+    extra = gem.Index(extent=2)
+
+    def unit(index):
+        return gem.Indexed(gem.Literal(numpy.ones(2)), (index,))
+
+    factor = gem.Sum(gem.IndexSum(unit(indices[0]) * unit(extra), (extra,)),
+                     unit(indices[1]))
+    expression = sum_factorise(indices, [factor], distribute=True)
+    value, = evaluate([expression])
+    assert value.arr == 12
+
+
+def test_sum_factorise_jagged_distribution():
+    """Preserve the joint jagged domain after distribution."""
+    parent = gem.JaggedIndex(extent=3)
+    child = gem.JaggedIndex(extent=3, parents=(parent,))
+
+    def unit(index: gem.Index) -> gem.Node:
+        """Return a unit vector carrying one free index.
+
+        Parameters
+        ----------
+        index
+            Free index of the vector.
+
+        Returns
+        -------
+        gem.Node
+            Indexed unit vector.
+        """
+        return gem.Indexed(gem.Literal(numpy.ones(3)), (index,))
+
+    triangle = numpy.fromfunction(
+        lambda i, j: j < 3 - i, (3, 3), dtype=int)
+    factor = gem.Sum(
+        unit(parent), gem.Indexed(gem.Literal(triangle), (parent, child)))
+    expression = sum_factorise((parent, child), [factor], distribute=True)
+    value, = evaluate([expression])
+    assert value.arr == 12
+
+
 def test_refactorise_sum_of_sparse_matvecs():
     left = gem.sparse_matrix((2, 2), [0, 1], [1, 0], [2.0, 3.0])
     right = gem.sparse_matrix((2, 2), [0, 1], [1, 0], [4.0, 5.0])
