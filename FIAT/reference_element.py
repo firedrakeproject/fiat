@@ -1331,10 +1331,6 @@ class TensorProductCell(Cell):
         if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
-            #if op == operator.gt or op == operator.lt or operator.ne:
-            #    return not op(other, self)
-            #if op == operator.ge or op == operator.le:
-            #    return not op(other, self) or operator.eq(self, other)
             raise ValueError("Unknown operator in cell comparison")
 
     def __gt__(self, other):
