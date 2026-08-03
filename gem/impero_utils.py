@@ -155,11 +155,7 @@ def inline_temporaries(expressions, ops):
         if isinstance(op, imp.Evaluate):
             expr = op.expression
             if (expr.shape == ()
-                    and (refcount[expr] == 1 or expr in exclusive
-                         or isinstance(expr, (gem.Comparison,
-                                              gem.LogicalNot,
-                                              gem.LogicalAnd,
-                                              gem.LogicalOr)))):
+                    and (refcount[expr] == 1 or expr in exclusive)):
                 candidates.add(expr)
 
     # Prevent inlining that pulls expressions into inner loops

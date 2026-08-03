@@ -3,13 +3,16 @@ import gem
 import numpy
 
 from gem import impero
-from gem.impero_utils import collect_temporaries, place_declarations
+from gem.flop_count import count_flops
+from gem.impero_utils import (collect_temporaries, compile_gem,
+                              place_declarations)
 from gem.node import traversal
 from gem.interpreter import evaluate
 from gem.optimise import (
     _distribute_sum,
     contraction,
     eliminate_deltas,
+    hoist_linear_index,
     sum_factorise,
     unflatten_returns,
 )
@@ -66,6 +69,51 @@ def test_componenttensor_from_indexed(A):
     i, j = gem.indices(2)
     Aij = gem.Indexed(A, (i, j))
     assert A == gem.ComponentTensor(Aij, (i, j))
+
+
+def test_hoist_linear_index():
+    i = gem.Index(extent=3)
+    j = gem.Index(extent=3)
+    q = gem.Index(extent=2)
+    x = gem.Variable("x", (3, 2))
+    y = gem.Variable("y", (3, 2))
+
+    def value(index):
+        return 2 * gem.Indexed(x, (index, q)) \
+            + gem.Indexed(y, (index, q))
+
+    expression = value(i) * value(j)
+    result = hoist_linear_index(expression, (i, j))
+
+    tensors = [node for node in traversal((result,))
+               if isinstance(node, gem.ComponentTensor)]
+    tensor, = tensors
+    assert tensor.shape == (3,)
+    assert tensor.free_indices == (q,)
+    accesses = [node for node in traversal((result,))
+                if isinstance(node, gem.Indexed)
+                and node.children[0] == tensor]
+    assert {access.multiindex for access in accesses} == {(i,), (j,)}
+
+    bindings = {
+        x: numpy.arange(6).reshape(3, 2),
+        y: numpy.arange(6, 12).reshape(3, 2),
+    }
+    expected, actual = evaluate([expression, result], bindings)
+    assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def test_componenttensor_flop_count():
+    i = gem.Index(extent=3)
+    j = gem.Index(extent=3)
+    x = gem.Variable("x", (3,))
+    result = gem.Variable("result", (3,))
+    tensor = gem.ComponentTensor(2 * gem.Indexed(x, (i,)), (i,))
+    expression = gem.Indexed(tensor, (j,))
+    impero_c = compile_gem(
+        [(gem.Indexed(result, (j,)), expression)], (j,))
+
+    assert count_flops(impero_c) == 6
 
 
 def test_indexed_transpose(A):

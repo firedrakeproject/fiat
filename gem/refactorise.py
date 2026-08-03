@@ -293,11 +293,8 @@ def collect_monomials(expressions, classifier):
     :raises FactorisationError: Failed to break up some "compound"
                                 expressions with expansion.
     """
-    # Preserve atomic tensor expressions so that repeated indexing can be
-    # materialised once by the imperative scheduler.
-    expressions = remove_componenttensors(
-        expressions, stop_at=lambda expression:
-        classifier(expression) == ATOMIC)
+    # Get ComponentTensors out of the way
+    expressions = remove_componenttensors(expressions)
 
     # Get ListTensors out of the way
     must_unroll = []  # indices to unroll
@@ -310,9 +307,7 @@ def collect_monomials(expressions, classifier):
         must_unroll = set(must_unroll)
         expressions = unroll_indexsum(expressions,
                                       predicate=lambda i: i in must_unroll)
-        expressions = remove_componenttensors(
-            expressions, stop_at=lambda expression:
-            classifier(expression) == ATOMIC)
+        expressions = remove_componenttensors(expressions)
 
     # Finally, refactorise expressions
     mapper = Memoizer(_collect_monomials)
