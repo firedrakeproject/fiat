@@ -529,7 +529,6 @@ class SimplicialComplex(Cell):
         include in each direction."""
         if dim == 0:
             return (self.get_vertices()[self.get_topology()[dim][entity_id][0]],)
-            # return (self.get_vertices()[entity_id], )
         elif 0 < dim <= self.get_spatial_dimension():
             entity_verts = \
                 self.get_vertices_of_subcomplex(
@@ -1332,10 +1331,10 @@ class TensorProductCell(Cell):
         if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
-            if op == operator.gt or op == operator.lt or operator.ne:
-                return not op(other, self)
-            if op == operator.ge or op == operator.le:
-                return not op(other, self) or operator.eq(self, other)
+            #if op == operator.gt or op == operator.lt or operator.ne:
+            #    return not op(other, self)
+            #if op == operator.ge or op == operator.le:
+            #    return not op(other, self) or operator.eq(self, other)
             raise ValueError("Unknown operator in cell comparison")
 
     def __gt__(self, other):
