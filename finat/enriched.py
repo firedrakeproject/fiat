@@ -14,6 +14,7 @@ from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
 from finat.hdivcurl import HCurlElement, HDivElement, WrapperElementBase
 from finat.point_set import UnionPointSet
 from finat.tensor_product import TensorProductElement
+from finat.tensorfiniteelement import TensorFiniteElement
 
 
 class EnrichedElement(FiniteElementBase):
@@ -327,6 +328,17 @@ def as_enriched_wrapper(element):
     # summands share with their sum, so every summand takes the same one.
     return EnrichedElement([type(element)(e) for e in summands.elements],
                            is_nodal_enriched=summands.is_nodal_enriched)
+
+
+@as_enriched.register(TensorFiniteElement)
+def as_enriched_tensor_finite_element(element):
+    """Distribute the vector/tensor wrapper over the sum its base element is."""
+    summands = as_enriched(element.base_element)
+    if summands is None:
+        return None
+    return EnrichedElement(
+        [TensorFiniteElement(e, element._shape, element._transpose) for e in summands.elements],
+        is_nodal_enriched=summands.is_nodal_enriched)
 
 
 @as_enriched.register(TensorProductElement)
