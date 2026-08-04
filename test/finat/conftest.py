@@ -107,18 +107,19 @@ def scaled_simplex(dim, scale):
 
 @pytest.fixture
 def ref_el():
-    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (1, 2, 3)}
     return K
 
 
 @pytest.fixture
 def phys_el():
-    K = {dim: FIAT.ufc_simplex(int(dim)) for dim in (2, 2.5, 3)}
+    K = {dim: FIAT.ufc_simplex(int(dim)) for dim in (1.5, 2, 2.5, 3)}
     K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
     K[3].vertices = ((0, 0, 0),
                      (1., 0.1, -0.37),
                      (0.01, 0.987, -.23),
                      (-0.1, -0.2, 1.38))
+    K[1.5].vertices = K[2].vertices[:-1]
     K[2.5].vertices = K[3].vertices[:-1]
     return K
 
