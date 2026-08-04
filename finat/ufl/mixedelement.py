@@ -257,11 +257,13 @@ class MixedElement(FiniteElementBase):
         degree = kwargs.pop('degree', None)
         if degree is None:
             degrees = [None] * len(self.sub_elements)
+        elif isinstance(degree, (list, tuple)):
+            degrees = degree
         else:
             degrees = shifted_sub_degrees(self.sub_elements, degree)
         return type(self)(
-            *[e.reconstruct(cell=c, degree=d, **kwargs)
-              for c, d, e in zip(cell.cells, degrees, self.sub_elements)],
+            *(e.reconstruct(cell=c, degree=d, **kwargs)
+              for c, d, e in zip(cell.cells, degrees, self.sub_elements)),
         )
 
     def variant(self):

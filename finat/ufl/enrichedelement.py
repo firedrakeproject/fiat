@@ -90,9 +90,11 @@ class EnrichedElementBase(FiniteElementBase):
         degree = kwargs.pop('degree', None)
         if degree is None:
             degrees = [None] * len(self._elements)
+        elif isinstance(degree, (list, tuple)):
+            degrees = degree
         else:
             degrees = shifted_sub_degrees(self._elements, degree)
-        return type(self)(*[e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self._elements)])
+        return type(self)(*(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self._elements)))
 
     @property
     def embedded_subdegree(self):

@@ -113,10 +113,12 @@ class TensorProductElement(FiniteElementBase):
         degree = kwargs.pop('degree', None)
         if degree is None:
             degrees = [None] * len(self.factor_elements)
+        elif isinstance(degree, (list, tuple)):
+            degrees = degree
         else:
             degrees = shifted_sub_degrees(self.factor_elements, degree)
         return TensorProductElement(
-            *[e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)],
+            *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
             cell=cell)
 
     def variant(self):
