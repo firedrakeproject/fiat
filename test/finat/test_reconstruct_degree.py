@@ -100,6 +100,23 @@ def test_reconstruct_degree_hdiv_delegates_to_wrapee():
     assert coarse == HDivElement(tp2)
 
 
+@pytest.mark.parametrize("modifier", (TensorProductElement, MixedElement, EnrichedElement))
+def test_reconstruct_degree_tuple_sets_explicit_degrees(modifier):
+    """Passing degree as a list/tuple gives the explicit per-sub-element
+    degrees directly, instead of shifting each sub-element by a common
+    offset.
+    """
+    CG4 = FiniteElement("Lagrange", ufl.interval, 4)
+    DG2 = FiniteElement("Discontinuous Lagrange", ufl.interval, 2)
+    composite = modifier(CG4, DG2)
+
+    explicit = composite.reconstruct(degree=(1, 3))
+
+    CG1 = FiniteElement("Lagrange", ufl.interval, 1)
+    DG3 = FiniteElement("Discontinuous Lagrange", ufl.interval, 3)
+    assert explicit == modifier(CG1, DG3)
+
+
 @pytest.mark.parametrize("degree", (1, 2, 3))
 def test_reconstruct_degree_no_kwarg_is_noop(degree):
     """Reconstructing without a degree kwarg must leave every sub-element's
