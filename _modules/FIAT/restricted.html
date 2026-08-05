@@ -64,8 +64,40 @@
                                          <span class="k">for</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">dofs</span> <span class="k">if</span> <span class="n">dof</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[</span><span class="n">nodes_old</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dual</span> <span class="o">=</span> <span class="n">dual</span>
+        <span class="n">entity_permutations</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_restrict_entity_permutations</span><span class="p">(</span><span class="n">dual</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
 
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_restrict_entity_permutations</span><span class="p">(</span><span class="n">dual</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Inherit the entity permutations of the dofs kept by the restriction.</span>
+
+<span class="sd">        An entity whose dofs are all kept keeps their relative order, and so</span>
+<span class="sd">        permutes exactly as it did in ``dual``; an entity whose dofs are all</span>
+<span class="sd">        dropped permutes trivially. An entity that keeps only some of its dofs</span>
+<span class="sd">        has no permutation to inherit, since the dofs it drops may be the ones</span>
+<span class="sd">        the parent permutation maps the others onto, so no permutations are</span>
+<span class="sd">        given at all in that case.</span>
+
+<span class="sd">        :arg dual: the DualSet being restricted.</span>
+<span class="sd">        :arg entity_ids: the entity ids of the restricted dual set.</span>
+<span class="sd">        :returns: the entity permutations, or None if they cannot be inherited.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">permutations_old</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">entity_permutations</span>
+        <span class="k">if</span> <span class="n">permutations_old</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">dual</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">entity_permutations</span><span class="p">[</span><span class="n">d</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">entity</span><span class="p">,</span> <span class="n">dofs</span> <span class="ow">in</span> <span class="n">entities</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">perms</span> <span class="o">=</span> <span class="n">permutations_old</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">entity</span><span class="p">])</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">dofs</span><span class="p">):</span>
+                    <span class="n">entity_permutations</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">o</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">perms</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+                <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">entity</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">entity_permutations</span><span class="p">[</span><span class="n">d</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">o</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">perms</span><span class="p">}</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">entity_permutations</span>
 
 <div class="viewcode-block" id="RestrictedDualSet.get_indices">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.restricted.RestrictedDualSet.get_indices">[docs]</a>
