@@ -45,3 +45,25 @@ def test_enriched_element_dual_evaluation():
     assert isinstance(expr.children[0], gem.Concatenate)
     assert len(indices) == 1
     assert indices[0].extent == enriched.space_dimension()
+
+
+def test_mixed_subelement_dual_evaluation():
+    cell = ufc_simplex(2)
+    scalar = finat.Lagrange(cell, 1)
+    vector = finat.TensorFiniteElement(scalar, (2,))
+    mixed = finat.MixedElement([scalar, vector])
+    vector_component = mixed.elements[1]
+
+    def fn(points):
+        coordinates = points.expression
+        return gem.ListTensor([
+            gem.Literal(0.0),
+            gem.Indexed(coordinates, (0,)),
+            gem.Indexed(coordinates, (1,)),
+        ])
+
+    expression, indices = vector_component.dual_evaluation(fn)
+    values = gem.ComponentTensor(expression, indices)
+    result, = gem.interpreter.evaluate([values])
+
+    assert numpy.allclose(result.arr, cell.vertices)
