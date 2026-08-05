@@ -1,4 +1,5 @@
 import pytest
+from FIAT import DiscontinuousLagrange, Lagrange, RestrictedElement
 from FIAT.reference_element import Point, UFCInterval, UFCTriangle, UFCQuadrilateral
 from FIAT.orientation_utils import make_entity_permutations_tensorproduct
 
@@ -71,12 +72,10 @@ def test_orientation_cell_orientation_reflection_map(cell):
                      (1, 1, 1): 1}
 
 
-@pytest.mark.parametrize("degree", [3, 4, 5])
+@pytest.mark.parametrize("degree", [1, 2, 3, 4, 5])
 def test_orientation_restricted_element(degree):
     # A restriction keeps the relative order of the dofs on the entities it
     # keeps, so those entities must permute exactly as they did before it.
-    from FIAT import Lagrange, RestrictedElement
-
     element = Lagrange(UFCTriangle(), degree)
     restricted = RestrictedElement(element, restriction_domain="facet")
 
@@ -89,3 +88,15 @@ def test_orientation_restricted_element(degree):
     # The cell is dropped, so it has no dofs left to permute.
     for orientation, perm in restricted_permutations[2][0].items():
         assert perm == []
+
+
+def test_orientation_restricted_element_partial_entity():
+    # An entity that keeps only some of its dofs has no permutation to
+    # inherit, since the dofs it drops may be where the parent permutation
+    # sends the ones it keeps, so no permutations are reported at all.
+    element = DiscontinuousLagrange(UFCTriangle(), 1)
+    restricted = RestrictedElement(element, indices=[0])
+
+    assert restricted.dual.entity_permutations is None
+    with pytest.raises(NotImplementedError):
+        restricted.dual.get_entity_permutations()
