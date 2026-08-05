@@ -49,7 +49,7 @@
 <span class="c1"># Modified by Massimiliano Leoni, 2016</span>
 <span class="c1"># Modified by Matthew Scroggs, 2023</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">finat.ufl.finiteelementbase</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElementBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">finat.ufl.finiteelementbase</span><span class="w"> </span><span class="kn">import</span> <span class="n">FiniteElementBase</span><span class="p">,</span> <span class="n">shifted_sub_degrees</span>
 
 
 <div class="viewcode-block" id="EnrichedElementBase">
@@ -135,7 +135,14 @@
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElementBase.reconstruct">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="o">*</span><span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">])</span></div>
+        <span class="n">degree</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;degree&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">degree</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">degrees</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+            <span class="n">degrees</span> <span class="o">=</span> <span class="n">degree</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">degrees</span> <span class="o">=</span> <span class="n">shifted_sub_degrees</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)(</span><span class="o">*</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="n">degree</span><span class="o">=</span><span class="n">d</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">degrees</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)))</span></div>
 
 
     <span class="nd">@property</span>

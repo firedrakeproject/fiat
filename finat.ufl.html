@@ -449,6 +449,23 @@ A component is a tuple of one or more ints.</p>
 
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.ufl.finiteelementbase.flat_max_degree">
+<span class="sig-prename descclassname"><span class="pre">finat.ufl.finiteelementbase.</span></span><span class="sig-name descname"><span class="pre">flat_max_degree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#flat_max_degree"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.flat_max_degree" title="Link to this definition">¶</a></dt>
+<dd><p>Return the maximum degree out of a possibly tuple-valued polynomial degree.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.ufl.finiteelementbase.shifted_sub_degrees">
+<span class="sig-prename descclassname"><span class="pre">finat.ufl.finiteelementbase.</span></span><span class="sig-name descname"><span class="pre">shifted_sub_degrees</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">elements</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Sequence" title="(in Python v3.14)"><span class="pre">Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase" title="finat.ufl.finiteelementbase.FiniteElementBase"><span class="pre">FiniteElementBase</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">degree</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a></span></span><a class="reference internal" href="_modules/finat/ufl/finiteelementbase.html#shifted_sub_degrees"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.ufl.finiteelementbase.shifted_sub_degrees" title="Link to this definition">¶</a></dt>
+<dd><p>Return the per-sub-element degree needed to reconstruct <code class="docutils literal notranslate"><span class="pre">elements</span></code> at <code class="docutils literal notranslate"><span class="pre">degree</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">degree</span></code> is the target maximum degree of the composite element made up of
+<code class="docutils literal notranslate"><span class="pre">elements</span></code>. Every sub-element’s own degree is shifted by the same amount, so that
+reconstructing a composite element with heterogeneous sub-element degrees (e.g. a
+Taylor-Hood pair, or NCF(k) x DQ(k-1)) preserves the relative degree offsets rather
+than clobbering every sub-element to the same absolute degree.</p>
+</dd></dl>
+
 </section>
 <section id="module-finat.ufl.hdivcurl">
 <span id="finat-ufl-hdivcurl-module"></span><h2>finat.ufl.hdivcurl module<a class="headerlink" href="#module-finat.ufl.hdivcurl" title="Link to this heading">¶</a></h2>
@@ -1107,6 +1124,8 @@ A component is a tuple of one or more ints.</p>
 <li><a class="reference internal" href="#finat.ufl.finiteelementbase.FiniteElementBase.variant"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.variant()</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#finat.ufl.finiteelementbase.flat_max_degree"><code class="docutils literal notranslate"><span class="pre">flat_max_degree()</span></code></a></li>
+<li><a class="reference internal" href="#finat.ufl.finiteelementbase.shifted_sub_degrees"><code class="docutils literal notranslate"><span class="pre">shifted_sub_degrees()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#module-finat.ufl.hdivcurl">finat.ufl.hdivcurl module</a><ul>
