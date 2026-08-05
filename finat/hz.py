@@ -13,7 +13,7 @@ class HuZhang(PhysicallyMappedElement, FiatElement):
         self.variant = variant
         super().__init__(FIAT.HuZhang(cell, degree, variant=variant, quad_scheme=quad_scheme))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         ndofs = self.space_dimension()
         V = identity(ndofs)
 

@@ -13,7 +13,7 @@ class AlfeldSorokina(PhysicallyMappedElement, FiatElement):
         cite("AlfeldSorokina2016")
         super().__init__(FIAT.AlfeldSorokina(cell, degree))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         sd = self.cell.get_spatial_dimension()
         bary, = self.cell.make_points(sd, 0, sd+1)
         J = coordinate_mapping.jacobian_at(bary)

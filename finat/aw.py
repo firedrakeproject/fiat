@@ -55,7 +55,7 @@ class ArnoldWintherNC(PhysicallyMappedElement, FiatElement):
         cite("Arnold2003")
         super().__init__(FIAT.ArnoldWintherNC(cell, degree))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         """Note, the extra 3 dofs which are removed here
         correspond to the constraints."""
         numbf = self._element.space_dimension()
@@ -86,7 +86,7 @@ class ArnoldWinther(PhysicallyMappedElement, FiatElement):
         cite("Arnold2002")
         super().__init__(FIAT.ArnoldWinther(cell, degree))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         # The extra 6 dofs removed here correspond to the constraints
         numbf = self._element.space_dimension()
         ndof = self.space_dimension()

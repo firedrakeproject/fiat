@@ -37,7 +37,7 @@ class Morley(PhysicallyMappedElement, ScalarFiatElement):
         cite("MingXu2006")
         super().__init__(FIAT.Morley(cell, degree=degree))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         sd = self.cell.get_spatial_dimension()
         top = self.cell.get_topology()
         # Jacobians at barycenter
