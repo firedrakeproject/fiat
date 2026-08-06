@@ -416,10 +416,12 @@ def canonical_element_description(family, cell, order, form_degree):
             raise ValueError("Need dimension to handle element aliases.")
         (family, order) = aliases[family](family, tdim, order, form_degree)
 
+    # Check that we don't have a raw FUSE object
+    if repr(family).startswith("FuseTriple"):
+        raise ValueError("Recieved unconverted FUSE triple - did you forget to call to_ufl()?")
+
     # Check that the element family exists
     if family not in ufl_elements:
-        if repr(family).startswith("FuseTriple"):
-            raise ValueError("Recieved unconverted FUSE triple - did you forget to call to_ufl()?")
         raise ValueError(f"Unknown finite element '{family}'.")
 
     # Check that element data is valid (and also get common family

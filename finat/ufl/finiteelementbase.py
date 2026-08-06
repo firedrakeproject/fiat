@@ -278,8 +278,10 @@ def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], use_fuse: bool 
     if isinstance(cell, str) and use_fuse:
         try:
             import fuse
-        except ModuleNotFoundError:
-            raise ModuleNotFoundError("Cannot create FUSE cell without FUSE")
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "FUSE cell construction requires the optional 'fuse' dependency. "
+            ) from exc
         return fuse.constructCellComplex(cell)
     else:
         return as_cell_ufl(cell)

@@ -145,7 +145,7 @@ class Cell:
         self.vertices = vertices
         self.topology = topology
 
-        if sub_entities:
+        if sub_entities is not None:
             self.sub_entities = sub_entities
         else:
             # If sub entity list not provided
@@ -1332,7 +1332,7 @@ class TensorProductCell(Cell):
         if isinstance(other, TensorProductCell):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
-            if op == operator.gt or op == operator.lt or operator.ne:
+            if op == operator.gt or op == operator.lt or op == operator.ne:
                 return not op(other, self)
             if op == operator.ge or op == operator.le:
                 return not op(other, self) or operator.eq(self, other)

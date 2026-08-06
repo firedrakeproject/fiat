@@ -11,17 +11,26 @@ class FuseElement(FiniteElementBase):
     """
     A finite element defined using FUSE.
 
-    TODO: Need to deal with cases where value shape and reference value shape are different
+    :arg triple: An ElementTriple object defined with FUSE
+    :arg cell: Optional (defaults to triple.cell) The cell the element is defined on
+
     """
 
     def __init__(self, triple, cell=None):
+        try:
+            import fuse
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "FUSE element creation requires the optional 'fuse' dependency. "
+            ) from exc
+        assert isinstance(triple, fuse.ElementTriple)
         self.triple = triple
         if not cell:
             cell = self.triple.cell.to_ufl()
 
         degree = self.triple.degree
         self.sobolev_space = self.triple.spaces[1].to_ufl()
-        super(FuseElement, self).__init__("IT", cell, degree, None, triple.get_value_shape())
+        super().__init__("IT", cell, degree, None, triple.get_value_shape())
 
     def __repr__(self):
         return repr(self.triple)
