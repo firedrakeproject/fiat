@@ -1260,12 +1260,24 @@ def factorisation_group_options(
     tuple
         Additive terms paired with a structural layout key and their possible
         sets of atomic groups.
+
+    Notes
+    -----
+    Distributing a sum over several linear axes is useful only when it exposes
+    a choice of sums over individual axes.  Without such a choice, preserving
+    the original sum retains its sharing for ordinary monomial collection.
     """
     linear_indices = frozenset(linear_indices)
 
     def multilinear_sum(node: Node) -> bool:
         return isinstance(node, Sum) and len(
             linear_indices.intersection(node.free_indices)) > 1
+
+    if not any(
+            isinstance(node, Sum)
+            and len(linear_indices.intersection(node.free_indices)) == 1
+            for node in traversal((expression,))):
+        return ((expression, (), (frozenset(),)),)
 
     terms = _distribute_sum(expression, predicate=multilinear_sum)
     result = []

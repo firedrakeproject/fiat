@@ -12,6 +12,7 @@ from gem.optimise import (
     _distribute_sum,
     contraction,
     eliminate_deltas,
+    factorisation_group_options,
     hoist_linear_index,
     sum_factorise,
     unflatten_returns,
@@ -164,6 +165,19 @@ def test_selective_distribution():
 
     assert len(terms) == 2
     assert all(common in set(traversal((term,))) for term in terms)
+
+
+def test_factorisation_group_options_early_exit():
+    """Do not expand a multilinear sum without grouping choices."""
+    i = gem.Index(extent=2)
+    j = gem.Index(extent=2)
+    variables = [gem.Variable(f"a{k}", (2, 2)) for k in range(4)]
+    expression = gem.Sum(*(
+        gem.Indexed(variable, (i, j)) for variable in variables))
+
+    options = factorisation_group_options(expression, (i, j))
+
+    assert options == ((expression, (), (frozenset(),)),)
 
 
 def test_constant_variable_index():
