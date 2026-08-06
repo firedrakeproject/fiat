@@ -111,13 +111,15 @@ have a direct FInAT equivalent."""
 
 
 @cache
-def as_fiat_cell(cell):
+def as_fiat_cell(cell, dtype=None):
     """Convert a ufl cell to a FIAT cell.
 
-    :arg cell: the :class:`ufl.Cell` to convert."""
+    :arg cell: the :class:`ufl.Cell` to convert.
+    :arg dtype: the dtype to build the reference cell's coordinates with.
+        Defaults to FIAT's own default (float64) if not given."""
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
-    return ufc_cell(cell)
+    return ufc_cell(cell, dtype=dtype)
 
 
 @singledispatch
@@ -153,7 +155,7 @@ dg_interval_variants = {
 # Base finite elements first
 @convert.register(finat.ufl.FiniteElement)
 def convert_finiteelement(element, **kwargs):
-    cell = as_fiat_cell(element.cell)
+    cell = as_fiat_cell(element.cell, dtype=kwargs.get("dtype"))
     if element.family() in {"Quadrature", "Boundary Quadrature"}:
         degree = element.degree()
         scheme = element.quadrature_scheme() or "default"
@@ -161,7 +163,7 @@ def convert_finiteelement(element, **kwargs):
             raise ValueError("Quadrature scheme and degree must be specified!")
 
         codim = 1 if element.family() == "Boundary Quadrature" else 0
-        return finat.make_quadrature_element(cell, degree, scheme, codim), set()
+        return finat.make_quadrature_element(cell, degree, scheme, codim), {"dtype"}
 
     make_finat_element = supported_elements[element.family()]
 
@@ -186,7 +188,7 @@ def convert_finiteelement(element, **kwargs):
         finat_elem, deps = _create_element(element, **kwargs)
         return finat.FlattenedDimensions(finat_elem), deps
 
-    deps = set()
+    deps = {"dtype"}
     finat_kwargs = {}
     kind = element.variant()
     if kind is None:
@@ -205,7 +207,7 @@ def convert_finiteelement(element, **kwargs):
             finat_kwargs["variant"] = kind
             finat_kwargs["shift_axes"] = kwargs["shift_axes"]
             finat_kwargs["restriction"] = kwargs["restriction"]
-            deps = {"shift_axes", "restriction"}
+            deps |= {"shift_axes", "restriction"}
         else:
             # Let FIAT handle the general case
             make_finat_element = finat.Lagrange
@@ -227,7 +229,7 @@ def convert_finiteelement(element, **kwargs):
             finat_kwargs["shift_axes"] = kwargs["shift_axes"]
             finat_kwargs["restriction"] = kwargs["restriction"]
             finat_kwargs["continuous"] = False
-            deps = {"shift_axes", "restriction"}
+            deps |= {"shift_axes", "restriction"}
         else:
             # Let FIAT handle the general case
             make_finat_element = finat.DiscontinuousLagrange
@@ -330,18 +332,21 @@ quadrilateral_tpc = ufl.TensorProductCell(ufl.interval, ufl.interval)
 _cache = weakref.WeakKeyDictionary()
 
 
-def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None):
+def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None, dtype=None):
     """Create a FInAT element (suitable for tabulating with) given a UFL element.
 
     :arg ufl_element: The UFL element to create a FInAT element from.
     :arg shape_innermost: Vector/tensor indices come after basis function indices
     :arg restriction: cell restriction in interior facet integrals
                       (only for runtime tabulated elements)
+    :arg dtype: the dtype to build the element's reference cell with.
+               Defaults to FIAT's own default (float64) if not given.
     """
     finat_element, deps = _create_element(ufl_element,
                                           shape_innermost=shape_innermost,
                                           shift_axes=shift_axes,
-                                          restriction=restriction)
+                                          restriction=restriction,
+                                          dtype=dtype)
     return finat_element
 
 
