@@ -444,9 +444,114 @@ def _index_closure(indices: Iterable[Index]) -> frozenset[Index]:
     return frozenset(closure)
 
 
+def _index_components(
+        indices: frozenset[Index]) -> tuple[frozenset[Index], ...]:
+    """Find independent components of an index-parent graph.
+
+    Parameters
+    ----------
+    indices
+        Indices closed under the jagged parent relation.
+
+    Returns
+    -------
+    tuple of frozenset of Index
+        Connected components of the undirected parent graph.
+    """
+    neighbours = {index: set() for index in indices}
+    for index in indices:
+        for parent in getattr(index, "parents", ()):
+            neighbours[index].add(parent)
+            neighbours[parent].add(index)
+
+    components = []
+    remaining = set(indices)
+    while remaining:
+        pending = [min(remaining, key=lambda index: index.count)]
+        component = set(pending)
+        while pending:
+            index = pending.pop()
+            new = neighbours[index] - component
+            component.update(new)
+            pending.extend(new)
+        remaining.difference_update(component)
+        components.append(frozenset(component))
+    return tuple(components)
+
+
+def _component_iteration_count(indices: frozenset[Index]) -> int:
+    """Count one connected rectangular or jagged index domain.
+
+    The dynamic-programming state contains only values on the live parent
+    frontier.  Values disappear as soon as no unvisited index depends on
+    them, so equivalent suffixes share one count.
+
+    Parameters
+    ----------
+    indices
+        One connected component of an index-parent graph.
+
+    Returns
+    -------
+    int
+        Number of points in the component domain.
+    """
+    parents = {
+        index: frozenset(getattr(index, "parents", ()))
+        for index in indices
+    }
+    ordered = []
+    remaining = set(indices)
+    while remaining:
+        available = sorted(
+            (index for index in remaining
+             if parents[index] <= set(ordered)),
+            key=lambda index: index.count)
+        if not available:
+            raise ValueError("Jagged index parents contain a cycle")
+        ordered.extend(available)
+        remaining.difference_update(available)
+
+    last_use = {
+        index: max(
+            (position for position, child in enumerate(ordered)
+             if index in parents[child]),
+            default=-1,
+        )
+        for index in ordered
+    }
+    frontiers = tuple(
+        tuple(index for index in ordered[:position]
+              if last_use[index] >= position)
+        for position in range(len(ordered) + 1)
+    )
+
+    @lru_cache(maxsize=None)
+    def count(position: int, state: tuple[int, ...]) -> int:
+        if position == len(ordered):
+            return 1
+        values = dict(zip(frontiers[position], state))
+        index = ordered[position]
+        extent = index.extent - sum(
+            values[parent] for parent in parents[index])
+        next_frontier = frontiers[position + 1]
+        total = 0
+        for value in range(extent):
+            values[index] = value
+            next_state = tuple(values[parent] for parent in next_frontier)
+            total += count(position + 1, next_state)
+        return total
+
+    return count(0, ())
+
+
 @lru_cache(maxsize=1024)
 def _iteration_count(indices: frozenset[Index]) -> int:
     """Count points in a rectangular or jagged iteration space.
+
+    Independent parent-graph components form a Cartesian product, so their
+    point counts multiply.  Each jagged component is counted by dynamic
+    programming over its live parent frontier.
 
     Parameters
     ----------
@@ -464,35 +569,8 @@ def _iteration_count(indices: frozenset[Index]) -> int:
     if not any(isinstance(index, JaggedIndex) for index in indices):
         return int(numpy.prod(
             [index.extent for index in indices], dtype=int))
-
-    ordered = []
-    remaining = set(indices)
-    while remaining:
-        available = sorted(
-            (index for index in remaining
-             if set(getattr(index, "parents", ())) <= set(ordered)),
-            key=lambda index: index.count)
-        if not available:
-            raise ValueError("Jagged index parents contain a cycle")
-        ordered.extend(available)
-        remaining.difference_update(available)
-
-    values = {}
-
-    def count(position: int) -> int:
-        if position == len(ordered):
-            return 1
-        index = ordered[position]
-        extent = index.extent - sum(
-            values[parent] for parent in getattr(index, "parents", ()))
-        total = 0
-        for value in range(extent):
-            values[index] = value
-            total += count(position + 1)
-        values.pop(index)
-        return total
-
-    return count(0)
+    return math.prod(map(
+        _component_iteration_count, _index_components(indices)))
 
 
 def _storage_count(indices: Iterable[Index]) -> int:

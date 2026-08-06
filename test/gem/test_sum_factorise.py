@@ -85,3 +85,19 @@ def test_estimate_cost_jagged_contraction():
 
     assert operations == 20
     assert storage == largest == 1
+
+
+def test_estimate_cost_independent_jagged_domains():
+    """Multiply point counts of independent simplex lattices."""
+    p = gem.JaggedIndex(extent=4)
+    q = gem.JaggedIndex(extent=4, parents=(p,))
+    t = gem.JaggedIndex(extent=4, parents=(p, q))
+    r = gem.JaggedIndex(extent=5)
+    s = gem.JaggedIndex(extent=5, parents=(r,))
+    table = gem.Indexed(
+        gem.Literal(numpy.ones((4, 4, 4, 5, 5))), (p, q, t, r, s))
+    expression = gem.IndexSum(table * table, (p, q, t, r, s))
+
+    operations, storage, largest, _ = estimate_cost((expression,))
+
+    assert operations == 2 * 20 * 15
