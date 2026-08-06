@@ -387,14 +387,14 @@ class SimplicialComplex(Cell):
 
     This consists of list of vertex locations and a topology map defining facets.
     """
-    def __init__(self, shape, vertices, topology, sub_ents=None):
+    def __init__(self, shape, vertices, topology, sub_entities=None):
         # Make sure that every facet has the right number of vertices to be
         # a simplex.
         for dim in topology:
             for entity in topology[dim]:
                 assert len(topology[dim][entity]) == dim + 1
 
-        super().__init__(shape, vertices, topology, sub_ents)
+        super().__init__(shape, vertices, topology, sub_entities)
 
     def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
