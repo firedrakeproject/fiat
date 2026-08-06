@@ -363,6 +363,7 @@ def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=
     :arg shape_innermost: Vector/tensor indices come after basis function indices
     :arg restriction: cell restriction in interior facet integrals
                       (only for runtime tabulated elements)
+    :arg use_fuse: When creating cells, ensure they are fuse compatible. inherited from the mesh.
     """
     finat_element, deps = _create_element(ufl_element,
                                           shape_innermost=shape_innermost,
