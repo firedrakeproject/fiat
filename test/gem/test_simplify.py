@@ -10,13 +10,11 @@ from gem.node import traversal
 from gem.interpreter import evaluate
 from gem.optimise import (
     _distribute_sum,
-    contraction,
     eliminate_deltas,
     factorisation_group_options,
     hoist_linear_index,
     sum_factorise,
 )
-from gem.refactorise import ATOMIC, COMPOUND, OTHER, collect_monomials
 
 
 @pytest.fixture
@@ -215,7 +213,6 @@ def test_delta_elimination_preserves_indirect_free_index():
     assert result.free_indices == (k,)
     actual, = evaluate([result])
     assert numpy.array_equal(actual.arr, values.array[entries])
-
 
 
 def test_sum_factorise_bounded_distribution():

@@ -195,6 +195,8 @@ def find_optimal_atomics(
     return tuple(
         atomic for position, atomic in enumerate(atomics)
         if best_solution & (1 << position))
+
+
 def factorise_atomics(monomials, optimal_atomics, linear_indices):
     """Group and factorise monomials using a list of atomics as common
     subexpressions. Create new monomials for each group and optimise them recursively.
@@ -346,6 +348,8 @@ def optimise_monomial_sum(
             monomials = optimise_monomials(monomials, linear_indices)
         optimized.extend(monomials)
     return monomial_sum_to_expression(optimized)
+
+
 def optimise_monomials(monomials, linear_indices):
     """Choose optimal common atomic subexpressions and factorise an iterable
     of monomials.

@@ -703,7 +703,6 @@ class JaggedIndex(Index):
         self.parents = state[-1]
 
 
-
 class RaggedIndex(Index):
     """Free index with a tabulated extent over its parent indices.
 
@@ -1006,12 +1005,6 @@ class ComponentTensor(Node):
         self.free_indices = unique(set(expression.free_indices) - set(multiindex))
 
         return self
-
-
-
-    def lattice_points(self) -> numpy.ndarray:
-        """Return the in-bounds lattice multi-indices in flat order."""
-        return _jagged_lattice(self.multiindex)
 
 
 def _jagged_layout(multiindex: tuple[Index, ...]) -> tuple:

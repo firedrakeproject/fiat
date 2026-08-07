@@ -17,8 +17,8 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Power, MathFunction, MinValue, MaxValue, Inverse, Solve,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
-                     IndexSum, JaggedIndex, RaggedIndex, ComponentTensor, ListTensor,
-                     Delta, _jagged_lattice, partial_indexed, uint_type, one)
+                     IndexSum, JaggedIndex, ComponentTensor, ListTensor,
+                     Delta, _jagged_lattice, partial_indexed, one)
 
 
 @singledispatch

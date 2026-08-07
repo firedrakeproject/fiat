@@ -7,7 +7,6 @@ import gem.gem as gem
 import gem.impero as imp
 from contextvars import ContextVar
 from functools import singledispatch
-from gem.node import traversal
 import numpy
 import math
 
@@ -242,6 +241,7 @@ def count_flops(impero_c):
             _control_indices.reset(control_token)
     except (ValueError, NotImplementedError):
         return 0
+
 
 _index_values = ContextVar("flop_count_index_values", default={})
 _control_indices = ContextVar("flop_count_control_indices",
