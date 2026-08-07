@@ -126,12 +126,12 @@ def restrict_enriched(element, domain, take_closure):
 
     elements = tuple(e for e in elements if e is not null_element)
     if elements:
+        kwargs = {}
         if reconstruct is finat.EnrichedElement:
             # Restriction selects disjoint subsets of the DoFs, so the
             # restricted subelements are nodal whenever the original ones are.
-            return reconstruct(elements,
-                               is_nodal_enriched=element.is_nodal_enriched)
-        return reconstruct(elements)
+            kwargs["is_nodal_enriched"] = element.is_nodal_enriched
+        return reconstruct(elements, **kwargs)
     else:
         return null_element
 
