@@ -146,15 +146,9 @@ def flops_power(expr, temporaries):
 
 @flops.register(gem.Conditional)
 def flops_conditional(expr, temporaries):
-    condition, then, else_ = expr.children
-    condition_flops = expression_flops(condition, temporaries)
-    value = _static_value(condition)
-    if value is not _UNKNOWN:
-        branch = then if value else else_
-        return condition_flops + expression_flops(branch, temporaries)
-    then_flops = expression_flops(then, temporaries)
-    else_flops = expression_flops(else_, temporaries)
-    return condition_flops + max(then_flops, else_flops)
+    condition, then, else_ = (expression_flops(child, temporaries)
+                              for child in expr.children)
+    return condition + max(then, else_)
 
 
 @flops.register(gem.Indexed)
@@ -249,90 +243,13 @@ def count_flops(impero_c):
     except (ValueError, NotImplementedError):
         return 0
 
-_UNKNOWN = object()
 _index_values = ContextVar("flop_count_index_values", default={})
 _control_indices = ContextVar("flop_count_control_indices",
                               default=frozenset())
 
 
-def _static_index(index):
-    """Evaluate an index from the current statically known loop values."""
-    if isinstance(index, (int, numpy.integer)):
-        return int(index)
-    if isinstance(index, gem.Index):
-        return _index_values.get().get(index, _UNKNOWN)
-    if isinstance(index, gem.VariableIndex):
-        value = _static_value(index.expression)
-        return _UNKNOWN if value is _UNKNOWN else int(value)
-    return _UNKNOWN
-
-
-def _static_value(expression):
-    """Partially evaluate compile-time data in a scalar expression."""
-    if isinstance(expression, gem.Zero):
-        return 0
-    if isinstance(expression, gem.Literal) and not expression.shape:
-        return expression.value
-    if isinstance(expression, gem.Index):
-        return _static_index(expression)
-    if isinstance(expression, gem.Indexed):
-        aggregate, = expression.children
-        multiindex = tuple(map(_static_index, expression.multiindex))
-        if any(index is _UNKNOWN for index in multiindex):
-            return _UNKNOWN
-        if isinstance(aggregate, gem.Literal):
-            return aggregate.array[multiindex]
-        if isinstance(aggregate, gem.ListTensor):
-            return _static_value(aggregate.array[multiindex])
-        return _UNKNOWN
-    if isinstance(expression, gem.Comparison):
-        left, right = map(_static_value, expression.children)
-        if left is _UNKNOWN or right is _UNKNOWN:
-            return _UNKNOWN
-        if expression.operator == "==":
-            return left == right
-        if expression.operator == "!=":
-            return left != right
-        if expression.operator == "<":
-            return left < right
-        if expression.operator == "<=":
-            return left <= right
-        if expression.operator == ">":
-            return left > right
-        if expression.operator == ">=":
-            return left >= right
-    if isinstance(expression, gem.LogicalNot):
-        value = _static_value(expression.children[0])
-        return _UNKNOWN if value is _UNKNOWN else not value
-    if isinstance(expression, (gem.LogicalAnd, gem.LogicalOr)):
-        left, right = map(_static_value, expression.children)
-        if isinstance(expression, gem.LogicalAnd):
-            if left is False or right is False:
-                return False
-            return _UNKNOWN if left is _UNKNOWN or right is _UNKNOWN else True
-        if left is True or right is True:
-            return True
-        return _UNKNOWN if left is _UNKNOWN or right is _UNKNOWN else False
-    return _UNKNOWN
-
-
-def _terminal_expressions(tree):
-    """Return GEM expressions evaluated by an Impero terminal."""
-    if isinstance(tree, imp.Evaluate):
-        return (tree.expression,)
-    if isinstance(tree, imp.Accumulate):
-        return tree.indexsum.children
-    if isinstance(tree, imp.Return):
-        return (tree.expression,)
-    if isinstance(tree, imp.ReturnAccumulate):
-        return tree.indexsum.children
-    if isinstance(tree, imp.Noop):
-        return (tree.expression,)
-    return ()
-
-
 def _find_control_indices(tree):
-    """Find loop indices controlling jagged bounds or static branches."""
+    """Find loop indices controlling dependent loop bounds."""
     result = set()
     if isinstance(tree, imp.For):
         if getattr(tree.index, "parents", ()):
@@ -341,9 +258,4 @@ def _find_control_indices(tree):
     elif isinstance(tree, imp.Block):
         for child in tree.children:
             result.update(_find_control_indices(child))
-    else:
-        for expression in _terminal_expressions(tree):
-            for node in traversal((expression,)):
-                if isinstance(node, gem.Conditional):
-                    result.update(node.children[0].free_indices)
     return result

@@ -30,7 +30,6 @@ class NoopError(Exception):
 
 def preprocess_gem(expressions, replace_delta=True, remove_componenttensors=True):
     """Lower GEM nodes that cannot be translated to C directly."""
-    expressions = optimise.replace_flattened(expressions)
     if remove_componenttensors:
         expressions = optimise.remove_componenttensors(expressions)
     if replace_delta:
@@ -141,21 +140,11 @@ def inline_temporaries(expressions, ops):
     """
     refcount = collect_refcount(expressions)
 
-    exclusive = set()
-    for node in traversal(expressions):
-        if isinstance(node, gem.Conditional):
-            _, then, else_ = node.children
-            if else_ in then.children and refcount[else_] == 2:
-                exclusive.add(else_)
-            elif then in else_.children and refcount[then] == 2:
-                exclusive.add(then)
-
     candidates = set()  # candidates for inlining
     for op in ops:
         if isinstance(op, imp.Evaluate):
             expr = op.expression
-            if (expr.shape == ()
-                    and (refcount[expr] == 1 or expr in exclusive)):
+            if expr.shape == () and refcount[expr] == 1:
                 candidates.add(expr)
 
     # Prevent inlining that pulls expressions into inner loops
