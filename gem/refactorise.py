@@ -4,6 +4,7 @@ refactorisation."""
 from collections import Counter, OrderedDict, defaultdict, namedtuple
 from functools import singledispatch
 from itertools import product
+import math
 from sys import intern
 
 from gem.node import Memoizer, traversal
@@ -129,6 +130,10 @@ class FactorisationError(Exception):
     pass
 
 
+class ExpansionLimitExceeded(FactorisationError):
+    """Raised when polynomial expansion exceeds its complexity budget."""
+
+
 @singledispatch
 def _collect_monomials(expression, self):
     """Refactorises an expression into a sum-of-products form, using
@@ -174,12 +179,19 @@ def _collect_monomials(expression, self):
             # recursion and fail gracefully raising an exception.
             raise FactorisationError(expr)
         # Recurse into each summand, concatenate their results
-        sums.append(MonomialSum.sum(*map(self, summands)))
+        monomial_sum = MonomialSum.sum(*map(self, summands))
+        if (self.max_monomials is not None
+                and len(monomial_sum) > self.max_monomials):
+            raise ExpansionLimitExceeded
+        sums.append(monomial_sum)
 
     # Phase 3: Expansion
     #
     # Each element of ``sums`` is a MonomialSum.  Expansion produces a
     # series (representing a sum) of products of monomials.
+    if (self.max_monomials is not None
+            and math.prod(map(len, sums)) > self.max_monomials):
+        raise ExpansionLimitExceeded
     result = MonomialSum()
     for s, a, r in MonomialSum.product(*sums, rename_map=self.rename_map):
         renamer = make_renamer(self.rename_map)
@@ -208,6 +220,9 @@ def _collect_monomials(expression, self):
         rest = sum_factorise(rest_indices, common_others + [applier(r)])
 
         result.add(sum_indices, atomics, rest)
+        if (self.max_monomials is not None
+                and len(result) > self.max_monomials):
+            raise ExpansionLimitExceeded
     return result
 
 
@@ -278,7 +293,7 @@ def _collect_monomials_conditional(
     return result
 
 
-def collect_monomials(expressions, classifier):
+def collect_monomials(expressions, classifier, max_monomials=None):
     """Refactorises expressions into a sum-of-products form, using
     distributivity rules (i.e. a*(b + c) -> a*b + a*c).  Expansion
     proceeds until all "compound" expressions are broken up.
@@ -312,5 +327,6 @@ def collect_monomials(expressions, classifier):
     # Finally, refactorise expressions
     mapper = Memoizer(_collect_monomials)
     mapper.classifier = classifier
+    mapper.max_monomials = max_monomials
     mapper.rename_map = make_rename_map()
     return list(map(mapper, expressions))
