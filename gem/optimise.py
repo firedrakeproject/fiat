@@ -208,6 +208,7 @@ def hoist_linear_index(expression: Node,
     -------
     Node
         Expression with profitable repeated linear expressions shared.
+
     """
     linear_indices = frozenset(linear_indices)
     canonical = {
@@ -431,6 +432,7 @@ def _index_closure(indices: Iterable[Index]) -> frozenset[Index]:
     -------
     frozenset of Index
         The iteration indices required to execute the operation.
+
     """
     closure = set(indices)
     pending = list(closure)
@@ -456,6 +458,7 @@ def _index_components(
     -------
     tuple of frozenset of Index
         Connected components of the undirected parent graph.
+
     """
     neighbours = {index: set() for index in indices}
     for index in indices:
@@ -494,6 +497,7 @@ def _component_iteration_count(indices: frozenset[Index]) -> int:
     -------
     int
         Number of points in the component domain.
+
     """
     parents = {
         index: frozenset(getattr(index, "parents", ()))
@@ -560,6 +564,7 @@ def _iteration_count(indices: frozenset[Index]) -> int:
     -------
     int
         Number of executions of the operation.
+
     """
     indices = _index_closure(indices)
     if not indices:
@@ -583,6 +588,7 @@ def _storage_count(indices: Iterable[Index]) -> int:
     -------
     int
         Number of scalar entries in the intermediate.
+
     """
     indices = _index_closure(indices)
     return int(numpy.prod(
@@ -601,6 +607,7 @@ def _operation_count(node: Node) -> int:
     -------
     int
         Operations over the node's complete iteration domain.
+
     """
     domain = _iteration_count(frozenset(node.free_indices))
     if isinstance(node, Product):
@@ -648,6 +655,7 @@ def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
     tuple of int
         Operation count, total contraction storage, largest contraction, and
         expression-node count.
+
     """
     nodes = tuple(traversal(tuple(expressions)))
     sizes = [
@@ -682,6 +690,7 @@ def associate(operator, operands: Iterable[Node]) -> tuple[Node, int]:
         Associated GEM expression.
     int
         Estimated number of floating-point operations.
+
     """
     operands = tuple(operands)
     if not operands:
@@ -758,6 +767,7 @@ def _ordered_contraction_indices(
     -------
     tuple of Index
         Legal loop order for an :class:`IndexSum`.
+
     """
     indices = frozenset(indices)
     result = []
@@ -792,6 +802,7 @@ def _contraction_component(
         Optimized contraction.
     tuple of int
         Estimated FLOPs, peak storage, and total storage.
+
     """
     if len(factors) > 10:
         terms = list(factors)
@@ -931,6 +942,7 @@ def sum_factorise(
     -------
     Node
         Optimized GEM expression.
+
     """
     sum_indices = tuple(sum_indices)
     factors = tuple(factors)
@@ -1191,6 +1203,7 @@ def _distribute_sum(expr: Node, predicate=None) -> list[Node]:
     Memoization uses object identity.  Structurally equal GEM nodes can have
     deep expression trees, while distribution only needs to reuse actual DAG
     nodes.
+
     """
     if predicate is None:
         def predicate(node):
@@ -1264,6 +1277,7 @@ def factorisation_group_options(
     Distributing a sum over several linear axes is useful only when it exposes
     a choice of sums over individual axes.  Without such a choice, preserving
     the original sum retains its sharing for ordinary monomial collection.
+
     """
     linear_indices = frozenset(linear_indices)
 

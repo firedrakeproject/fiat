@@ -627,6 +627,7 @@ class Index(IndexBase):
         -------
         int
             Number of admissible values.
+
         """
         return self.extent
 
@@ -716,6 +717,7 @@ class RaggedIndex(Index):
         Indices selecting an entry of ``lengths``.
     lengths : array_like
         Number of admissible values for each tuple of parent values.
+
     """
 
     __slots__ = ("parents", "lengths")

@@ -88,6 +88,7 @@ def find_optimal_atomics(
     -------
     tuple of Node
         Atomics selected for common-subexpression factorization.
+
     """
     monomials = sort_monomials(list(monomials))
     atomics = tuple(dict.fromkeys(chain.from_iterable(
@@ -271,6 +272,7 @@ def collect_common_rests(monomials):
     -------
     list of Monomial
         Monomials after common coefficients have been collected.
+
     """
     def group_key(monomial):
         linear = frozenset(chain.from_iterable(
@@ -309,6 +311,7 @@ def optimise_monomial_sum(
     -------
     Node
         Factorized GEM expression.
+
     """
     if contraction_order:
         grouped = defaultdict(MonomialSum)

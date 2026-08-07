@@ -266,6 +266,7 @@ def _collect_monomials_conditional(
     MonomialSum
         Sum-of-products representation with argument atomics pulled out of
         the branches.
+
     """
     if self.classifier(expression) != COMPOUND:
         return _collect_monomials.dispatch(Node.mro()[0])(
