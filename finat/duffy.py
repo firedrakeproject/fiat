@@ -5,6 +5,7 @@ import numpy
 import gem
 
 from FIAT.expansions import C0_basis
+from finat.physically_mapped import MappedTabulation
 from finat.point_set import CollapsedTensorProductPointSet
 
 
@@ -23,8 +24,14 @@ class DuffyElement:
                 coordinate_mapping=coordinate_mapping)
         return self.duffy_evaluation(order, ps, entity)
 
-    def get_sparse_coeffs(self):
-        """Return the sparse map from lattice-ordered expansions to dofs."""
+    def get_coefficient_matrix(self) -> gem.Literal:
+        """Return the map from lattice-ordered expansions to dofs.
+
+        Returns
+        -------
+        gem.Literal
+            Coefficient matrix in Duffy lattice order.
+        """
         degree = self.degree
         sd = self.cell.get_spatial_dimension()
         poly_set = self._element.get_nodal_basis()
@@ -39,7 +46,7 @@ class DuffyElement:
         rows, cols = numpy.nonzero(~numpy.isclose(coeffs, 0.0))
         if not len(rows):
             raise ValueError("empty Duffy coefficient matrix")
-        return gem.sparse_matrix(coeffs.shape, rows, cols, coeffs[rows, cols])
+        return gem.Literal(coeffs)
 
     def duffy_evaluation(self, order, ps, entity=None):
         """Return a sum-factorized, dof-indexed tabulation."""
@@ -98,6 +105,8 @@ class DuffyElement:
                 exprs.append(expr)
             result[alpha] = gem.Sum(*exprs)
 
-        coeffs = self.get_sparse_coeffs()
-        return {alpha: coeffs @ gem.FlattenedTensor(expr, multiindex)
-                for alpha, expr in result.items()}
+        coefficients = self.get_coefficient_matrix()
+        tabulation = {
+            alpha: gem.FlattenedTensor(expr, multiindex)
+            for alpha, expr in result.items()}
+        return MappedTabulation(coefficients, tabulation)
