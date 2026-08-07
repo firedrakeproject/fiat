@@ -409,7 +409,8 @@ class SimplicialComplex(Cell):
         if cell is None:
             cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
                         if facet_i in facets)
-        verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]))
+        # Always compute in double precision for a robust SVD below.
+        verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]), dtype=float)
         # Interval case
         if self.get_shape() == LINE:
             v_i = t[1][cell].index(t[0][facet_i][0])
@@ -429,7 +430,7 @@ class SimplicialComplex(Cell):
             self.get_vertices_of_subcomplex(t[sd-1][facet_i])
 
         # now I find everything normal to the facet.
-        vcf = numpy.asarray(vert_coords_of_facet)
+        vcf = numpy.asarray(vert_coords_of_facet, dtype=float)
         facet_span = vcf[1:, :] - vcf[:1, :]
         (_, sf, vft) = numpy.linalg.svd(facet_span)
 
