@@ -31,6 +31,7 @@ class DuffyElement:
         -------
         gem.Literal
             Coefficient matrix in Duffy lattice order.
+
         """
         degree = self.degree
         sd = self.cell.get_spatial_dimension()
