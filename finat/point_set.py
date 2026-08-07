@@ -7,6 +7,7 @@ import numpy
 
 import gem
 from gem.utils import safe_repr
+from FIAT.precision import calibrate_tolerance
 
 
 class AbstractPointSet(abc.ABC):
@@ -49,6 +50,7 @@ class AbstractPointSet(abc.ABC):
 
     def almost_equal(self, other, tolerance=1e-12):
         """Approximate numerical equality of point sets"""
+        tolerance = calibrate_tolerance(tolerance, self.points.dtype)
         return type(self) is type(other) and \
             self.points.shape == other.points.shape and \
             numpy.allclose(self.points, other.points, rtol=0, atol=tolerance)
