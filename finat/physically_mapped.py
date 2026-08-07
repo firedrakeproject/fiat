@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
+from numbers import Number
 
 import gem
 import numpy
@@ -36,8 +37,13 @@ class MappedTabulation(Mapping):
                 [
                     column
                     for column in range(M.shape[1])
-                    if not isinstance(M.array[source_row, column], gem.Zero)
-                    and (M.array[source_row, column] == one) == unit
+                    if not (
+                        isinstance(M.array[source_row, column], gem.Zero)
+                        or isinstance(M.array[source_row, column], Number)
+                        and M.array[source_row, column] == 0)
+                    and ((M.array[source_row, column] == 1
+                          if isinstance(M.array[source_row, column], Number)
+                          else M.array[source_row, column] == one) == unit)
                 ]
                 for source_row in indices
             ]
@@ -51,7 +57,8 @@ class MappedTabulation(Mapping):
             for row, entries in enumerate(rows):
                 columns[row, :len(entries)] = entries
                 if data is not None:
-                    data[row, :len(entries)] = M.array[indices[row], entries]
+                    data[row, :len(entries)] = tuple(
+                        map(gem.as_gem, M.array[indices[row], entries]))
             groups.append((
                 lengths,
                 gem.Literal(columns, dtype=gem.uint_type),
