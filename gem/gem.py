@@ -32,7 +32,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Variable', 'Sum', 'Product', 'Division', 'FloorDiv', 'Remainder', 'Power',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
-           'Index', 'JaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
+           'Index', 'JaggedIndex', 'RaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
            'FlattenedTensor', 'IndexSum', 'ListTensor', 'Concatenate', 'Delta',
            'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
@@ -615,6 +615,21 @@ class Index(IndexBase):
         self.count = Index._count
         self.extent = extent
 
+    def iteration_extent(self, parent_values: dict) -> int:
+        """Return the loop extent at fixed parent-index values.
+
+        Parameters
+        ----------
+        parent_values
+            Values of indices controlling this index.
+
+        Returns
+        -------
+        int
+            Number of admissible values.
+        """
+        return self.extent
+
     def set_extent(self, value):
         # Set extent, check for consistency
         if self.extent is None:
@@ -676,6 +691,10 @@ class JaggedIndex(Index):
         assert all(isinstance(p, Index) for p in parents)
         self.parents = parents
 
+    def iteration_extent(self, parent_values: dict) -> int:
+        return self.extent - sum(
+            parent_values[parent] for parent in self.parents)
+
     def __getstate__(self):
         return super().__getstate__() + (self.parents,)
 
@@ -683,6 +702,55 @@ class JaggedIndex(Index):
         super().__setstate__(state[:-1])
         self.parents = state[-1]
 
+
+
+class RaggedIndex(Index):
+    """Free index with a tabulated extent over its parent indices.
+
+    Parameters
+    ----------
+    name : str, optional
+        Name of the index.
+    extent : int, optional
+        Static upper bound.  Defaults to the largest tabulated length.
+    parents : tuple of Index
+        Indices selecting an entry of ``lengths``.
+    lengths : array_like
+        Number of admissible values for each tuple of parent values.
+    """
+
+    __slots__ = ("parents", "lengths")
+
+    def __init__(self, name: str | None = None, extent: int | None = None,
+                 parents: tuple = (), lengths=()):
+        parents = tuple(parents)
+        if not parents or not all(isinstance(parent, Index)
+                                  for parent in parents):
+            raise ValueError("Ragged indices require Index parents")
+        lengths = numpy.asarray(lengths, dtype=uint_type)
+        shape = tuple(parent.extent for parent in parents)
+        if lengths.shape != shape:
+            raise ValueError(
+                f"length table shape {lengths.shape} does not match {shape}")
+        maximum = int(lengths.max(initial=0))
+        if extent is None:
+            extent = maximum
+        elif maximum > extent:
+            raise ValueError("Ragged index length exceeds its extent")
+        super().__init__(name=name, extent=extent)
+        self.parents = parents
+        self.lengths = lengths
+
+    def iteration_extent(self, parent_values: dict) -> int:
+        point = tuple(parent_values[parent] for parent in self.parents)
+        return int(self.lengths[point])
+
+    def __getstate__(self):
+        return super().__getstate__() + (self.parents, self.lengths)
+
+    def __setstate__(self, state):
+        super().__setstate__(state[:-2])
+        self.parents, self.lengths = state[-2:]
 
 
 class VariableIndex(IndexBase):
@@ -1013,7 +1081,9 @@ class IndexSum(Scalar):
             return summand
 
         # Unroll singleton sums
-        unroll = tuple(index for index in multiindex if index.extent <= 1)
+        unroll = tuple(
+            index for index in multiindex
+            if index.extent <= 1 and not getattr(index, "parents", ()))
         if unroll:
             assert numpy.prod([index.extent for index in unroll]) == 1
             summand = Indexed(ComponentTensor(summand, unroll),

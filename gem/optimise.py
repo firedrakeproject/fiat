@@ -17,7 +17,7 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Power, MathFunction, MinValue, MaxValue, Inverse, Solve,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
-                     IndexSum, JaggedIndex, ComponentTensor, ListTensor,
+                     IndexSum, JaggedIndex, RaggedIndex, ComponentTensor, ListTensor,
                      FlattenedTensor, Delta, _jagged_lattice,
                      partial_indexed, uint_type, one)
 
@@ -532,8 +532,7 @@ def _component_iteration_count(indices: frozenset[Index]) -> int:
             return 1
         values = dict(zip(frontiers[position], state))
         index = ordered[position]
-        extent = index.extent - sum(
-            values[parent] for parent in parents[index])
+        extent = index.iteration_extent(values)
         next_frontier = frontiers[position + 1]
         total = 0
         for value in range(extent):
@@ -566,7 +565,7 @@ def _iteration_count(indices: frozenset[Index]) -> int:
     indices = _index_closure(indices)
     if not indices:
         return 1
-    if not any(isinstance(index, JaggedIndex) for index in indices):
+    if not any(getattr(index, "parents", ()) for index in indices):
         return int(numpy.prod(
             [index.extent for index in indices], dtype=int))
     return math.prod(map(

@@ -29,62 +29,55 @@ class MappedTabulation(Mapping):
         if indices is None:
             indices = list(range(M.shape[0]))
         self.indices = indices
-        rows = [[column for column in range(M.shape[1])
-                 if not isinstance(M.array[row, column], gem.Zero)]
-                for row in indices]
-        width = max(map(len, rows))
+        groups = []
         nrows = len(indices)
-        columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
-        data = numpy.full((nrows, width), zero, dtype=object)
-        for row, entries in enumerate(rows):
-            columns[row, :len(entries)] = entries
-            data[row, :len(entries)] = M.array[indices[row], entries]
-
-        def unit_action(values):
-            active_values = [value for value in values
-                             if not isinstance(value, gem.Zero)]
-            if all(value == one for value in active_values):
-                return "all"
-            if any(value == one for value in active_values):
-                return "some"
-            return None
-
-        row_numbers = numpy.arange(nrows, dtype=gem.uint_type)
-        self.columns = tuple(
-            None if numpy.array_equal(column, row_numbers)
-            else gem.Literal(column, dtype=gem.uint_type)
-            for column in columns.T)
-        self.data = tuple(gem.ListTensor(values) for values in data.T)
-        self.unit_actions = tuple(map(unit_action, data.T))
+        for unit in (True, False):
+            rows = [
+                [
+                    column
+                    for column in range(M.shape[1])
+                    if not isinstance(M.array[source_row, column], gem.Zero)
+                    and (M.array[source_row, column] == one) == unit
+                ]
+                for source_row in indices
+            ]
+            lengths = numpy.asarray(tuple(map(len, rows)), dtype=gem.uint_type)
+            width = int(lengths.max(initial=0))
+            if width == 0:
+                continue
+            columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
+            data = None if unit \
+                else numpy.full((nrows, width), zero, dtype=object)
+            for row, entries in enumerate(rows):
+                columns[row, :len(entries)] = entries
+                if data is not None:
+                    data[row, :len(entries)] = M.array[indices[row], entries]
+            groups.append((
+                lengths,
+                gem.Literal(columns, dtype=gem.uint_type),
+                None if unit else gem.ListTensor(data),
+            ))
+        self.groups = tuple(groups)
         self._tabulation_cache = {}
 
     def matvec(self, table):
         row = gem.Index(extent=len(self.indices))
         tail = gem.indices(len(table.shape) - 1)
 
-        def term(entry):
-            column_table = self.columns[entry]
-            column = row if column_table is None \
-                else gem.VariableIndex(gem.Indexed(column_table, (row,)))
-            value = gem.Indexed(self.data[entry], (row,))
+        def term(group):
+            lengths, column_table, data = group
+            entry = gem.RaggedIndex(
+                extent=column_table.shape[1],
+                parents=(row,), lengths=lengths)
+            column = gem.VariableIndex(
+                gem.Indexed(column_table, (row, entry)))
             basis = gem.Indexed(table, (column, *tail))
-            unit_action = self.unit_actions[entry]
-            if unit_action == "all":
-                mapped = basis
-            elif unit_action == "some":
-                unit = gem.Comparison("==", value, one)
-                mapped = gem.Conditional(
-                    unit, basis, gem.Product(value, basis))
-            else:
-                mapped = gem.Product(value, basis)
-            return value, mapped
+            if data is not None:
+                basis = gem.Product(
+                    gem.Indexed(data, (row, entry)), basis)
+            return gem.IndexSum(basis, (entry,))
 
-        _, mapped = term(0)
-        for entry in range(1, len(self.columns)):
-            value, correction = term(entry)
-            active = gem.Comparison("!=", value, zero)
-            mapped = gem.Conditional(
-                active, gem.Sum(mapped, correction), mapped)
+        mapped = gem.Sum(*(term(group) for group in self.groups))
         return gem.ComponentTensor(mapped, (row, *tail))
 
     def __getitem__(self, alpha):

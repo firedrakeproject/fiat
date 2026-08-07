@@ -28,9 +28,9 @@ def statement_for(tree, temporaries):
     extent = tree.index.extent
     assert extent is not None
     index_values = _index_values.get()
-    if isinstance(tree.index, gem.JaggedIndex) and all(
+    if getattr(tree.index, "parents", ()) and all(
             parent in index_values for parent in tree.index.parents):
-        extent -= sum(index_values[parent] for parent in tree.index.parents)
+        extent = tree.index.iteration_extent(index_values)
     child, = tree.children
     if tree.index in _control_indices.get():
         flops = 0
@@ -193,7 +193,7 @@ def flops_componenttensor(expr, temporaries):
     multiindex = expr.multiindex
     control = _control_indices.get().intersection(multiindex)
     if not control and not any(
-            isinstance(index, gem.JaggedIndex) for index in multiindex):
+            getattr(index, "parents", ()) for index in multiindex):
         return numpy.prod(expr.shape, dtype=int) * expression_flops(
             body, temporaries)
 
@@ -203,8 +203,8 @@ def flops_componenttensor(expr, temporaries):
         index = multiindex[position]
         values = _index_values.get()
         extent = index.extent
-        if isinstance(index, gem.JaggedIndex):
-            extent -= sum(values[parent] for parent in index.parents)
+        if getattr(index, "parents", ()):
+            extent = index.iteration_extent(values)
         total = 0
         for value in range(extent):
             token = _index_values.set(values | {index: value})
@@ -335,7 +335,7 @@ def _find_control_indices(tree):
     """Find loop indices controlling jagged bounds or static branches."""
     result = set()
     if isinstance(tree, imp.For):
-        if isinstance(tree.index, gem.JaggedIndex):
+        if getattr(tree.index, "parents", ()):
             result.update(tree.index.parents)
         result.update(_find_control_indices(tree.children[0]))
     elif isinstance(tree, imp.Block):
