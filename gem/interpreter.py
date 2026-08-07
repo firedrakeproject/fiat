@@ -8,7 +8,7 @@ from functools import singledispatch
 import itertools
 
 from gem import gem, node
-from gem.optimise import remove_componenttensors, replace_delta
+from gem.optimise import replace_delta
 
 __all__ = ("evaluate", )
 
@@ -337,6 +337,24 @@ def _evaluate_indexsum(e, self):
     """Index sums reduce over the given axis."""
     val = self(e.children[0])
     idx = tuple(map(val.fids.index, e.multiindex))
+    ragged = tuple(index for index in e.multiindex
+                   if isinstance(index, gem.RaggedIndex))
+    if ragged:
+        shape = (1,) * len(val.fids)
+        mask = numpy.ones(val.fshape, dtype=bool)
+        for index in ragged:
+            axis = val.fids.index(index)
+            entry_shape = list(shape)
+            entry_shape[axis] = index.extent
+            entry = numpy.arange(index.extent).reshape(entry_shape)
+            parents = tuple(
+                numpy.arange(parent.extent).reshape(
+                    shape[:val.fids.index(parent)] + (parent.extent,)
+                    + shape[val.fids.index(parent) + 1:])
+                for parent in index.parents)
+            mask &= entry < index.lengths[parents]
+        mask = mask[(...,) + (None,) * len(val.shape)]
+        val = Result(numpy.where(mask, val.arr, 0), val.fids)
     rfids = tuple(fi for fi in val.fids if fi not in e.multiindex)
     return Result(val.arr.sum(axis=idx), rfids)
 
@@ -383,7 +401,6 @@ def evaluate(expressions, bindings=None):
         exprs = tuple(expressions)
     except TypeError:
         exprs = (expressions, )
-    exprs = remove_componenttensors(exprs)
     mapper = node.Memoizer(_evaluate)
     mapper.bindings = bindings if bindings is not None else {}
     return list(map(mapper, exprs))

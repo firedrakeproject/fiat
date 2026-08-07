@@ -17,7 +17,7 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Power, MathFunction, MinValue, MaxValue, Inverse, Solve,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
-                     IndexSum, JaggedIndex, ComponentTensor, ListTensor,
+                     IndexSum, JaggedIndex, RaggedIndex, ComponentTensor, ListTensor,
                      Delta, _jagged_lattice, partial_indexed, one)
 
 
@@ -1489,6 +1489,7 @@ def aggressive_unroll(expression):
         expression, = remove_componenttensors((ListTensor(tensor),))
 
     # Unroll summation
-    expression, = unroll_indexsum((expression,), predicate=lambda index: True)
+    expression, = unroll_indexsum(
+        (expression,), predicate=lambda index: not isinstance(index, RaggedIndex))
     expression, = remove_componenttensors((expression,))
     return expression

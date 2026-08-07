@@ -98,7 +98,7 @@ def test_hoist_linear_index():
         y: numpy.arange(6, 12).reshape(3, 2),
     }
     expected, actual = evaluate([expression, result], bindings)
-    assert numpy.array_equal(actual.arr, expected.arr)
+    assert numpy.array_equal(actual.broadcast(expected.fids), expected.arr)
 
 
 def test_componenttensor_flop_count():
