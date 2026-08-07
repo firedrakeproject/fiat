@@ -16,7 +16,7 @@ from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
 
 
-__all__ = ['optimise_monomial_sum', 'sum_factorise_monomial_sum']
+__all__ = ['optimise_monomial_sum']
 
 
 def monomial_sum_to_expression(monomial_sum):
@@ -88,13 +88,6 @@ def find_optimal_atomics(
     -------
     tuple of Node
         Atomics selected for common-subexpression factorization.
-
-    Notes
-    -----
-    This is a minimum hitting-set problem.  Integer bitsets encode both the
-    monomial constraints and the monomials covered by an atomic.  A greedy
-    feasible cover gives the initial upper bound; a packing of disjoint
-    constraints gives a lower bound at every branch.
     """
     monomials = sort_monomials(list(monomials))
     atomics = tuple(dict.fromkeys(chain.from_iterable(
@@ -102,159 +95,106 @@ def find_optimal_atomics(
     if not atomics:
         return ()
 
-    atomic_costs = tuple(int(index_extent(atomic, linear_indices))
-                         for atomic in atomics)
-    constraints = []
-    for monomial in monomials:
-        constraint = 0
-        for atomic in monomial.atomics:
-            constraint |= 1 << atomics.index(atomic)
-        constraints.append(constraint)
-    constraints = tuple(dict.fromkeys(constraints))
+    positions = {atomic: position
+                 for position, atomic in enumerate(atomics)}
+    constraints = tuple(dict.fromkeys(
+        sum({1 << positions[atomic] for atomic in monomial.atomics})
+        for monomial in monomials))
     constraints = tuple(
         constraint for constraint in constraints
         if not any(
             other != constraint and other & constraint == other
             for other in constraints))
-
-    full_cover = (1 << len(constraints)) - 1
+    costs = tuple(int(index_extent(atomic, linear_indices))
+                  for atomic in atomics)
     covers = tuple(sum(
         1 << position
         for position, constraint in enumerate(constraints)
         if constraint & (1 << atomic))
         for atomic in range(len(atomics)))
+    full_cover = (1 << len(constraints)) - 1
 
-    uncovered = full_cover
-    optimal_solution = 0
-    while uncovered:
+    covered = 0
+    best_solution = 0
+    while covered != full_cover:
         atomic = max(
             range(len(atomics)),
             key=lambda candidate: (
-                (covers[candidate] & uncovered).bit_count(),
-                atomic_costs[candidate],
-                -candidate,
-            ))
-        optimal_solution |= 1 << atomic
-        uncovered &= ~covers[atomic]
+                ((covers[candidate] & ~covered).bit_count(),
+                 costs[candidate], -candidate)))
+        best_solution |= 1 << atomic
+        covered |= covers[atomic]
 
-    for atomic in sorted(
-            (position for position in range(len(atomics))
-             if optimal_solution & (1 << position)),
-            key=lambda position: (atomic_costs[position], position)):
-        candidate = optimal_solution & ~(1 << atomic)
-        covered = 0
-        for position in range(len(atomics)):
-            if candidate & (1 << position):
-                covered |= covers[position]
-        if covered == full_cover:
-            optimal_solution = candidate
+    def solution_cost(solution):
+        selected = [position for position in range(len(atomics))
+                    if solution & (1 << position)]
+        return len(selected), -sum(costs[position] for position in selected)
 
-    def solution_cost(solution: int) -> tuple[int, int]:
-        selected = [
-            position for position in range(len(atomics))
-            if solution & (1 << position)]
-        return (
-            len(selected),
-            -sum(atomic_costs[position] for position in selected),
-        )
-
-    optimal_cost = solution_cost(optimal_solution)
-    best_state = {}
-    max_states = 1 << 16
+    best_cost = solution_cost(best_solution)
+    seen = {}
     states = 0
+    max_states = 1 << 16
 
-    def packing_bound(uncovered_constraints: int) -> int:
-        masks = sorted(
-            (constraint
-             for position, constraint in enumerate(constraints)
-             if uncovered_constraints & (1 << position)),
-            key=int.bit_count)
-        used_atomics = 0
-        bound = 0
-        for mask in masks:
-            if not mask & used_atomics:
-                used_atomics |= mask
-                bound += 1
-        return bound
+    def lower_bound(uncovered):
+        disjoint = 0
+        count = 0
+        for position in sorted(
+                (position for position in range(len(constraints))
+                 if uncovered & (1 << position)),
+                key=lambda position: constraints[position].bit_count()):
+            constraint = constraints[position]
+            if not constraint & disjoint:
+                disjoint |= constraint
+                count += 1
+        return count
 
-    def solve(
-            covered: int, solution: int,
-            cardinality: int, extent: int) -> None:
-        nonlocal optimal_solution, optimal_cost, states
+    def solve(covered, solution, cardinality, extent):
+        nonlocal best_solution, best_cost, states
         states += 1
         if states > max_states:
             raise StopIteration
 
-        cost = (cardinality, -extent)
-        previous = best_state.get(covered)
-        if previous is not None and previous <= cost:
+        cost = cardinality, -extent
+        if seen.get(covered, (numpy.inf, numpy.inf)) <= cost:
             return
-        best_state[covered] = cost
-
+        seen[covered] = cost
         if covered == full_cover:
-            if cost < optimal_cost:
-                optimal_solution = solution
-                optimal_cost = cost
+            best_solution, best_cost = solution, cost
             return
 
-        uncovered_constraints = full_cover & ~covered
-        lower_bound = packing_bound(uncovered_constraints)
-        if cardinality + lower_bound > optimal_cost[0]:
+        uncovered = full_cover & ~covered
+        if cardinality + lower_bound(uncovered) > best_cost[0]:
             return
-        if cardinality + lower_bound == optimal_cost[0]:
-            slots = optimal_cost[0] - cardinality
-            candidates = [
-                atomic_costs[position]
-                for position in range(len(atomics))
-                if covers[position] & uncovered_constraints]
-            maximum_extent = extent + sum(
-                sorted(candidates, reverse=True)[:slots])
-            if maximum_extent <= -optimal_cost[1]:
-                return
-
-        pending = [
-            position for position in range(len(constraints))
-            if uncovered_constraints & (1 << position)]
-        position = min(
-            pending,
-            key=lambda candidate: (
-                constraints[candidate].bit_count(),
-                -max(
-                    (covers[atomic] & uncovered_constraints).bit_count()
-                    for atomic in range(len(atomics))
-                    if constraints[candidate] & (1 << atomic)),
-            ))
-        choices = [
-            atomic for atomic in range(len(atomics))
-            if constraints[position] & (1 << atomic)]
+        constraint = min(
+            (position for position in range(len(constraints))
+             if uncovered & (1 << position)),
+            key=lambda position: constraints[position].bit_count())
+        choices = [atomic for atomic in range(len(atomics))
+                   if constraints[constraint] & (1 << atomic)]
         choices.sort(
             key=lambda atomic: (
-                (covers[atomic] & uncovered_constraints).bit_count(),
-                atomic_costs[atomic],
-                -atomic,
-            ),
+                (covers[atomic] & uncovered).bit_count(),
+                costs[atomic], -atomic),
             reverse=True)
         for atomic in choices:
-            solve(
-                covered | covers[atomic],
-                solution | (1 << atomic),
-                cardinality + 1,
-                extent + atomic_costs[atomic],
-            )
+            candidate_cost = cardinality + 1, -(extent + costs[atomic])
+            if candidate_cost < best_cost:
+                solve(
+                    covered | covers[atomic],
+                    solution | (1 << atomic),
+                    cardinality + 1,
+                    extent + costs[atomic])
 
     try:
         solve(0, 0, 0, 0)
     except StopIteration:
-        logger = logging.getLogger("tsfc")
-        logger.warning(
+        logging.getLogger("tsfc").warning(
             "Solution to hitting-set problem may not be optimal: search "
             "interrupted after examining %d states.", max_states)
 
     return tuple(
         atomic for position, atomic in enumerate(atomics)
-        if optimal_solution & (1 << position))
-
-
+        if best_solution & (1 << position))
 def factorise_atomics(monomials, optimal_atomics, linear_indices):
     """Group and factorise monomials using a list of atomics as common
     subexpressions. Create new monomials for each group and optimise them recursively.
@@ -348,84 +288,64 @@ def collect_common_rests(monomials):
     return result
 
 
-def optimise_monomial_sum(monomial_sum, linear_indices):
-    """Choose optimal common atomic subexpressions and factorise a
-    :class:`MonomialSum` object to create a GEM expression.
+def optimise_monomial_sum(
+        monomial_sum: MonomialSum,
+        linear_indices: tuple,
+        contraction_order: tuple = ()) -> Node:
+    """Factor monomial algebra and place ordered contractions.
 
-    :arg monomial_sum: a :class:`MonomialSum` object
-    :arg linear_indices: tuple of linear indices
+    Parameters
+    ----------
+    monomial_sum
+        Sum-of-products representation to optimize.
+    linear_indices
+        Free indices identifying argument tabulations.
+    contraction_order
+        Contraction indices, from outermost to innermost stage.
 
-    :returns: factorised GEM expression
+    Returns
+    -------
+    Node
+        Factorized GEM expression.
     """
+    if contraction_order:
+        grouped = defaultdict(MonomialSum)
+        order = OrderedDict()
+        remaining = frozenset(contraction_order)
+        for monomial in monomial_sum:
+            inner_indices = tuple(index for index in monomial.sum_indices
+                                  if index in remaining)
+            involved = frozenset(inner_indices)
+            inner_atomics = tuple(
+                atomic for atomic in monomial.atomics
+                if involved.intersection(atomic.free_indices))
+            outer_indices = tuple(index for index in monomial.sum_indices
+                                  if index not in remaining)
+            outer_atomics = tuple(
+                atomic for atomic in monomial.atomics
+                if atomic not in inner_atomics)
+            key = outer_indices, outer_atomics
+            order.setdefault(key)
+            grouped[key].add(
+                inner_indices, inner_atomics, monomial.rest)
+
+        outer_sum = MonomialSum()
+        for outer_indices, outer_atomics in order:
+            inner = optimise_monomial_sum(
+                grouped[(outer_indices, outer_atomics)],
+                linear_indices, contraction_order[1:])
+            outer_sum.add(outer_indices, outer_atomics, inner)
+        monomial_sum = outer_sum
+
     groups = groupby(monomial_sum, key=lambda m: frozenset(m.sum_indices))
-    new_monomials = []
+    optimized = []
     for _, monomials in groups:
         old_size = len(monomials) + 1
         while len(monomials) < old_size:
             old_size = len(monomials)
             monomials = optimise_monomials(monomials, linear_indices)
-        new_monomials.extend(monomials)
-    return monomial_sum_to_expression(new_monomials)
-
-
-def sum_factorise_monomial_sum(
-        monomial_sum: MonomialSum, sum_indices: tuple,
-        linear_indices: tuple) -> Node:
-    """Apply sum factorisation and COFFEE optimisation to monomials.
-
-    The indices in ``sum_indices`` are contracted one at a time.  At each
-    stage, monomials are grouped by the factors that do not involve the
-    remaining contraction indices.  The remaining part is optimized
-    recursively, making each contraction as local as its tensor-product
-    structure permits.  Once every contraction index has been placed,
-    COFFEE extracts common argument factors.
-
-    Parameters
-    ----------
-    monomial_sum : MonomialSum
-        Sum-of-products representation to optimize.
-    sum_indices : tuple of Index
-        Contraction indices, from outermost to innermost factorization stage.
-    linear_indices : tuple of Index
-        Free indices identifying argument tabulations.
-
-    Returns
-    -------
-    Node
-        Sum-factorized GEM expression.
-
-    """
-    if not sum_indices:
-        return optimise_monomial_sum(monomial_sum, linear_indices)
-
-    grouped_monomials = defaultdict(MonomialSum)
-    group_order = OrderedDict()
-    remaining_indices = frozenset(sum_indices)
-    for monomial in monomial_sum:
-        tail_indices = tuple(index for index in monomial.sum_indices
-                             if index in remaining_indices)
-        tail_index_set = frozenset(tail_indices)
-        tail_atomics = tuple(
-            atomic for atomic in monomial.atomics
-            if tail_index_set.intersection(atomic.free_indices))
-        head_indices = tuple(index for index in monomial.sum_indices
-                             if index not in remaining_indices)
-        head_atomics = tuple(atomic for atomic in monomial.atomics
-                             if atomic not in tail_atomics)
-        key = (head_indices, head_atomics)
-        group_order.setdefault(key)
-        grouped_monomials[key].add(
-            tail_indices, tail_atomics, monomial.rest)
-
-    outer_sum = MonomialSum()
-    for head_indices, head_atomics in group_order:
-        inner_sum = grouped_monomials[(head_indices, head_atomics)]
-        inner_expression = sum_factorise_monomial_sum(
-            inner_sum, sum_indices[1:], linear_indices)
-        outer_sum.add(head_indices, head_atomics, inner_expression)
-    return optimise_monomial_sum(outer_sum, linear_indices)
-
-
+        optimized.extend(monomials)
+    return monomial_sum_to_expression(optimized)
 def optimise_monomials(monomials, linear_indices):
     """Choose optimal common atomic subexpressions and factorise an iterable
     of monomials.
