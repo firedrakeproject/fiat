@@ -30,6 +30,7 @@ class NoopError(Exception):
 
 def preprocess_gem(expressions, replace_delta=True, remove_componenttensors=True):
     """Lower GEM nodes that cannot be translated to C directly."""
+    expressions = optimise.replace_flattened(expressions)
     if remove_componenttensors:
         expressions = optimise.remove_componenttensors(expressions)
     if replace_delta:
