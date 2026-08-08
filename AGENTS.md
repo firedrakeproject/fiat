@@ -97,3 +97,60 @@ When writing Python code for FIAT, maintain the ecosystem's structural and styli
 * CI enforces `pydocstyle` (see the `[pydocstyle]` section of `setup.cfg` for the active ignore list)
   in addition to `flake8`; run `pydocstyle <changed files>` locally before finishing a change, since a
   clean `flake8` pass does not imply a clean `pydocstyle` pass.
+* Every docstring or comment you write or touch must follow Simplified Technical English
+  (ASD-STE100): short sentences, one idea per sentence, active voice, subject named up front instead
+  of buried in a relative clause. Avoid the clause-stacking, inverted phrasing typical of unedited
+  AI-generated prose.
+* When fixing code that was wrong, do not leave comments or prose explaining what the removed,
+  incorrect approach used to do or why it was wrong. Keep comments and documentation focused on the
+  current, correct code. The test to apply: a reader who never saw the diff must not be able to tell
+  that anything was removed.
+
+## Anti-Patterns
+
+These must be avoided when writing code, and flagged when reviewing it.
+
+### Clause-Stacked Docstrings And Comments
+
+WRONG — the subject hides inside a relative clause the reader must unwind before finding the verb:
+
+```python
+def scale_boundary_nodes(u, factor):
+    """Give the nodes a boundary condition constrains their scaled values."""
+```
+
+RIGHT — subject named up front, one short sentence, active voice:
+
+```python
+def scale_boundary_nodes(u, factor):
+    """Scale the values of the nodes that a boundary condition constrains."""
+```
+
+### Documenting Code That Is Not There
+
+A reader has only the file in front of them. A comment can describe a removed approach. It can also
+argue against a branch the code does not take. Either one sends the reader looking for something
+that is not there.
+
+WRONG — the first sentence describes deleted code, and the second argues with an absent branch:
+
+```python
+def barycentric_weights(points):
+    # This no longer normalises the weights, which was wrong when the points
+    # were not symmetric. A test for a repeated point here would divide by
+    # zero.
+    return 1.0 / numpy.prod(points[:, None] - points[None, :] + numpy.eye(len(points)), axis=1)
+```
+
+RIGHT — say what the present code does, and state the condition it relies on:
+
+```python
+def barycentric_weights(points):
+    # The identity keeps the diagonal out of the product. The caller passes
+    # distinct points.
+    return 1.0 / numpy.prod(points[:, None] - points[None, :] + numpy.eye(len(points)), axis=1)
+```
+
+Some words give this away on sight: "used to", "previously", "no longer", "instead of", "we removed",
+"this replaces". Watch equally for "would" when its subject is code that does not exist. An argument
+against a branch that nobody can see is still a description of the past.
