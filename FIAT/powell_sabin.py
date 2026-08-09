@@ -44,7 +44,10 @@ class QuadraticPowellSabin6(finite_element.CiarletElement):
     """The PS6 macroelement is a C^1 quadratic macroelement defined
     on the 6-way Powell-Sabin split of a triangle.
     """
+    DEFAULT_DEGREE = 2
+
     def __init__(self, ref_el, degree=2):
+        degree = self._parse_degree(degree)
         if degree != 2:
             raise ValueError("PS6 only defined for degree = 2")
         ref_complex = macro.PowellSabinSplit(ref_el)
@@ -96,7 +99,10 @@ class QuadraticPowellSabin12(finite_element.CiarletElement):
     """The PS12 macroelement is a C^1 quadratic macroelement defined
     on the 12-way Powell-Sabin split of a triangle.
     """
+    DEFAULT_DEGREE = 2
+
     def __init__(self, ref_el, degree=2):
+        degree = self._parse_degree(degree)
         if degree != 2:
             raise ValueError("PS12 only defined for degree = 2")
         ref_complex = macro.PowellSabin12Split(ref_el)

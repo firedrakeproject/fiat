@@ -26,16 +26,16 @@ def choose_ijk_total(degree):
 
 
 class TrimmedSerendipityCurl(FiniteElement):
-    def __init__(self, ref_el, degree):
-        if degree < 1:
-            raise Exception("Trimmed serendipity elements only valid for k >= 1")
 
+    DEFAULT_DEGREE = 1
+
+    def __init__(self, ref_el, degree):
+        degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         self.fdim = dim
-        if dim != 3:
-            if dim != 2:
-                raise Exception("Trimmed serendipity elements only valid for dimensions 2 and 3")
+        if dim not in {2, 3}:
+            raise ValueError(f"{type(self).__name__} only valid for dimensions 2 and 3")
 
         flat_topology = flat_el.get_topology()
         entity_ids = {}

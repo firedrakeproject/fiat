@@ -85,9 +85,10 @@ class HuZhangDual(dual_set.DualSet):
 
 class HuZhang(finite_element.CiarletElement):
     """The definition of the Hu-Zhang element."""
+    DEFAULT_DEGREE = 3
+
     def __init__(self, ref_el, degree=3, variant=None, quad_scheme=None):
-        if degree < 3:
-            raise ValueError(f"{type(self).__name__} only defined for degree >= 3")
+        degree = self._parse_degree(degree)
         if ref_el.shape != TRIANGLE:
             raise ValueError(f"{type(self).__name__} only defined on triangles")
         splitting, variant, qdegree = check_format_variant(variant, degree)

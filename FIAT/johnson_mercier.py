@@ -58,8 +58,10 @@ class JohnsonMercierDualSet(dual_set.DualSet):
 
 class JohnsonMercier(finite_element.CiarletElement):
     """The Johnson-Mercier finite element."""
+    DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree=1, variant=None, quad_scheme=None):
+        degree = self._parse_degree(degree)
         ref_complex = macro.AlfeldSplit(ref_el)
         poly_set = macro.HDivSymPolynomialSet(ref_complex, degree)
         dual = JohnsonMercierDualSet(ref_complex, degree, variant=variant, quad_scheme=quad_scheme)

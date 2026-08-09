@@ -39,22 +39,19 @@ class BrezziDouglasMariniCube(FiniteElement):
     The Brezzi-Douglas-Marini element on quadrilateral cells.
 
     :arg ref_el: The reference element.
-    :arg k: The degree.
+    :arg degree: The degree.
     :arg mapping: A string giving the Piola mapping.
                   Either 'contravariant Piola' or 'covariant Piola'.
     """
+    DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree, mapping):
-
-        # Check that ref_el and degree are appropriate
-        if degree < 1:
-            raise Exception("BDMc_k elements only valid for k >= 1")
-
+        degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         dim = flat_el.get_spatial_dimension()
         self.fdim = dim
         if dim != 2:
-            raise Exception("BDMc_k elements only valid for dimension 2")
+            raise Exception(f"{type(self).__name__} only valid for dimension 2")
 
         # Collect the IDs of the reference element entities
         flat_topology = flat_el.get_topology()

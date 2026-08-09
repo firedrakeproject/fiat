@@ -99,8 +99,10 @@ class DPCDualSet(dual_set.DualSet):
 
 class HigherOrderDPC(finite_element.CiarletElement):
     """The DPC finite element.  It is what it is."""
+    DEFAULT_DEGREE = 0
 
     def __init__(self, ref_el, degree):
+        degree = self._parse_degree(degree)
         flat_el = flatten_reference_cube(ref_el)
         poly_set = polynomial_set.ONPolynomialSet(hypercube_simplex_map[flat_el], degree)
         dual = DPCDualSet(ref_el, flat_el, degree)

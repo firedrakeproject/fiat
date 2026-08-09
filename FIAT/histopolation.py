@@ -60,7 +60,10 @@ class HistopolationDualSet(dual_set.DualSet):
 
 class Histopolation(finite_element.CiarletElement):
     """1D discontinuous element with integral DOFs on GLL subgrid."""
+    DEFAULT_DEGREE = 0
+
     def __init__(self, ref_el, degree):
+        degree = self._parse_degree(degree)
         if ref_el.shape != LINE:
             raise ValueError("Histopolation elements are only defined in one dimension.")
 
