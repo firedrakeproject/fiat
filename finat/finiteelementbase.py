@@ -281,7 +281,11 @@ class FiniteElementBase(metaclass=ABCMeta):
         # ignoring any shape indices to avoid hitting the sum-
         # factorisation index limit (this is a bit of a hack).
         # Really need to do a more targeted job here.
-        evaluation = gem.optimise.contraction(evaluation, shape_indices)
+        try:
+            evaluation = gem.optimise.contraction(evaluation, shape_indices)
+        except NotImplementedError as e:
+            if str(e) != "Too many indices for sum factorisation!":
+                raise
         return evaluation, basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):
