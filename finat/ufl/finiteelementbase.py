@@ -14,6 +14,7 @@
 from abc import abstractmethod, abstractproperty
 from hashlib import md5
 from typing import Sequence, Union
+from enum import Enum
 
 from ufl import pullback
 from ufl.cell import AbstractCell, as_cell as as_cell_ufl
@@ -292,9 +293,12 @@ class FiniteElementBase(AbstractFiniteElement):
         except KeyError:
             raise ValueError(f"Unsupported mapping: {self.mapping()}")
 
+class CellBackend(Enum):
+    FIAT = 1
+    FUSE = 2
 
-def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], use_fuse: bool = False) -> AbstractCell:
-    if isinstance(cell, str) and use_fuse:
+def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], cell_backend: CellBackend = CellBackend.FIAT) -> AbstractCell:
+    if isinstance(cell, str) and cell_backend == CellBackend.FUSE:
         try:
             import fuse
         except ModuleNotFoundError as exc:

@@ -30,13 +30,13 @@ class FuseElement(FiniteElementBase):
 
         degree = self.triple.degree
         self.sobolev_space = self.triple.spaces[1].to_ufl()
-        super().__init__("IT", cell, degree, None, triple.get_value_shape())
+        super().__init__("FUSE", cell, degree, None, triple.get_value_shape())
 
     def __repr__(self):
         return repr(self.triple)
 
     def __str__(self):
-        return "<Fuse%sElem on %s>" % (self.triple.spaces[0], self.triple.cell)
+        return f"<FuseElem on {self.triple.cell}>"
 
     def mapping(self):
         if str(self.sobolev_space) == "HCurl":

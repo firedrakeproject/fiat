@@ -1328,10 +1328,10 @@ class TensorProductCell(Cell):
         This is done dimension by dimension."""
         if hasattr(other, "product"):
             other = other.product
-        if isinstance(other, TensorProductCell):
+        if isinstance(other, type(self)):
             return all(op(a, b) for a, b in zip(self.cells, other.cells))
         else:
-            raise ValueError("Unknown operator in cell comparison")
+            return op(self, other)
 
     def __gt__(self, other):
         return self.compare(operator.gt, other)

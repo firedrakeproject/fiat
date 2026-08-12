@@ -342,20 +342,20 @@ def convert_fuse_element(element, **kwargs):
 _cache = weakref.WeakKeyDictionary()
 
 
-def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None, use_fuse=False):
+def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None, cell_backend=finat.ufl.CellBackend.FIAT):
     """Create a FInAT element (suitable for tabulating with) given a UFL element.
 
     :arg ufl_element: The UFL element to create a FInAT element from.
     :arg shape_innermost: Vector/tensor indices come after basis function indices
     :arg restriction: cell restriction in interior facet integrals
                       (only for runtime tabulated elements)
-    :arg use_fuse: When creating cells, ensure they are fuse compatible. inherited from the mesh.
+    :arg cell_backend: Enum determining the default cell type to use.
     """
     finat_element, deps = _create_element(ufl_element,
                                           shape_innermost=shape_innermost,
                                           shift_axes=shift_axes,
                                           restriction=restriction,
-                                          use_fuse=use_fuse)
+                                          cell_backend=cell_backend)
     return finat_element
 
 
