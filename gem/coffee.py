@@ -260,8 +260,8 @@ def collect_common_rests(monomials):
     """Group monomials with a common scalar coefficient.
 
     This applies ``r*a + r*b = r*(a + b)`` after argument-factor
-    extraction, allowing the scalar part of a finite element contraction to
-    participate in COFFEE factorisation.
+    extraction. It exposes the scalar part of a finite element contraction
+    to COFFEE factorisation.
 
     Parameters
     ----------

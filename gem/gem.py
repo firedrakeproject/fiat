@@ -664,12 +664,11 @@ class JaggedIndex(Index):
     other (parent) free indices.
 
     The iteration bound is ``0 <= i < extent - (p_1 + ... + p_k)`` for
-    parent indices ``p_1, ..., p_k``.  The ``extent`` attribute remains the
-    static upper bound, attained when every parent index is zero, so
-    consumers that ignore the jagged structure and treat this as a plain
-    :class:`Index` of extent ``extent`` remain correct, provided that
-    expressions indexed by a `JaggedIndex` evaluate to zero outside the
-    jagged bounds.  The jagged bounds are thus purely a loop optimization.
+    parent indices ``p_1, ..., p_k``. The ``extent`` attribute is the static
+    upper bound. Every parent index is zero at this bound. Consumers can
+    treat this as a plain :class:`Index` of extent ``extent``. Expressions
+    indexed by a :class:`JaggedIndex` must evaluate to zero outside the
+    jagged bounds. The jagged bounds only optimize the generated loops.
 
     Parameters
     ----------

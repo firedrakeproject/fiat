@@ -12,9 +12,9 @@ from gem.refactorise import Monomial
 def contraction(nfactors, ndims, extent=2):
     """Build a product of independent contractions.
 
-    Each factor contracts a table with a coefficient over its own indices,
-    as a tensor product coefficient evaluation does, so no factor carries
-    the indices of another.
+    Each factor contracts a table with a coefficient over its own indices.
+    This models one factor of a tensor product coefficient evaluation. No
+    factor carries the indices of another.
     """
     numpy.random.seed(0)
     sum_indices = []
