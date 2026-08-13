@@ -3,6 +3,7 @@ import gem
 import numpy
 
 from gem import impero
+from gem.coffee import monomial_sum_to_expression
 from gem.flop_count import count_flops
 from gem.impero_utils import (collect_temporaries, compile_gem,
                               place_declarations)
@@ -11,10 +12,12 @@ from gem.interpreter import evaluate
 from gem.optimise import (
     _distribute_sum,
     eliminate_deltas,
-    factorisation_group_options,
     hoist_linear_index,
+    preserve_linear_maps,
     sum_factorise,
 )
+from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
+                             collect_factorisation_plans)
 
 
 @pytest.fixture
@@ -164,17 +167,76 @@ def test_selective_distribution():
     assert all(common in set(traversal((term,))) for term in terms)
 
 
-def test_factorisation_group_options_early_exit():
-    """Do not expand a multilinear sum without grouping choices."""
+def test_preserve_linear_maps_early_exit():
+    """Keep a multilinear sum that contains no separate linear maps."""
     i = gem.Index(extent=2)
     j = gem.Index(extent=2)
     variables = [gem.Variable(f"a{k}", (2, 2)) for k in range(4)]
     expression = gem.Sum(*(
         gem.Indexed(variable, (i, j)) for variable in variables))
 
-    options = factorisation_group_options(expression, (i, j))
+    terms, linear_maps = preserve_linear_maps(expression, (i, j))
 
-    assert options == ((expression, (), (frozenset(),)),)
+    assert terms == (expression,)
+    assert linear_maps == ()
+
+
+def test_collect_factorisation_plans():
+    """Collect equivalent expanded and map-preserving plans."""
+    i = gem.Index(extent=2)
+    j = gem.Index(extent=2)
+    left = gem.Sum(
+        gem.Indexed(gem.Literal([1.0, 2.0]), (i,)),
+        gem.Indexed(gem.Literal([3.0, 5.0]), (i,)))
+    right = gem.Sum(
+        gem.Indexed(gem.Literal([7.0, 11.0]), (j,)),
+        gem.Indexed(gem.Literal([13.0, 17.0]), (j,)))
+    expression = left * right
+    linear_indices = frozenset((i, j))
+
+    def classifier(node: gem.Node) -> str:
+        support = linear_indices.intersection(node.free_indices)
+        if not support:
+            return OTHER
+        if isinstance(node, gem.Indexed):
+            return ATOMIC
+        return COMPOUND
+
+    plans = collect_factorisation_plans(
+        expression, classifier, linear_indices)
+
+    assert tuple(map(len, plans)) == (4, 1)
+    expected, = evaluate([gem.ComponentTensor(expression, (i, j))])
+    for plan in plans:
+        actual, = evaluate([gem.ComponentTensor(
+            monomial_sum_to_expression(plan), (i, j))])
+        assert numpy.array_equal(actual.arr, expected.arr)
+
+
+def test_collect_factorisation_plans_bounds_expansion():
+    """Stop polynomial expansion before it exceeds the compact plan."""
+    linear_indices = tuple(gem.Index(extent=2) for _ in range(8))
+    factors = tuple(
+        gem.Sum(
+            gem.Indexed(gem.Literal([1.0, 2.0]), (index,)),
+            gem.Indexed(gem.Literal([3.0, 5.0]), (index,)))
+        for index in linear_indices)
+    expression = gem.Product(*factors)
+    linear_indices = frozenset(linear_indices)
+
+    def classifier(node: gem.Node) -> str:
+        support = linear_indices.intersection(node.free_indices)
+        if not support:
+            return OTHER
+        if isinstance(node, gem.Indexed):
+            return ATOMIC
+        return COMPOUND
+
+    plans = collect_factorisation_plans(
+        expression, classifier, linear_indices)
+
+    assert len(plans) == 1
+    assert len(plans[0]) == 1
 
 
 def test_constant_variable_index():

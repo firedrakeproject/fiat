@@ -2,15 +2,17 @@
 refactorisation."""
 
 from collections import Counter, OrderedDict, defaultdict, namedtuple
+from collections.abc import Callable, Iterable
 from functools import singledispatch
 from itertools import product
 import math
 from sys import intern
 
 from gem.node import Memoizer, traversal
-from gem.gem import (Node, Conditional, Zero, Product, Sum, Indexed,
+from gem.gem import (Node, Conditional, Zero, Product, Sum, Index, Indexed,
                      ListTensor, one, MathFunction)
-from gem.optimise import (remove_componenttensors, sum_factorise,
+from gem.optimise import (preserve_linear_maps, remove_componenttensors,
+                          sum_factorise,
                           traverse_product, traverse_sum, unroll_indexsum,
                           make_rename_map, make_renamer)
 
@@ -331,3 +333,62 @@ def collect_monomials(expressions, classifier, max_monomials=None):
     mapper.max_monomials = max_monomials
     mapper.rename_map = make_rename_map()
     return list(map(mapper, expressions))
+
+
+def collect_factorisation_plans(
+        expression: Node,
+        classifier: Callable[[Node], str],
+        linear_indices: Iterable[Index]) -> tuple[MonomialSum, ...]:
+    """Collect expanded and map-preserving polynomial representations.
+
+    Parameters
+    ----------
+    expression
+        Multilinear GEM expression.
+    classifier
+        Function that labels GEM nodes for polynomial collection.
+    linear_indices
+        Free indices belonging to form arguments.
+
+    Returns
+    -------
+    tuple of MonomialSum
+        Distinct algebraic plans for contraction optimization.
+
+    Notes
+    -----
+    The expanded plan exposes scalar common factors to polynomial
+    factorization. The map-preserving plan keeps basis transformation as a
+    linear contraction before form evaluation. Expansion stops when its
+    monomial count exceeds the node count of the map-preserving factors.
+    This bound keeps search work proportional to the compact representation.
+
+    """
+    terms, linear_maps = preserve_linear_maps(
+        expression, linear_indices)
+    if not linear_maps:
+        expanded, = collect_monomials((expression,), classifier)
+        return (expanded,)
+
+    map_ids = frozenset(map(id, linear_maps))
+
+    def preserve_map(node: Node) -> str:
+        if id(node) in map_ids:
+            return ATOMIC
+        return classifier(node)
+
+    grouped = MonomialSum.sum(*collect_monomials(terms, preserve_map))
+    factors = tuple(
+        factor
+        for monomial in grouped
+        for factor in (*monomial.atomics, monomial.rest))
+    expansion_limit = len(tuple(traversal(factors)))
+    try:
+        expanded, = collect_monomials(
+            (expression,), classifier,
+            max_monomials=expansion_limit)
+    except ExpansionLimitExceeded:
+        return (grouped,)
+    if tuple(grouped) == tuple(expanded):
+        return (expanded,)
+    return expanded, grouped

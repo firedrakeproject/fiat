@@ -1246,18 +1246,16 @@ def _distribute_sum(expr: Node, predicate=None) -> list[Node]:
     return results[id(expr)]
 
 
-def factorisation_group_options(
+def preserve_linear_maps(
         expression: Node,
         linear_indices: Iterable[Index]) -> tuple[
-            tuple[Node, tuple, tuple[frozenset[Node], ...]], ...]:
-    """Find algebraic grouping alternatives before polynomial expansion.
+            tuple[Node, ...], tuple[Node, ...]]:
+    """Expose multilinear terms and retain each one-axis linear map.
 
-    Sums involving several linear axes separate additive bilinear or
-    multilinear terms.  Within each term, a sum depending on exactly one
-    linear axis is a candidate linear map.  Keeping all such maps grouped
-    represents the original contraction; expanding them exposes common
-    tensor-product factors.  Returning both alternatives lets the caller
-    compare those contraction plans after ordinary GEM optimization.
+    A sum that depends on one linear index represents a linear map into an
+    argument tabulation. A sum that depends on several linear indices
+    separates multilinear form terms. This function distributes the latter
+    sums and returns the former sums as factors.
 
     Parameters
     ----------
@@ -1269,14 +1267,14 @@ def factorisation_group_options(
     Returns
     -------
     tuple
-        Additive terms paired with a structural layout key and their possible
-        sets of atomic groups.
+        Additive terms and the linear-map factors that they contain.
 
     Notes
     -----
-    Distributing a sum over several linear axes is useful only when it exposes
-    a choice of sums over individual axes.  Without such a choice, preserving
-    the original sum retains its sharing for ordinary monomial collection.
+    Polynomial factorization can recover any partial grouping from a fully
+    expanded expression. The map-preserving representation remains useful
+    because it bounds expansion and exposes basis transformation as a
+    separate contraction.
 
     """
     linear_indices = frozenset(linear_indices)
@@ -1289,32 +1287,22 @@ def factorisation_group_options(
             isinstance(node, Sum)
             and len(linear_indices.intersection(node.free_indices)) == 1
             for node in traversal((expression,))):
-        return ((expression, (), (frozenset(),)),)
+        return (expression,), ()
 
-    terms = _distribute_sum(expression, predicate=multilinear_sum)
-    result = []
+    terms = tuple(_distribute_sum(
+        expression, predicate=multilinear_sum))
+    groups = OrderedDict()
     for term in terms:
         _, factors = traverse_product(term)
-        groups = tuple(dict.fromkeys(
-            factor for factor in factors
-            if isinstance(factor, Sum)
-            and len(linear_indices.intersection(
-                factor.free_indices)) == 1))
-        if len(groups) <= 8:
-            options = tuple(
-                frozenset(
-                    group for position, group in enumerate(groups)
-                    if mask & (1 << position))
-                for mask in range(1 << len(groups)))
-        else:
-            options = (frozenset(), frozenset(groups))
-        layout = tuple(sorted(
-            (len(traverse_sum(group)),
-             tuple(sorted(index.extent
-                          for index in group.free_indices)))
-            for group in groups))
-        result.append((term, layout, options))
-    return tuple(result)
+        for factor in factors:
+            if (isinstance(factor, Sum)
+                    and len(linear_indices.intersection(
+                        factor.free_indices)) == 1):
+                groups.setdefault(factor)
+
+    if not groups:
+        return (expression,), ()
+    return terms, tuple(groups)
 
 
 def eliminate_deltas(expression):
