@@ -298,6 +298,8 @@ def test_unflatten_bijective_return_index():
     ])[0]
 
     assert len(variable.free_indices) == 2
+    scatter_expression = variable.multiindex[0].expression
+    assert scatter_expression.children[0].shape == (extent, extent)
     assert not any(isinstance(node, gem.FlattenedTensor)
                    for node in traversal((optimized,)))
 
