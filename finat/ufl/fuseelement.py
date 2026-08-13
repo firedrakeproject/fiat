@@ -29,7 +29,6 @@ class FuseElement(FiniteElementBase):
             cell = self.triple.cell.to_ufl()
 
         degree = self.triple.degree
-        self.sobolev_space = self.triple.spaces[1].to_ufl()
         super().__init__("FUSE", cell, degree, None, triple.get_value_shape())
 
     def __repr__(self):
@@ -38,16 +37,13 @@ class FuseElement(FiniteElementBase):
     def __str__(self):
         return f"<FuseElem on {self.triple.cell}>"
 
-    def mapping(self):
-        if str(self.sobolev_space) == "HCurl":
-            return "covariant Piola"
-        elif str(self.sobolev_space) == "HDiv":
-            return "contravariant Piola"
-        else:
-            return "identity"
-
+    @property
     def sobolev_space(self):
-        return self.triple.spaces[1]
+        return self.triple.spaces[2].ufl_sobolev_space(self.triple.form_degree,
+                                                       self.triple.cell.dim())
+
+    def mapping(self):
+        return self.triple.spaces[2].mapping()
 
     def reconstruct(self, family=None, cell=None, degree=None, quad_scheme=None, variant=None):
         return FuseElement(self.triple, cell=cell)
