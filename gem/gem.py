@@ -17,6 +17,7 @@ indices.
 from abc import ABCMeta
 from itertools import chain, repeat
 from functools import lru_cache, partial, reduce
+from math import comb, factorial
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -37,7 +38,8 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
-           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
+           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise',
+           'compact_index_layout', 'simplex_lattice_rank']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -1038,6 +1040,119 @@ def _jagged_lattice(multiindex: tuple[Index, ...]) -> numpy.ndarray:
     """All lattice points of ``multiindex``'s iteration domain, honouring
     `JaggedIndex` bounds, as an integer array of shape (npoint, dim)."""
     return _lattice_points(_jagged_layout(multiindex))
+
+
+def _index_components(indices: tuple[Index, ...]) -> tuple[tuple, ...]:
+    """Partition indices into connected parent domains."""
+    index_set = frozenset(indices)
+    neighbours = {index: set() for index in indices}
+    for index in indices:
+        for parent in getattr(index, "parents", ()):
+            if parent in index_set:
+                neighbours[index].add(parent)
+                neighbours[parent].add(index)
+
+    components = []
+    unseen = set(indices)
+    for seed in indices:
+        if seed not in unseen:
+            continue
+        component = {seed}
+        pending = [seed]
+        unseen.remove(seed)
+        while pending:
+            for index in neighbours[pending.pop()] & unseen:
+                unseen.remove(index)
+                component.add(index)
+                pending.append(index)
+        components.append(tuple(index for index in indices
+                                if index in component))
+    return tuple(components)
+
+
+def _is_simplex_lattice(component: tuple[Index, ...]) -> bool:
+    """Check whether indices describe a nested simplex lattice."""
+    return all(
+        isinstance(index, JaggedIndex)
+        and index.extent == component[0].extent
+        and index.parents == component[:position]
+        for position, index in enumerate(component))
+
+
+def compact_index_layout(
+        indices: tuple[Index, ...]) -> tuple[tuple[int, ...], tuple]:
+    """Compact a product of independent simplex lattices.
+
+    Parameters
+    ----------
+    indices
+        Indices in loop order.
+
+    Returns
+    -------
+    shape
+        Compact storage shape.
+    layout
+        Scalar indices and compact simplex components.
+
+    Notes
+    -----
+    One simplex component retains its rectangular layout. This keeps affine
+    access for short-lived contraction stages. A product of simplex lattices
+    uses one compact dimension per lattice and avoids exponential padding.
+    """
+    components = _index_components(indices)
+    simplex_components = tuple(filter(_is_simplex_lattice, components))
+    if len(simplex_components) < 2:
+        return tuple(index.extent for index in indices), indices
+
+    shape = []
+    layout = []
+    for component in components:
+        if _is_simplex_lattice(component):
+            shape.append(comb(
+                component[0].extent + len(component) - 1,
+                len(component)))
+            layout.append(component)
+        else:
+            shape.extend(index.extent for index in component)
+            layout.extend(component)
+    return tuple(shape), tuple(layout)
+
+
+def simplex_lattice_rank(
+        component: tuple[Index, ...], values: dict[Index, object]) -> object:
+    """Return the lexicographic rank of one simplex lattice point.
+
+    Parameters
+    ----------
+    component
+        Nested simplex lattice indices.
+    values
+        Scalar value for each index.
+
+    Returns
+    -------
+    object
+        Integer or symbolic lattice rank.
+    """
+    prefix = 0
+    rank = 0
+    dimension = len(component)
+    for position, index in enumerate(component):
+        value = values[index]
+        order = dimension - position
+
+        def choose(argument):
+            product = 1
+            for offset in range(order):
+                product *= argument - offset
+            return product // factorial(order)
+
+        upper = index.extent - prefix + order - 1
+        rank += choose(upper) - choose(upper - value)
+        prefix += value
+    return rank
 
 
 class IndexSum(Scalar):
