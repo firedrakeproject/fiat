@@ -1100,6 +1100,7 @@ def compact_index_layout(
     One simplex component retains its rectangular layout. This keeps affine
     access for short-lived contraction stages. A product of simplex lattices
     uses one compact dimension per lattice and avoids exponential padding.
+
     """
     components = _index_components(indices)
     simplex_components = tuple(filter(_is_simplex_lattice, components))
@@ -1135,6 +1136,7 @@ def simplex_lattice_rank(
     -------
     object
         Integer or symbolic lattice rank.
+
     """
     prefix = 0
     rank = 0
