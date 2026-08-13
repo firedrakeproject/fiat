@@ -1368,6 +1368,46 @@ def _flattened_layout(gather: Indexed) -> tuple:
                  for index in tensor.multiindex)
 
 
+def _flat_index_bijection(
+        index, extent: int) -> tuple[Index, tuple[int, ...] | None] | None:
+    """Identify a direct or compile-time bijective flat index.
+
+    Parameters
+    ----------
+    index
+        Index of a flattened tensor.
+    extent
+        Length of the flattened tensor.
+
+    Returns
+    -------
+    tuple or None
+        Source index and its forward permutation. A direct index has no
+        permutation.
+
+    """
+    if isinstance(index, Index):
+        return (index, None) if index.extent == extent else None
+    if not isinstance(index, VariableIndex):
+        return None
+
+    expression = index.expression
+    if not (isinstance(expression, Indexed)
+            and len(expression.multiindex) == 1
+            and isinstance(expression.multiindex[0], Index)
+            and isinstance(expression.children[0], Literal)):
+        return None
+    source, = expression.multiindex
+    table, = expression.children
+    if table.shape != (source.extent,) or source.extent != extent:
+        return None
+
+    permutation = tuple(map(int, table.array))
+    if tuple(sorted(permutation)) != tuple(range(extent)):
+        return None
+    return source, permutation
+
+
 def _find_unflattenable_index(
         nodes: Iterable[Node],
         indices: Iterable[Index]) -> tuple | None:
@@ -1380,37 +1420,52 @@ def _find_unflattenable_index(
     indices = tuple(indices)
     index_set = frozenset(indices)
     constrained = set()
-    gathers = defaultdict(OrderedDict)
+    gathers = defaultdict(lambda: defaultdict(OrderedDict))
     for node in nodes:
         if isinstance(node, Delta):
             constrained.update(node.free_indices)
         elif (isinstance(node, Indexed)
               and len(node.multiindex) == 1
-              and node.multiindex[0] in index_set
               and isinstance(node.children[0], FlattenedTensor)):
-            gathers[node.multiindex[0]].setdefault(node)
+            tensor, = node.children
+            bijection = _flat_index_bijection(
+                node.multiindex[0], tensor.shape[0])
+            if bijection is None:
+                continue
+            source, permutation = bijection
+            if source in index_set:
+                key = _flattened_layout(node), permutation
+                gathers[source][key].setdefault(node)
 
     for index in indices:
-        candidates = tuple(gathers[index])
-        layouts = {_flattened_layout(gather) for gather in candidates}
-        if candidates and len(layouts) == 1 and index not in constrained:
-            layout, = layouts
-            return index, layout, candidates
+        groups = gathers[index]
+        if len(groups) == 1 and index not in constrained:
+            layout, candidates = next(iter(groups.items()))
+            return index, layout, tuple(candidates)
     return None
 
 
 def _prepare_unflattening(
-        gathers: tuple[Indexed, ...]) -> tuple[MemoizerArg, tuple, VariableIndex]:
+        gathers: tuple[Indexed, ...],
+        source: Index) -> tuple[MemoizerArg, tuple, VariableIndex]:
     """Prepare one joint rewrite of compatible flat gathers.
 
     Each flattened tensor is inlined on the same fresh lattice multiindex.
-    ``flat_index`` maps that lattice point back to the original flat ordering
-    wherever the old index is still needed, notably in the return variable.
+    The returned index maps each lattice point to the original source index.
+    A compile-time permutation is inverted before the index is used in the
+    return variable.
     """
     gather = gathers[0]
     tensor, = gather.children
     assert all(_flattened_layout(other) == _flattened_layout(gather)
                for other in gathers)
+    bijection = _flat_index_bijection(
+        gather.multiindex[0], tensor.shape[0])
+    assert bijection is not None and bijection[0] == source
+    permutation = bijection[1]
+    assert all(_flat_index_bijection(
+        other.multiindex[0], other.children[0].shape[0]) == bijection
+        for other in gathers)
     multiindex = _clone_multiindex(tensor.multiindex)
     replacer = MemoizerArg(filtered_replace_indices)
     mapper = MemoizerArg(_replace_gathers)
@@ -1426,7 +1481,15 @@ def _prepare_unflattening(
     ordering[tuple(points.T)] = numpy.arange(len(points))
     flat_index = VariableIndex(Indexed(
         Literal(ordering, dtype=uint_type), multiindex))
-    return mapper, multiindex, flat_index
+    if permutation is None:
+        source_index = flat_index
+    else:
+        inverse = numpy.empty(len(permutation), dtype=uint_type)
+        inverse[numpy.asarray(permutation)] = numpy.arange(
+            len(permutation), dtype=uint_type)
+        source_index = VariableIndex(Indexed(
+            Literal(inverse, dtype=uint_type), (flat_index,)))
+    return mapper, multiindex, source_index
 
 
 def _separable_sum(node: Node, indices: frozenset[Index]) -> bool:
@@ -1452,8 +1515,9 @@ def _unflatten_contracted_terms(
             leftover.append(term)
             continue
         _, _, gathers = candidate
-        mapper, multiindex, flat_index = _prepare_unflattening(gathers)
-        term = mapper(term, ((index, flat_index),))
+        mapper, multiindex, source_index = _prepare_unflattening(
+            gathers, index)
+        term = mapper(term, ((index, source_index),))
         own = frozenset(multiindex)
         predicate = partial(_separable_sum, indices=own)
         rewritten.extend(
@@ -1561,8 +1625,9 @@ def _unflatten_free_indices(
             changed = True
             index, _ = key
             gathers = tuple(OrderedDict.fromkeys(gathers))
-            mapper, multiindex, flat_index = _prepare_unflattening(gathers)
-            substitution = ((index, flat_index),)
+            mapper, multiindex, source_index = _prepare_unflattening(
+                gathers, index)
+            substitution = ((index, source_index),)
             new_variable = MemoizerArg(filtered_replace_indices)(
                 current_variable, substitution)
             new_expression = mapper(term, substitution)

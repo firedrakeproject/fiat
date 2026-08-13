@@ -279,6 +279,48 @@ def test_unflatten_compatible_returns_together():
                    for node in traversal((expression,)))
 
 
+def test_unflatten_bijective_return_index():
+    """Invert a compile-time permutation before exposing a return lattice."""
+    extent = 3
+    p = gem.Index(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    X = gem.Variable("X", (extent, extent))
+    table = gem.FlattenedTensor(
+        gem.Indexed(X, (p, q)), (p, q))
+
+    r = gem.Index(extent=6)
+    permutation = numpy.asarray([2, 0, 5, 1, 4, 3], dtype=gem.uint_type)
+    mapped = gem.Indexed(table, (gem.VariableIndex(gem.Indexed(
+        gem.Literal(permutation, dtype=gem.uint_type), (r,))),))
+    output = gem.Variable("output", (6,))
+    variable, optimized = unflatten_returns([
+        (gem.Indexed(output, (r,)), mapped)
+    ])[0]
+
+    assert len(variable.free_indices) == 2
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((optimized,)))
+
+    values = numpy.arange(extent * extent, dtype=float).reshape(
+        extent, extent)
+    expected, = evaluate([mapped], {X: values})
+    actual, scatter = evaluate(
+        [optimized, variable.multiindex[0].expression], {X: values})
+    points = table.lattice_points()
+    coordinates = {
+        index: points[:, position]
+        for position, index in enumerate(variable.free_indices)
+    }
+
+    def sample(value):
+        return value.arr[tuple(coordinates[index]
+                               for index in value.fids)]
+
+    dense = numpy.empty(6)
+    dense[sample(scatter)] = sample(actual)
+    assert numpy.array_equal(dense, expected.broadcast((r,)))
+
+
 def test_unflatten_factorises_local_sum():
     extent = 3
     p = gem.JaggedIndex(extent=extent)
