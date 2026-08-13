@@ -1649,16 +1649,13 @@ def _prepare_unflattening(
     points = gather.children[0].lattice_points()
     ordering = numpy.zeros(shape, dtype=uint_type)
     ordering[tuple(points.T)] = numpy.arange(len(points))
-    flat_index = VariableIndex(Indexed(
-        Literal(ordering, dtype=uint_type), multiindex))
-    if permutation is None:
-        source_index = flat_index
-    else:
+    if permutation is not None:
         inverse = numpy.empty(len(permutation), dtype=uint_type)
         inverse[numpy.asarray(permutation)] = numpy.arange(
             len(permutation), dtype=uint_type)
-        source_index = VariableIndex(Indexed(
-            Literal(inverse, dtype=uint_type), (flat_index,)))
+        ordering = inverse[ordering]
+    source_index = VariableIndex(Indexed(
+        Literal(ordering, dtype=uint_type), multiindex))
     return mapper, multiindex, source_index
 
 
