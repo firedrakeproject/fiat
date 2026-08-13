@@ -293,9 +293,11 @@ class FiniteElementBase(AbstractFiniteElement):
         except KeyError:
             raise ValueError(f"Unsupported mapping: {self.mapping()}")
 
+
 class CellBackend(Enum):
     FIAT = 1
     FUSE = 2
+
 
 def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], cell_backend: CellBackend = CellBackend.FIAT) -> AbstractCell:
     if isinstance(cell, str) and cell_backend == CellBackend.FUSE:
