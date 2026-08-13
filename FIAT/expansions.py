@@ -334,9 +334,9 @@ def _duffy_derivative_factors(tables, direction):
     """Factorize one physical derivative of the Duffy pullback.
 
     For the lower-triangular Duffy map, ``d/dxi_direction`` is a sum over
-    collapsed axes up to ``direction``.  Axes before the differentiated one
-    contribute values, axes after it contribute one lower power of their
-    collapse weight, and a non-final differentiated axis also contributes its
+    collapsed axes up to ``direction``. Axes before the differentiated axis
+    contribute values. Axes after it contribute one lower power of their
+    collapse weight. A non-final differentiated axis also contributes its
     affine collapsed coordinate.
     """
     terms = []
@@ -537,33 +537,44 @@ class ExpansionSet(object):
              for alpha in reference_element.lattice_iter(0, n+1, dim)),
             dtype=int, count=math.comb(n + dim, dim))
 
-    def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0, cell: int = 0) -> dict:
-        """Tabulate the expansion set in separable form on collapsed
-        tensor-product points.
+    def tabulate_duffy(self, n: int, eta_pts: tuple, order: int = 0,
+                       cell: int = 0) -> dict:
+        """Tabulate the expansion set in separable Duffy form.
 
-        The evaluation points are the image on the reference cell of the
-        tensor-product grid ``eta_pts`` (one ``(-1, 1)`` array per spatial
-        dimension), collapsed onto the default simplex by the Duffy map
-        (`xi_triangle`, `xi_tetrahedron`).
+        Parameters
+        ----------
+        n : int
+            Polynomial degree.
+        eta_pts : tuple
+            One collapsed-coordinate point array per spatial dimension.
+        order : int, optional
+            Highest derivative order.
+        cell : int, optional
+            Cell in the reference complex.
 
-        :returns: a dict mapping each derivative multi-index alpha with
-            ``|alpha| <= order`` to a list of separable terms
-            ``(coeff, factors)``, with ``coeff`` a float and ``factors`` an
-            ordered tuple of ``(axis, table)`` pairs such that::
+        Returns
+        -------
+        dict
+            Separable terms for each derivative multi-index.
 
-                D^alpha phi_(i_1..i_d) = sum_terms coeff * prod_q F_q[m_q, i_q, pt_axis_q]
+        Notes
+        -----
+        The Duffy map sends the tensor-product grid ``eta_pts`` to the
+        reference cell. Each result term is ``(coefficient, factors)``.
+        ``factors`` is an ordered tuple of ``(axis, table)`` pairs such that::
 
-            on the lattice ``i_1 + ... + i_d <= n``, where ``m_1 = 0`` and
-            ``m_t = i_1 + ... + i_{t-1}``. Factor order determines the
-            lattice axes; each axis label selects the corresponding point
-            coordinate. Members are enumerated by the lattice multi-index
-            through `morton_index2` / `morton_index3`. Tables are shared
-            between terms, so consumers may deduplicate them by identity.
+            D^alpha phi_(i_1..i_d) = sum_terms coeff * prod_q F_q[m_q, i_q, pt_axis_q]
 
-            Always the *raw* (continuity=None) tabulation, even when
-            ``self.continuity == "C0"``: `C0_basis`'s recombination mixes
-            lattice multi-indices. Callers needing the C0 basis compose that
-            recombination with their expansion coefficients.
+        The basis lattice satisfies ``i_1 + ... + i_d <= n``. Its prefix
+        index is ``m_1 = 0`` and ``m_t = i_1 + ... + i_{t-1}``. Factor order
+        determines the lattice axes. Each axis label selects a point
+        coordinate. ``morton_index2`` and ``morton_index3`` enumerate the
+        lattice members. Consumers can deduplicate shared tables by identity.
+
+        The result contains the raw tabulation for every continuity variant.
+        The ``C0_basis`` recombination mixes lattice multi-indices. Callers
+        compose this recombination with their expansion coefficients.
+
         """
         if order > 1:
             raise NotImplementedError("tabulate_duffy is limited to first derivatives")

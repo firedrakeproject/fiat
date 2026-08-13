@@ -17,24 +17,30 @@ from finat.point_set import (CollapsedTensorProductPointSet,
 
 
 def make_quadrature(ref_el, degree, scheme="default"):
-    """
-    Generate quadrature rule for given reference element
-    that will integrate an polynomial of order 'degree' exactly.
+    """Create a quadrature rule for a reference element.
 
-    For low-degree polynomials on triangles (<=50) and tetrahedra (<=15), this
-    uses hard-coded rules, otherwise it falls back to a collapsed
-    Gauss scheme on simplices.  On tensor-product cells, it is a
-    tensor-product quadrature rule of the subcells.
+    Parameters
+    ----------
+    ref_el : FIAT.reference_element.Cell
+        Reference cell.
+    degree : int or tuple of int
+        Exact polynomial degree.
+    scheme : str, optional
+        Quadrature scheme.
 
-    :arg ref_el: The FIAT cell to create the quadrature for.
-    :arg degree: The degree of polynomial that the rule should
-        integrate exactly.
-    :kwarg scheme: The quadrature scheme, can be choosen from ["default", "canonical", "KMV", "collapsed"]
-        "default" -> hard-coded scheme for low degree and collapsed Gauss scheme for high degree,
-        "canonical" -> collapsed Gauss scheme,
-        "KMV" -> spectral lumped scheme for low degree (<=6 on triangles, <=3 on tetrahedra),
-        "collapsed" -> collapsed Gauss scheme on simplices, keeping the
-        tensor-product structure in collapsed coordinates for sum factorization.
+    Returns
+    -------
+    QuadratureRule
+        Quadrature points, weights, and reference cell.
+
+    Notes
+    -----
+    The ``default`` scheme uses tabulated simplex rules at low degree. It
+    uses collapsed Gauss rules at high degree. The ``canonical`` scheme uses
+    collapsed Gauss rules with flat points. The ``KMV`` scheme uses spectral
+    lumped rules. The ``collapsed`` scheme retains the tensor-product Duffy
+    structure for sum factorization.
+
     """
     if ref_el.get_shape() == TENSORPRODUCT:
         try:
@@ -78,13 +84,7 @@ def make_quadrature(ref_el, degree, scheme="default"):
 
 
 def collapsed_gauss_jacobi_quadrature(ref_el, degree):
-    """Create a collapsed Gauss-Jacobi quadrature rule on a simplex, keeping
-    the tensor-product structure in collapsed coordinates.
-
-    Per-axis Gauss-Jacobi rules are collapsed onto the simplex through the
-    Duffy map ``x_t = eta_t * prod(u > t) (1 - eta_u)``; the Jacobi weight
-    ``(1 - eta_u)**u`` of axis ``u`` absorbs the Duffy Jacobian, so the
-    simplex weights are products of the one-dimensional weights.
+    """Create a structured collapsed Gauss-Jacobi quadrature rule.
 
     Parameters
     ----------
@@ -97,6 +97,13 @@ def collapsed_gauss_jacobi_quadrature(ref_el, degree):
     -------
     CollapsedTensorProductQuadratureRule
         The structured quadrature rule.
+
+    Notes
+    -----
+    The Duffy map is
+    ``x_t = eta_t * prod(u > t) (1 - eta_u)``. The Jacobi weight
+    ``(1 - eta_u)**u`` absorbs the Duffy Jacobian on axis ``u``. The simplex
+    weights are products of the one-dimensional weights.
 
     """
     if ref_el.is_macrocell():
