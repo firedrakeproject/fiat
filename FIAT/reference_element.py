@@ -145,42 +145,25 @@ class Cell:
         self.vertices = vertices
         self.topology = topology
 
-        if sub_entities:
+        if sub_entities is not None:
             self.sub_entities = sub_entities
         else:
             # If sub entity list not provided
             # Given the topology, work out for each entity in the cell,
             # which other entities it contains.
             self.sub_entities = {}
-            self.sub_entities_old = {}
             for dim, entities in topology.items():
                 self.sub_entities[dim] = {}
-                self.sub_entities_old[dim] = {}
 
                 for e, v in entities.items():
                     vertices = frozenset(v)
                     sub_entities = []
-                    sub_entities_old = []
                     for dim_, entities_ in topology.items():
                         for e_, vertices_ in entities_.items():
                             if vertices.issuperset(vertices_):
-                                sub_entities_old.append((dim_, e_))
+                                sub_entities.append((dim_, e_))
 
-                        # in order to maintain ordering, extract subentities from vertex numbering
-                        entities_of_dim_ = list(entities_.values())
-
-                        from itertools import permutations
-                        # generate all possible sub entities
-                        sub_list = permutations(v, len(entities_of_dim_[0]))
-                        for s in sub_list:
-                            # add the sub entities in the same order as in topology
-                            for i, val in entities_.items():
-                                if set(s) == set(val) and (dim_, i) not in sub_entities:
-                                    sub_entities.append((dim_, i))
-
-                    self.sub_entities[dim][e] = list(sub_entities)
-                    self.sub_entities_old[dim][e] = list(sub_entities_old)
-                self.sub_entities = self.sub_entities_old
+                    self.sub_entities[dim][e] = sorted(list(sub_entities))
         # Build super-entity dictionary by inverting the sub-entity dictionary
         self.super_entities = {dim: {entity: [] for entity in topology[dim]} for dim in topology}
         for dim0 in topology:
@@ -404,14 +387,14 @@ class SimplicialComplex(Cell):
 
     This consists of list of vertex locations and a topology map defining facets.
     """
-    def __init__(self, shape, vertices, topology, sub_ents=None):
+    def __init__(self, shape, vertices, topology, sub_entities=None):
         # Make sure that every facet has the right number of vertices to be
         # a simplex.
         for dim in topology:
             for entity in topology[dim]:
                 assert len(topology[dim][entity]) == dim + 1
 
-        super().__init__(shape, vertices, topology, sub_ents)
+        super().__init__(shape, vertices, topology, sub_entities)
 
     def compute_normal(self, facet_i, cell=None):
         """Returns the unit normal vector to facet i of codimension 1."""
@@ -546,7 +529,6 @@ class SimplicialComplex(Cell):
         include in each direction."""
         if dim == 0:
             return (self.get_vertices()[self.get_topology()[dim][entity_id][0]],)
-            # return (self.get_vertices()[entity_id], )
         elif 0 < dim <= self.get_spatial_dimension():
             entity_verts = \
                 self.get_vertices_of_subcomplex(

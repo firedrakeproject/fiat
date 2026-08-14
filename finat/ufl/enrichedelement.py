@@ -11,7 +11,7 @@
 # Modified by Massimiliano Leoni, 2016
 # Modified by Matthew Scroggs, 2023
 
-from finat.ufl.finiteelementbase import FiniteElementBase
+from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees
 
 
 class EnrichedElementBase(FiniteElementBase):
@@ -93,9 +93,16 @@ class EnrichedElementBase(FiniteElementBase):
 
     def reconstruct(self, **kwargs):
         """Doc."""
+        degree = kwargs.pop('degree', None)
+        if degree is None:
+            degrees = [None] * len(self._elements)
+        elif isinstance(degree, (list, tuple)):
+            degrees = degree
+        else:
+            degrees = shifted_sub_degrees(self._elements, degree)
         if hasattr(self, "_triple"):
-            return type(self)(*[e.reconstruct(**kwargs) for e in self._elements], triple=self._triple)
-        return type(self)(*[e.reconstruct(**kwargs) for e in self._elements])
+            return type(self)(*[e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self._elements)], triple=self._triple)
+        return type(self)(*(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self._elements)))
 
     @property
     def embedded_subdegree(self):

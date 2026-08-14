@@ -16,7 +16,7 @@ import numpy as np
 from ufl.cell import CellSequence
 from ufl.domain import MeshSequence
 from finat.ufl.finiteelement import FiniteElement
-from finat.ufl.finiteelementbase import FiniteElementBase, as_cell
+from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees, as_cell
 from ufl.permutation import compute_indices
 from ufl.pullback import MixedPullback, SymmetricPullback
 from ufl.utils.indexflattening import flatten_multiindex, shape_to_strides, unflatten_index
@@ -254,8 +254,16 @@ class MixedElement(FiniteElementBase):
             if not isinstance(cell, CellSequence):
                 # Allow for passing a single base cell.
                 cell = CellSequence([cell] * len(self.sub_elements))
+        degree = kwargs.pop('degree', None)
+        if degree is None:
+            degrees = [None] * len(self.sub_elements)
+        elif isinstance(degree, (list, tuple)):
+            degrees = degree
+        else:
+            degrees = shifted_sub_degrees(self.sub_elements, degree)
         return type(self)(
-            *[e.reconstruct(cell=c, **kwargs) for c, e in zip(cell.cells, self.sub_elements)],
+            *(e.reconstruct(cell=c, degree=d, **kwargs)
+              for c, d, e in zip(cell.cells, degrees, self.sub_elements)),
         )
 
     def variant(self):

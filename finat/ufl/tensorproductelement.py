@@ -14,7 +14,7 @@
 from itertools import chain
 
 from ufl.cell import TensorProductCell
-from finat.ufl.finiteelementbase import FiniteElementBase, as_cell
+from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees, as_cell
 from ufl.sobolevspace import DirectionalSobolevSpace
 
 
@@ -112,9 +112,20 @@ class TensorProductElement(FiniteElementBase):
     def reconstruct(self, **kwargs):
         """Doc."""
         cell = kwargs.pop("cell", self.cell)
+        degree = kwargs.pop('degree', None)
+        if degree is None:
+            degrees = [None] * len(self.factor_elements)
+        elif isinstance(degree, (list, tuple)):
+            degrees = degree
+        else:
+            degrees = shifted_sub_degrees(self.factor_elements, degree)
         if hasattr(self, "_triple"):
-            return TensorProductElement(*[e.reconstruct(**kwargs) for e in self.factor_elements], cell=cell, triple=self._triple)
-        return TensorProductElement(*[e.reconstruct(**kwargs) for e in self.factor_elements], cell=cell)
+            return TensorProductElement(
+                *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
+                cell=celli, triple=self._triple)
+        return TensorProductElement(
+            *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
+            cell=cell)
 
     def variant(self):
         """Doc."""

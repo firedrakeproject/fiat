@@ -22,6 +22,7 @@ import sys
 from FIAT.reference_element import UFCInterval, UFCTriangle, UFCTetrahedron
 from FIAT.reference_element import Point, TensorProductCell, UFCQuadrilateral, UFCHexahedron
 from FIAT.reference_element import is_ufc, is_hypercube, default_simplex, flatten_reference_cube, Hypercube
+from FIAT.reference_element import Cell
 
 point = Point()
 interval = UFCInterval()
@@ -84,6 +85,51 @@ def test_ufc_connectivity_Dx(cell):
         connectivity = cell.get_connectivity()[(D, dim1)]
         assert len(connectivity) == 1
         assert connectivity[0] == tuple(range(len(connectivity[0])))
+
+
+def test_explicit_sub_entities_reproduces_default():
+    """An explicit sub_entities mapping equal to the one Cell would
+    compute automatically must produce identical super_entities and
+    connectivity."""
+    topology = {0: {0: (0,), 1: (1,)}, 1: {0: (0, 1)}}
+    vertices = ((0.0,), (1.0,))
+
+    reference = Cell("interval", vertices, topology)
+    explicit = Cell("interval", vertices, topology,
+                    sub_entities=reference.sub_entities)
+
+    assert explicit.sub_entities == reference.sub_entities
+    assert explicit.super_entities == reference.super_entities
+    assert explicit.connectivity == reference.connectivity
+
+
+def test_explicit_sub_entities_custom_mapping():
+    """A deliberately different (but self-consistent) explicit
+    sub_entities mapping should be used as-is, and super_entities /
+    connectivity should be derived from it rather than recomputed
+    from the topology."""
+    topology = {0: {0: (0,), 1: (1,)}, 1: {0: (0, 1)}}
+    vertices = ((0.0,), (1.0,))
+
+    # Deliberately omit the "each entity is a sub-entity of itself"
+    # entries that the automatic computation would include.
+    custom_sub_entities = {
+        0: {0: [], 1: []},
+        1: {0: [(0, 0), (0, 1)]},
+    }
+
+    cell = Cell("interval", vertices, topology,
+                sub_entities=custom_sub_entities)
+
+    assert cell.sub_entities == custom_sub_entities
+    assert cell.super_entities == {
+        0: {0: [(1, 0)], 1: [(1, 0)]},
+        1: {0: []},
+    }
+    assert cell.connectivity[(1, 0)] == [(0, 1)]
+    assert cell.connectivity[(0, 1)] == [(0,), (0,)]
+    assert cell.connectivity[(1, 1)] == [()]
+    assert cell.connectivity[(0, 0)] == [(), ()]
 
 
 @pytest.mark.parametrize(('cell', 'volume'),

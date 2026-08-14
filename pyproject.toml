@@ -35,6 +35,9 @@ doc = [
   "sphinx",
 ]
 test = ["pytest"]
+fuse = [
+  "fuse-element @ git+https://github.com/firedrakeproject/fuse.git",
+]
 
 [tool.setuptools]
 packages = ["FIAT", "finat", "finat.ufl", "gem"]

@@ -13,11 +13,31 @@
 
 from abc import abstractmethod, abstractproperty
 from hashlib import md5
+from typing import Sequence, Union
+from enum import Enum
 
 from ufl import pullback
 from ufl.cell import AbstractCell, as_cell as as_cell_ufl
 from ufl.finiteelement import AbstractFiniteElement
 from ufl.utils.sequences import product
+
+
+def flat_max_degree(degree: Union[int, tuple]) -> int:
+    """Return the maximum degree out of a possibly tuple-valued polynomial degree."""
+    return max(degree) if isinstance(degree, tuple) else degree
+
+
+def shifted_sub_degrees(elements: Sequence["FiniteElementBase"], degree: int) -> list:
+    """Return the per-sub-element degree needed to reconstruct ``elements`` at ``degree``.
+
+    ``degree`` is the target maximum degree of the composite element made up of
+    ``elements``. Every sub-element's own degree is shifted by the same amount, so that
+    reconstructing a composite element with heterogeneous sub-element degrees (e.g. a
+    Taylor-Hood pair, or NCF(k) x DQ(k-1)) preserves the relative degree offsets rather
+    than clobbering every sub-element to the same absolute degree.
+    """
+    shift = degree - max(flat_max_degree(e.degree()) for e in elements)
+    return [flat_max_degree(e.degree()) + shift for e in elements]
 
 
 # Dict of supported pullback names and their ufl representation
@@ -274,12 +294,19 @@ class FiniteElementBase(AbstractFiniteElement):
             raise ValueError(f"Unsupported mapping: {self.mapping()}")
 
 
-def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], use_fuse: bool = False) -> AbstractCell:
-    if isinstance(cell, str) and use_fuse:
+class CellBackend(Enum):
+    FIAT = 1
+    FUSE = 2
+
+
+def as_cell(cell: AbstractCell | str | tuple[AbstractCell, ...], cell_backend: CellBackend = CellBackend.FIAT) -> AbstractCell:
+    if isinstance(cell, str) and cell_backend == CellBackend.FUSE:
         try:
             import fuse
-        except ModuleNotFoundError:
-            raise ModuleNotFoundError("Cannot create FUSE cell without FUSE")
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "FUSE cell construction requires the optional 'fuse' dependency. "
+            ) from exc
         return fuse.constructCellComplex(cell)
     else:
         return as_cell_ufl(cell)

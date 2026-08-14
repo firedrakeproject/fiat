@@ -18,6 +18,7 @@ elements by calling the function register_element.
 # Modified by Pablo Brubeck, 2024
 
 import warnings
+import inspect
 
 from numpy import asarray
 
@@ -415,6 +416,10 @@ def canonical_element_description(family, cell, order, form_degree):
         if tdim is None:
             raise ValueError("Need dimension to handle element aliases.")
         (family, order) = aliases[family](family, tdim, order, form_degree)
+
+    # Check that we don't have a raw FUSE object
+    if not isinstance(family, str) and 'fuse' in inspect.getmodule(family).__name__:
+        raise ValueError("Received unconverted FUSE triple - did you forget to call to_ufl()?")
 
     # Check that the element family exists
     if family not in ufl_elements:
