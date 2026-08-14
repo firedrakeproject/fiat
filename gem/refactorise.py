@@ -1,11 +1,18 @@
-"""Data structures and algorithms for generic expansion and
-refactorisation."""
+"""Collect the polynomial structure used by GEM optimizations.
+
+Argument factorization and contraction ordering solve different problems.
+The former identifies the multilinear operands of a finite element form;
+the latter places reduction loops around those operands.  In particular, a
+basis transformation depending on one argument axis remains a linear map
+rather than being expanded into its scalar entries.  Its contractions stay
+visible to GEM, while COFFEE can eliminate sharing between linear maps at
+each reduction level.
+"""
 
 from collections import Counter, OrderedDict, defaultdict, namedtuple
 from collections.abc import Callable, Iterable
 from functools import singledispatch
 from itertools import product
-import math
 from sys import intern
 
 from gem.node import Memoizer, traversal
@@ -132,10 +139,6 @@ class FactorisationError(Exception):
     pass
 
 
-class ExpansionLimitExceeded(FactorisationError):
-    """Raised when polynomial expansion exceeds its complexity budget."""
-
-
 @singledispatch
 def _collect_monomials(expression, self):
     """Refactorises an expression into a sum-of-products form, using
@@ -181,19 +184,12 @@ def _collect_monomials(expression, self):
             # recursion and fail gracefully raising an exception.
             raise FactorisationError(expr)
         # Recurse into each summand, concatenate their results
-        monomial_sum = MonomialSum.sum(*map(self, summands))
-        if (self.max_monomials is not None
-                and len(monomial_sum) > self.max_monomials):
-            raise ExpansionLimitExceeded
-        sums.append(monomial_sum)
+        sums.append(MonomialSum.sum(*map(self, summands)))
 
     # Phase 3: Expansion
     #
     # Each element of ``sums`` is a MonomialSum.  Expansion produces a
     # series (representing a sum) of products of monomials.
-    if (self.max_monomials is not None
-            and math.prod(map(len, sums)) > self.max_monomials):
-        raise ExpansionLimitExceeded
     result = MonomialSum()
     for s, a, r in MonomialSum.product(*sums, rename_map=self.rename_map):
         renamer = make_renamer(self.rename_map)
@@ -222,9 +218,6 @@ def _collect_monomials(expression, self):
         rest = sum_factorise(rest_indices, common_others + [applier(r)])
 
         result.add(sum_indices, atomics, rest)
-        if (self.max_monomials is not None
-                and len(result) > self.max_monomials):
-            raise ExpansionLimitExceeded
     return result
 
 
@@ -296,20 +289,29 @@ def _collect_monomials_conditional(
     return result
 
 
-def collect_monomials(expressions, classifier, max_monomials=None):
-    """Refactorises expressions into a sum-of-products form, using
-    distributivity rules (i.e. a*(b + c) -> a*b + a*c).  Expansion
-    proceeds until all "compound" expressions are broken up.
+def _collect_monomial_sums(
+        expressions: Iterable[Node],
+        classifier: Callable[[Node], str]) -> list[MonomialSum]:
+    """Collect monomial sums using the supplied node classifier.
 
-    :arg expressions: GEM expressions to refactorise
-    :arg classifier: a function that can classify any GEM expression
-                     as ``ATOMIC``, ``COMPOUND``, or ``OTHER``.  This
-                     classification drives the factorisation.
+    Parameters
+    ----------
+    expressions : iterable of Node
+        GEM expressions to refactorize.
+    classifier : callable
+        Function labeling each node as ``ATOMIC``, ``COMPOUND``, or
+        ``OTHER``.
 
-    :returns: list of :py:class:`MonomialSum`s
+    Returns
+    -------
+    list of MonomialSum
+        Polynomial representations of the expressions.
 
-    :raises FactorisationError: Failed to break up some "compound"
-                                expressions with expansion.
+    Raises
+    ------
+    FactorisationError
+        If a compound expression cannot be expanded.
+
     """
     # Get ComponentTensors out of the way
     expressions = remove_componenttensors(expressions)
@@ -330,65 +332,65 @@ def collect_monomials(expressions, classifier, max_monomials=None):
     # Finally, refactorise expressions
     mapper = Memoizer(_collect_monomials)
     mapper.classifier = classifier
-    mapper.max_monomials = max_monomials
     mapper.rename_map = make_rename_map()
     return list(map(mapper, expressions))
 
 
-def collect_factorisation_plans(
-        expression: Node,
+def collect_monomials(
+        expressions: Iterable[Node],
         classifier: Callable[[Node], str],
-        linear_indices: Iterable[Index]) -> tuple[MonomialSum, ...]:
-    """Collect expanded and map-preserving polynomial representations.
+        linear_indices: Iterable[Index] = ()) -> list[MonomialSum]:
+    """Collect structure-preserving sum-of-products representations.
 
     Parameters
     ----------
-    expression
-        Multilinear GEM expression.
+    expressions
+        GEM expressions to refactorize.
     classifier
         Function that labels GEM nodes for polynomial collection.
     linear_indices
-        Free indices belonging to form arguments.
+        Free indices identifying the multilinear axes.  Sums depending on
+        exactly one such axis represent linear maps and remain atomic.
 
     Returns
     -------
-    tuple of MonomialSum
-        Distinct algebraic plans for contraction optimization.
+    list of MonomialSum
+        One polynomial representation for each input expression.
 
     Notes
     -----
-    The expanded plan exposes scalar common factors to polynomial
-    factorization. The map-preserving plan keeps basis transformation as a
-    linear contraction before form evaluation. Expansion stops when its
-    monomial count exceeds the node count of the map-preserving factors.
-    This bound keeps search work proportional to the compact representation.
+    A one-axis sum is a finite element linear operand: examples include a
+    sparse basis transformation and a tensor-product tabulation factor.
+    Preserving it keeps domain-specific basis structure available for
+    contraction optimization.  This does not make the map opaque: its GEM
+    expression remains available for scalar simplification and code motion.
+
+    Sums involving several linear axes separate form monomials and are
+    distributed.  COFFEE subsequently chooses scalar factorizations across
+    the resulting operands.  Keeping these two stages distinct avoids a
+    Cartesian expansion of basis-map entries before loop placement.
 
     """
-    terms, linear_maps = preserve_linear_maps(
-        expression, linear_indices)
-    if not linear_maps:
-        expanded, = collect_monomials((expression,), classifier)
-        return (expanded,)
+    expressions = tuple(expressions)
+    linear_indices = tuple(linear_indices)
+    if not linear_indices:
+        return _collect_monomial_sums(expressions, classifier)
 
-    map_ids = frozenset(map(id, linear_maps))
+    result = []
+    for expression in expressions:
+        terms, linear_maps = preserve_linear_maps(
+            expression, linear_indices)
+        if not linear_maps:
+            monomial_sum, = _collect_monomial_sums(
+                (expression,), classifier)
+            result.append(monomial_sum)
+            continue
 
-    def preserve_map(node: Node) -> str:
-        if id(node) in map_ids:
-            return ATOMIC
-        return classifier(node)
+        map_ids = frozenset(map(id, linear_maps))
 
-    grouped = MonomialSum.sum(*collect_monomials(terms, preserve_map))
-    factors = tuple(
-        factor
-        for monomial in grouped
-        for factor in (*monomial.atomics, monomial.rest))
-    expansion_limit = len(tuple(traversal(factors)))
-    try:
-        expanded, = collect_monomials(
-            (expression,), classifier,
-            max_monomials=expansion_limit)
-    except ExpansionLimitExceeded:
-        return (grouped,)
-    if tuple(grouped) == tuple(expanded):
-        return (expanded,)
-    return expanded, grouped
+        def preserve_map(node: Node) -> str:
+            return ATOMIC if id(node) in map_ids else classifier(node)
+
+        result.append(MonomialSum.sum(*_collect_monomial_sums(
+            terms, preserve_map)))
+    return result

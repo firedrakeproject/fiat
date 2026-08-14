@@ -1,7 +1,14 @@
-"""This module contains an implementation of the COFFEE optimisation
-algorithm operating on a GEM representation.
+"""Eliminate sharing in multilinear GEM expressions.
 
-This file is NOT for code generation as a COFFEE AST.
+The input :class:`MonomialSum` is the normal form of a finite element
+integrand: its atomics are the linear operands and its ``rest`` is
+independent of the multilinear loops.  COFFEE chooses scalar factorizations
+between those operands.  When sum factorization supplies a contraction
+order, the same sharing elimination is applied at every reduction level.
+This realizes sum factorization as generalized code motion while retaining
+the finite element maps selected during argument factorization.
+
+This module transforms GEM; it does not generate a COFFEE AST.
 """
 
 from collections import OrderedDict, defaultdict
@@ -311,6 +318,14 @@ def _share_linear_maps(
     MonomialSum
         Representation whose repeated linear maps access one tensor.
 
+    Notes
+    -----
+    Test and trial axes use distinct indices even when they apply the same
+    finite element map.  Renaming each axis to a canonical index exposes
+    that isomorphism without inspecting the element family.  Materializing
+    the canonical map is generalized code motion: the basis transformation
+    is evaluated once and both axes index its result.
+
     """
     linear_indices = tuple(linear_indices)
     linear_set = frozenset(linear_indices)
@@ -374,6 +389,14 @@ def optimise_monomial_sum(
     -------
     Node
         Factorized GEM expression.
+
+    Notes
+    -----
+    ``contraction_order`` fixes only reduction-loop placement.  At each
+    level, monomials are partitioned by factors independent of the remaining
+    reductions, the inner reduction is optimized recursively, and COFFEE
+    eliminates sharing in the resulting outer polynomial.  Thus contraction
+    ordering and scalar factorization cooperate without competing planners.
 
     """
     monomial_sum = _share_linear_maps(monomial_sum, linear_indices)

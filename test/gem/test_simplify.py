@@ -16,7 +16,7 @@ from gem.optimise import (
     sum_factorise,
 )
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
-                             collect_factorisation_plans)
+                             collect_monomials)
 
 
 @pytest.fixture
@@ -148,8 +148,8 @@ def test_preserve_linear_maps_early_exit():
     assert linear_maps == ()
 
 
-def test_collect_factorisation_plans():
-    """Collect equivalent expanded and map-preserving plans."""
+def test_collect_monomials_preserves_linear_maps():
+    """Keep finite element linear maps intact during factorization."""
     i = gem.Index(extent=2)
     j = gem.Index(extent=2)
     left = gem.Sum(
@@ -169,41 +169,15 @@ def test_collect_factorisation_plans():
             return ATOMIC
         return COMPOUND
 
-    plans = collect_factorisation_plans(
-        expression, classifier, linear_indices)
+    monomial_sum, = collect_monomials(
+        (expression,), classifier, linear_indices)
 
-    assert tuple(map(len, plans)) == (4, 1)
+    monomial, = tuple(monomial_sum)
+    assert frozenset(monomial.atomics) == frozenset((left, right))
     expected, = evaluate([gem.ComponentTensor(expression, (i, j))])
-    for plan in plans:
-        actual, = evaluate([gem.ComponentTensor(
-            monomial_sum_to_expression(plan), (i, j))])
-        assert numpy.array_equal(actual.arr, expected.arr)
-
-
-def test_collect_factorisation_plans_bounds_expansion():
-    """Stop polynomial expansion before it exceeds the compact plan."""
-    linear_indices = tuple(gem.Index(extent=2) for _ in range(8))
-    factors = tuple(
-        gem.Sum(
-            gem.Indexed(gem.Literal([1.0, 2.0]), (index,)),
-            gem.Indexed(gem.Literal([3.0, 5.0]), (index,)))
-        for index in linear_indices)
-    expression = gem.Product(*factors)
-    linear_indices = frozenset(linear_indices)
-
-    def classifier(node: gem.Node) -> str:
-        support = linear_indices.intersection(node.free_indices)
-        if not support:
-            return OTHER
-        if isinstance(node, gem.Indexed):
-            return ATOMIC
-        return COMPOUND
-
-    plans = collect_factorisation_plans(
-        expression, classifier, linear_indices)
-
-    assert len(plans) == 1
-    assert len(plans[0]) == 1
+    actual, = evaluate([gem.ComponentTensor(
+        monomial_sum_to_expression(monomial_sum), (i, j))])
+    assert numpy.array_equal(actual.arr, expected.arr)
 
 
 def test_constant_variable_index():
