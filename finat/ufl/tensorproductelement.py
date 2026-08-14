@@ -13,8 +13,8 @@
 
 from itertools import chain
 
-from ufl.cell import TensorProductCell, as_cell
-from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees
+from ufl.cell import TensorProductCell
+from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees, as_cell
 from ufl.sobolevspace import DirectionalSobolevSpace
 
 
@@ -35,9 +35,11 @@ class TensorProductElement(FiniteElementBase):
             raise ValueError("Cannot create TensorProductElement from empty list.")
 
         keywords = list(kwargs.keys())
-        if keywords and keywords != ["cell"]:
+        if keywords and not (keywords == ["cell"] or keywords == ["cell", "triple"]):
             raise ValueError("TensorProductElement got an unexpected keyword argument '%s'" % keywords[0])
         cell = kwargs.get("cell")
+        if "triple" in keywords:
+            self._triple = kwargs.get("triple")
 
         try:
             family, = {e.family() for e in elements}
@@ -117,6 +119,10 @@ class TensorProductElement(FiniteElementBase):
             degrees = degree
         else:
             degrees = shifted_sub_degrees(self.factor_elements, degree)
+        if hasattr(self, "_triple"):
+            return TensorProductElement(
+                *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
+                cell=celli, triple=self._triple)
         return TensorProductElement(
             *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
             cell=cell)
