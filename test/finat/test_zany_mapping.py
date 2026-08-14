@@ -1,11 +1,41 @@
 import FIAT
 import finat
+import gem
 import numpy as np
 import pytest
 import pprint
 
 from gem.interpreter import evaluate
-from finat.physically_mapped import PhysicallyMappedElement
+from gem.node import traversal
+from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
+
+
+def test_sparse_mapped_tabulation():
+    """Represent a sparse basis map by exact ragged contractions."""
+    coefficient = gem.Variable("coefficient", ())
+    matrix = gem.ListTensor(np.asarray([
+        [gem.Literal(1.0), gem.Zero(), coefficient],
+        [gem.Zero(), gem.Literal(1.0), gem.Zero()],
+    ], dtype=object))
+    table_values = np.arange(1.0, 7.0).reshape(3, 2)
+    table = gem.Literal(table_values)
+
+    mapped = MappedTabulation(matrix, {None: table})[None]
+
+    contractions = [
+        node for node in traversal((mapped,))
+        if isinstance(node, gem.IndexSum)
+    ]
+    assert len(contractions) == 2
+    assert all(isinstance(node.multiindex[0], gem.RaggedIndex)
+               for node in contractions)
+    assert not any(isinstance(node, gem.Conditional)
+                   for node in traversal((mapped,)))
+
+    actual, = evaluate([mapped], {coefficient: np.asarray(2.0)})
+    expected = np.asarray([[1.0, 0.0, 2.0], [0.0, 1.0, 0.0]]) \
+        @ table_values
+    assert np.array_equal(actual.arr, expected)
 
 
 def make_unisolvent_points(element, interior=False):

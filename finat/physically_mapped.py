@@ -1,11 +1,37 @@
 from abc import ABCMeta, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from numbers import Number
 
 import gem
 import numpy
 
 from finat.citations import cite
+
+
+zero = gem.Zero()
+one = gem.Literal(1.0)
+
+
+def _as_basis_entry(value: object) -> gem.Node:
+    """Normalize a basis-transformation matrix entry.
+
+    Parameters
+    ----------
+    value
+        Scalar numerical or GEM matrix entry.
+
+    Returns
+    -------
+    gem.Node
+        Scalar GEM entry with numerical zero and one represented
+        symbolically.
+    """
+    if isinstance(value, Number):
+        if value == 0:
+            return zero
+        if value == 1:
+            return one
+    return gem.as_gem(value)
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -17,35 +43,50 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
 
 
 class MappedTabulation(Mapping):
-    """A lazy tabulation dict that applies the basis transformation only
-    on the requested derivatives.
+    """Apply a sparse basis transformation to reference tabulations.
 
-    :arg M: a gem.ListTensor with the basis transformation matrix.
-    :arg ref_tabulation: a dict of tabulations on the reference cell.
-    :kwarg indices: an optional list of restriction indices on the basis functions.
+    Parameters
+    ----------
+    M : gem.ListTensor
+        Basis-transformation matrix.
+    ref_tabulation : Mapping
+        Reference tabulations indexed by derivative order.
+    indices : iterable of int, optional
+        Rows retained by an element restriction.
+
+    Notes
+    -----
+    The transformation is represented as ``M = U + W``, where ``U`` holds
+    unit entries and ``W`` the remaining nonzeros.  Each part is a ragged
+    row contraction.  Exact row lengths avoid branches and padded-zero
+    arithmetic, while separating ``U`` avoids multiplication by one.  The
+    resulting GEM expression still exposes the transformation as a finite
+    element linear map before quadrature contraction.
     """
-    def __init__(self, M, ref_tabulation, indices=None):
-        self.M = M
+
+    def __init__(
+            self, M: gem.ListTensor, ref_tabulation: Mapping,
+            indices: Iterable[int] | None = None) -> None:
         self.ref_tabulation = ref_tabulation
         if indices is None:
-            indices = list(range(M.shape[0]))
-        self.indices = indices
+            indices = range(M.shape[0])
+        self.indices = tuple(indices)
+
+        nonzero_rows = []
+        for source_row in self.indices:
+            row = []
+            for column in range(M.shape[1]):
+                value = _as_basis_entry(M.array[source_row, column])
+                if not isinstance(value, gem.Zero):
+                    row.append((column, value))
+            nonzero_rows.append(row)
         groups = []
-        nrows = len(indices)
+        nrows = len(self.indices)
         for unit in (True, False):
             rows = [
-                [
-                    column
-                    for column in range(M.shape[1])
-                    if not (
-                        isinstance(M.array[source_row, column], gem.Zero)
-                        or isinstance(M.array[source_row, column], Number)
-                        and M.array[source_row, column] == 0)
-                    and ((M.array[source_row, column] == 1
-                          if isinstance(M.array[source_row, column], Number)
-                          else M.array[source_row, column] == one) == unit)
-                ]
-                for source_row in indices
+                [(column, value) for column, value in row
+                 if (value == one) == unit]
+                for row in nonzero_rows
             ]
             lengths = numpy.asarray(tuple(map(len, rows)), dtype=gem.uint_type)
             width = int(lengths.max(initial=0))
@@ -55,36 +96,48 @@ class MappedTabulation(Mapping):
             data = None if unit \
                 else numpy.full((nrows, width), zero, dtype=object)
             for row, entries in enumerate(rows):
-                columns[row, :len(entries)] = entries
+                columns[row, :len(entries)] = tuple(
+                    column for column, _ in entries)
                 if data is not None:
                     data[row, :len(entries)] = tuple(
-                        map(gem.as_gem, M.array[indices[row], entries]))
+                        gem.as_gem(value) for _, value in entries)
             groups.append((
                 lengths,
                 gem.Literal(columns, dtype=gem.uint_type),
                 None if unit else gem.ListTensor(data),
             ))
-        self.groups = tuple(groups)
+        self._sparse_maps = tuple(groups)
         self._tabulation_cache = {}
 
-    def matvec(self, table):
+    def matvec(self, table: gem.Node) -> gem.Node:
+        """Transform one reference tabulation.
+
+        Parameters
+        ----------
+        table
+            Reference tabulation with the basis axis first.
+
+        Returns
+        -------
+        gem.Node
+            Tabulation whose first axis is the transformed basis axis.
+        """
         row = gem.Index(extent=len(self.indices))
         tail = gem.indices(len(table.shape) - 1)
-
-        def term(group):
-            lengths, column_table, data = group
+        terms = []
+        for lengths, column_table, coefficients in self._sparse_maps:
             entry = gem.RaggedIndex(
                 extent=column_table.shape[1],
                 parents=(row,), lengths=lengths)
             column = gem.VariableIndex(
                 gem.Indexed(column_table, (row, entry)))
             basis = gem.Indexed(table, (column, *tail))
-            if data is not None:
+            if coefficients is not None:
                 basis = gem.Product(
-                    gem.Indexed(data, (row, entry)), basis)
-            return gem.IndexSum(basis, (entry,))
+                    gem.Indexed(coefficients, (row, entry)), basis)
+            terms.append(gem.IndexSum(basis, (entry,)))
 
-        mapped = gem.Sum(*(term(group) for group in self.groups))
+        mapped = gem.Sum(*terms)
         return gem.ComponentTensor(mapped, (row, *tail))
 
     def __getitem__(self, alpha):
@@ -231,10 +284,6 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :returns: a GEM expression for the physical vertices, shape
                 (gdim, )."""
-
-
-zero = gem.Zero()
-one = gem.Literal(1.0)
 
 
 def identity(*shape):
