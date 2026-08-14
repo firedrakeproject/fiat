@@ -20,7 +20,7 @@ import numpy
 from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Node, one
 from gem.node import MemoizerArg
 from gem.optimise import (estimate_cost, filtered_replace_indices,
-                          make_sum, make_product)
+                          make_sum, make_product, partition_connected)
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
 
@@ -481,24 +481,9 @@ def optimise_monomials(monomials, linear_indices):
     result = [m for m in monomials if not m.atomics]  # skipped monomials
     active_monomials = [m for m in monomials if m.atomics]
 
-    while len(active_monomials) > 0:
-        # Extract a connected component: maximal subset of monomials with intersecting atomics
-        old_size = 0
-        subset = {active_monomials[0]}
-        while len(subset) > old_size:
-            old_size = len(subset)
-            for candidate in active_monomials:
-                if candidate not in subset:
-                    candidate_atomics = frozenset(candidate.atomics)
-                    if any(candidate_atomics.intersection(m.atomics) for m in subset):
-                        subset.add(candidate)
-        connected_monomials = [m for m in active_monomials if m in subset]
-
-        # Optimise the connected component and append to the result
+    for connected_monomials in partition_connected(
+            active_monomials, lambda monomial: monomial.atomics):
         optimal_atomics = find_optimal_atomics(connected_monomials, linear_indices)
         result += factorise_atomics(connected_monomials, optimal_atomics, linear_indices)
-
-        # Discard the connected component
-        active_monomials = [m for m in active_monomials if m not in subset]
 
     return collect_common_rests(result)

@@ -16,11 +16,12 @@ symbolic layer.
 """
 
 from collections import OrderedDict, defaultdict
-from collections.abc import Iterable
+from collections.abc import Callable, Hashable, Iterable
 from functools import lru_cache, singledispatch, partial
 from itertools import zip_longest
 import math
 from numbers import Integral
+from typing import TypeVar
 
 import numpy
 
@@ -33,6 +34,9 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, JaggedIndex, RaggedIndex, ComponentTensor, ListTensor,
                      Delta, _jagged_lattice, partial_indexed, one)
+
+
+T = TypeVar("T")
 
 
 @singledispatch
@@ -371,6 +375,58 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
                        for index in (f.i, f.j) if index in sum_indices]
 
     return sum_indices, factors
+
+
+def partition_connected(
+        items: Iterable[T],
+        support: Callable[[T], Iterable[Hashable]]) -> tuple[tuple[T, ...], ...]:
+    """Partition objects connected by transitive support overlap.
+
+    Parameters
+    ----------
+    items
+        Objects to partition.
+    support
+        Function returning the hypergraph vertices incident on an object.
+
+    Returns
+    -------
+    tuple of tuple
+        Connected components in deterministic input order.
+
+    Notes
+    -----
+    Factors joined by contraction indices and monomials joined by common
+    atomics are both incidence hypergraphs.  Traversing their bipartite
+    incidence relation avoids constructing a quadratic pairwise-overlap
+    graph and gives both optimizers the same definition of independence.
+
+    """
+    items = tuple(items)
+    supports = tuple(frozenset(support(item)) for item in items)
+    incidence = defaultdict(list)
+    for position, keys in enumerate(supports):
+        for key in keys:
+            incidence[key].append(position)
+
+    unseen = set(range(len(items)))
+    components = []
+    for seed in range(len(items)):
+        if seed not in unseen:
+            continue
+        component = []
+        pending = [seed]
+        while pending:
+            position = pending.pop()
+            if position not in unseen:
+                continue
+            unseen.remove(position)
+            component.append(position)
+            for key in supports[position]:
+                pending.extend(reversed(incidence[key]))
+        components.append(tuple(items[position]
+                                for position in sorted(component)))
+    return tuple(components)
 
 
 def _index_closure(indices: Iterable[Index]) -> frozenset[Index]:
@@ -979,23 +1035,8 @@ def sum_factorise(
     factor_indices = [
         _index_closure(factor.free_indices) & contraction_set
         for factor in factors]
-    remaining = set(range(len(factors)))
-    components = []
-    while remaining:
-        component = {remaining.pop()}
-        active_indices = set().union(*(
-            factor_indices[position] for position in component))
-        changed = True
-        while changed:
-            connected = {
-                position for position in remaining
-                if active_indices & factor_indices[position]}
-            changed = bool(connected)
-            component.update(connected)
-            remaining.difference_update(connected)
-            active_indices.update(*(
-                factor_indices[position] for position in connected))
-        components.append(tuple(sorted(component)))
+    components = partition_connected(
+        range(len(factors)), lambda position: factor_indices[position])
 
     expressions = []
     for component in components:
