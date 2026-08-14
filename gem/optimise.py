@@ -1,5 +1,19 @@
-"""A set of routines implementing various transformations on GEM
-expressions."""
+"""Transform GEM expressions while preserving contraction structure.
+
+The contraction optimizer separates three decisions that have different
+mathematical costs.  :func:`associate` reassociates scalar sums and products
+without moving an index contraction.  :func:`sum_factorise` treats a tensor
+contraction as a hypergraph and moves each reduction to the earliest subtree
+containing all factors incident on its index.  A scalar optimizer such as
+COFFEE can then eliminate sharing inside the resulting loops.
+
+This separation makes sum factorization an instance of generalized code
+motion: GEM chooses which index domain computes a value, while COFFEE chooses
+how the scalar value is written.  Contraction plans are ordered first by
+arithmetic work and then by live and total intermediate storage.  The storage
+criteria avoid embedding an architecture-specific cache threshold in this
+symbolic layer.
+"""
 
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterable
@@ -725,8 +739,21 @@ def _ordered_contraction_indices(
 
 def _contraction_component(
         sum_indices: tuple[Index, ...],
-        factors: tuple[Node, ...]) -> tuple[Node, tuple[int, int, int]]:
+        factors: tuple[Node, ...]) -> Node:
     """Optimize one connected tensor contraction by subset DP.
+
+    A state is a subset of factors.  A contraction index becomes *closed*
+    when the state contains every factor incident on that index; reducing it
+    at that point is precisely the earliest legal code motion.  The state
+    retains only indices needed by factors outside the subset.  Consequently,
+    its score compares plans lexicographically by FLOPs, peak live
+    intermediate storage, and total materialized storage.
+
+    This dynamic program subsumes scalar reassociation for a connected
+    contraction: each bipartition chooses both a product association and the
+    reductions that become legal there.  :func:`associate` handles expressions
+    for which no contraction-placement decision remains.  Beyond ten factors
+    a deterministic index-at-a-time plan bounds the exponential search.
 
     Parameters
     ----------
@@ -739,14 +766,9 @@ def _contraction_component(
     -------
     Node
         Optimized contraction.
-    tuple of int
-        Estimated FLOPs, peak storage, and total storage.
-
     """
     if len(factors) > 10:
         terms = list(factors)
-        flops = 0
-        storage = 0
         for index in reversed(sum_indices):
             contract = [term for term in terms
                         if index in term.free_indices]
@@ -754,15 +776,11 @@ def _contraction_component(
                 continue
             deferred = [term for term in terms
                         if index not in term.free_indices]
-            product, product_flops = associate(Product, contract)
-            extent = _iteration_count(frozenset(product.free_indices))
+            product, _ = associate(Product, contract)
             result = IndexSum(product, (index,))
-            flops += product_flops + extent
-            result_storage = _storage_count(result.free_indices)
-            storage += result_storage
             terms = deferred + [result]
-        result, product_flops = associate(Product, terms)
-        return result, (flops + product_flops, storage, storage)
+        result, _ = associate(Product, terms)
+        return result
 
     full_mask = (1 << len(factors)) - 1
     factor_indices = tuple(
@@ -852,8 +870,8 @@ def _contraction_component(
                             best = candidate
                 left = (left - 1) & mask
             plans[mask] = best
-    score, expression, _, _ = plans[full_mask]
-    return expression, score
+    _, expression, _, _ = plans[full_mask]
+    return expression
 
 
 def sum_factorise(
@@ -866,6 +884,13 @@ def sum_factorise(
     indices.  Independent connected components are reduced separately.  A
     subset dynamic program then chooses the contraction tree minimizing
     arithmetic work, with peak and total intermediate storage as tie-breakers.
+
+    Optional distribution is a competing transformation: it may expose a
+    smaller contraction domain, but it duplicates expression structure.  It
+    is therefore applied only when a summand has strictly smaller contraction
+    support, before the contraction tree is optimized.  Disconnected tensor
+    network components are then planned independently and scalar-associated
+    only after all their reductions have completed.
 
     Parameters
     ----------
@@ -886,7 +911,6 @@ def sum_factorise(
     sum_indices = tuple(sum_indices)
     factors = tuple(factors)
     if len(factors) == 0 and len(sum_indices) == 0:
-        # Empty product
         return one
 
     factor_indices = set().union(*(factor.free_indices for factor in factors))
@@ -919,14 +943,13 @@ def sum_factorise(
         sum_indices = tuple(index for index in sum_indices
                             if index not in marginalised)
 
-    missing = set(sum_indices) - factor_indices
-    if missing:
-        # A rectangular sum of an index-independent expression is its extent
-        # times that expression.
+    constant_sum_indices = set(sum_indices) - factor_indices
+    if constant_sum_indices:
         factors += tuple(Literal(index.extent)
-                         for index in sum_indices if index in missing)
+                         for index in sum_indices
+                         if index in constant_sum_indices)
         sum_indices = tuple(index for index in sum_indices
-                            if index not in missing)
+                            if index not in constant_sum_indices)
 
     if distribute:
         contraction_indices = frozenset(sum_indices)
@@ -981,7 +1004,7 @@ def sum_factorise(
             factor_indices[position] for position in component))
         component_indices = tuple(
             index for index in sum_indices if index in involved)
-        expression, _ = _contraction_component(
+        expression = _contraction_component(
             component_indices, component_factors)
         expressions.append(expression)
     expression, _ = associate(Product, expressions)
