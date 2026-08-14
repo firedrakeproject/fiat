@@ -187,67 +187,6 @@ def remove_componenttensors(expressions, subst=()):
     return [mapper(expression, subst) for expression in expressions]
 
 
-def hoist_linear_index(expression: Node,
-                       linear_indices: Iterable[Index]) -> Node:
-    """Materialise repeated scalar expressions over one linear index.
-
-    Expressions that differ only in which equally-sized linear axis they use
-    are evaluations of the same indexed tensor.  Replacing both evaluations
-    by accesses to one :class:`ComponentTensor` exposes that tensor to the
-    imperative scheduler, which can compute it once in the surrounding loop
-    nest.
-
-    Parameters
-    ----------
-    expression
-        Scalar expression to optimise.
-    linear_indices
-        Free indices representing multilinear argument axes.
-
-    Returns
-    -------
-    Node
-        Expression with profitable repeated linear expressions shared.
-
-    """
-    linear_indices = frozenset(linear_indices)
-    canonical = {
-        extent: Index(extent=extent)
-        for extent in {index.extent for index in linear_indices}
-    }
-    replacer = MemoizerArg(filtered_replace_indices)
-    groups = defaultdict(list)
-    for node in traversal((expression,)):
-        involved = linear_indices.intersection(node.free_indices)
-        if node.shape or len(involved) != 1:
-            continue
-        index, = involved
-        normal = replacer(node, ((index, canonical[index.extent]),))
-        groups[normal].append((node, index))
-
-    replacements = {}
-    for normal, occurrences in groups.items():
-        indices = {index for _, index in occurrences}
-        if len(indices) < 2 or estimate_cost((normal,))[0] == 0:
-            continue
-        index = canonical[next(iter(indices)).extent]
-        tensor = ComponentTensor(normal, (index,))
-        replacements.update(
-            (node, Indexed(tensor, (original,)))
-            for node, original in occurrences)
-
-    if not replacements:
-        return expression
-
-    def replace(node, self):
-        try:
-            return replacements[node]
-        except KeyError:
-            return reuse_if_untouched(node, self)
-
-    return Memoizer(replace)(expression)
-
-
 @singledispatch
 def _constant_fold_zero(node, self):
     raise AssertionError("cannot handle type %s" % type(node))

@@ -2,11 +2,12 @@ import numpy
 import pytest
 
 import gem
-from gem.coffee import find_optimal_atomics
+from gem.coffee import find_optimal_atomics, optimise_monomial_sum
 from gem.gem import one
 from gem.interpreter import evaluate
+from gem.node import traversal
 from gem.optimise import estimate_cost, sum_factorise
-from gem.refactorise import Monomial
+from gem.refactorise import Monomial, MonomialSum
 
 
 def contraction(nfactors, ndims, extent=2):
@@ -73,6 +74,41 @@ def test_optimal_atomics_complete_bipartite():
     assert len(selected) == len(left)
     assert all(any(atomic in monomial.atomics for atomic in selected)
                for monomial in monomials)
+
+
+def test_share_isomorphic_linear_maps():
+    i = gem.Index(extent=3)
+    j = gem.Index(extent=3)
+    q = gem.Index(extent=2)
+    table = gem.Variable("table", (3, 2))
+    weight = gem.Variable("weight", (3, 2))
+
+    def mapped(index):
+        return 2 * gem.Indexed(table, (index, q)) \
+            + gem.Indexed(weight, (index, q))
+
+    monomial_sum = MonomialSum()
+    monomial_sum.add((), (mapped(i), mapped(j)), one)
+
+    expression = optimise_monomial_sum(monomial_sum, (i, j))
+
+    tensors = [node for node in traversal((expression,))
+               if isinstance(node, gem.ComponentTensor)]
+    tensor, = tensors
+    assert tensor.shape == (3,)
+    assert tensor.free_indices == (q,)
+    accesses = [node for node in traversal((expression,))
+                if isinstance(node, gem.Indexed)
+                and node.children[0] == tensor]
+    assert {access.multiindex for access in accesses} == {(i,), (j,)}
+
+    bindings = {
+        table: numpy.arange(6).reshape(3, 2),
+        weight: numpy.arange(6, 12).reshape(3, 2),
+    }
+    original = mapped(i) * mapped(j)
+    expected, actual = evaluate([original, expression], bindings)
+    assert numpy.array_equal(actual.broadcast(expected.fids), expected.arr)
 
 
 def test_estimate_cost_jagged_contraction():

@@ -10,8 +10,10 @@ import logging
 
 import numpy
 
-from gem.gem import IndexSum, Node, one
-from gem.optimise import make_sum, make_product
+from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Node, one
+from gem.node import MemoizerArg
+from gem.optimise import (estimate_cost, filtered_replace_indices,
+                          make_sum, make_product)
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
 
@@ -292,11 +294,98 @@ def collect_common_rests(monomials):
     return result
 
 
+def _share_linear_maps(
+        monomial_sum: MonomialSum,
+        linear_indices: tuple[Index, ...]) -> MonomialSum:
+    """Share isomorphic maps of distinct multilinear axes.
+
+    Parameters
+    ----------
+    monomial_sum
+        Sum-of-products representation of a multilinear expression.
+    linear_indices
+        Free indices identifying argument axes.
+
+    Returns
+    -------
+    MonomialSum
+        Representation whose repeated linear maps access one tensor.
+
+    """
+    linear_indices = tuple(linear_indices)
+    linear_set = frozenset(linear_indices)
+    canonical = {
+        index.extent: Index(extent=index.extent)
+        for index in linear_indices
+    }
+    replacer = MemoizerArg(filtered_replace_indices)
+    groups = defaultdict(list)
+    for monomial in monomial_sum:
+        for atomic in monomial.atomics:
+            involved = linear_set.intersection(atomic.free_indices)
+            if len(involved) != 1:
+                continue
+            index, = involved
+            normal = replacer(
+                atomic, ((index, canonical[index.extent]),))
+            groups[normal].append((atomic, index))
+
+    replacements = {}
+    for normal, occurrences in groups.items():
+        indices = {index for _, index in occurrences}
+        if len(indices) < 2 or estimate_cost((normal,))[0] == 0:
+            continue
+        index = canonical[next(iter(indices)).extent]
+        tensor = ComponentTensor(normal, (index,))
+        replacements.update(
+            (atomic, Indexed(tensor, (original,)))
+            for atomic, original in occurrences)
+
+    if not replacements:
+        return monomial_sum
+
+    result = MonomialSum()
+    for monomial in monomial_sum:
+        result.add(
+            monomial.sum_indices,
+            tuple(replacements.get(atomic, atomic)
+                  for atomic in monomial.atomics),
+            monomial.rest,
+        )
+    return result
+
+
 def optimise_monomial_sum(
         monomial_sum: MonomialSum,
         linear_indices: tuple,
         contraction_order: tuple = ()) -> Node:
     """Factor monomial algebra and place ordered contractions.
+
+    Parameters
+    ----------
+    monomial_sum
+        Sum-of-products representation to optimize.
+    linear_indices
+        Free indices identifying argument tabulations.
+    contraction_order
+        Contraction indices, from outermost to innermost stage.
+
+    Returns
+    -------
+    Node
+        Factorized GEM expression.
+
+    """
+    monomial_sum = _share_linear_maps(monomial_sum, linear_indices)
+    return _optimise_monomial_sum(
+        monomial_sum, linear_indices, contraction_order)
+
+
+def _optimise_monomial_sum(
+        monomial_sum: MonomialSum,
+        linear_indices: tuple,
+        contraction_order: tuple) -> Node:
+    """Implement recursive monomial and contraction optimization.
 
     Parameters
     ----------
@@ -336,7 +425,7 @@ def optimise_monomial_sum(
 
         outer_sum = MonomialSum()
         for outer_indices, outer_atomics in order:
-            inner = optimise_monomial_sum(
+            inner = _optimise_monomial_sum(
                 grouped[(outer_indices, outer_atomics)],
                 linear_indices, contraction_order[1:])
             outer_sum.add(outer_indices, outer_atomics, inner)
