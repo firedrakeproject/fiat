@@ -190,14 +190,14 @@ def convert_finiteelement(element, **kwargs):
     if make_finat_element is None:
         if element.cell.cellname == "quadrilateral":
             # Handle quadrilateral short names like RTCF and RTCE.
-            quadrilateral_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["use_fuse"]),
-                                                      finat.ufl.as_cell("interval", kwargs["use_fuse"]))
+            quadrilateral_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["cell_backend"]),
+                                                      finat.ufl.as_cell("interval", kwargs["cell_backend"]))
             element = element.reconstruct(cell=quadrilateral_tpc)
         elif element.cell.cellname == "hexahedron":
             # Handle hexahedron short names like NCF and NCE.
-            hexahedron_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["use_fuse"]),
-                                                   finat.ufl.as_cell("interval", kwargs["use_fuse"]),
-                                                   finat.ufl.as_cell("interval", kwargs["use_fuse"]))
+            hexahedron_tpc = ufl.TensorProductCell(finat.ufl.as_cell("interval", kwargs["cell_backend"]),
+                                                   finat.ufl.as_cell("interval", kwargs["cell_backend"]),
+                                                   finat.ufl.as_cell("interval", kwargs["cell_backend"]))
             element = element.reconstruct(cell=hexahedron_tpc)
         else:
             raise ValueError("%s is supported, but handled incorrectly" %
