@@ -263,8 +263,34 @@ def _evaluate_conditional(e, self):
 def _evaluate_indexed(e, self):
     """Indexing maps shape to free indices"""
     val = self(e.children[0])
-    fids = tuple(i for i in e.multiindex if isinstance(i, gem.Index))
+    variable_indices = {i: self(i.expression) for i in e.multiindex
+                        if isinstance(i, gem.VariableIndex)}
 
+    if any(result.fids for result in variable_indices.values()):
+        # Some variable index depends on free indices: gather entries
+        # one by one over the extent of the free indices.
+        fids = list(val.fids)
+        for i in e.multiindex:
+            new_fids = (i,) if isinstance(i, gem.Index) else \
+                variable_indices[i].fids if isinstance(i, gem.VariableIndex) else ()
+            fids.extend(f for f in new_fids if f not in fids)
+        fids = tuple(fids)
+        out = numpy.empty(tuple(f.extent for f in fids), dtype=val.arr.dtype)
+        for idx in numpy.ndindex(out.shape):
+            env = dict(zip(fids, idx))
+            vidx = [env[f] for f in val.fids]
+            for i in e.multiindex:
+                if isinstance(i, gem.Index):
+                    vidx.append(env[i])
+                elif isinstance(i, gem.VariableIndex):
+                    result = variable_indices[i]
+                    vidx.append(int(result.arr[tuple(env[f] for f in result.fids)]))
+                else:
+                    vidx.append(i)
+            out[idx] = val.arr[tuple(vidx)]
+        return Result(out, fids)
+
+    fids = tuple(i for i in e.multiindex if isinstance(i, gem.Index))
     idx = []
     # First pick up all the existing free indices
     for _ in val.fids:
@@ -275,10 +301,10 @@ def _evaluate_indexed(e, self):
             # Free index, want entire extent
             idx.append(slice(None))
         elif isinstance(i, gem.VariableIndex):
-            # Variable index, evaluate inner expression
-            result, = self(i.expression)
+            # Variable index, constant during kernel execution
+            result = variable_indices[i]
             assert not result.tshape
-            idx.append(result[()])
+            idx.append(int(result.arr[()]))
         else:
             # Fixed index, just pick that value
             idx.append(i)
@@ -311,6 +337,24 @@ def _evaluate_indexsum(e, self):
     """Index sums reduce over the given axis."""
     val = self(e.children[0])
     idx = tuple(map(val.fids.index, e.multiindex))
+    ragged = tuple(index for index in e.multiindex
+                   if isinstance(index, gem.RaggedIndex))
+    if ragged:
+        shape = (1,) * len(val.fids)
+        mask = numpy.ones(val.fshape, dtype=bool)
+        for index in ragged:
+            axis = val.fids.index(index)
+            entry_shape = list(shape)
+            entry_shape[axis] = index.extent
+            entry = numpy.arange(index.extent).reshape(entry_shape)
+            parents = tuple(
+                numpy.arange(parent.extent).reshape(
+                    shape[:val.fids.index(parent)] + (parent.extent,)
+                    + shape[val.fids.index(parent) + 1:])
+                for parent in index.parents)
+            mask &= entry < index.lengths[parents]
+        mask = mask[(...,) + (None,) * len(val.shape)]
+        val = Result(numpy.where(mask, val.arr, 0), val.fids)
     rfids = tuple(fi for fi in val.fids if fi not in e.multiindex)
     return Result(val.arr.sum(axis=idx), rfids)
 
