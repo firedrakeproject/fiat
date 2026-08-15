@@ -11,9 +11,11 @@ from gem.node import traversal
 from gem.interpreter import evaluate
 from gem.optimise import (
     _distribute_sum,
+    contraction,
     eliminate_deltas,
     preserve_linear_maps,
     sum_factorise,
+    unflatten_returns,
 )
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
                              collect_monomials)
@@ -235,6 +237,188 @@ def test_delta_elimination_preserves_indirect_free_index():
     assert result.free_indices == (k,)
     actual, = evaluate([result])
     assert numpy.array_equal(actual.arr, values.array[entries])
+
+
+def test_unflatten_compatible_returns_together():
+    extent = 3
+    p = gem.Index(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    X = gem.Variable("X", (extent, extent))
+    Y = gem.Variable("Y", (extent, extent))
+    ft_x = gem.FlattenedTensor(gem.Indexed(X, (p, q)), (p, q))
+    ft_y = gem.FlattenedTensor(gem.Indexed(Y, (p, q)), (p, q))
+
+    r = gem.Index(extent=6)
+    result = gem.Variable("result", (6,))
+    pairs = unflatten_returns([
+        (gem.Indexed(result, (r,)),
+         gem.Sum(gem.Indexed(ft_x, (r,)), gem.Indexed(ft_y, (r,))))
+    ])
+
+    assert len(pairs) == 1
+    variable, expression = pairs[0]
+    assert variable.free_indices == expression.free_indices
+    assert len(variable.free_indices) == 2
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((expression,)))
+
+
+def test_unflatten_bijective_return_index():
+    """Invert a compile-time permutation before exposing a return lattice."""
+    extent = 3
+    p = gem.Index(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    X = gem.Variable("X", (extent, extent))
+    table = gem.FlattenedTensor(
+        gem.Indexed(X, (p, q)), (p, q))
+
+    r = gem.Index(extent=6)
+    permutation = numpy.asarray([2, 0, 5, 1, 4, 3], dtype=gem.uint_type)
+    mapped = gem.Indexed(table, (gem.VariableIndex(gem.Indexed(
+        gem.Literal(permutation, dtype=gem.uint_type), (r,))),))
+    output = gem.Variable("output", (6,))
+    variable, optimized = unflatten_returns([
+        (gem.Indexed(output, (r,)), mapped)
+    ])[0]
+
+    assert len(variable.free_indices) == 2
+    scatter_expression = variable.multiindex[0].expression
+    assert scatter_expression.children[0].shape == (extent, extent)
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((optimized,)))
+
+    values = numpy.arange(extent * extent, dtype=float).reshape(
+        extent, extent)
+    expected, = evaluate([mapped], {X: values})
+    actual, scatter = evaluate(
+        [optimized, variable.multiindex[0].expression], {X: values})
+    points = table.lattice_points()
+    coordinates = {
+        index: points[:, position]
+        for position, index in enumerate(variable.free_indices)
+    }
+
+    def sample(value):
+        return value.arr[tuple(coordinates[index]
+                               for index in value.fids)]
+
+    dense = numpy.empty(6)
+    dense[sample(scatter)] = sample(actual)
+    assert numpy.array_equal(dense, expected.broadcast((r,)))
+
+
+def test_unflatten_factorises_local_sum():
+    extent = 3
+    p = gem.JaggedIndex(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    ip, iq = gem.indices(2)
+    A = gem.Variable("A", (extent, 2))
+    B = gem.Variable("B", (extent, extent, 2))
+    C = gem.Variable("C", (extent, 2))
+    D = gem.Variable("D", (extent, extent, 2))
+    lattice = gem.Sum(
+        gem.Product(gem.Indexed(A, (p, ip)), gem.Indexed(B, (p, q, iq))),
+        gem.Product(gem.Indexed(C, (p, ip)), gem.Indexed(D, (p, q, iq))),
+    )
+    table = gem.FlattenedTensor(lattice, (p, q))
+
+    r = gem.Index(extent=6)
+    w = gem.Variable("w", (6,))
+    expression = gem.IndexSum(
+        gem.Product(gem.Indexed(table, (r,)), gem.Indexed(w, (r,))), (r,))
+    result = contraction(expression)
+
+    sums = [node for node in traversal((result,))
+            if isinstance(node, gem.IndexSum)]
+    assert sums
+    assert all(len(node.multiindex) == 1 for node in sums)
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((result,)))
+
+
+def test_unflatten_factorises_bilinear_arguments_together():
+    """Two argument lattices are exposed before their local sums expand."""
+    extent = 3
+    p = gem.JaggedIndex(extent=extent)
+    q = gem.JaggedIndex(extent=extent, parents=(p,))
+    r = gem.JaggedIndex(extent=extent)
+    s = gem.JaggedIndex(extent=extent, parents=(r,))
+    ip, iq = gem.indices(2)
+
+    variables = tuple(
+        gem.Variable(name, shape)
+        for name, shape in [
+            ("A", (extent, 2)),
+            ("B", (extent, extent, 2)),
+            ("C", (extent, 2)),
+            ("D", (extent, extent, 2)),
+            ("E", (extent, 2)),
+            ("F", (extent, extent, 2)),
+            ("G", (extent, 2)),
+            ("H", (extent, extent, 2)),
+        ])
+    A, B, C, D, E, F, G, H = variables
+    left = gem.FlattenedTensor(gem.Sum(
+        gem.Product(gem.Indexed(A, (p, ip)),
+                    gem.Indexed(B, (p, q, iq))),
+        gem.Product(gem.Indexed(C, (p, ip)),
+                    gem.Indexed(D, (p, q, iq))),
+    ), (p, q))
+    right = gem.FlattenedTensor(gem.Sum(
+        gem.Product(gem.Indexed(E, (r, ip)),
+                    gem.Indexed(F, (r, s, iq))),
+        gem.Product(gem.Indexed(G, (r, ip)),
+                    gem.Indexed(H, (r, s, iq))),
+    ), (r, s))
+
+    i, j = gem.indices(2)
+    output = gem.Variable("output", (6, 6))
+    expression = gem.IndexSum(
+        gem.Product(gem.Indexed(left, (i,)),
+                    gem.Indexed(right, (j,))),
+        (ip, iq))
+    pairs = unflatten_returns([
+        (gem.Indexed(output, (i, j)), expression)
+    ])
+
+    assert len(pairs) == 1
+    variable, optimized = pairs[0]
+    assert len(variable.free_indices) == 4
+    assert all(isinstance(index, gem.JaggedIndex)
+               for index in variable.free_indices)
+    assert not any(isinstance(node, gem.FlattenedTensor)
+                   for node in traversal((optimized,)))
+    assert all(len(node.multiindex) == 1
+               for node in traversal((optimized,))
+               if isinstance(node, gem.IndexSum))
+
+    rng = numpy.random.default_rng(2)
+    bindings = {
+        variable_: rng.random(variable_.shape)
+        for variable_ in variables
+    }
+    expected, = evaluate([expression], bindings)
+    actual, = evaluate([optimized], bindings)
+    points = left.lattice_points()
+    row_map, column_map = evaluate([
+        index.expression for index in variable.multiindex
+    ])
+    row = row_map.arr[points[:, 0], points[:, 1]]
+    column = column_map.arr[points[:, 0], points[:, 1]]
+    row_indices = {
+        index: points[:, position, None]
+        for position, index in enumerate(row_map.fids)
+    }
+    column_indices = {
+        index: points[None, :, position]
+        for position, index in enumerate(column_map.fids)
+    }
+    indices = tuple((row_indices | column_indices)[index]
+                    for index in actual.fids)
+    values = actual.arr[indices]
+    dense = numpy.empty((6, 6))
+    dense[row[:, None], column[None, :]] = values
+    assert numpy.allclose(dense, expected.broadcast((i, j)))
 
 
 def test_sum_factorise_bounded_distribution():

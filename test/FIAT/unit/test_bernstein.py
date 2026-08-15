@@ -20,9 +20,10 @@
 import numpy
 import pytest
 
-from FIAT.reference_element import ufc_simplex
 from FIAT.bernstein import Bernstein
+from FIAT.polynomial_set import mis
 from FIAT.quadrature_schemes import create_quadrature
+from FIAT.reference_element import multiindex_equal, ufc_simplex
 
 
 D02 = numpy.array([
@@ -74,10 +75,13 @@ def test_bernstein_2nd_derivatives():
     points = rule.get_points()
 
     actual = elem.tabulate(2, points)
+    barycentric_indices = list(mis(3, degree))
+    ordering = [barycentric_indices.index(alpha)
+                for alpha in multiindex_equal(3, degree)]
 
-    assert numpy.allclose(D02, actual[(0, 2)])
-    assert numpy.allclose(D11, actual[(1, 1)])
-    assert numpy.allclose(D20, actual[(2, 0)])
+    assert numpy.allclose(D02[ordering], actual[(0, 2)])
+    assert numpy.allclose(D11[ordering], actual[(1, 1)])
+    assert numpy.allclose(D20[ordering], actual[(2, 0)])
 
 
 if __name__ == '__main__':

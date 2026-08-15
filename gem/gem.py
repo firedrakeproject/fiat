@@ -33,7 +33,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
            'Index', 'JaggedIndex', 'RaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
-           'IndexSum', 'ListTensor', 'Concatenate', 'Delta',
+           'FlattenedTensor', 'IndexSum', 'ListTensor', 'Concatenate', 'Delta',
            'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
@@ -1008,6 +1008,36 @@ class ComponentTensor(Node):
         return self
 
 
+class FlattenedTensor(Node):
+    """Lexicographically flattened view of a jagged tensor.
+
+    Parameters
+    ----------
+    expression : Node
+        Scalar expression indexed by ``multiindex``.
+    multiindex : tuple of Index
+        Rectangular or jagged tensor axes, in flattening order.
+
+    """
+
+    __slots__ = ('children', 'multiindex', 'shape')
+    __back__ = ('multiindex',)
+
+    def __init__(self, expression: Node,
+                 multiindex: tuple[Index, ...]) -> None:
+        assert not expression.shape
+        multiindex = tuple(multiindex)
+        assert set(multiindex) <= set(expression.free_indices)
+        self.children = (expression,)
+        self.multiindex = multiindex
+        self.shape = (len(_jagged_lattice(multiindex)),)
+        self.free_indices = unique(set(expression.free_indices) - set(multiindex))
+
+    def lattice_points(self) -> numpy.ndarray:
+        """Return the in-bounds lattice multi-indices in flat order."""
+        return _jagged_lattice(self.multiindex)
+
+
 def _jagged_layout(multiindex: tuple[Index, ...]) -> tuple:
     """Return a structural description of a jagged iteration domain."""
     positions = {}
@@ -1195,6 +1225,28 @@ class Concatenate(Node):
         return (int(sum(numpy.prod(child.shape, dtype=int) for child in self.children)),)
 
 
+@lru_cache(maxsize=128)
+def _permutation_source(index):
+    """Return the source index and table for a tabulated permutation."""
+    if not isinstance(index, VariableIndex):
+        return None
+    expression = index.expression
+    if not isinstance(expression, Indexed) or len(expression.multiindex) != 1:
+        return None
+    source, = expression.multiindex
+    table, = expression.children
+    if (not isinstance(source, Index) or source.extent is None
+            or not isinstance(table, Literal)):
+        return None
+    entries = table.array
+    if (entries.shape != (source.extent,)
+            or not numpy.all(entries < source.extent)
+            or not numpy.all(numpy.bincount(
+                entries, minlength=source.extent) == 1)):
+        return None
+    return source, table
+
+
 class Delta(Scalar, Terminal):
     __slots__ = ('i', 'j')
     __front__ = ('i', 'j')
@@ -1210,6 +1262,13 @@ class Delta(Scalar, Terminal):
         # \delta_{i,i} = 1
         if i == j:
             return one
+
+        # A shared bijection preserves equality: delta(p(i), p(j)) = delta(i, j).
+        source_i = _permutation_source(i)
+        source_j = _permutation_source(j)
+        if (source_i is not None and source_j is not None
+                and source_i[1] == source_j[1]):
+            return Delta(source_i[0], source_j[0], dtype=dtype)
 
         # Fixed indices
         if isinstance(i, Integral) and isinstance(j, Integral):
