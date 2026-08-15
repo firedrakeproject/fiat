@@ -6,7 +6,8 @@ from gem.coffee import find_optimal_atomics, optimise_monomial_sum
 from gem.gem import one
 from gem.interpreter import evaluate
 from gem.node import traversal
-from gem.optimise import estimate_cost, sum_factorise
+from gem.contraction import estimate_cost
+from gem.optimise import sum_factorise
 from gem.refactorise import Monomial, MonomialSum
 
 

@@ -19,8 +19,8 @@ import numpy
 
 from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Node, one
 from gem.node import MemoizerArg
-from gem.optimise import (estimate_cost, filtered_replace_indices,
-                          make_sum, make_product, partition_connected)
+from gem.contraction import estimate_cost, partition_connected
+from gem.optimise import filtered_replace_indices, make_sum, make_product
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
 
