@@ -410,6 +410,10 @@ def sum_factorise(
     factors = tuple(factors)
     if len(factors) == 0 and len(sum_indices) == 0:
         return one
+    if len(sum_indices) == 0:
+        # Without contraction the plan is just an association of the product.
+        expression, _ = associate(Product, factors)
+        return expression
 
     factor_indices = set().union(*(factor.free_indices for factor in factors))
     jagged_domain = set().union(*(

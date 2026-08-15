@@ -297,6 +297,28 @@ def _operation_count(node: Node) -> int:
     return 0
 
 
+def has_arithmetic(expressions: Iterable[Node]) -> bool:
+    """Does a GEM DAG perform any scalar arithmetic?
+
+    Parameters
+    ----------
+    expressions
+        Roots of a scalar GEM expression DAG.
+
+    Returns
+    -------
+    bool
+        Whether the operation count of :func:`estimate_cost` is nonzero.
+
+    Notes
+    -----
+    A tabulation reference costs nothing to evaluate, so materializing it
+    buys no arithmetic.  Deciding that needs no storage model.
+
+    """
+    return any(map(_operation_count, traversal(tuple(expressions))))
+
+
 def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
     """Estimate arithmetic work and contraction storage for a GEM DAG.
 
@@ -445,6 +467,7 @@ def _ordered_contraction_indices(
     return tuple(result)
 
 
+@lru_cache(maxsize=4096)
 def _contraction_component(
         sum_indices: tuple[Index, ...],
         factors: tuple[Node, ...]) -> Node:
@@ -462,6 +485,9 @@ def _contraction_component(
     reductions that become legal there.  :func:`associate` handles expressions
     for which no contraction-placement decision remains.  Beyond ten factors
     a deterministic index-at-a-time plan bounds the exponential search.
+
+    Plans are memoized because a loop-ordering search re-plans the same
+    components once per candidate ordering.
 
     Parameters
     ----------
@@ -502,20 +528,33 @@ def _contraction_component(
         for index in sum_indices
     }
 
-    @lru_cache(maxsize=None)
+    closed_cache = {}
+    live_cache = {}
+
     def closed(mask: int) -> frozenset[Index]:
-        return frozenset(
+        try:
+            return closed_cache[mask]
+        except KeyError:
+            pass
+        result = frozenset(
             index for index, support in supports.items()
             if support and not support & ~mask)
+        closed_cache[mask] = result
+        return result
 
-    @lru_cache(maxsize=None)
     def live(mask: int) -> frozenset[Index]:
+        try:
+            return live_cache[mask]
+        except KeyError:
+            pass
         indices = set().union(*(
             factor_indices[position]
             for position in range(len(factors))
             if mask & (1 << position)))
         indices.difference_update(closed(mask))
-        return frozenset(indices)
+        result = frozenset(indices)
+        live_cache[mask] = result
+        return result
 
     def reduce(
             expression: Node, mask: int,

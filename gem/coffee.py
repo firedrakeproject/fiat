@@ -12,6 +12,7 @@ This module transforms GEM; it does not generate a COFFEE AST.
 """
 
 from collections import OrderedDict, defaultdict
+from collections.abc import Sequence
 from itertools import chain
 import logging
 
@@ -19,7 +20,7 @@ import numpy
 
 from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Node, one
 from gem.node import MemoizerArg
-from gem.contraction import estimate_cost, partition_connected
+from gem.contraction import has_arithmetic, partition_connected
 from gem.optimise import filtered_replace_indices, make_sum, make_product
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
@@ -57,32 +58,8 @@ def index_extent(factor, linear_indices):
     return numpy.prod([i.extent for i in factor.free_indices if i in linear_indices])
 
 
-def sort_monomials(monomials):
-    """Sort monomials to produce a better initial guess for :func:`find_optimal_atomics`.
-
-    :arg monomials: A list of :class:`Monomial`s
-
-    :returns: the reordered list of monomials.
-    """
-    if len(monomials) <= 2:
-        return monomials
-    # Construct a monomial subset with non-intersecting atomics
-    head = []
-    rest = []
-    atomics = set()
-    for m in monomials:
-        if atomics.intersection(m.atomics):
-            rest.append(m)
-        else:
-            atomics.update(m.atomics)
-            head.append(m)
-    # Put non-intersecting subset first and recurse on the rest
-    monomials = head + sort_monomials(rest)
-    return monomials
-
-
 def find_optimal_atomics(
-        monomials: list[Monomial],
+        monomials: Sequence[Monomial],
         linear_indices: tuple) -> tuple[Node, ...]:
     """Find a minimum-cost set of atomics intersecting every monomial.
 
@@ -99,7 +76,6 @@ def find_optimal_atomics(
         Atomics selected for common-subexpression factorization.
 
     """
-    monomials = sort_monomials(list(monomials))
     atomics = tuple(dict.fromkeys(chain.from_iterable(
         monomial.atomics for monomial in monomials)))
     if not atomics:
@@ -348,7 +324,7 @@ def _share_linear_maps(
     replacements = {}
     for normal, occurrences in groups.items():
         indices = {index for _, index in occurrences}
-        if len(indices) < 2 or estimate_cost((normal,))[0] == 0:
+        if len(indices) < 2 or not has_arithmetic((normal,)):
             continue
         index = canonical[next(iter(indices)).extent]
         tensor = ComponentTensor(normal, (index,))
