@@ -32,7 +32,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Variable', 'Sum', 'Product', 'Division', 'FloorDiv', 'Remainder', 'Power',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
-           'Index', 'JaggedIndex', 'RaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
+           'Index', 'JaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
            'IndexSum', 'ListTensor', 'Concatenate', 'Delta',
            'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
@@ -312,10 +312,13 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
+        if self.dtype != other.dtype:
+            return False
         return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
-        return hash((type(self), self.shape, tuple(self.array.flat)))
+        return hash((type(self), self.shape, self.dtype,
+                     tuple(self.array.flat)))
 
     @property
     def value(self):
@@ -701,56 +704,6 @@ class JaggedIndex(Index):
     def __setstate__(self, state):
         super().__setstate__(state[:-1])
         self.parents = state[-1]
-
-
-class RaggedIndex(Index):
-    """Free index with a tabulated extent over its parent indices.
-
-    Parameters
-    ----------
-    name : str, optional
-        Name of the index.
-    extent : int, optional
-        Static upper bound.  Defaults to the largest tabulated length.
-    parents : tuple of Index
-        Indices selecting an entry of ``lengths``.
-    lengths : array_like
-        Number of admissible values for each tuple of parent values.
-
-    """
-
-    __slots__ = ("parents", "lengths")
-
-    def __init__(self, name: str | None = None, extent: int | None = None,
-                 parents: tuple = (), lengths=()):
-        parents = tuple(parents)
-        if not parents or not all(isinstance(parent, Index)
-                                  for parent in parents):
-            raise ValueError("Ragged indices require Index parents")
-        lengths = numpy.asarray(lengths, dtype=uint_type)
-        shape = tuple(parent.extent for parent in parents)
-        if lengths.shape != shape:
-            raise ValueError(
-                f"length table shape {lengths.shape} does not match {shape}")
-        maximum = int(lengths.max(initial=0))
-        if extent is None:
-            extent = maximum
-        elif maximum > extent:
-            raise ValueError("Ragged index length exceeds its extent")
-        super().__init__(name=name, extent=extent)
-        self.parents = parents
-        self.lengths = lengths
-
-    def iteration_extent(self, parent_values: dict) -> int:
-        point = tuple(parent_values[parent] for parent in self.parents)
-        return int(self.lengths[point])
-
-    def __getstate__(self):
-        return super().__getstate__() + (self.parents, self.lengths)
-
-    def __setstate__(self, state):
-        super().__setstate__(state[:-2])
-        self.parents, self.lengths = state[-2:]
 
 
 class VariableIndex(IndexBase):

@@ -57,12 +57,14 @@ class MappedTabulation(Mapping):
 
     Notes
     -----
-    The transformation is represented as ``M = U + W``, where ``U`` holds
-    unit entries and ``W`` the remaining nonzeros.  Each part is a ragged
-    row contraction.  Exact row lengths avoid branches and padded-zero
-    arithmetic, while separating ``U`` avoids multiplication by one.  The
-    resulting GEM expression still exposes the transformation as a finite
-    element linear map before quadrature contraction.
+    The transformation is stored in compressed sparse row form.  One
+    constant table holds the column of each nonzero, and a second holds its
+    value.  Rows shorter than the longest are padded with zero values, which
+    contribute nothing to the sum.
+
+    Every row therefore contracts over the same number of entries.  The
+    basis axis stays one loop, so the transformation reaches the quadrature
+    contraction as a linear map over the reference tabulation.
 
     """
 
@@ -82,33 +84,17 @@ class MappedTabulation(Mapping):
                 if not isinstance(value, gem.Zero):
                     row.append((column, value))
             nonzero_rows.append(row)
-        groups = []
+        width = max((len(row) for row in nonzero_rows), default=0)
         nrows = len(self.indices)
-        for unit in (True, False):
-            rows = [
-                [(column, value) for column, value in row
-                 if (value == one) == unit]
-                for row in nonzero_rows
-            ]
-            lengths = numpy.asarray(tuple(map(len, rows)), dtype=gem.uint_type)
-            width = int(lengths.max(initial=0))
-            if width == 0:
-                continue
-            columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
-            data = None if unit \
-                else numpy.full((nrows, width), zero, dtype=object)
-            for row, entries in enumerate(rows):
-                columns[row, :len(entries)] = tuple(
-                    column for column, _ in entries)
-                if data is not None:
-                    data[row, :len(entries)] = tuple(
-                        gem.as_gem(value) for _, value in entries)
-            groups.append((
-                lengths,
-                gem.Literal(columns, dtype=gem.uint_type),
-                None if unit else gem.ListTensor(data),
-            ))
-        self._sparse_maps = tuple(groups)
+        columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
+        data = numpy.full((nrows, width), zero, dtype=object)
+        for index, row in enumerate(nonzero_rows):
+            columns[index, :len(row)] = tuple(column for column, _ in row)
+            data[index, :len(row)] = tuple(
+                gem.as_gem(value) for _, value in row)
+        self._width = width
+        self._columns = gem.Literal(columns, dtype=gem.uint_type)
+        self._values = gem.ListTensor(data)
         self._tabulation_cache = {}
 
     def matvec(self, table: gem.Node) -> gem.Node:
@@ -125,22 +111,13 @@ class MappedTabulation(Mapping):
             Tabulation whose first axis is the transformed basis axis.
 
         """
-        row = gem.Index(extent=len(self.indices))
         tail = gem.indices(len(table.shape) - 1)
-        terms = []
-        for lengths, column_table, coefficients in self._sparse_maps:
-            entry = gem.RaggedIndex(
-                extent=column_table.shape[1],
-                parents=(row,), lengths=lengths)
-            column = gem.VariableIndex(
-                gem.Indexed(column_table, (row, entry)))
-            basis = gem.Indexed(table, (column, *tail))
-            if coefficients is not None:
-                basis = gem.Product(
-                    gem.Indexed(coefficients, (row, entry)), basis)
-            terms.append(gem.IndexSum(basis, (entry,)))
-
-        mapped = gem.Sum(*terms)
+        row = gem.Index(extent=len(self.indices))
+        entry = gem.Index(extent=self._width)
+        column = gem.VariableIndex(gem.Indexed(self._columns, (row, entry)))
+        basis = gem.Product(gem.Indexed(self._values, (row, entry)),
+                            gem.Indexed(table, (column, *tail)))
+        mapped = gem.IndexSum(basis, (entry,))
         return gem.ComponentTensor(mapped, (row, *tail))
 
     def __getitem__(self, alpha):

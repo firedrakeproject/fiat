@@ -295,3 +295,19 @@ def test_sum_factorise_jagged_distribution():
     expression = sum_factorise((parent, child), [factor], distribute=True)
     value, = evaluate([expression])
     assert value.arr == 12
+
+
+def test_literal_distinguishes_dtypes():
+    """Tell an index literal apart from a value literal.
+
+    An index table holds unsigned integers and a coefficient table holds
+    floats. GEM memoizes on node identity, so the two must not compare
+    equal when they happen to hold the same number.
+    """
+    index = gem.Literal(numpy.uint32(3), dtype=gem.uint_type)
+    value = gem.Literal(3.0)
+
+    assert index.dtype != value.dtype
+    assert index != value
+    assert hash(index) != hash(value)
+    assert {index: "index"}.get(value) is None

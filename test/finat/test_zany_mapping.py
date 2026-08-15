@@ -11,7 +11,7 @@ from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
 
 
 def test_sparse_mapped_tabulation():
-    """Represent a sparse basis map by exact ragged contractions."""
+    """Apply a sparse basis map at the cost of its nonzeros."""
     coefficient = gem.Variable("coefficient", ())
     matrix = gem.ListTensor(np.asarray([
         [gem.Literal(1.0), gem.Zero(), coefficient],
@@ -22,13 +22,11 @@ def test_sparse_mapped_tabulation():
 
     mapped = MappedTabulation(matrix, {None: table})[None]
 
-    contractions = [
-        node for node in traversal((mapped,))
-        if isinstance(node, gem.IndexSum)
-    ]
-    assert len(contractions) == 2
-    assert all(isinstance(node.multiindex[0], gem.RaggedIndex)
-               for node in contractions)
+    # The three unit entries cost no multiplication, and the one remaining
+    # nonzero costs exactly one. Nothing is selected by a branch.
+    products = [node for node in traversal((mapped,))
+                if isinstance(node, gem.Product)]
+    assert len(products) == 1
     assert not any(isinstance(node, gem.Conditional)
                    for node in traversal((mapped,)))
 

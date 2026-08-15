@@ -30,7 +30,7 @@ from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
-                     IndexSum, JaggedIndex, RaggedIndex, ComponentTensor, ListTensor,
+                     IndexSum, JaggedIndex, ComponentTensor, ListTensor,
                      Delta, _jagged_lattice, partial_indexed, one)
 
 
@@ -918,7 +918,6 @@ def aggressive_unroll(expression):
         expression, = remove_componenttensors((ListTensor(tensor),))
 
     # Unroll summation
-    expression, = unroll_indexsum(
-        (expression,), predicate=lambda index: not isinstance(index, RaggedIndex))
+    expression, = unroll_indexsum((expression,), predicate=lambda index: True)
     expression, = remove_componenttensors((expression,))
     return expression
