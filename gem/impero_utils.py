@@ -92,6 +92,7 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
         the tensor still executes that index as a value loop.  Exposing the
         loop to Impero lets several tensor outputs share scalar work within
         one fused loop instead of materializing that work as arrays.
+
         """
         indices = expr.free_indices
         if isinstance(expr, gem.ComponentTensor):

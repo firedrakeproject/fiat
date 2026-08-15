@@ -25,6 +25,7 @@ def _as_basis_entry(value: object) -> gem.Node:
     gem.Node
         Scalar GEM entry with numerical zero and one represented
         symbolically.
+
     """
     if isinstance(value, Number):
         if value == 0:
@@ -62,6 +63,7 @@ class MappedTabulation(Mapping):
     arithmetic, while separating ``U`` avoids multiplication by one.  The
     resulting GEM expression still exposes the transformation as a finite
     element linear map before quadrature contraction.
+
     """
 
     def __init__(
@@ -121,6 +123,7 @@ class MappedTabulation(Mapping):
         -------
         gem.Node
             Tabulation whose first axis is the transformed basis axis.
+
         """
         row = gem.Index(extent=len(self.indices))
         tail = gem.indices(len(table.shape) - 1)
