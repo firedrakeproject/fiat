@@ -72,8 +72,35 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
 
     get_indices = lambda expr: apply_ordering(expr.free_indices)
 
+    def get_loop_indices(expr: gem.Node) -> tuple[gem.Index, ...]:
+        """Return every explicit loop axis used to evaluate an expression.
+
+        Parameters
+        ----------
+        expr
+            GEM expression being scheduled.
+
+        Returns
+        -------
+        tuple of gem.Index
+            Free indices followed by bound value indices in global loop
+            order.
+
+        Notes
+        -----
+        A ``ComponentTensor`` binds its multi-index in GEM, but evaluating
+        the tensor still executes that index as a value loop.  Exposing the
+        loop to Impero lets several tensor outputs share scalar work within
+        one fused loop instead of materializing that work as arrays.
+        """
+        indices = expr.free_indices
+        if isinstance(expr, gem.ComponentTensor):
+            indices = (*indices, *expr.multiindex)
+        return apply_ordering(indices)
+
     # Build operation ordering
-    ops = scheduling.emit_operations(assignments, get_indices, emit_return_accumulate)
+    ops = scheduling.emit_operations(
+        assignments, get_loop_indices, emit_return_accumulate)
 
     # Empty kernel
     if len(ops) == 0:
@@ -83,7 +110,7 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
     ops = inline_temporaries(expressions, ops)
 
     # Build Impero AST
-    tree = make_loop_tree(ops, get_indices)
+    tree = make_loop_tree(ops, get_loop_indices)
 
     # Collect temporaries
     temporaries = collect_temporaries(tree)

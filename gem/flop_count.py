@@ -26,22 +26,28 @@ def statement_block(tree, temporaries):
 def statement_for(tree, temporaries):
     extent = tree.index.extent
     assert extent is not None
-    index_values = _index_values.get()
-    if getattr(tree.index, "parents", ()) and all(
-            parent in index_values for parent in tree.index.parents):
-        extent = tree.index.iteration_extent(index_values)
-    child, = tree.children
-    if tree.index in _control_indices.get():
-        flops = 0
-        for value in range(extent):
-            token = _index_values.set(index_values | {tree.index: value})
-            try:
-                flops += statement(child, temporaries)
-            finally:
-                _index_values.reset(token)
-        return flops
-    flops = statement(child, temporaries)
-    return flops * extent
+    active_token = _active_indices.set(
+        _active_indices.get() | {tree.index})
+    try:
+        index_values = _index_values.get()
+        if getattr(tree.index, "parents", ()) and all(
+                parent in index_values for parent in tree.index.parents):
+            extent = tree.index.iteration_extent(index_values)
+        child, = tree.children
+        if tree.index in _control_indices.get():
+            flops = 0
+            for value in range(extent):
+                token = _index_values.set(
+                    index_values | {tree.index: value})
+                try:
+                    flops += statement(child, temporaries)
+                finally:
+                    _index_values.reset(token)
+            return flops
+        flops = statement(child, temporaries)
+        return flops * extent
+    finally:
+        _active_indices.reset(active_token)
 
 
 @statement.register(imp.Initialise)
@@ -183,17 +189,22 @@ def flops_solve(expr, temporaries):
 @flops.register(gem.ComponentTensor)
 def flops_componenttensor(expr, temporaries):
     body, = expr.children
-    multiindex = expr.multiindex
-    control = _control_indices.get().intersection(multiindex)
+    implicit_indices = tuple(
+        index for index in expr.multiindex
+        if index not in _active_indices.get())
+    if not implicit_indices:
+        return expression_flops(body, temporaries)
+    control = _control_indices.get().intersection(implicit_indices)
     if not control and not any(
-            getattr(index, "parents", ()) for index in multiindex):
-        return numpy.prod(expr.shape, dtype=int) * expression_flops(
-            body, temporaries)
+            getattr(index, "parents", ()) for index in implicit_indices):
+        extent = numpy.prod(
+            [index.extent for index in implicit_indices], dtype=int)
+        return extent * expression_flops(body, temporaries)
 
     def count(position):
-        if position == len(multiindex):
+        if position == len(implicit_indices):
             return expression_flops(body, temporaries)
-        index = multiindex[position]
+        index = implicit_indices[position]
         values = _index_values.get()
         extent = index.extent
         if getattr(index, "parents", ()):
@@ -234,9 +245,11 @@ def count_flops(impero_c):
         control_token = _control_indices.set(
             frozenset(_find_control_indices(impero_c.tree)))
         index_token = _index_values.set({})
+        active_token = _active_indices.set(frozenset())
         try:
             return statement(impero_c.tree, set(impero_c.temporaries))
         finally:
+            _active_indices.reset(active_token)
             _index_values.reset(index_token)
             _control_indices.reset(control_token)
     except (ValueError, NotImplementedError):
@@ -244,6 +257,8 @@ def count_flops(impero_c):
 
 
 _index_values = ContextVar("flop_count_index_values", default={})
+_active_indices = ContextVar("flop_count_active_indices",
+                             default=frozenset())
 _control_indices = ContextVar("flop_count_control_indices",
                               default=frozenset())
 

@@ -84,6 +84,25 @@ def test_componenttensor_flop_count():
     assert count_flops(impero_c) == 6
 
 
+def test_componenttensor_sharing_uses_scalar_temporary():
+    """Keep shared work inside a component tensor's value loop."""
+    i = gem.Index(extent=3)
+    j = gem.Index(extent=3)
+    x = gem.Variable("x", (3,))
+    result = gem.Variable("result", (3,))
+    shared = 2 * gem.Indexed(x, (i,))
+    positive = gem.ComponentTensor(shared + 1, (i,))
+    negative = gem.ComponentTensor(shared - 1, (i,))
+    expression = gem.Indexed(positive, (j,)) \
+        + gem.Indexed(negative, (j,))
+
+    impero_c = compile_gem(
+        [(gem.Indexed(result, (j,)), expression)], (j,))
+
+    assert shared in impero_c.temporaries
+    assert impero_c.indices[shared] == ()
+
+
 def test_indexed_transpose(A):
     i, j = gem.indices(2)
     ATij = gem.Indexed(A.T, (i, j))
