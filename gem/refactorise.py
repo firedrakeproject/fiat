@@ -9,7 +9,7 @@ visible to GEM, while COFFEE can eliminate sharing between linear maps at
 each reduction level.
 """
 
-from collections import Counter, OrderedDict, defaultdict, namedtuple
+from collections import Counter, OrderedDict, namedtuple
 from collections.abc import Callable, Iterable
 from functools import singledispatch
 from itertools import product
@@ -63,7 +63,7 @@ class MonomialSum(object):
     """
     def __init__(self):
         # (unordered sum_indices, unordered atomics) -> rest
-        self.monomials = defaultdict(Zero)
+        self.monomials = {}
 
         # We shall retain ordering for deterministic code generation:
         #
@@ -87,7 +87,8 @@ class MonomialSum(object):
         assert isinstance(rest, Node)
 
         key = (sum_indices_set, atomics_set)
-        self.monomials[key] = Sum(self.monomials[key], rest)
+        previous = self.monomials.get(key)
+        self.monomials[key] = rest if previous is None else Sum(previous, rest)
         self.ordering.setdefault(key, (sum_indices, atomics))
 
     def __iter__(self):
@@ -105,7 +106,9 @@ class MonomialSum(object):
             # Optimised implementation: no need to decompose and
             # reconstruct key.
             for key, rest in arg.monomials.items():
-                result.monomials[key] = Sum(result.monomials[key], rest)
+                previous = result.monomials.get(key)
+                result.monomials[key] = \
+                    rest if previous is None else Sum(previous, rest)
             for key, value in arg.ordering.items():
                 result.ordering.setdefault(key, value)
         return result
