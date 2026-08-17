@@ -1,21 +1,37 @@
-"""A set of routines implementing various transformations on GEM
-expressions."""
+"""Transform GEM expressions while preserving contraction structure.
+
+The contraction optimizer separates three decisions that have different
+mathematical costs.  :func:`associate` reassociates scalar sums and products
+without moving an index contraction.  :func:`sum_factorise` treats a tensor
+contraction as a hypergraph and moves each reduction to the earliest subtree
+containing all factors incident on its index.  A scalar optimizer such as
+COFFEE can then eliminate sharing inside the resulting loops.
+
+This separation makes sum factorization an instance of generalized code
+motion: GEM chooses which index domain computes a value, while COFFEE chooses
+how the scalar value is written.  Contraction plans are ordered first by
+arithmetic work and then by live and total intermediate storage.  The storage
+criteria avoid embedding an architecture-specific cache threshold in this
+symbolic layer.
+"""
 
 from collections import OrderedDict, defaultdict
+from collections.abc import Iterable
 from functools import singledispatch, partial
-from itertools import combinations, permutations, zip_longest
+from itertools import zip_longest
 from numbers import Integral
 
 import numpy
 
+from gem.contraction import associate, factor_contraction, index_closure
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
-                     IndexSum, ComponentTensor, ListTensor, Delta,
-                     partial_indexed, one)
+                     IndexSum, JaggedIndex, ComponentTensor, ListTensor,
+                     Delta, _jagged_lattice, partial_indexed, one)
 
 
 @singledispatch
@@ -269,6 +285,15 @@ def _select_expression(expressions, index):
         elif all(e.j == k and e.i == expr.i for k, e in enumerate(expressions)):
             return expr.reconstruct(expr.i, index)
 
+    if types == {IndexSum}:
+        extents = {tuple(i.extent for i in e.multiindex) for e in expressions}
+        if len(extents) == 1:
+            multiindex = tuple(Index(extent=extent) for extent in extents.pop())
+            summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
+                                multiindex)
+                        for e in expressions]
+            return IndexSum(_select_expression(summands, index), multiindex)
+
     if len(types) == 1:
         cls, = types
         if cls.__front__ or cls.__back__:
@@ -338,7 +363,6 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         to_, = list({delta.i, delta.j} - {from_})
 
         sum_indices.remove(from_)
-
         factors = [substitute(f, from_, to_) for f in factors]
 
         delta_queue = [(f, index)
@@ -348,91 +372,112 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
     return sum_indices, factors
 
 
-def associate(operator, operands):
-    """Apply associativity rules to construct an operation-minimal expression tree.
+def sum_factorise(
+        sum_indices: Iterable[Index],
+        factors: Iterable[Node],
+        distribute: bool = False) -> Node:
+    """Optimize a tensor contraction using sum factorization.
 
-    For best performance give factors that have different set of free indices.
+    The factors form a tensor network whose hyperedges are contraction
+    indices.  Independent connected components are reduced separately.  A
+    subset dynamic program then chooses the contraction tree minimizing
+    arithmetic work, with peak and total intermediate storage as tie-breakers.
 
-    :arg operator: associative binary operator
-    :arg operands: list of operands
+    Optional distribution is a competing transformation: it may expose a
+    smaller contraction domain, but it duplicates expression structure.  It
+    is therefore applied only when a summand has strictly smaller contraction
+    support, before the contraction tree is optimized.  Disconnected tensor
+    network components are then planned independently and scalar-associated
+    only after all their reductions have completed.
 
-    :returns: (reduced expression, # of floating-point operations)
+    Parameters
+    ----------
+    sum_indices
+        Free indices to contract.
+    factors
+        Scalar tensor factors.
+    distribute
+        Split selected sums when doing so exposes contractions over fewer
+        indices.
+
+    Returns
+    -------
+    Node
+        Optimized GEM expression.
+
     """
-    if len(operands) > 32:
-        # O(N^3) algorithm
-        raise NotImplementedError("Not expected such a complicated expression!")
-
-    def count(pair):
-        """Operation count to reduce a pair of GEM expressions"""
-        a, b = pair
-        extents = [i.extent for i in set().union(a.free_indices, b.free_indices)]
-        return numpy.prod(extents, dtype=int)
-
-    flops = 0
-    while len(operands) > 1:
-        # Greedy algorithm: choose a pair of operands that are the
-        # cheapest to reduce.
-        a, b = min(combinations(operands, 2), key=count)
-        flops += count((a, b))
-        # Remove chosen factors, append their product
-        operands.remove(a)
-        operands.remove(b)
-        operands.append(operator(a, b))
-    result, = operands
-    return result, flops
-
-
-def sum_factorise(sum_indices, factors):
-    """Optimise a tensor product through sum factorisation.
-
-    :arg sum_indices: free indices for contractions
-    :arg factors: product factors
-    :returns: optimised GEM expression
-    """
+    sum_indices = tuple(sum_indices)
+    factors = tuple(factors)
     if len(factors) == 0 and len(sum_indices) == 0:
-        # Empty product
         return one
+    if len(sum_indices) == 0:
+        # Without contraction the plan is just an association of the product.
+        expression, _ = associate(Product, factors)
+        return expression
 
-    if len(sum_indices) > 6:
-        raise NotImplementedError("Too many indices for sum factorisation!")
+    factor_indices = set().union(*(factor.free_indices for factor in factors))
+    jagged_domain = set().union(*(
+        index_closure((index,))
+        for index in sum_indices if isinstance(index, JaggedIndex)))
+    if jagged_domain - factor_indices:
+        domain_indices = tuple(index for index in sum_indices
+                               if index in jagged_domain)
+        active = index_closure(factor_indices & jagged_domain) \
+            & jagged_domain
+        active_indices = tuple(index for index in domain_indices
+                               if index in active)
+        points = _jagged_lattice(domain_indices)
+        if active_indices:
+            positions = [domain_indices.index(index)
+                         for index in active_indices]
+            multiplicity = numpy.zeros(
+                tuple(index.extent for index in active_indices))
+            numpy.add.at(
+                multiplicity,
+                tuple(points[:, position] for position in positions), 1)
+            domain_factor = Indexed(
+                Literal(multiplicity), active_indices)
+        else:
+            domain_factor = Literal(len(points))
+        factors += (domain_factor,)
+        factor_indices.update(active_indices)
+        marginalised = jagged_domain - active
+        sum_indices = tuple(index for index in sum_indices
+                            if index not in marginalised)
 
-    # Form groups by free indices
-    groups = groupby(factors, key=lambda f: f.free_indices)
-    groups = [Product(*terms) for _, terms in groups]
+    constant_sum_indices = set(sum_indices) - factor_indices
+    if constant_sum_indices:
+        factors += tuple(Literal(index.extent)
+                         for index in sum_indices
+                         if index in constant_sum_indices)
+        sum_indices = tuple(index for index in sum_indices
+                            if index not in constant_sum_indices)
 
-    # Sum factorisation
-    expression = None
-    best_flops = numpy.inf
+    if distribute:
+        contraction_indices = frozenset(sum_indices)
+        for position, factor in enumerate(factors):
+            summands = traverse_sum(factor)
+            involved = contraction_indices.intersection(factor.free_indices)
+            if (len(summands) > 1 and involved
+                    and any(any(
+                        contraction_indices.intersection(term.free_indices)
+                        < involved
+                        for term in traverse_product(summand)[1])
+                        for summand in summands)):
+                expressions = []
+                for summand in summands:
+                    extra, summand_factors = traverse_product(summand)
+                    indices = tuple(OrderedDict.fromkeys((*sum_indices, *extra)))
+                    if len(indices) > 6:
+                        break
+                    expressions.append(sum_factorise(
+                        indices,
+                        factors[:position] + tuple(summand_factors)
+                        + factors[position + 1:]))
+                else:
+                    return make_sum(expressions)
 
-    # Consider all orderings of contraction indices
-    for ordering in permutations(sum_indices):
-        terms = groups[:]
-        flops = 0
-        # Apply contraction index by index
-        for sum_index in ordering:
-            # Select terms that need to be part of the contraction
-            contract = [t for t in terms if sum_index in t.free_indices]
-            deferred = [t for t in terms if sum_index not in t.free_indices]
-
-            # Optimise associativity
-            product, flops_ = associate(Product, contract)
-            term = IndexSum(product, (sum_index,))
-            flops += flops_ + numpy.prod([i.extent for i in product.free_indices], dtype=int)
-
-            # Replace the contracted terms with the result of the
-            # contraction.
-            terms = deferred + [term]
-
-        # If some contraction indices were independent, then we may
-        # still have several terms at this point.
-        expr, flops_ = associate(Product, terms)
-        flops += flops_
-
-        if flops < best_flops:
-            expression = expr
-            best_flops = flops
-
-    return expression
+    return factor_contraction(sum_indices, factors)
 
 
 def make_sum(summands):
@@ -488,7 +533,8 @@ def make_renamer(rename_map):
                 else:
                     return expr
         else:
-            applier = lambda expr: expr
+            def applier(expr):
+                return expr
 
         return tuple(renamed), applier
     return partial(_renamer, rename_map, set())
@@ -568,6 +614,156 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _distribute_sum(expr: Node, predicate=None) -> list[Node]:
+    """Distribute selected sums through products and contractions.
+
+    Parameters
+    ----------
+    expr
+        GEM expression to distribute.
+    predicate
+        Optional predicate selecting operations to distribute.
+
+    Returns
+    -------
+    list of Node
+        Additive terms after distribution.
+
+    Notes
+    -----
+    Memoization uses object identity.  Structurally equal GEM nodes can have
+    deep expression trees, while distribution only needs to reuse actual DAG
+    nodes.
+
+    """
+    if predicate is None:
+        def predicate(node):
+            return True
+
+    results = {}
+    active = {}
+    stack = [(expr, False)]
+    while stack:
+        node, expanded = stack.pop()
+        key = id(node)
+        if key in results:
+            continue
+        if not expanded:
+            stack.append((node, True))
+            stack.extend((c, False) for c in node.children)
+            continue
+        active[key] = predicate(node) or any(
+            active[id(child)] for child in node.children)
+        if active[key] and isinstance(node, (Sum, IndexSum, Product)):
+            if isinstance(node, Sum):
+                results[key] = [
+                    term
+                    for child in node.children
+                    for term in results[id(child)]]
+            elif isinstance(node, IndexSum):
+                body, = node.children
+                results[key] = [
+                    IndexSum(term, tuple(
+                        index for index in node.multiindex
+                        if index in term.free_indices))
+                    for term in results[id(body)]]
+            else:  # Product
+                a, b = node.children
+                ta, tb = results[id(a)], results[id(b)]
+                results[key] = [node] if len(ta) == 1 and len(tb) == 1 \
+                    else [Product(x, y) for x in ta for y in tb]
+        else:
+            results[key] = [node]
+    return results[id(expr)]
+
+
+def preserve_linear_maps(
+        expression: Node,
+        linear_indices: Iterable[Index]) -> tuple[
+            tuple[Node, ...], tuple[Node, ...]]:
+    """Expose multilinear terms and retain each one-axis linear map.
+
+    A sum that depends on one linear index represents a linear map into an
+    argument tabulation. A sum that depends on several linear indices
+    separates multilinear form terms. This function distributes the latter
+    sums and returns the former sums as factors.
+
+    Parameters
+    ----------
+    expression
+        Multilinear GEM expression.
+    linear_indices
+        Free indices identifying the linear axes.
+
+    Returns
+    -------
+    tuple
+        Additive terms and the linear-map factors that they contain.
+
+    Notes
+    -----
+    Polynomial factorization can recover any partial grouping from a fully
+    expanded expression. The map-preserving representation remains useful
+    because it bounds expansion and exposes basis transformation as a
+    separate contraction.
+
+    """
+    linear_indices = frozenset(linear_indices)
+
+    def multilinear_sum(node: Node) -> bool:
+        return isinstance(node, Sum) and len(
+            linear_indices.intersection(node.free_indices)) > 1
+
+    if not any(
+            isinstance(node, Sum)
+            and len(linear_indices.intersection(node.free_indices)) == 1
+            for node in traversal((expression,))):
+        return (expression,), ()
+
+    terms = tuple(_distribute_sum(
+        expression, predicate=multilinear_sum))
+    groups = OrderedDict()
+    for term in terms:
+        _, factors = traverse_product(term)
+        for factor in factors:
+            if (isinstance(factor, Sum)
+                    and len(linear_indices.intersection(
+                        factor.free_indices)) == 1):
+                groups.setdefault(factor)
+
+    if not groups:
+        return (expression,), ()
+    return terms, tuple(groups)
+
+
+def eliminate_deltas(expression):
+    """Cancel contracted deltas without changing other contractions."""
+    replacer = MemoizerArg(filtered_replace_indices)
+    expression = replacer(expression, ())
+    nodes = tuple(traversal((expression,)))
+    contracted = frozenset(
+        index
+        for node in nodes if isinstance(node, IndexSum)
+        for index in node.multiindex)
+
+    def cancellable(node):
+        return isinstance(node, Delta) \
+            and bool({node.i, node.j} & contracted)
+
+    if not any(isinstance(node, Delta) and cancellable(node)
+               for node in nodes):
+        return expression
+
+    terms = []
+    for term in _distribute_sum(expression, predicate=cancellable):
+        indices, factors = traverse_product(term, index_replacer=replacer)
+        indices, factors = delta_elimination(
+            indices, factors, index_replacer=replacer)
+        factors = [replacer(factor, ()) for factor in factors]
+        terms.append(IndexSum(Product(*factors), indices))
+    return make_sum(terms)
+
+
 def contraction(expression, ignore=None):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
@@ -592,9 +788,11 @@ def contraction(expression, ignore=None):
 
     # Flatten product tree, eliminate deltas, sum factorise
     def rebuild(expression):
+        expression = eliminate_deltas(expression)
         sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
+
         if ignore is not None:
             # TODO: This is a really blunt instrument and one might
             # plausibly want the ignored indices to be contracted on

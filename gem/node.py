@@ -37,8 +37,14 @@ class Node(object):
 
         Internally used utility function.
         """
-        front_args = (getattr(self, name) for name in self.__front__)
-        back_args = (getattr(self, name) for name in self.__back__)
+        front = self.__front__
+        back = self.__back__
+        if not front and not back:
+            # Operators carry no non-child data, and dominate construction
+            return tuple(children)
+
+        front_args = [getattr(self, name) for name in front]
+        back_args = [getattr(self, name) for name in back]
 
         return (*front_args, *children, *back_args)
 

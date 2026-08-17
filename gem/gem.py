@@ -16,7 +16,7 @@ indices.
 
 from abc import ABCMeta
 from itertools import chain, repeat
-from functools import partial, reduce
+from functools import lru_cache, partial, reduce
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -32,8 +32,9 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'Variable', 'Sum', 'Product', 'Division', 'FloorDiv', 'Remainder', 'Power',
            'MathFunction', 'MinValue', 'MaxValue', 'Comparison',
            'LogicalNot', 'LogicalAnd', 'LogicalOr', 'Conditional',
-           'Index', 'VariableIndex', 'Indexed', 'ComponentTensor',
-           'IndexSum', 'ListTensor', 'Concatenate', 'Delta', 'OrientationVariableIndex',
+           'Index', 'JaggedIndex', 'VariableIndex', 'Indexed', 'ComponentTensor',
+           'IndexSum', 'ListTensor', 'Concatenate', 'Delta',
+           'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
            'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
@@ -311,10 +312,13 @@ class Literal(Constant):
             return False
         if self.shape != other.shape:
             return False
+        if self.dtype != other.dtype:
+            return False
         return numpy.array_equal(self.array, other.array)
 
     def get_hash(self):
-        return hash((type(self), self.shape, tuple(self.array.flat)))
+        return hash((type(self), self.shape, self.dtype,
+                     tuple(self.array.flat)))
 
     @property
     def value(self):
@@ -614,6 +618,22 @@ class Index(IndexBase):
         self.count = Index._count
         self.extent = extent
 
+    def iteration_extent(self, parent_values: dict) -> int:
+        """Return the loop extent at fixed parent-index values.
+
+        Parameters
+        ----------
+        parent_values
+            Values of indices controlling this index.
+
+        Returns
+        -------
+        int
+            Number of admissible values.
+
+        """
+        return self.extent
+
     def set_extent(self, value):
         # Set extent, check for consistency
         if self.extent is None:
@@ -642,17 +662,66 @@ class Index(IndexBase):
         self.name, self.extent, self.count = state
 
 
+class JaggedIndex(Index):
+    """Free index whose effective iteration bound depends on the values of
+    other (parent) free indices.
+
+    The iteration bound is ``0 <= i < extent - (p_1 + ... + p_k)`` for
+    parent indices ``p_1, ..., p_k``. The ``extent`` attribute is the static
+    upper bound. Every parent index is zero at this bound. Consumers can
+    treat this as a plain :class:`Index` of extent ``extent``. Expressions
+    indexed by a :class:`JaggedIndex` must evaluate to zero outside the
+    jagged bounds. The jagged bounds only optimize the generated loops.
+
+    Parameters
+    ----------
+    name : str, optional
+        Name of the index.
+    extent : int, optional
+        Static (rectangular) upper bound of the index.
+    parents : tuple of Index
+        The indices whose values reduce the iteration bound.  Loops over
+        this index must nest inside the loops over its parents.
+
+    """
+
+    __slots__ = ('parents',)
+
+    def __init__(self, name: str | None = None, extent: int | None = None,
+                 parents: tuple = ()):
+        super().__init__(name=name, extent=extent)
+        parents = tuple(parents)
+        assert all(isinstance(p, Index) for p in parents)
+        self.parents = parents
+
+    def iteration_extent(self, parent_values: dict) -> int:
+        return self.extent - sum(
+            parent_values[parent] for parent in self.parents)
+
+    def __getstate__(self):
+        return super().__getstate__() + (self.parents,)
+
+    def __setstate__(self, state):
+        super().__setstate__(state[:-1])
+        self.parents = state[-1]
+
+
 class VariableIndex(IndexBase):
     """An index that is constant during a single execution of the
     kernel, but whose value is not known at compile time."""
 
     __slots__ = ('expression',)
 
-    def __init__(self, expression):
+    def __new__(cls, expression):
         assert isinstance(expression, Node)
         assert not expression.shape
         if expression.dtype != uint_type:
             raise ValueError(f"expression.dtype ({expression.dtype}) != uint_type ({uint_type})")
+        if isinstance(expression, Constant):
+            return int(expression.value)
+        return super().__new__(cls)
+
+    def __init__(self, expression):
         self.expression = expression
 
     def __eq__(self, other):
@@ -676,6 +745,15 @@ class VariableIndex(IndexBase):
 
     def __reduce__(self):
         return type(self), (self.expression,)
+
+
+def _index_free_indices(index):
+    """Return the free indices represented by an index expression."""
+    if isinstance(index, Index):
+        return (index,)
+    if isinstance(index, VariableIndex):
+        return index.expression.free_indices
+    return ()
 
 
 class Indexed(Scalar):
@@ -715,7 +793,11 @@ class Indexed(Scalar):
                 C, = B.children
                 kk = B.multiindex
                 ff = C.free_indices
-                if not any((j in ff) for j in jj):
+                nested = set(chain.from_iterable(
+                    k.expression.free_indices
+                    for k in kk if isinstance(k, VariableIndex)))
+                safe = not set(jj).intersection(set(ff) | nested)
+                if safe:
                     # Only replace indices that are not present in C
                     rep = dict(zip(jj, ii))
                     ll = tuple(rep.get(k, k) for k in kk)
@@ -734,25 +816,14 @@ class Indexed(Scalar):
         self.multiindex = multiindex
         self.indirect_children = tuple(i.expression for i in self.multiindex if isinstance(i, VariableIndex))
 
-        new_indices = []
-        for i in multiindex:
-            if isinstance(i, Index):
-                new_indices.append(i)
-            elif isinstance(i, VariableIndex):
-                new_indices.extend(i.expression.free_indices)
+        new_indices = tuple(chain.from_iterable(map(_index_free_indices, multiindex)))
         self.free_indices = unique(aggregate.free_indices + tuple(new_indices))
 
         return self
 
     def index_ordering(self):
         """Running indices in the order of indexing in this node."""
-        free_indices = []
-        for i in self.multiindex:
-            if isinstance(i, Index):
-                free_indices.append(i)
-            elif isinstance(i, VariableIndex):
-                free_indices.extend(i.expression.free_indices)
-        return tuple(free_indices)
+        return tuple(chain.from_iterable(map(_index_free_indices, self.multiindex)))
 
 
 class FlexiblyIndexed(Scalar):
@@ -890,6 +961,38 @@ class ComponentTensor(Node):
         return self
 
 
+def _jagged_layout(multiindex: tuple[Index, ...]) -> tuple:
+    """Return a structural description of a jagged iteration domain."""
+    positions = {}
+    layout = []
+    for position, index in enumerate(multiindex):
+        parents = tuple(positions[parent]
+                        for parent in getattr(index, "parents", ()))
+        layout.append((index.extent, parents))
+        positions[index] = position
+    return tuple(layout)
+
+
+@lru_cache(maxsize=128)
+def _lattice_points(layout: tuple) -> numpy.ndarray:
+    """Enumerate one structural jagged iteration domain."""
+    points = []
+    for alpha in numpy.ndindex(*(extent for extent, _ in layout)):
+        if all(alpha[position] < extent
+               - sum(alpha[parent] for parent in parents)
+               for position, (extent, parents) in enumerate(layout)):
+            points.append(alpha)
+    points = numpy.asarray(points).reshape(len(points), len(layout))
+    points.flags.writeable = False
+    return points
+
+
+def _jagged_lattice(multiindex: tuple[Index, ...]) -> numpy.ndarray:
+    """All lattice points of ``multiindex``'s iteration domain, honouring
+    `JaggedIndex` bounds, as an integer array of shape (npoint, dim)."""
+    return _lattice_points(_jagged_layout(multiindex))
+
+
 class IndexSum(Scalar):
     __slots__ = ('children', 'multiindex')
     __back__ = ('multiindex',)
@@ -901,7 +1004,9 @@ class IndexSum(Scalar):
             return summand
 
         # Unroll singleton sums
-        unroll = tuple(index for index in multiindex if index.extent <= 1)
+        unroll = tuple(
+            index for index in multiindex
+            if index.extent <= 1 and not getattr(index, "parents", ()))
         if unroll:
             assert numpy.prod([index.extent for index in unroll]) == 1
             summand = Indexed(ComponentTensor(summand, unroll),
@@ -1066,9 +1171,12 @@ class Delta(Scalar, Terminal):
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
-        # Set up free indices
-        free_indices = [index for index in (i, j) if isinstance(index, Index)]
-        self.free_indices = tuple(unique(free_indices))
+        # Set up free indices.  A VariableIndex operand is not itself a free
+        # index, but its wrapped expression may be free in other indices
+        # (e.g. a Morton index computed from a lattice multiindex); those
+        # need to propagate here too, exactly as Indexed/FlexiblyIndexed do.
+        self.free_indices = tuple(unique(chain.from_iterable(
+            _index_free_indices(index) for index in (i, j))))
         self._dtype = dtype
         return self
 
