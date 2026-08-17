@@ -36,7 +36,7 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.aw</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Implementation of the Arnold-Winther finite elements.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""Implementation of the Arnold-Winther finite elements."""</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">ListTensor</span>
@@ -92,14 +92,14 @@
 <a class="viewcode-back" href="../../finat.html#finat.aw.ArnoldWintherNC">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ArnoldWintherNC</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">FiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
-        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;Arnold2003&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">"Arnold2003"</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">ArnoldWintherNC</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
 
 <div class="viewcode-block" id="ArnoldWintherNC.basis_transformation">
 <a class="viewcode-back" href="../../finat.html#finat.aw.ArnoldWintherNC.basis_transformation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">basis_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Note, the extra 3 dofs which are removed here</span>
-<span class="sd">        correspond to the constraints.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Note, the extra 3 dofs which are removed here</span>
+<span class="sd">        correspond to the constraints."""</span>
         <span class="n">numbf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
         <span class="n">ndof</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>
         <span class="n">V</span> <span class="o">=</span> <span class="n">identity</span><span class="p">(</span><span class="n">numbf</span><span class="p">,</span> <span class="n">ndof</span><span class="p">)</span>
@@ -135,7 +135,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.aw.ArnoldWinther">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ArnoldWinther</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">FiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
-        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;Arnold2002&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">"Arnold2002"</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">ArnoldWinther</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span>
 
 <div class="viewcode-block" id="ArnoldWinther.basis_transformation">

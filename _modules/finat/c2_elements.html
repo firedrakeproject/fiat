@@ -129,7 +129,7 @@
                     <span class="n">s0</span> <span class="o">=</span> <span class="n">emoments</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">k</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
                     <span class="n">V</span><span class="p">[</span><span class="n">s2</span><span class="p">,</span> <span class="n">s0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span> <span class="o">*</span> <span class="n">Bnt</span> <span class="o">*</span> <span class="n">V</span><span class="p">[</span><span class="n">s1</span><span class="p">,</span> <span class="n">s0</span><span class="p">]</span>
 
-        <span class="c1"># Now let&#39;s fix the scaling.</span>
+        <span class="c1"># Now let's fix the scaling.</span>
         <span class="n">h</span> <span class="o">=</span> <span class="n">coordinate_mapping</span><span class="o">.</span><span class="n">cell_size</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">top</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
             <span class="n">vids</span> <span class="o">=</span> <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span>
@@ -160,7 +160,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.c2_elements.BrambleZlamalC2">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">BrambleZlamalC2</span><span class="p">(</span><span class="n">C2Element</span><span class="p">,</span> <span class="n">ScalarFiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;BrambleZlamal1970&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">"BrambleZlamal1970"</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">avg</span> <span class="o">=</span> <span class="n">avg</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">BrambleZlamalC2</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
 
@@ -170,7 +170,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.c2_elements.AlfeldC2">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AlfeldC2</span><span class="p">(</span><span class="n">C2Element</span><span class="p">,</span> <span class="n">ScalarFiatElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">avg</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;Alfeld1984&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">"Alfeld1984"</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">avg</span> <span class="o">=</span> <span class="n">avg</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">FIAT</span><span class="o">.</span><span class="n">AlfeldC2</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">))</span></div>
 

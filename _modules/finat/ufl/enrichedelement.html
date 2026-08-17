@@ -36,7 +36,7 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.ufl.enrichedelement</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;This module defines the UFL finite element classes.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""This module defines the UFL finite element classes."""</span>
 
 <span class="c1"># Copyright (C) 2008-2016 Martin Sandve Alnæs</span>
 <span class="c1">#</span>
@@ -55,15 +55,15 @@
 <div class="viewcode-block" id="EnrichedElementBase">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElementBase">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">EnrichedElementBase</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The vector sum of several finite element spaces.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The vector sum of several finite element spaces."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">elements</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Doc."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span> <span class="o">=</span> <span class="n">elements</span>
 
         <span class="n">cell</span> <span class="o">=</span> <span class="n">elements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">cell</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">cell</span> <span class="o">==</span> <span class="n">cell</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cell mismatch for sub elements of enriched element.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cell mismatch for sub elements of enriched element."</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">elements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">degree</span><span class="p">(),</span> <span class="nb">int</span><span class="p">):</span>
             <span class="n">degrees</span> <span class="o">=</span> <span class="p">{</span><span class="n">e</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">}</span> <span class="o">-</span> <span class="p">{</span><span class="kc">None</span><span class="p">}</span>
@@ -77,15 +77,15 @@
         <span class="n">quad_schemes</span> <span class="o">=</span> <span class="p">[</span><span class="n">qs</span> <span class="k">for</span> <span class="n">qs</span> <span class="ow">in</span> <span class="n">quad_schemes</span> <span class="k">if</span> <span class="n">qs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
         <span class="n">quad_scheme</span> <span class="o">=</span> <span class="n">quad_schemes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">quad_schemes</span> <span class="k">else</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">qs</span> <span class="o">==</span> <span class="n">quad_scheme</span> <span class="k">for</span> <span class="n">qs</span> <span class="ow">in</span> <span class="n">quad_schemes</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Quadrature scheme mismatch.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Quadrature scheme mismatch."</span><span class="p">)</span>
 
         <span class="n">reference_value_shape</span> <span class="o">=</span> <span class="n">elements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">reference_value_shape</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">reference_value_shape</span> <span class="o">==</span> <span class="n">reference_value_shape</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Element reference value shape mismatch.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Element reference value shape mismatch."</span><span class="p">)</span>
 
         <span class="c1"># mapping = elements[0].mapping() # FIXME: This fails for a mixed subelement here.</span>
         <span class="c1"># if not all(e.mapping() == mapping for e in elements[1:]):</span>
-        <span class="c1">#    raise ValueError(&quot;Element mapping mismatch.&quot;)</span>
+        <span class="c1">#    raise ValueError("Element mapping mismatch.")</span>
 
         <span class="c1"># Get name of subclass: EnrichedElement or NodalEnrichedElement</span>
         <span class="n">class_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span>
@@ -97,13 +97,13 @@
 <div class="viewcode-block" id="EnrichedElementBase.mapping">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElementBase.mapping">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Doc."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mapping</span><span class="p">()</span></div>
 
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">sobolev_space</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the underlying Sobolev space.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return the underlying Sobolev space."""</span>
         <span class="n">elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">]</span>
         <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">sobolev_space</span> <span class="o">==</span> <span class="n">elements</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">sobolev_space</span>
                <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">):</span>
@@ -123,7 +123,7 @@
 <div class="viewcode-block" id="EnrichedElementBase.variant">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElementBase.variant">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">variant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Doc."""</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">variant</span><span class="p">,</span> <span class="o">=</span> <span class="p">{</span><span class="n">e</span><span class="o">.</span><span class="n">variant</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">}</span>
             <span class="k">return</span> <span class="n">variant</span>
@@ -134,8 +134,8 @@
 <div class="viewcode-block" id="EnrichedElementBase.reconstruct">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElementBase.reconstruct">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
-        <span class="n">degree</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;degree&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="w">        </span><span class="sd">"""Doc."""</span>
+        <span class="n">degree</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">'degree'</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">degrees</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">degree</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
@@ -147,12 +147,12 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">embedded_subdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return embedded subdegree.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return embedded subdegree."""</span>
         <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">embedded_subdegree</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">embedded_superdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return embedded superdegree.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return embedded superdegree."""</span>
         <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">embedded_superdegree</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span></div>
 
 
@@ -160,7 +160,7 @@
 <div class="viewcode-block" id="EnrichedElement">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">EnrichedElement</span><span class="p">(</span><span class="n">EnrichedElementBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;The vector sum of several finite element spaces.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""The vector sum of several finite element spaces.</span>
 
 <span class="sd">    .. math:: \\textrm{EnrichedElement}(V, Q) = \\{v + q | v \\in V, q \\in Q\\}.</span>
 
@@ -168,28 +168,28 @@
 <span class="sd">    primal basis is a concatenation of subelements primal bases;</span>
 <span class="sd">    resulting element is not nodal even when subelements are.</span>
 <span class="sd">    Structured basis may be exploited in form compilers.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="EnrichedElement.is_cellwise_constant">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElement.is_cellwise_constant">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_cellwise_constant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether the basis functions of this element is spatially constant over each cell.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return whether the basis functions of this element is spatially constant over each cell."""</span>
         <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">is_cellwise_constant</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;EnrichedElement(&quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span>
+<span class="w">        </span><span class="sd">"""Doc."""</span>
+        <span class="k">return</span> <span class="s2">"EnrichedElement("</span> <span class="o">+</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span> <span class="o">+</span> <span class="s2">")"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Format as string for pretty printing.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="s2">&quot; + &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
+<span class="w">        </span><span class="sd">"""Format as string for pretty printing."""</span>
+        <span class="k">return</span> <span class="s2">"&lt;</span><span class="si">%s</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="s2">" + "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
 
 <div class="viewcode-block" id="EnrichedElement.shortstr">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.EnrichedElement.shortstr">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">shortstr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Format as string for pretty printing.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;&lt;</span><span class="si">%s</span><span class="s2">&gt;&quot;</span> <span class="o">%</span> <span class="s2">&quot; + &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shortstr</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span></div>
+<span class="w">        </span><span class="sd">"""Format as string for pretty printing."""</span>
+        <span class="k">return</span> <span class="s2">"&lt;</span><span class="si">%s</span><span class="s2">&gt;"</span> <span class="o">%</span> <span class="s2">" + "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shortstr</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span></div>
 </div>
 
 
@@ -197,34 +197,34 @@
 <div class="viewcode-block" id="NodalEnrichedElement">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.NodalEnrichedElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">NodalEnrichedElement</span><span class="p">(</span><span class="n">EnrichedElementBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;The vector sum of several finite element spaces.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""The vector sum of several finite element spaces.</span>
 
 <span class="sd">    .. math:: \\textrm{EnrichedElement}(V, Q) = \\{v + q | v \\in V, q \\in Q\\}.</span>
 
 <span class="sd">    Primal basis is reorthogonalized to dual basis which is</span>
 <span class="sd">    a concatenation of subelements dual bases; resulting</span>
 <span class="sd">    element is nodal.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 <div class="viewcode-block" id="NodalEnrichedElement.is_cellwise_constant">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.NodalEnrichedElement.is_cellwise_constant">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_cellwise_constant</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether the basis functions of this element is spatially constant over each cell.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return whether the basis functions of this element is spatially constant over each cell."""</span>
         <span class="k">return</span> <span class="kc">False</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Doc.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;NodalEnrichedElement(&quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span>
+<span class="w">        </span><span class="sd">"""Doc."""</span>
+        <span class="k">return</span> <span class="s2">"NodalEnrichedElement("</span> <span class="o">+</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span> <span class="o">+</span> <span class="s2">")"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Format as string for pretty printing.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;&lt;Nodal enriched element(</span><span class="si">%s</span><span class="s2">)&gt;&quot;</span> <span class="o">%</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
+<span class="w">        </span><span class="sd">"""Format as string for pretty printing."""</span>
+        <span class="k">return</span> <span class="s2">"&lt;Nodal enriched element(</span><span class="si">%s</span><span class="s2">)&gt;"</span> <span class="o">%</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span>
 
 <div class="viewcode-block" id="NodalEnrichedElement.shortstr">
 <a class="viewcode-back" href="../../../finat.ufl.html#finat.ufl.enrichedelement.NodalEnrichedElement.shortstr">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">shortstr</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Format as string for pretty printing.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;NodalEnriched(</span><span class="si">%s</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shortstr</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span></div>
+<span class="w">        </span><span class="sd">"""Format as string for pretty printing."""</span>
+        <span class="k">return</span> <span class="s2">"NodalEnriched(</span><span class="si">%s</span><span class="s2">)"</span> <span class="o">%</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shortstr</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span></div>
 </div>
 
 </pre></div>

@@ -36,7 +36,7 @@
           <div class="body" role="main">
             
   <h1>Source code for gem.unconcatenate</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Utility functions for decomposing Concatenate nodes.</span>
+<span></span><span class="sd">"""Utility functions for decomposing Concatenate nodes.</span>
 
 <span class="sd">The exported functions are flatten and unconcatenate.</span>
 <span class="sd">- flatten: destroys the structure preserved within Concatenate nodes,</span>
@@ -55,7 +55,7 @@
 <span class="sd">the form starts with a single assignment pair [(v, e)].  v is now the</span>
 <span class="sd">indexed return variable, something equivalent to</span>
 
-<span class="sd">    Indexed(Variable(&#39;A&#39;, (112,)), (j,))</span>
+<span class="sd">    Indexed(Variable('A', (112,)), (j,))</span>
 
 <span class="sd">where j is the basis function index of the argument.  e is just a GEM</span>
 <span class="sd">quadrature expression with j as its only free index.  This will</span>
@@ -84,9 +84,9 @@
 <span class="sd">elements as usual.  This pair splitting is also applicable to</span>
 <span class="sd">coefficient evaluation: take the local basis function coefficients as</span>
 <span class="sd">the variable, the FInAT tabulation of the element as the expression,</span>
-<span class="sd">and apply &quot;matrix-vector multifunction&quot; for each pair after</span>
+<span class="sd">and apply "matrix-vector multifunction" for each pair after</span>
 <span class="sd">unconcatenation, and then add up the results.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
@@ -101,11 +101,11 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.interpreter</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate</span>
 
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;flatten&#39;</span><span class="p">,</span> <span class="s1">&#39;unconcatenate&#39;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'flatten'</span><span class="p">,</span> <span class="s1">'unconcatenate'</span><span class="p">]</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">find_group</span><span class="p">(</span><span class="n">expressions</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Finds a full set of indexed Concatenate nodes with the same</span>
+<span class="w">    </span><span class="sd">"""Finds a full set of indexed Concatenate nodes with the same</span>
 <span class="sd">    free index, if any such node exists.</span>
 
 <span class="sd">    Pre-condition: ComponentTensor nodes surrounding Concatenate nodes</span>
@@ -113,7 +113,7 @@
 
 <span class="sd">    :arg expressions: a multi-root GEM expression DAG</span>
 <span class="sd">    :returns: a list of GEM nodes, or None</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">free_indices</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">free_indices</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">]))</span>
 
     <span class="c1"># Result variables</span>
@@ -154,14 +154,14 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">split_variable</span><span class="p">(</span><span class="n">variable_ref</span><span class="p">,</span> <span class="n">index</span><span class="p">,</span> <span class="n">multiindices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a flexibly indexed variable along a concatenation index.</span>
+<span class="w">    </span><span class="sd">"""Splits a flexibly indexed variable along a concatenation index.</span>
 
 <span class="sd">    :param variable_ref: flexibly indexed variable to split</span>
 <span class="sd">    :param index: :py:class:`Concatenate` index to split along</span>
 <span class="sd">    :param multiindices: one multiindex for each split variable</span>
 
 <span class="sd">    :returns: generator of split indexed variables</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">variable_ref</span><span class="p">,</span> <span class="n">FlexiblyIndexed</span><span class="p">)</span>
     <span class="n">other_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">variable_ref</span><span class="o">.</span><span class="n">index_ordering</span><span class="p">())</span>
     <span class="n">other_indices</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
@@ -185,11 +185,11 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_replace_node</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace subexpressions using a given mapping.</span>
+<span class="w">    </span><span class="sd">"""Replace subexpressions using a given mapping.</span>
 
 <span class="sd">    :param node: root of expression</span>
 <span class="sd">    :param self: function for recursive calls</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Node</span><span class="p">)</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cut</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">node</span>
@@ -200,13 +200,13 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">replace_node</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">cut</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace subexpressions using a given mapping.</span>
+<span class="w">    </span><span class="sd">"""Replace subexpressions using a given mapping.</span>
 
 <span class="sd">    :param expression: a GEM expression</span>
 <span class="sd">    :param mapping: a :py:class:`dict` containing the substitutions</span>
 <span class="sd">    :param cut: cutting predicate; if returns true, it is assumed that</span>
 <span class="sd">                no replacements would take place in the subexpression.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">Memoizer</span><span class="p">(</span><span class="n">_replace_node</span><span class="p">)</span>
     <span class="n">mapper</span><span class="o">.</span><span class="n">mapping</span> <span class="o">=</span> <span class="n">mapping</span>
     <span class="n">mapper</span><span class="o">.</span><span class="n">cut</span> <span class="o">=</span> <span class="n">cut</span> <span class="ow">or</span> <span class="p">(</span><span class="k">lambda</span> <span class="n">node</span><span class="p">:</span> <span class="kc">False</span><span class="p">)</span>
@@ -234,8 +234,8 @@
         <span class="n">cache</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">multiindices</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">cut</span><span class="p">(</span><span class="n">node</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;No need to rebuild expression of independent of the</span>
-<span class="sd">        relevant concatenation index.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""No need to rebuild expression of independent of the</span>
+<span class="sd">        relevant concatenation index."""</span>
         <span class="k">return</span> <span class="n">index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">free_indices</span>
 
     <span class="c1"># Build Concatenate node replacement mappings</span>
@@ -263,14 +263,14 @@
 <div class="viewcode-block" id="unconcatenate">
 <a class="viewcode-back" href="../../gem.html#gem.unconcatenate.unconcatenate">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">unconcatenate</span><span class="p">(</span><span class="n">pairs</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a list of (indexed variable, expression) pairs along</span>
+<span class="w">    </span><span class="sd">"""Splits a list of (indexed variable, expression) pairs along</span>
 <span class="sd">    :py:class:`Concatenate` nodes embedded in the expressions.</span>
 
 <span class="sd">    :param pairs: list of (indexed variable, expression) pairs</span>
 <span class="sd">    :param cache: index splitting cache :py:class:`dict` (optional)</span>
 
 <span class="sd">    :returns: list of (indexed variable, expression) pairs</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Set up cache</span>
     <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">cache</span> <span class="o">=</span> <span class="p">{}</span>
@@ -285,12 +285,12 @@
 
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_flatten</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace Concatenate nodes with Literal nodes.</span>
+<span class="w">    </span><span class="sd">"""Replace Concatenate nodes with Literal nodes.</span>
 
 <span class="sd">    :arg node: root of the expression</span>
 <span class="sd">    :arg self: function for recursive calls</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;cannot handle type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+<span class="sd">    """</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"cannot handle type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
 
 
 <span class="n">_flatten</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Node</span><span class="p">)(</span><span class="n">reuse_if_untouched</span><span class="p">)</span>
@@ -305,10 +305,10 @@
 <div class="viewcode-block" id="flatten">
 <a class="viewcode-back" href="../../gem.html#gem.unconcatenate.flatten">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">flatten</span><span class="p">(</span><span class="n">expressions</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flatten Concatenate nodes, and destroy the structure they express.</span>
+<span class="w">    </span><span class="sd">"""Flatten Concatenate nodes, and destroy the structure they express.</span>
 
 <span class="sd">    :arg expressions: a multi-root expression DAG</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">Memoizer</span><span class="p">(</span><span class="n">_flatten</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">mapper</span><span class="p">,</span> <span class="n">expressions</span><span class="p">))</span></div>
 

@@ -57,12 +57,12 @@
 <div class="viewcode-block" id="sym_eig">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.sym_eig">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">sym_eig</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    A numpy-only implementation of `scipy.linalg.eigh`</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Linv</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cholesky</span><span class="p">(</span><span class="n">B</span><span class="p">))</span>
     <span class="n">C</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Linv</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">Linv</span><span class="o">.</span><span class="n">T</span><span class="p">))</span>
-    <span class="n">Z</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigh</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="s2">&quot;U&quot;</span><span class="p">)</span>
+    <span class="n">Z</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigh</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="s2">"U"</span><span class="p">)</span>
     <span class="n">V</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">Linv</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">V</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">Z</span><span class="p">,</span> <span class="n">V</span></div>
 
@@ -71,14 +71,14 @@
 <div class="viewcode-block" id="tridiag_eig">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.tridiag_eig">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">tridiag_eig</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Same as sym_eig, but assumes that A is already diagonal and B tri-diagonal</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">a</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">reciprocal</span><span class="p">(</span><span class="n">A</span><span class="o">.</span><span class="n">diagonal</span><span class="p">())</span>
     <span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">a</span><span class="p">)</span>
     <span class="n">C</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">B</span><span class="p">)</span>
     <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="n">a</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">out</span><span class="o">=</span><span class="n">C</span><span class="p">)</span>
-    <span class="n">Z</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigh</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="s2">&quot;U&quot;</span><span class="p">)</span>
+    <span class="n">Z</span><span class="p">,</span> <span class="n">V</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigh</span><span class="p">(</span><span class="n">C</span><span class="p">,</span> <span class="s2">"U"</span><span class="p">)</span>
     <span class="n">numpy</span><span class="o">.</span><span class="n">reciprocal</span><span class="p">(</span><span class="n">Z</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">Z</span><span class="p">)</span>
     <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">Z</span><span class="p">),</span> <span class="n">V</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">V</span><span class="p">)</span>
     <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">V</span><span class="p">,</span> <span class="n">a</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">out</span><span class="o">=</span><span class="n">V</span><span class="p">)</span>
@@ -90,10 +90,10 @@
 <div class="viewcode-block" id="FDMDual">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMDual">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMDual</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for 1D elements with FDM shape functions.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The dual basis for 1D elements with FDM shape functions."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">bc_order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">formdegree</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">orthogonalize</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="c1"># Define the generalized eigenproblem on a reference element</span>
-        <span class="n">P</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span>
+        <span class="n">P</span> <span class="o">=</span> <span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span> <span class="o">+</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span>
         <span class="n">Pdim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">P</span><span class="p">)</span>
         <span class="c1"># Apply even / odd reordering on edge bubbles</span>
         <span class="n">P</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">take</span><span class="p">([</span><span class="o">*</span><span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span> <span class="o">*</span><span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">Pdim</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="o">*</span><span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="n">Pdim</span><span class="p">,</span> <span class="mi">2</span><span class="p">)])</span>
@@ -111,7 +111,7 @@
 
         <span class="c1"># Tabulate the BC nodes</span>
         <span class="k">if</span> <span class="n">bc_order</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="n">C</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">Pdim</span><span class="p">),</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+            <span class="n">C</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">Pdim</span><span class="p">),</span> <span class="s2">"d"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">constraints</span> <span class="o">=</span> <span class="n">P</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">(),</span> <span class="n">bc_order</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
             <span class="n">C</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">constraints</span><span class="o">.</span><span class="n">values</span><span class="p">())))</span>
@@ -192,7 +192,7 @@
 <div class="viewcode-block" id="FDMFiniteElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMFiniteElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMFiniteElement</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D element that diagonalizes bilinear forms with BCs.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D element that diagonalizes bilinear forms with BCs."""</span>
 
     <span class="n">_orthogonalize</span> <span class="o">=</span> <span class="kc">False</span>
 
@@ -213,7 +213,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">LINE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> is only defined in one dimension.&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> is only defined in one dimension."</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">FDMDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">bc_order</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_bc_order</span><span class="p">,</span>
                        <span class="n">formdegree</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_formdegree</span><span class="p">,</span> <span class="n">orthogonalize</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_orthogonalize</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_formdegree</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -228,7 +228,7 @@
 <div class="viewcode-block" id="FDMLagrange">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMLagrange">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMLagrange</span><span class="p">(</span><span class="n">FDMFiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D CG element with interior shape functions that diagonalize the Laplacian.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D CG element with interior shape functions that diagonalize the Laplacian."""</span>
     <span class="n">_bc_order</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="n">_formdegree</span> <span class="o">=</span> <span class="mi">0</span></div>
 
@@ -237,7 +237,7 @@
 <div class="viewcode-block" id="FDMDiscontinuousLagrange">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMDiscontinuousLagrange">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMDiscontinuousLagrange</span><span class="p">(</span><span class="n">FDMFiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D DG element with derivatives of interior CG FDM shape functions.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D DG element with derivatives of interior CG FDM shape functions."""</span>
     <span class="n">_bc_order</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="n">_formdegree</span> <span class="o">=</span> <span class="mi">1</span></div>
 
@@ -246,7 +246,7 @@
 <div class="viewcode-block" id="FDMQuadrature">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMQuadrature">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMQuadrature</span><span class="p">(</span><span class="n">FDMFiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D DG element with interior CG FDM shape functions and orthogonalized vertex modes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D DG element with interior CG FDM shape functions and orthogonalized vertex modes."""</span>
     <span class="n">_bc_order</span> <span class="o">=</span> <span class="mi">1</span>
     <span class="n">_formdegree</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">_orthogonalize</span> <span class="o">=</span> <span class="kc">True</span></div>
@@ -256,7 +256,7 @@
 <div class="viewcode-block" id="FDMBrokenH1">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMBrokenH1">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMBrokenH1</span><span class="p">(</span><span class="n">FDMFiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D DG element with shape functions that diagonalize the Laplacian.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D DG element with shape functions that diagonalize the Laplacian."""</span>
     <span class="n">_bc_order</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">_formdegree</span> <span class="o">=</span> <span class="mi">0</span></div>
 
@@ -265,7 +265,7 @@
 <div class="viewcode-block" id="FDMBrokenL2">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMBrokenL2">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMBrokenL2</span><span class="p">(</span><span class="n">FDMFiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D DG element with the derivates of DG FDM shape functions.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D DG element with the derivates of DG FDM shape functions."""</span>
     <span class="n">_bc_order</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">_formdegree</span> <span class="o">=</span> <span class="mi">1</span></div>
 
@@ -274,7 +274,7 @@
 <div class="viewcode-block" id="FDMHermite">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.fdm_element.FDMHermite">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FDMHermite</span><span class="p">(</span><span class="n">FDMFiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D CG element with interior shape functions that diagonalize the biharmonic operator.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D CG element with interior shape functions that diagonalize the biharmonic operator."""</span>
     <span class="n">_bc_order</span> <span class="o">=</span> <span class="mi">2</span>
     <span class="n">_formdegree</span> <span class="o">=</span> <span class="mi">0</span></div>
 

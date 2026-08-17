@@ -37,7 +37,7 @@
             
   <h1>Source code for FIAT.mardal_tai_winther</h1><div class="highlight"><pre>
 <span></span><span class="c1"># -*- coding: utf-8 -*-</span>
-<span class="sd">&quot;&quot;&quot;Implementation of the Mardal-Tai-Winther finite elements.&quot;&quot;&quot;</span>
+<span class="sd">"""Implementation of the Mardal-Tai-Winther finite elements."""</span>
 
 <span class="c1"># Copyright (C) 2020 by Robert C. Kirby (Baylor University)</span>
 <span class="c1">#</span>
@@ -58,12 +58,12 @@
 <div class="viewcode-block" id="curl">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.curl">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">curl</span><span class="p">(</span><span class="n">tabulation</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    Compute the curl of a vector (the skew-symmetric part of the gradient) or the rot of scalar in 2D.</span>
 
 <span class="sd">    :arg tabulation: a dictionary with at least the first order tabulation.</span>
 <span class="sd">    :returns: a numpy.ndarray with the curl.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">grad_u</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span> <span class="n">tabulation</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">tabulation</span> <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">}</span>
     <span class="n">shp</span> <span class="o">=</span> <span class="n">grad_u</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="k">if</span> <span class="n">shp</span> <span class="o">==</span> <span class="p">():</span>
@@ -79,12 +79,12 @@
 <div class="viewcode-block" id="MardalTaiWintherSpace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.MardalTaiWintherSpace">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">MardalTaiWintherSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct the MTW space BDM(order) + curl(B [P1]^d).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Construct the MTW space BDM(order) + curl(B [P1]^d)."""</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="n">k</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">+</span> <span class="mi">1</span>
     <span class="k">assert</span> <span class="n">order</span> <span class="o">&lt;</span> <span class="n">k</span>
     <span class="c1"># [Pk]^d = vector polynomials of degree k = sd+1</span>
-    <span class="n">Pk</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">scale</span><span class="o">=</span><span class="s2">&quot;orthonormal&quot;</span><span class="p">)</span>
+    <span class="n">Pk</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">scale</span><span class="o">=</span><span class="s2">"orthonormal"</span><span class="p">)</span>
 
     <span class="c1"># Grab BDM(order) = [P_order]^d from [Pk]^d</span>
     <span class="n">dimP1</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">polynomial_dimension</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
@@ -114,7 +114,7 @@
 <div class="viewcode-block" id="MardalTaiWintherDual">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.MardalTaiWintherDual">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MardalTaiWintherDual</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Degrees of freedom for Mardal-Tai-Winther elements.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Degrees of freedom for Mardal-Tai-Winther elements."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
@@ -172,22 +172,22 @@
 <div class="viewcode-block" id="MardalTaiWinther">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mardal_tai_winther.MardalTaiWinther">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MardalTaiWinther</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The definition of the Mardal-Tai-Winther element.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The definition of the Mardal-Tai-Winther element.</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">sd</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined in dimension 2 and 3.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined in dimension 2 and 3."</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_simplex</span><span class="p">():</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on simplices.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on simplices."</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;=</span> <span class="n">sd</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for 1 &lt;= order &lt; dim. &quot;</span>
-                             <span class="s2">&quot;The order is defined as the embedded sub-degree, with 1 for lowest-order case.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for 1 &lt;= order &lt; dim. "</span>
+                             <span class="s2">"The order is defined as the embedded sub-degree, with 1 for lowest-order case."</span><span class="p">)</span>
 
         <span class="n">dual</span> <span class="o">=</span> <span class="n">MardalTaiWintherDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">MardalTaiWintherSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="n">sd</span> <span class="o">-</span> <span class="mi">1</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"contravariant piola"</span><span class="p">)</span></div>
 
 </pre></div>
 

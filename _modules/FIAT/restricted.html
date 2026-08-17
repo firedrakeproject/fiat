@@ -49,7 +49,7 @@
 <div class="viewcode-block" id="RestrictedDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.restricted.RestrictedDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">RestrictedDualSet</span><span class="p">(</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Restrict the given DualSet to the specified list of dofs.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Restrict the given DualSet to the specified list of dofs."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">indices</span><span class="p">):</span>
         <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">indices</span><span class="p">))</span>
@@ -70,7 +70,7 @@
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_restrict_entity_permutations</span><span class="p">(</span><span class="n">dual</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Inherit the entity permutations of the dofs kept by the restriction.</span>
+<span class="w">        </span><span class="sd">"""Inherit the entity permutations of the dofs kept by the restriction.</span>
 
 <span class="sd">        An entity whose dofs are all kept keeps their relative order, and so</span>
 <span class="sd">        permutes exactly as it did in ``dual``; an entity whose dofs are all</span>
@@ -82,7 +82,7 @@
 <span class="sd">        :arg dual: the DualSet being restricted.</span>
 <span class="sd">        :arg entity_ids: the entity ids of the restricted dual set.</span>
 <span class="sd">        :returns: the entity permutations, or None if they cannot be inherited.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">permutations_old</span> <span class="o">=</span> <span class="n">dual</span><span class="o">.</span><span class="n">entity_permutations</span>
         <span class="k">if</span> <span class="n">permutations_old</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
@@ -102,11 +102,11 @@
 <div class="viewcode-block" id="RestrictedDualSet.get_indices">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.restricted.RestrictedDualSet.get_indices">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the list of dofs with support on a given restriction domain.</span>
+<span class="w">        </span><span class="sd">"""Return the list of dofs with support on a given restriction domain.</span>
 
-<span class="sd">        :arg restriction_domain: can be &#39;interior&#39;, &#39;vertex&#39;, &#39;edge&#39;, &#39;face&#39; or &#39;facet&#39;</span>
+<span class="sd">        :arg restriction_domain: can be 'interior', 'vertex', 'edge', 'face' or 'facet'</span>
 <span class="sd">        :kwarg take_closure: Are we taking the closure of the restriction domain?</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># Call get_indices on the parent class to support multiple restriction domains</span>
         <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dual</span><span class="p">)</span><span class="o">.</span><span class="n">get_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="o">=</span><span class="n">take_closure</span><span class="p">)</span></div>
 </div>
@@ -116,22 +116,22 @@
 <div class="viewcode-block" id="RestrictedElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.restricted.RestrictedElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">RestrictedElement</span><span class="p">(</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Restrict the given element to the specified list of dofs.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Restrict the given element to the specified list of dofs."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">indices</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">take_closure</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;For sake of argument, indices overrides restriction_domain&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''For sake of argument, indices overrides restriction_domain'''</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">indices</span> <span class="ow">or</span> <span class="n">restriction_domain</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Either indices or restriction_domain must be passed in&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Either indices or restriction_domain must be passed in"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">indices</span><span class="p">:</span>
             <span class="n">indices</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">dual</span><span class="o">.</span><span class="n">get_indices</span><span class="p">(</span><span class="n">restriction_domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="o">=</span><span class="n">take_closure</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;variable &#39;indices&#39; was a string; did you forget to use a keyword?&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"variable 'indices' was a string; did you forget to use a keyword?"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No point in creating empty RestrictedElement.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"No point in creating empty RestrictedElement."</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_element</span> <span class="o">=</span> <span class="n">element</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_indices</span> <span class="o">=</span> <span class="n">indices</span>

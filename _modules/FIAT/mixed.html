@@ -56,13 +56,13 @@
 <div class="viewcode-block" id="MixedElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mixed.MixedElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MixedElement</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A FIAT-like representation of a mixed element.</span>
+<span class="w">    </span><span class="sd">"""A FIAT-like representation of a mixed element.</span>
 
 <span class="sd">    :arg elements: An iterable of FIAT elements.</span>
 <span class="sd">    :arg ref_el: The reference element (optional).</span>
 
 <span class="sd">    This object offers tabulation of the concatenated basis function</span>
-<span class="sd">    tables along with an entity_dofs dict.&quot;&quot;&quot;</span>
+<span class="sd">    tables along with an entity_dofs dict."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">elements</span><span class="p">,</span> <span class="n">ref_el</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">elements</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">elements</span><span class="p">)</span>
 
@@ -110,15 +110,15 @@
 <div class="viewcode-block" id="MixedElement.get_nodal_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mixed.MixedElement.get_nodal_basis">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;get_nodal_basis not implemented&quot;</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"get_nodal_basis not implemented"</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="MixedElement.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mixed.MixedElement.tabulate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Tabulate a mixed element by appropriately splatting</span>
+<span class="w">        </span><span class="sd">"""Tabulate a mixed element by appropriately splatting</span>
 <span class="sd">        together the tabulation of the individual elements.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">(),)</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span> <span class="o">+</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">),)</span>
 
         <span class="n">output</span> <span class="o">=</span> <span class="p">{}</span>
@@ -150,7 +150,7 @@
 <div class="viewcode-block" id="MixedElement.is_nodal">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mixed.MixedElement.is_nodal">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_nodal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;True if primal and dual bases are orthogonal.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""True if primal and dual bases are orthogonal."""</span>
         <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">is_nodal</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_elements</span><span class="p">)</span></div>
 </div>
 
@@ -159,9 +159,9 @@
 <div class="viewcode-block" id="concatenate_entity_dofs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.mixed.concatenate_entity_dofs">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">concatenate_entity_dofs</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">elements</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Combine the entity_dofs from a list of elements into a combined</span>
+<span class="w">    </span><span class="sd">"""Combine the entity_dofs from a list of elements into a combined</span>
 <span class="sd">    entity_dof containing the information for the concatenated DoFs of</span>
-<span class="sd">    all the elements.&quot;&quot;&quot;</span>
+<span class="sd">    all the elements."""</span>
     <span class="n">entity_dofs</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">entities</span><span class="p">}</span>
                    <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entities</span> <span class="ow">in</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
     <span class="n">offsets</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cumsum</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">space_dimension</span><span class="p">()</span>

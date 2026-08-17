@@ -41,11 +41,11 @@
 <span class="c1"># This file is part of FIAT (https://www.fenicsproject.org)</span>
 <span class="c1">#</span>
 <span class="c1"># SPDX-License-Identifier:    LGPL-3.0-or-later</span>
-<span class="sd">&quot;&quot;&quot;Several functions related to the one-dimensional jacobi polynomials:</span>
+<span class="sd">"""Several functions related to the one-dimensional jacobi polynomials:</span>
 <span class="sd">Evaluation, evaluation of derivatives, plus computation of the roots</span>
-<span class="sd">via Newton&#39;s method.  These mainly are used in defining the expansion</span>
+<span class="sd">via Newton's method.  These mainly are used in defining the expansion</span>
 <span class="sd">functions over the simplices and in defining quadrature</span>
-<span class="sd">rules over each domain.&quot;&quot;&quot;</span>
+<span class="sd">rules over each domain."""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 
@@ -53,9 +53,9 @@
 <div class="viewcode-block" id="eval_jacobi">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the nth jacobi polynomial with weight parameters a,b at a</span>
+<span class="w">    </span><span class="sd">"""Evaluates the nth jacobi polynomial with weight parameters a,b at a</span>
 <span class="sd">    point x. Recurrence relations implemented from the pseudocode</span>
-<span class="sd">    given in Karniadakis and Sherwin, Appendix B&quot;&quot;&quot;</span>
+<span class="sd">    given in Karniadakis and Sherwin, Appendix B"""</span>
 
     <span class="k">if</span> <span class="mi">0</span> <span class="o">==</span> <span class="n">n</span><span class="p">:</span>
         <span class="c1"># Get zeros of the right shape</span>
@@ -88,11 +88,11 @@
 <div class="viewcode-block" id="eval_jacobi_batch">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi_batch">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates all jacobi polynomials with weights a,b</span>
+<span class="w">    </span><span class="sd">"""Evaluates all jacobi polynomials with weights a,b</span>
 <span class="sd">    up to degree n.  xs is a numpy.array of points.</span>
 <span class="sd">    Returns a two-dimensional array of tabulations, where the</span>
 <span class="sd">    rows correspond to the Jacobi polynomials and the</span>
-<span class="sd">    columns correspond to the points.&quot;&quot;&quot;</span>
+<span class="sd">    columns correspond to the points."""</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="o">*</span><span class="n">xs</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]),</span> <span class="n">xs</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
     <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
 
@@ -121,7 +121,7 @@
 <div class="viewcode-block" id="eval_jacobi_deriv">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi_deriv">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_deriv</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the first derivative of P_{n}^{a,b} at a point x.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Evaluates the first derivative of P_{n}^{a,b} at a point x."""</span>
     <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="mf">0.0</span>
     <span class="k">else</span><span class="p">:</span>
@@ -132,11 +132,11 @@
 <div class="viewcode-block" id="eval_jacobi_deriv_batch">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.jacobi.eval_jacobi_deriv_batch">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">eval_jacobi_deriv_batch</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">xs</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates the derivative of the given order of all jacobi polynomials with</span>
+<span class="w">    </span><span class="sd">"""Evaluates the derivative of the given order of all jacobi polynomials with</span>
 <span class="sd">    weights a,b up to degree n.  xs is a numpy.array of points.</span>
 <span class="sd">    Returns a two-dimensional array of points, where the</span>
 <span class="sd">    rows correspond to the Jacobi polynomials and the</span>
-<span class="sd">    columns correspond to the points.&quot;&quot;&quot;</span>
+<span class="sd">    columns correspond to the points."""</span>
     <span class="n">results</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">xs</span><span class="p">)),</span> <span class="n">xs</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">n</span><span class="o">+</span><span class="mi">1</span> <span class="o">&lt;=</span> <span class="n">order</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">results</span>

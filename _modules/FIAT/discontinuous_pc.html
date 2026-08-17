@@ -90,10 +90,10 @@
 <div class="viewcode-block" id="DPCDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_pc.DPCDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DPCDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for DPC elements.  This class works for</span>
+<span class="w">    </span><span class="sd">"""The dual basis for DPC elements.  This class works for</span>
 <span class="sd">    hypercubes of any dimension.  Nodes are point evaluation at</span>
 <span class="sd">    equispaced points.  This is the discontinuous version where</span>
-<span class="sd">    all nodes are topologically associated with the cell itself&quot;&quot;&quot;</span>
+<span class="sd">    all nodes are topologically associated with the cell itself"""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">flat_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
@@ -144,7 +144,7 @@
 <div class="viewcode-block" id="HigherOrderDPC">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_pc.HigherOrderDPC">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HigherOrderDPC</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The DPC finite element.  It is what it is.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The DPC finite element.  It is what it is."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>

@@ -36,10 +36,10 @@
           <div class="body" role="main">
             
   <h1>Source code for gem.flop_count</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""</span>
 <span class="sd">This file contains all the necessary functions to accurately count the</span>
 <span class="sd">total number of floating point operations for a given script.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">gem.gem</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">gem</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">gem.impero</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">imp</span>
@@ -125,7 +125,7 @@
 <a class="viewcode-back" href="../../gem.html#gem.flop_count.flops">[docs]</a>
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">flops</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">temporaries</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Don&#39;t know how to count flops of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Don't know how to count flops of </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
 
 
 
@@ -133,7 +133,7 @@
 <a class="viewcode-back" href="../../gem.html#gem.flop_count.flops_failure">[docs]</a>
 <span class="nd">@flops</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Failure</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">flops_failure</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">temporaries</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not expecting a Failure node&quot;</span><span class="p">)</span></div>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Not expecting a Failure node"</span><span class="p">)</span></div>
 
 
 
@@ -238,7 +238,7 @@
 <a class="viewcode-back" href="../../gem.html#gem.flop_count.flops_indexsum">[docs]</a>
 <span class="nd">@flops</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">flops_indexsum</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">temporaries</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not expecting IndexSum&quot;</span><span class="p">)</span></div>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Not expecting IndexSum"</span><span class="p">)</span></div>
 
 
 
@@ -268,20 +268,20 @@
 <a class="viewcode-back" href="../../gem.html#gem.flop_count.flops_componenttensor">[docs]</a>
 <span class="nd">@flops</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">flops_componenttensor</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">temporaries</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not expecting ComponentTensor&quot;</span><span class="p">)</span></div>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Not expecting ComponentTensor"</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="expression_flops">
 <a class="viewcode-back" href="../../gem.html#gem.flop_count.expression_flops">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">expression_flops</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">temporaries</span><span class="p">,</span> <span class="n">top</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;An approximation to flops required for each expression.</span>
+<span class="w">    </span><span class="sd">"""An approximation to flops required for each expression.</span>
 
 <span class="sd">    :arg expression: GEM expression.</span>
 <span class="sd">    :arg temporaries: Expressions that are assigned to temporaries</span>
 <span class="sd">    :arg top: are we at the root?</span>
 <span class="sd">    :returns: flop count for the expression</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">top</span> <span class="ow">and</span> <span class="n">expression</span> <span class="ow">in</span> <span class="n">temporaries</span><span class="p">:</span>
         <span class="k">return</span> <span class="mi">0</span>
     <span class="k">else</span><span class="p">:</span>
@@ -292,11 +292,11 @@
 <div class="viewcode-block" id="count_flops">
 <a class="viewcode-back" href="../../gem.html#gem.flop_count.count_flops">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">count_flops</span><span class="p">(</span><span class="n">impero_c</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;An approximation to flops required for a scheduled impero_c tree.</span>
+<span class="w">    </span><span class="sd">"""An approximation to flops required for a scheduled impero_c tree.</span>
 
 <span class="sd">    :arg impero_c: a :class:`~.Impero_C` object.</span>
 <span class="sd">    :returns: approximate flop count for the tree.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">statement</span><span class="p">(</span><span class="n">impero_c</span><span class="o">.</span><span class="n">tree</span><span class="p">,</span> <span class="nb">set</span><span class="p">(</span><span class="n">impero_c</span><span class="o">.</span><span class="n">temporaries</span><span class="p">))</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">NotImplementedError</span><span class="p">):</span>

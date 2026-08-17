@@ -56,7 +56,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">flatten_reference_cube</span><span class="p">,</span> <span class="n">make_lattice</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.pointwise_dual</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_pointwise_dual</span>
 
-<span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x y z&#39;</span><span class="p">)</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">'x y z'</span><span class="p">)</span>
 <span class="n">variables</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
 <span class="n">leg</span> <span class="o">=</span> <span class="n">legendre</span>
 
@@ -79,12 +79,12 @@
     <span class="k">for</span> <span class="n">poly</span> <span class="ow">in</span> <span class="n">polynomials</span><span class="o">.</span><span class="n">tolist</span><span class="p">():</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poly</span><span class="p">,</span> <span class="n">numbers</span><span class="o">.</span><span class="n">Real</span><span class="p">):</span>
             <span class="k">if</span> <span class="n">poly</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">extra_vars</span><span class="p">:</span>
-                <span class="n">extra_vars</span><span class="p">[</span><span class="n">poly</span><span class="p">]</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;num_&#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_vars</span><span class="p">)))</span>
+                <span class="n">extra_vars</span><span class="p">[</span><span class="n">poly</span><span class="p">]</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">'num_'</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">extra_vars</span><span class="p">)))</span>
             <span class="n">polynomials_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">extra_vars</span><span class="p">[</span><span class="n">poly</span><span class="p">])</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poly</span><span class="p">,</span> <span class="n">sympy</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">Expr</span><span class="p">):</span>
             <span class="n">polynomials_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unexpected type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">poly</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
     <span class="n">polynomials</span> <span class="o">=</span> <span class="n">Array</span><span class="p">(</span><span class="n">polynomials_list</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">polynomials</span><span class="p">,</span> <span class="n">extra_vars</span>
 
@@ -98,7 +98,7 @@
         <span class="k">if</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">Lagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;reference element cannot be dimension 0&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">"reference element cannot be dimension 0"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span>
@@ -159,7 +159,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">dim</span><span class="p">:</span> <span class="n">Array</span><span class="p">(</span><span class="n">s_list</span><span class="p">)}</span>
         <span class="n">polynomials</span><span class="p">,</span> <span class="n">extra_vars</span> <span class="o">=</span> <span class="n">_replace_numbers_with_symbols</span><span class="p">(</span><span class="n">Array</span><span class="p">(</span><span class="n">s_list</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">basis_callable</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">dim</span><span class="p">:</span> <span class="p">[</span><span class="n">lambdify</span><span class="p">(</span><span class="n">variables</span><span class="p">[:</span><span class="n">dim</span><span class="p">],</span> <span class="n">polynomials</span><span class="p">,</span>
-                                                   <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                                                   <span class="n">modules</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
                                           <span class="n">extra_vars</span><span class="p">]}</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">flat_el</span> <span class="o">=</span> <span class="n">flat_el</span>
@@ -177,7 +177,7 @@
 <div class="viewcode-block" id="Serendipity.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.Serendipity.get_coeffs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;get_coeffs not implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"get_coeffs not implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Serendipity.tabulate">
@@ -194,9 +194,9 @@
         <span class="n">phivals</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">dim</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;no tabulate method for serendipity elements of dimension 1 or less.&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">'no tabulate method for serendipity elements of dimension 1 or less.'</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">dim</span> <span class="o">&gt;=</span> <span class="mi">4</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">&#39;tabulate does not support higher dimensions than 3.&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s1">'tabulate does not support higher dimensions than 3.'</span><span class="p">)</span>
         <span class="n">npoints</span><span class="p">,</span> <span class="n">pointdim</span> <span class="o">=</span> <span class="n">points</span><span class="o">.</span><span class="n">shape</span>
         <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
             <span class="n">alphas</span> <span class="o">=</span> <span class="n">mis</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">o</span><span class="p">)</span>
@@ -206,7 +206,7 @@
                 <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
                     <span class="n">polynomials</span> <span class="o">=</span> <span class="n">diff</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">dim</span><span class="p">],</span> <span class="o">*</span><span class="nb">zip</span><span class="p">(</span><span class="n">variables</span><span class="p">,</span> <span class="n">alpha</span><span class="p">))</span>
                     <span class="n">polynomials</span><span class="p">,</span> <span class="n">extra_vars</span> <span class="o">=</span> <span class="n">_replace_numbers_with_symbols</span><span class="p">(</span><span class="n">polynomials</span><span class="p">)</span>
-                    <span class="nb">callable</span> <span class="o">=</span> <span class="n">lambdify</span><span class="p">(</span><span class="n">variables</span><span class="p">[:</span><span class="n">dim</span><span class="p">]</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">extra_vars</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="n">polynomials</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                    <span class="nb">callable</span> <span class="o">=</span> <span class="n">lambdify</span><span class="p">(</span><span class="n">variables</span><span class="p">[:</span><span class="n">dim</span><span class="p">]</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">extra_vars</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="n">polynomials</span><span class="p">,</span> <span class="n">modules</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="n">dummify</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">basis</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="n">polynomials</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">basis_callable</span><span class="p">[</span><span class="n">alpha</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="nb">callable</span><span class="p">,</span> <span class="n">extra_vars</span><span class="p">]</span>
                 <span class="c1"># Can no longer make a numpy array from objects of inhomogeneous shape</span>
@@ -215,7 +215,7 @@
                 <span class="c1">#</span>
                 <span class="c1"># Casting `key`s to float() is needed, otherwise we somehow get the following error:</span>
                 <span class="c1">#</span>
-                <span class="c1"># E           TypeError: unsupported type for persistent hash keying: &lt;class &#39;complex&#39;&gt;</span>
+                <span class="c1"># E           TypeError: unsupported type for persistent hash keying: &lt;class 'complex'&gt;</span>
                 <span class="c1">#</span>
                 <span class="c1"># ../../lib/python3.8/site-packages/pytools/persistent_dict.py:243: TypeError</span>
                 <span class="c1">#</span>
@@ -303,15 +303,15 @@
     <span class="k">elif</span> <span class="n">dim</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">unisolvent_pts_hex</span><span class="p">(</span><span class="n">flat_el</span><span class="p">,</span> <span class="n">deg</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Serendipity only defined for quads and hexes&quot;</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Serendipity only defined for quads and hexes"</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="unisolvent_pts_quad">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.unisolvent_pts_quad">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">unisolvent_pts_quad</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">deg</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gives a set of unisolvent points for the quad serendipity space of order deg.</span>
-<span class="sd">    The S element is not dual to these nodes, but a dual basis can be constructed from them.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Gives a set of unisolvent points for the quad serendipity space of order deg.</span>
+<span class="sd">    The S element is not dual to these nodes, but a dual basis can be constructed from them."""</span>
     <span class="n">L</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
     <span class="n">vs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>
     <span class="n">pts</span> <span class="o">=</span> <span class="p">[</span><span class="n">pt</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">K</span><span class="o">.</span><span class="n">vertices</span><span class="p">]</span>
@@ -336,8 +336,8 @@
 <div class="viewcode-block" id="unisolvent_pts_hex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.serendipity.unisolvent_pts_hex">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">unisolvent_pts_hex</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">deg</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gives a set of unisolvent points for the hex serendipity space of order deg.</span>
-<span class="sd">    The S element is not dual to these nodes, but a dual basis can be constructed from them.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Gives a set of unisolvent points for the hex serendipity space of order deg.</span>
+<span class="sd">    The S element is not dual to these nodes, but a dual basis can be constructed from them."""</span>
     <span class="n">L</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
     <span class="n">F</span> <span class="o">=</span> <span class="n">K</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
     <span class="n">vs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">K</span><span class="o">.</span><span class="n">vertices</span><span class="p">)</span>

@@ -104,7 +104,7 @@
 <div class="viewcode-block" id="DualSet.get_entity_permutations">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_entity_permutations">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;This method returns a nested dictionary that gives, for</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""This method returns a nested dictionary that gives, for</span>
 <span class="sd">        each dimension, for each entity, and for each possible entity</span>
 <span class="sd">        orientation, the DoF permutation array that maps the entity</span>
 <span class="sd">        local DoF ordering to the canonical global DoF ordering; see</span>
@@ -126,9 +126,9 @@
 <span class="sd">        a single entity on dimension ``1`` (interval), which has two</span>
 <span class="sd">        possible orientations representing non-reflected and reflected</span>
 <span class="sd">        intervals.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_permutations</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"entity_permutations not yet implemented for </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">entity_permutations</span></div>
 
 
@@ -141,7 +141,7 @@
 <div class="viewcode-block" id="DualSet.to_riesz">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.to_riesz">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_riesz</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poly_set</span><span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;This method gives the action of the entire dual set</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""This method gives the action of the entire dual set</span>
 <span class="sd">        on each member of the expansion set underlying poly_set.</span>
 <span class="sd">        Then, applying the linear functionals of the dual set to an</span>
 <span class="sd">        arbitrary polynomial in poly_set is accomplished by (generalized)</span>
@@ -156,7 +156,7 @@
 <span class="sd">        the number of functionals in the dual set, the value shape</span>
 <span class="sd">        of functions it takes, and the number of members of the</span>
 <span class="sd">        expansion set.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
         <span class="c1"># This rather technical code queries the low-level information</span>
         <span class="c1"># in pt_dict and deriv_dict</span>
@@ -174,7 +174,7 @@
         <span class="n">num_exp</span> <span class="o">=</span> <span class="n">es</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">(</span><span class="n">poly_set</span><span class="o">.</span><span class="n">get_embedded_degree</span><span class="p">())</span>
 
         <span class="n">riesz_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_nodes</span><span class="p">,</span> <span class="o">*</span><span class="n">tshape</span><span class="p">,</span> <span class="n">num_exp</span><span class="p">)</span>
-        <span class="n">mat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">riesz_shape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+        <span class="n">mat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">riesz_shape</span><span class="p">,</span> <span class="s2">"d"</span><span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">map_quadratures_to_points</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">deriv</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
             <span class="n">Qs_to_ells</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
@@ -212,7 +212,7 @@
             <span class="n">cur_pts</span> <span class="o">=</span> <span class="n">Qs_to_pts</span><span class="p">[</span><span class="n">Q</span><span class="p">]</span>
             <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">cur_pts</span><span class="p">))</span>
             <span class="n">wshape</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ells</span><span class="p">),</span> <span class="o">*</span><span class="n">tshape</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">cur_pts</span><span class="p">))</span>
-            <span class="n">wts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">wshape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+            <span class="n">wts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">wshape</span><span class="p">,</span> <span class="s2">"d"</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">Q</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ells</span><span class="p">):</span>
                     <span class="n">ell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
@@ -232,7 +232,7 @@
         <span class="n">max_deriv_order</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">ell</span><span class="o">.</span><span class="n">max_deriv_order</span> <span class="k">for</span> <span class="n">ell</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">max_deriv_order</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">Qs_to_ells</span><span class="p">,</span> <span class="n">Qs_to_pts</span><span class="p">,</span> <span class="n">pts</span> <span class="o">=</span> <span class="n">map_quadratures_to_points</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">,</span> <span class="n">deriv</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-            <span class="c1"># It&#39;s easiest/most efficient to get derivatives of the</span>
+            <span class="c1"># It's easiest/most efficient to get derivatives of the</span>
             <span class="c1"># expansion set through the polynomial set interface.</span>
             <span class="c1"># This is creating a short-lived set to do just this.</span>
             <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_exp</span><span class="p">)</span>
@@ -243,7 +243,7 @@
                 <span class="n">cur_pts</span> <span class="o">=</span> <span class="n">Qs_to_pts</span><span class="p">[</span><span class="n">Q</span><span class="p">]</span>
                 <span class="n">indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">pts</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">cur_pts</span><span class="p">))</span>
                 <span class="n">wshape</span> <span class="o">=</span> <span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ells</span><span class="p">),</span> <span class="o">*</span><span class="n">tshape</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">cur_pts</span><span class="p">))</span>
-                <span class="n">dwts</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">wshape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">dexpansion_values</span> <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">}</span>
+                <span class="n">dwts</span> <span class="o">=</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">wshape</span><span class="p">,</span> <span class="s2">"d"</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">dexpansion_values</span> <span class="k">if</span> <span class="nb">sum</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">}</span>
                 <span class="k">if</span> <span class="n">Q</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ells</span><span class="p">):</span>
                         <span class="n">ell</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
@@ -266,13 +266,13 @@
 <div class="viewcode-block" id="DualSet.get_indices">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.DualSet.get_indices">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">restriction_domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the list of dofs with support on a given restriction domain.</span>
+<span class="w">        </span><span class="sd">"""Returns the list of dofs with support on a given restriction domain.</span>
 
-<span class="sd">        :arg restriction_domain: can be &#39;interior&#39;, &#39;vertex&#39;, &#39;edge&#39;, &#39;face&#39; or &#39;facet&#39;</span>
+<span class="sd">        :arg restriction_domain: can be 'interior', 'vertex', 'edge', 'face' or 'facet'</span>
 <span class="sd">        :kwarg take_closure: Are we taking the closure of the restriction domain?</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">entity_dofs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_entity_ids</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;interior&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">"interior"</span><span class="p">:</span>
             <span class="c1"># Return dofs from interior, never taking the closure</span>
             <span class="n">indices</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="n">entities</span> <span class="o">=</span> <span class="n">entity_dofs</span><span class="p">[</span><span class="nb">max</span><span class="p">(</span><span class="n">entity_dofs</span><span class="o">.</span><span class="n">keys</span><span class="p">())]</span>
@@ -281,18 +281,18 @@
             <span class="k">return</span> <span class="n">indices</span>
 
         <span class="c1"># otherwise return dofs with d &lt;= dim</span>
-        <span class="k">if</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;vertex&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">"vertex"</span><span class="p">:</span>
             <span class="n">dim</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;edge&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">"edge"</span><span class="p">:</span>
             <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span>
-        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;face&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">"face"</span><span class="p">:</span>
             <span class="n">dim</span> <span class="o">=</span> <span class="mi">2</span>
-        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;facet&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">"facet"</span><span class="p">:</span>
             <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>
-        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">&quot;ridge&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">restriction_domain</span> <span class="o">==</span> <span class="s2">"ridge"</span><span class="p">:</span>
             <span class="n">dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">2</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Invalid restriction domain&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Invalid restriction domain"</span><span class="p">)</span>
 
         <span class="n">is_prodcell</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="n">entity_dofs</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> <span class="nb">tuple</span><span class="p">)</span>
 
@@ -317,8 +317,8 @@
 <div class="viewcode-block" id="sorted_by_key">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.sorted_by_key">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">sorted_by_key</span><span class="p">(</span><span class="n">mapping</span><span class="p">):</span>
-    <span class="s2">&quot;Sort dict items by key, allowing different key types.&quot;</span>
-    <span class="c1"># Python3 doesn&#39;t allow comparing builtins of different type, therefore the typename trick here</span>
+    <span class="s2">"Sort dict items by key, allowing different key types."</span>
+    <span class="c1"># Python3 doesn't allow comparing builtins of different type, therefore the typename trick here</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_key</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">mapping</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">_key</span><span class="p">)</span></div>
@@ -347,7 +347,7 @@
 <div class="viewcode-block" id="unflatten_entity_ids">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.unflatten_entity_ids">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">unflatten_entity_ids</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reconstruct entity_ids to match the entities of ref_el.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Reconstruct entity_ids to match the entities of ref_el."""</span>
     <span class="n">topology</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
     <span class="n">unflattening_map</span> <span class="o">=</span> <span class="n">compute_unflattening_map</span><span class="p">(</span><span class="n">topology</span><span class="p">)</span>
     <span class="n">unflattened_entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">topology</span><span class="p">)}</span>
@@ -362,7 +362,7 @@
 <div class="viewcode-block" id="lexsort_nodes">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.lexsort_nodes">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">lexsort_nodes</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sort PointEvaluation nodes in lexicographical ordering.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Sort PointEvaluation nodes in lexicographical ordering."""</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="n">pts</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
@@ -379,7 +379,7 @@
 <div class="viewcode-block" id="merge_entities">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.dual_set.merge_entities">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">merge_entities</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collect DOFs from simplicial complex onto facets of parent cell.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Collect DOFs from simplicial complex onto facets of parent cell."""</span>
     <span class="n">parent_cell</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">parent_cell</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">,</span> <span class="n">entity_permutations</span>

@@ -36,8 +36,8 @@
           <div class="body" role="main">
             
   <h1>Source code for gem.optimise</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;A set of routines implementing various transformations on GEM</span>
-<span class="sd">expressions.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""A set of routines implementing various transformations on GEM</span>
+<span class="sd">expressions."""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span><span class="p">,</span> <span class="n">defaultdict</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span><span class="p">,</span> <span class="n">partial</span>
@@ -60,13 +60,13 @@
 <a class="viewcode-back" href="../../gem.html#gem.optimise.literal_rounding">[docs]</a>
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">literal_rounding</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Perform FFC rounding of FIAT tabulation matrices on the literals of</span>
+<span class="w">    </span><span class="sd">"""Perform FFC rounding of FIAT tabulation matrices on the literals of</span>
 <span class="sd">    a GEM expression.</span>
 
 <span class="sd">    :arg node: root of the expression</span>
 <span class="sd">    :arg self: function for recursive calls</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;cannot handle type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
+<span class="sd">    """</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"cannot handle type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
 
 
 
@@ -90,12 +90,12 @@
 <div class="viewcode-block" id="ffc_rounding">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.ffc_rounding">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">ffc_rounding</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Perform FFC rounding of FIAT tabulation matrices on the literals of</span>
+<span class="w">    </span><span class="sd">"""Perform FFC rounding of FIAT tabulation matrices on the literals of</span>
 <span class="sd">    a GEM expression.</span>
 
 <span class="sd">    :arg expression: GEM expression</span>
 <span class="sd">    :arg epsilon: tolerance limit for rounding</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">Memoizer</span><span class="p">(</span><span class="n">literal_rounding</span><span class="p">)</span>
     <span class="n">mapper</span><span class="o">.</span><span class="n">epsilon</span> <span class="o">=</span> <span class="n">epsilon</span>
     <span class="k">return</span> <span class="n">mapper</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span></div>
@@ -104,12 +104,12 @@
 
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_replace_division</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace division with multiplication</span>
+<span class="w">    </span><span class="sd">"""Replace division with multiplication</span>
 
 <span class="sd">    :param node: root of expression</span>
 <span class="sd">    :param self: function for recursive calls</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;cannot handle type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+<span class="sd">    """</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"cannot handle type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
 
 
 <span class="n">_replace_division</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Node</span><span class="p">)(</span><span class="n">reuse_if_untouched</span><span class="p">)</span>
@@ -124,7 +124,7 @@
 <div class="viewcode-block" id="replace_division">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.replace_division">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">replace_division</span><span class="p">(</span><span class="n">expressions</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace divisions with multiplications in expressions&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Replace divisions with multiplications in expressions"""</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">Memoizer</span><span class="p">(</span><span class="n">_replace_division</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">mapper</span><span class="p">,</span> <span class="n">expressions</span><span class="p">))</span></div>
 
@@ -134,15 +134,15 @@
 <a class="viewcode-back" href="../../gem.html#gem.optimise.replace_indices">[docs]</a>
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">replace_indices</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">subst</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace free indices in a GEM expression.</span>
+<span class="w">    </span><span class="sd">"""Replace free indices in a GEM expression.</span>
 
 <span class="sd">    :arg node: root of the expression</span>
 <span class="sd">    :arg self: function for recursive calls</span>
 <span class="sd">    :arg subst: tuple of pairs; each pair is a substitution</span>
 <span class="sd">                rule with a free index to replace and an index to</span>
 <span class="sd">                replace with.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;cannot handle type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
+<span class="sd">    """</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"cannot handle type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
 
 
 
@@ -234,10 +234,10 @@
 <div class="viewcode-block" id="filtered_replace_indices">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.filtered_replace_indices">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">filtered_replace_indices</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">subst</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wrapper for :func:`replace_indices`.  At each call removes</span>
-<span class="sd">    substitution rules that do not apply.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Wrapper for :func:`replace_indices`.  At each call removes</span>
+<span class="sd">    substitution rules that do not apply."""</span>
     <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">VariableIndex</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">subst</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Can not replace VariableIndex (will need inverse)&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Can not replace VariableIndex (will need inverse)"</span><span class="p">)</span>
     <span class="n">filtered_subst</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">((</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">subst</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">replace_indices</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">filtered_subst</span><span class="p">)</span></div>
 
@@ -246,7 +246,7 @@
 <div class="viewcode-block" id="remove_componenttensors">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.remove_componenttensors">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">remove_componenttensors</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">subst</span><span class="o">=</span><span class="p">()):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Removes all ComponentTensors in multi-root expression DAG.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Removes all ComponentTensors in multi-root expression DAG."""</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
     <span class="k">return</span> <span class="p">[</span><span class="n">mapper</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">subst</span><span class="p">)</span> <span class="k">for</span> <span class="n">expression</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">]</span></div>
 
@@ -254,7 +254,7 @@
 
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_constant_fold_zero</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;cannot handle type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"cannot handle type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
 
 
 <span class="n">_constant_fold_zero</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Node</span><span class="p">)(</span><span class="n">reuse_if_untouched</span><span class="p">)</span>
@@ -283,7 +283,7 @@
 <div class="viewcode-block" id="constant_fold_zero">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.constant_fold_zero">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">constant_fold_zero</span><span class="p">(</span><span class="n">exprs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Produce symbolic zeros from Literals</span>
+<span class="w">    </span><span class="sd">"""Produce symbolic zeros from Literals</span>
 
 <span class="sd">    :arg exprs: An iterable of gem expressions.</span>
 <span class="sd">    :returns: A list of gem expressions where any Literal containing</span>
@@ -293,21 +293,21 @@
 <span class="sd">    We need a separate path for ListTensor so that its `reconstruct`</span>
 <span class="sd">    method will not be called when the new children are `Zero()`s;</span>
 <span class="sd">    otherwise Literal `0`s would be reintroduced.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">Memoizer</span><span class="p">(</span><span class="n">_constant_fold_zero</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">mapper</span><span class="p">,</span> <span class="n">exprs</span><span class="p">))</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_select_expression</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to select an expression from a list of</span>
+<span class="w">    </span><span class="sd">"""Helper function to select an expression from a list of</span>
 <span class="sd">    expressions with an index.  This function expect sanitised input,</span>
 <span class="sd">    one should normally call :py:func:`select_expression` instead.</span>
 
 <span class="sd">    :arg expressions: a list of expressions</span>
 <span class="sd">    :arg index: an index (free, fixed or variable)</span>
 <span class="sd">    :returns: an expression</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">expr</span> <span class="o">=</span> <span class="n">expressions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span> <span class="o">==</span> <span class="n">expr</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">expr</span>
@@ -343,7 +343,7 @@
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">types</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="o">=</span> <span class="n">types</span>
         <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__front__</span> <span class="ow">or</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__back__</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;How to factorise </span><span class="si">{}</span><span class="s2"> expressions?&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"How to factorise </span><span class="si">{}</span><span class="s2"> expressions?"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">children</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">children</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span>
 
@@ -351,13 +351,13 @@
                                   <span class="k">for</span> <span class="n">nth_children</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">children</span>
                                                             <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">))))</span>
 
-    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;No rule for factorising expressions of this kind.&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"No rule for factorising expressions of this kind."</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="select_expression">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.select_expression">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">select_expression</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">index</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Select an expression from a list of expressions with an index.</span>
+<span class="w">    </span><span class="sd">"""Select an expression from a list of expressions with an index.</span>
 <span class="sd">    Semantically equivalent to</span>
 
 <span class="sd">        partial_indexed(ListTensor(expressions), (index,))</span>
@@ -367,7 +367,7 @@
 <span class="sd">    :arg expressions: a list of expressions of the same shape</span>
 <span class="sd">    :arg index: an index (free, fixed or variable)</span>
 <span class="sd">    :returns: an expression of the same shape as the given expressions</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Check arguments</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">expressions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
     <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">shape</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">)</span>
@@ -385,14 +385,14 @@
 <div class="viewcode-block" id="delta_elimination">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.delta_elimination">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">delta_elimination</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;IndexSum-Delta cancellation.</span>
+<span class="w">    </span><span class="sd">"""IndexSum-Delta cancellation.</span>
 
 <span class="sd">    :arg sum_indices: free indices for contractions</span>
 <span class="sd">    :arg factors: product factors</span>
 <span class="sd">    :kwarg index_replacer: MemoizerArg(filtered_replace_indices)</span>
 
 <span class="sd">    :returns: optimised (sum_indices, factors)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">index_replacer</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">index_replacer</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
 
@@ -428,7 +428,7 @@
 <div class="viewcode-block" id="associate">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.associate">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">associate</span><span class="p">(</span><span class="n">operator</span><span class="p">,</span> <span class="n">operands</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply associativity rules to construct an operation-minimal expression tree.</span>
+<span class="w">    </span><span class="sd">"""Apply associativity rules to construct an operation-minimal expression tree.</span>
 
 <span class="sd">    For best performance give factors that have different set of free indices.</span>
 
@@ -436,13 +436,13 @@
 <span class="sd">    :arg operands: list of operands</span>
 
 <span class="sd">    :returns: (reduced expression, # of floating-point operations)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">operands</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">32</span><span class="p">:</span>
         <span class="c1"># O(N^3) algorithm</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Not expected such a complicated expression!&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Not expected such a complicated expression!"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">count</span><span class="p">(</span><span class="n">pair</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Operation count to reduce a pair of GEM expressions&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Operation count to reduce a pair of GEM expressions"""</span>
         <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">pair</span>
         <span class="n">extents</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">()</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">free_indices</span><span class="p">,</span> <span class="n">b</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)]</span>
         <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">extents</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
@@ -465,18 +465,18 @@
 <div class="viewcode-block" id="sum_factorise">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.sum_factorise">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Optimise a tensor product through sum factorisation.</span>
+<span class="w">    </span><span class="sd">"""Optimise a tensor product through sum factorisation.</span>
 
 <span class="sd">    :arg sum_indices: free indices for contractions</span>
 <span class="sd">    :arg factors: product factors</span>
 <span class="sd">    :returns: optimised GEM expression</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">factors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="c1"># Empty product</span>
         <span class="k">return</span> <span class="n">one</span>
 
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">6</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Too many indices for sum factorisation!&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Too many indices for sum factorisation!"</span><span class="p">)</span>
 
     <span class="c1"># Form groups by free indices</span>
     <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
@@ -521,7 +521,7 @@
 <div class="viewcode-block" id="make_sum">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.make_sum">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_sum</span><span class="p">(</span><span class="n">summands</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs an operation-minimal sum of GEM expressions.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Constructs an operation-minimal sum of GEM expressions."""</span>
     <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">summands</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
     <span class="n">summands</span> <span class="o">=</span> <span class="p">[</span><span class="n">Sum</span><span class="p">(</span><span class="o">*</span><span class="n">terms</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">terms</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
     <span class="n">result</span><span class="p">,</span> <span class="n">flops</span> <span class="o">=</span> <span class="n">associate</span><span class="p">(</span><span class="n">Sum</span><span class="p">,</span> <span class="n">summands</span><span class="p">)</span>
@@ -532,7 +532,7 @@
 <div class="viewcode-block" id="make_product">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.make_product">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_product</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">sum_indices</span><span class="o">=</span><span class="p">()):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs an operation-minimal (tensor) product of GEM expressions.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Constructs an operation-minimal (tensor) product of GEM expressions."""</span>
     <span class="k">return</span> <span class="n">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">)</span></div>
 
 
@@ -540,7 +540,7 @@
 <div class="viewcode-block" id="make_rename_map">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.make_rename_map">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_rename_map</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates an rename map for reusing the same index renames.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Creates an rename map for reusing the same index renames."""</span>
     <span class="k">return</span> <span class="n">defaultdict</span><span class="p">(</span><span class="n">Index</span><span class="p">)</span></div>
 
 
@@ -548,10 +548,10 @@
 <div class="viewcode-block" id="make_renamer">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.make_renamer">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_renamer</span><span class="p">(</span><span class="n">rename_map</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Creates a function for renaming indices when expanding products of</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Creates a function for renaming indices when expanding products of</span>
 <span class="sd">    IndexSums, i.e. applying to following rule:</span>
 
-<span class="sd">        (\sum_i a_i)*(\sum_i b_i) ===&gt; \sum_{i,i&#39;} a_i*b_{i&#39;}</span>
+<span class="sd">        (\sum_i a_i)*(\sum_i b_i) ===&gt; \sum_{i,i'} a_i*b_{i'}</span>
 
 <span class="sd">    :arg rename_map: An rename map for renaming indices the same way</span>
 <span class="sd">                     as functions returned by other calls of this</span>
@@ -560,7 +560,7 @@
 <span class="sd">              and returns (renamed indices, applier), where applier is</span>
 <span class="sd">              a function that remap the free indices of GEM</span>
 <span class="sd">              expressions from the old to the new indices.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_renamer</span><span class="p">(</span><span class="n">rename_map</span><span class="p">,</span> <span class="n">current_set</span><span class="p">,</span> <span class="n">incoming</span><span class="p">):</span>
         <span class="n">renamed</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">renames</span> <span class="o">=</span> <span class="p">[]</span>
@@ -592,7 +592,7 @@
 <div class="viewcode-block" id="traverse_product">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.traverse_product">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">traverse_product</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rename_map</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Traverses a product tree and collects factors, also descending into</span>
+<span class="w">    </span><span class="sd">"""Traverses a product tree and collects factors, also descending into</span>
 <span class="sd">    tensor contractions (IndexSum).  The numerators of divisions are</span>
 <span class="sd">    also broken up, but not the denominators.</span>
 
@@ -607,7 +607,7 @@
 <span class="sd">    :returns: (sum_indices, terms)</span>
 <span class="sd">              - sum_indices: list of indices to sum over</span>
 <span class="sd">              - terms: list of product terms</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">rename_map</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">rename_map</span> <span class="o">=</span> <span class="n">make_rename_map</span><span class="p">()</span>
     <span class="n">renamer</span> <span class="o">=</span> <span class="n">make_renamer</span><span class="p">(</span><span class="n">rename_map</span><span class="p">)</span>
@@ -646,7 +646,7 @@
 <div class="viewcode-block" id="traverse_sum">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.traverse_sum">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">traverse_sum</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Traverses a summation tree and collects summands.</span>
+<span class="w">    </span><span class="sd">"""Traverses a summation tree and collects summands.</span>
 
 <span class="sd">    :arg expression: a GEM expression</span>
 <span class="sd">    :arg stop_at: Optional predicate on GEM expressions.  If specified</span>
@@ -654,7 +654,7 @@
 <span class="sd">                  subexpression is not broken into further summands</span>
 <span class="sd">                  even if it is an addition.</span>
 <span class="sd">    :returns: list of summand expressions</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">stack</span> <span class="o">=</span> <span class="p">[</span><span class="n">expression</span><span class="p">]</span>
     <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
@@ -672,7 +672,7 @@
 <div class="viewcode-block" id="contraction">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.contraction">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">contraction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">ignore</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Optimise the contractions of the tensor product at the root of</span>
+<span class="w">    </span><span class="sd">"""Optimise the contractions of the tensor product at the root of</span>
 <span class="sd">    the expression, including:</span>
 
 <span class="sd">    - IndexSum-Delta cancellation</span>
@@ -685,7 +685,7 @@
 
 <span class="sd">    This routine was designed with finite element coefficient</span>
 <span class="sd">    evaluation in mind.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="c1"># Common memoizer to remove ComponentTensors</span>
     <span class="n">index_replacer</span> <span class="o">=</span> <span class="n">MemoizerArg</span><span class="p">(</span><span class="n">filtered_replace_indices</span><span class="p">)</span>
@@ -738,7 +738,7 @@
 
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_replace_delta</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;cannot handle type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"cannot handle type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
 
 
 <span class="n">_replace_delta</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Node</span><span class="p">)(</span><span class="n">reuse_if_untouched</span><span class="p">)</span>
@@ -765,16 +765,16 @@
             <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">VariableIndex</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">index</span><span class="o">.</span><span class="n">expression</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot convert running index to expression.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot convert running index to expression."</span><span class="p">)</span>
         <span class="n">e_i</span> <span class="o">=</span> <span class="n">expression</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
         <span class="n">e_j</span> <span class="o">=</span> <span class="n">expression</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">Conditional</span><span class="p">(</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">&quot;==&quot;</span><span class="p">,</span> <span class="n">e_i</span><span class="p">,</span> <span class="n">e_j</span><span class="p">),</span> <span class="n">one</span><span class="p">,</span> <span class="n">Zero</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">Conditional</span><span class="p">(</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">"=="</span><span class="p">,</span> <span class="n">e_i</span><span class="p">,</span> <span class="n">e_j</span><span class="p">),</span> <span class="n">one</span><span class="p">,</span> <span class="n">Zero</span><span class="p">())</span>
 
 
 <div class="viewcode-block" id="replace_delta">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.replace_delta">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">replace_delta</span><span class="p">(</span><span class="n">expressions</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lowers all Deltas in a multi-root expression DAG.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Lowers all Deltas in a multi-root expression DAG."""</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">Memoizer</span><span class="p">(</span><span class="n">_replace_delta</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">mapper</span><span class="p">,</span> <span class="n">expressions</span><span class="p">))</span></div>
 
@@ -782,12 +782,12 @@
 
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_unroll_indexsum</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unrolls IndexSums below a certain extent.</span>
+<span class="w">    </span><span class="sd">"""Unrolls IndexSums below a certain extent.</span>
 
 <span class="sd">    :arg node: root of the expression</span>
 <span class="sd">    :arg self: function for recursive calls</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;cannot handle type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
+<span class="sd">    """</span>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"cannot handle type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span>
 
 
 <span class="n">_unroll_indexsum</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">Node</span><span class="p">)(</span><span class="n">reuse_if_untouched</span><span class="p">)</span>
@@ -811,13 +811,13 @@
 <div class="viewcode-block" id="unroll_indexsum">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.unroll_indexsum">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">unroll_indexsum</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">predicate</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unrolls IndexSums below a specified extent.</span>
+<span class="w">    </span><span class="sd">"""Unrolls IndexSums below a specified extent.</span>
 
 <span class="sd">    :arg expressions: list of expression DAGs</span>
 <span class="sd">    :arg predicate: a predicate function on :py:class:`Index` objects</span>
 <span class="sd">                    that tells whether to unroll a particular index</span>
 <span class="sd">    :returns: list of expression DAGs with some unrolled IndexSums</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">mapper</span> <span class="o">=</span> <span class="n">Memoizer</span><span class="p">(</span><span class="n">_unroll_indexsum</span><span class="p">)</span>
     <span class="n">mapper</span><span class="o">.</span><span class="n">predicate</span> <span class="o">=</span> <span class="n">predicate</span>
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">mapper</span><span class="p">,</span> <span class="n">expressions</span><span class="p">))</span></div>
@@ -827,7 +827,7 @@
 <div class="viewcode-block" id="aggressive_unroll">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.aggressive_unroll">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">aggressive_unroll</span><span class="p">(</span><span class="n">expression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Aggressively unrolls all loop structures.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Aggressively unrolls all loop structures."""</span>
     <span class="c1"># Unroll expression shape</span>
     <span class="k">if</span> <span class="n">expression</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
         <span class="n">tensor</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">expression</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>

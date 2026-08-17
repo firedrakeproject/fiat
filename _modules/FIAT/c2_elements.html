@@ -57,21 +57,21 @@
 <div class="viewcode-block" id="C2DualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.C2DualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">C2DualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A DualSet for triangular C2 elements.</span>
+<span class="w">    </span><span class="sd">"""A DualSet for triangular C2 elements.</span>
 
 <span class="sd">    By default, this imposes C4 continuity at vertices for non-macroelements,</span>
 <span class="sd">    and the minimal C2 continuity for macroelements.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">vorder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">vorder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">vorder</span> <span class="o">=</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">()</span> <span class="k">else</span> <span class="mi">4</span>
 
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="o">*</span><span class="n">vorder</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree &gt;= </span><span class="si">{</span><span class="mi">2</span><span class="o">*</span><span class="n">vorder</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree &gt;= </span><span class="si">{</span><span class="mi">2</span><span class="o">*</span><span class="n">vorder</span><span class="o">+</span><span class="mi">1</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span> <span class="ow">or</span> <span class="n">ref_complex</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on triangles&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined on triangles"</span><span class="p">)</span>
 
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
@@ -127,7 +127,7 @@
 <div class="viewcode-block" id="BrambleZlamalC2">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.BrambleZlamalC2">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">BrambleZlamalC2</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Bramble-Zlamal C2 element.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The Bramble-Zlamal C2 element."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">9</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">C2DualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="n">reduced</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="n">quad_scheme</span><span class="p">)</span>
@@ -138,7 +138,7 @@
 <div class="viewcode-block" id="AlfeldC2Space">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.AlfeldC2Space">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">AlfeldC2Space</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Construct the generalization of the quintic C2 spline on the double Alfeld split.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Construct the generalization of the quintic C2 spline on the double Alfeld split."""</span>
     <span class="c1"># Construct the double Alfeld split by splitting twice</span>
     <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">macro</span><span class="o">.</span><span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">ref_el</span><span class="p">))</span>
     <span class="c1"># C3 on major split facets, C2 elsewhere</span>
@@ -148,16 +148,16 @@
     <span class="c1"># C4 at minor split barycenters, C3 at major split barycenter</span>
     <span class="n">order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">ref_complex</span><span class="o">.</span><span class="n">get_interior_facets</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">degree</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
     <span class="n">order</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="n">degree</span><span class="o">-</span><span class="mi">2</span>
-    <span class="k">return</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="AlfeldC2">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.c2_elements.AlfeldC2">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AlfeldC2</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Alfeld C^2 macroelement on a double barycentric split.</span>
+<span class="w">    </span><span class="sd">"""The Alfeld C^2 macroelement on a double barycentric split.</span>
 <span class="sd">    See Section 7.5 of Lai &amp; Schumacher for the quintic C^2 spline.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">AlfeldC2Space</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>

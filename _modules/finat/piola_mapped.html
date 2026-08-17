@@ -48,8 +48,8 @@
 <div class="viewcode-block" id="piola_inverse">
 <a class="viewcode-back" href="../../finat.html#finat.piola_mapped.piola_inverse">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">piola_inverse</span><span class="p">(</span><span class="n">fiat_cell</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">detJ</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the basis transformation of evaluation at a point.</span>
-<span class="sd">    This simply inverts the Piola transform inv(J / detJ) = adj(J).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Return the basis transformation of evaluation at a point.</span>
+<span class="sd">    This simply inverts the Piola transform inv(J / detJ) = adj(J)."""</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="n">Jnp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">J</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">sd</span><span class="p">)])</span>
     <span class="k">return</span> <span class="n">adjugate</span><span class="p">(</span><span class="n">Jnp</span><span class="p">)</span></div>
@@ -59,8 +59,8 @@
 <div class="viewcode-block" id="normal_tangential_edge_transform">
 <a class="viewcode-back" href="../../finat.html#finat.piola_mapped.normal_tangential_edge_transform">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">normal_tangential_edge_transform</span><span class="p">(</span><span class="n">fiat_cell</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the basis transformation of</span>
-<span class="sd">    normal and tangential edge moments&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Return the basis transformation of</span>
+<span class="sd">    normal and tangential edge moments"""</span>
     <span class="n">R</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">]])</span>
     <span class="n">that</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">compute_edge_tangent</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
     <span class="n">that</span> <span class="o">/=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">that</span><span class="p">)</span>
@@ -77,8 +77,8 @@
 <div class="viewcode-block" id="normal_tangential_face_transform">
 <a class="viewcode-back" href="../../finat.html#finat.piola_mapped.normal_tangential_face_transform">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">normal_tangential_face_transform</span><span class="p">(</span><span class="n">fiat_cell</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the basis transformation of</span>
-<span class="sd">    normal and tangential face moments&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Return the basis transformation of</span>
+<span class="sd">    normal and tangential face moments"""</span>
     <span class="c1"># Compute the reciprocal basis</span>
     <span class="n">thats</span> <span class="o">=</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">compute_tangents</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
     <span class="n">nhat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cross</span><span class="p">(</span><span class="o">*</span><span class="n">thats</span><span class="p">)</span>
@@ -103,7 +103,7 @@
 <div class="viewcode-block" id="normal_tangential_transform">
 <a class="viewcode-back" href="../../finat.html#finat.piola_mapped.normal_tangential_transform">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">normal_tangential_transform</span><span class="p">(</span><span class="n">fiat_cell</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the basis transformation of normal and tangential face moments</span>
+<span class="w">    </span><span class="sd">"""Return the basis transformation of normal and tangential face moments</span>
 
 <span class="sd">    :arg fiat_cell: a :class:`FIAT.reference_element.Cell`</span>
 <span class="sd">    :arg J: the Jacobian of the coordinate transformation</span>
@@ -113,7 +113,7 @@
 <span class="sd">    :returns: a 2-tuple of (Bnt, Btt) where</span>
 <span class="sd">        Bnt is the numpy.ndarray of normal-tangential coefficients, and</span>
 <span class="sd">        Btt is the tangential-tangential coefficient.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">fiat_cell</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">normal_tangential_edge_transform</span><span class="p">(</span><span class="n">fiat_cell</span><span class="p">,</span> <span class="n">J</span><span class="p">,</span> <span class="n">detJ</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
@@ -124,11 +124,11 @@
 <div class="viewcode-block" id="PiolaBubbleElement">
 <a class="viewcode-back" href="../../finat.html#finat.piola_mapped.PiolaBubbleElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PiolaBubbleElement</span><span class="p">(</span><span class="n">PhysicallyMappedElement</span><span class="p">,</span> <span class="n">FiatElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A general class to transform Piola-mapped elements with normal facet bubbles.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""A general class to transform Piola-mapped elements with normal facet bubbles."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fiat_element</span><span class="p">):</span>
         <span class="n">mapping</span><span class="p">,</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">fiat_element</span><span class="o">.</span><span class="n">mapping</span><span class="p">())</span>
-        <span class="k">if</span> <span class="n">mapping</span> <span class="o">!=</span> <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">fiat_element</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> needs to be Piola mapped.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mapping</span> <span class="o">!=</span> <span class="s2">"contravariant piola"</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">fiat_element</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> needs to be Piola mapped."</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">fiat_element</span><span class="p">)</span>
 
         <span class="c1"># On each facet we expect the normal dof followed by the tangential ones</span>

@@ -57,10 +57,10 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadraticPowellSabin6DualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PS6 only defined for degree = 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"PS6 only defined for degree = 2"</span><span class="p">)</span>
         <span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PS6 only defined on triangles&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"PS6 only defined on triangles"</span><span class="p">)</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -84,12 +84,12 @@
 <div class="viewcode-block" id="QuadraticPowellSabin6">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.powell_sabin.QuadraticPowellSabin6">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadraticPowellSabin6</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The PS6 macroelement is a C^1 quadratic macroelement defined</span>
+<span class="w">    </span><span class="sd">"""The PS6 macroelement is a C^1 quadratic macroelement defined</span>
 <span class="sd">    on the 6-way Powell-Sabin split of a triangle.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PS6 only defined for degree = 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"PS6 only defined for degree = 2"</span><span class="p">)</span>
         <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">PowellSabinSplit</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">QuadraticPowellSabin6DualSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
@@ -103,10 +103,10 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadraticPowellSabin12DualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PS12 only defined for degree = 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"PS12 only defined for degree = 2"</span><span class="p">)</span>
         <span class="n">ref_el</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PS12 only defined on triangles&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"PS12 only defined on triangles"</span><span class="p">)</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -142,12 +142,12 @@
 <div class="viewcode-block" id="QuadraticPowellSabin12">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.powell_sabin.QuadraticPowellSabin12">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadraticPowellSabin12</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The PS12 macroelement is a C^1 quadratic macroelement defined</span>
+<span class="w">    </span><span class="sd">"""The PS12 macroelement is a C^1 quadratic macroelement defined</span>
 <span class="sd">    on the 12-way Powell-Sabin split of a triangle.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PS12 only defined for degree = 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"PS12 only defined for degree = 2"</span><span class="p">)</span>
         <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">PowellSabin12Split</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">QuadraticPowellSabin12DualSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">macro</span><span class="o">.</span><span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>

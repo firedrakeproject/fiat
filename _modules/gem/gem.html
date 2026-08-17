@@ -36,9 +36,9 @@
           <div class="body" role="main">
             
   <h1>Source code for gem.gem</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;GEM is the intermediate language of TSFC for describing</span>
+<span></span><span class="sd">"""GEM is the intermediate language of TSFC for describing</span>
 <span class="sd">tensor-valued mathematical expressions and tensor operations.</span>
-<span class="sd">It is similar to Einstein&#39;s notation.</span>
+<span class="sd">It is similar to Einstein's notation.</span>
 
 <span class="sd">Its design was heavily inspired by UFL, with some major differences:</span>
 <span class="sd"> - GEM has got nothing FEM-specific.</span>
@@ -46,11 +46,11 @@
 <span class="sd">   restrictive about operations on expressions with different sets of</span>
 <span class="sd">   free indices. GEM is much more relaxed about free indices.</span>
 
-<span class="sd">Similarly to UFL, all GEM nodes have &#39;shape&#39; and &#39;free_indices&#39;</span>
+<span class="sd">Similarly to UFL, all GEM nodes have 'shape' and 'free_indices'</span>
 <span class="sd">attributes / properties. Unlike UFL, however, index extents live on</span>
 <span class="sd">the Index objects in GEM, not on all the nodes that have those free</span>
 <span class="sd">indices.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABCMeta</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">repeat</span>
@@ -66,37 +66,37 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.orientation_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orientation</span> <span class="k">as</span> <span class="n">FIATOrientation</span>
 
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Node&#39;</span><span class="p">,</span> <span class="s1">&#39;Identity&#39;</span><span class="p">,</span> <span class="s1">&#39;Literal&#39;</span><span class="p">,</span> <span class="s1">&#39;Zero&#39;</span><span class="p">,</span> <span class="s1">&#39;Failure&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;Variable&#39;</span><span class="p">,</span> <span class="s1">&#39;Sum&#39;</span><span class="p">,</span> <span class="s1">&#39;Product&#39;</span><span class="p">,</span> <span class="s1">&#39;Division&#39;</span><span class="p">,</span> <span class="s1">&#39;FloorDiv&#39;</span><span class="p">,</span> <span class="s1">&#39;Remainder&#39;</span><span class="p">,</span> <span class="s1">&#39;Power&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;MathFunction&#39;</span><span class="p">,</span> <span class="s1">&#39;MinValue&#39;</span><span class="p">,</span> <span class="s1">&#39;MaxValue&#39;</span><span class="p">,</span> <span class="s1">&#39;Comparison&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;LogicalNot&#39;</span><span class="p">,</span> <span class="s1">&#39;LogicalAnd&#39;</span><span class="p">,</span> <span class="s1">&#39;LogicalOr&#39;</span><span class="p">,</span> <span class="s1">&#39;Conditional&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;Index&#39;</span><span class="p">,</span> <span class="s1">&#39;VariableIndex&#39;</span><span class="p">,</span> <span class="s1">&#39;Indexed&#39;</span><span class="p">,</span> <span class="s1">&#39;ComponentTensor&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;IndexSum&#39;</span><span class="p">,</span> <span class="s1">&#39;ListTensor&#39;</span><span class="p">,</span> <span class="s1">&#39;Concatenate&#39;</span><span class="p">,</span> <span class="s1">&#39;Delta&#39;</span><span class="p">,</span> <span class="s1">&#39;OrientationVariableIndex&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;index_sum&#39;</span><span class="p">,</span> <span class="s1">&#39;partial_indexed&#39;</span><span class="p">,</span> <span class="s1">&#39;reshape&#39;</span><span class="p">,</span> <span class="s1">&#39;view&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;indices&#39;</span><span class="p">,</span> <span class="s1">&#39;as_gem&#39;</span><span class="p">,</span> <span class="s1">&#39;FlexiblyIndexed&#39;</span><span class="p">,</span>
-           <span class="s1">&#39;Inverse&#39;</span><span class="p">,</span> <span class="s1">&#39;Solve&#39;</span><span class="p">,</span> <span class="s1">&#39;extract_type&#39;</span><span class="p">,</span> <span class="s1">&#39;uint_type&#39;</span><span class="p">,</span> <span class="s1">&#39;Piecewise&#39;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'Node'</span><span class="p">,</span> <span class="s1">'Identity'</span><span class="p">,</span> <span class="s1">'Literal'</span><span class="p">,</span> <span class="s1">'Zero'</span><span class="p">,</span> <span class="s1">'Failure'</span><span class="p">,</span>
+           <span class="s1">'Variable'</span><span class="p">,</span> <span class="s1">'Sum'</span><span class="p">,</span> <span class="s1">'Product'</span><span class="p">,</span> <span class="s1">'Division'</span><span class="p">,</span> <span class="s1">'FloorDiv'</span><span class="p">,</span> <span class="s1">'Remainder'</span><span class="p">,</span> <span class="s1">'Power'</span><span class="p">,</span>
+           <span class="s1">'MathFunction'</span><span class="p">,</span> <span class="s1">'MinValue'</span><span class="p">,</span> <span class="s1">'MaxValue'</span><span class="p">,</span> <span class="s1">'Comparison'</span><span class="p">,</span>
+           <span class="s1">'LogicalNot'</span><span class="p">,</span> <span class="s1">'LogicalAnd'</span><span class="p">,</span> <span class="s1">'LogicalOr'</span><span class="p">,</span> <span class="s1">'Conditional'</span><span class="p">,</span>
+           <span class="s1">'Index'</span><span class="p">,</span> <span class="s1">'VariableIndex'</span><span class="p">,</span> <span class="s1">'Indexed'</span><span class="p">,</span> <span class="s1">'ComponentTensor'</span><span class="p">,</span>
+           <span class="s1">'IndexSum'</span><span class="p">,</span> <span class="s1">'ListTensor'</span><span class="p">,</span> <span class="s1">'Concatenate'</span><span class="p">,</span> <span class="s1">'Delta'</span><span class="p">,</span> <span class="s1">'OrientationVariableIndex'</span><span class="p">,</span>
+           <span class="s1">'index_sum'</span><span class="p">,</span> <span class="s1">'partial_indexed'</span><span class="p">,</span> <span class="s1">'reshape'</span><span class="p">,</span> <span class="s1">'view'</span><span class="p">,</span>
+           <span class="s1">'indices'</span><span class="p">,</span> <span class="s1">'as_gem'</span><span class="p">,</span> <span class="s1">'FlexiblyIndexed'</span><span class="p">,</span>
+           <span class="s1">'Inverse'</span><span class="p">,</span> <span class="s1">'Solve'</span><span class="p">,</span> <span class="s1">'extract_type'</span><span class="p">,</span> <span class="s1">'uint_type'</span><span class="p">,</span> <span class="s1">'Piecewise'</span><span class="p">]</span>
 
 
 <span class="n">uint_type</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">uintc</span><span class="p">)</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">NodeMeta</span><span class="p">(</span><span class="nb">type</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Metaclass of GEM nodes.</span>
+<span class="w">    </span><span class="sd">"""Metaclass of GEM nodes.</span>
 
 <span class="sd">    When a GEM node is constructed, this metaclass automatically</span>
-<span class="sd">    collects its free indices if &#39;free_indices&#39; has not been set yet.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    collects its free indices if 'free_indices' has not been set yet.</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="c1"># Create and initialise object</span>
         <span class="n">obj</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">NodeMeta</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__call__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
         <span class="c1"># Set free_indices if not set already</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;free_indices&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">'free_indices'</span><span class="p">):</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">free_indices</span> <span class="o">=</span> <span class="n">unique</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">free_indices</span>
                                                           <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">obj</span><span class="o">.</span><span class="n">children</span><span class="p">))</span>
         <span class="c1"># Set dtype if not set already.</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">&#39;dtype&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s1">'dtype'</span><span class="p">):</span>
             <span class="n">obj</span><span class="o">.</span><span class="n">dtype</span> <span class="o">=</span> <span class="n">obj</span><span class="o">.</span><span class="n">inherit_dtype_from_children</span><span class="p">(</span><span class="n">obj</span><span class="o">.</span><span class="n">children</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">obj</span>
@@ -105,19 +105,19 @@
 <div class="viewcode-block" id="Node">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Node">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Node</span><span class="p">(</span><span class="n">NodeBase</span><span class="p">,</span> <span class="n">metaclass</span><span class="o">=</span><span class="n">NodeMeta</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract GEM node class.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract GEM node class."""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;free_indices&#39;</span><span class="p">,</span> <span class="s1">&#39;dtype&#39;</span><span class="p">)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'free_indices'</span><span class="p">,</span> <span class="s1">'dtype'</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Node.is_equal">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Node.is_equal">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Common subexpression eliminating equality predicate.</span>
+<span class="w">        </span><span class="sd">"""Common subexpression eliminating equality predicate.</span>
 
 <span class="sd">        When two (sub)expressions are equal, the children of one</span>
 <span class="sd">        object are reassigned to the children of the other, so some</span>
 <span class="sd">        duplicated subexpressions are eliminated.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">result</span> <span class="o">=</span> <span class="n">NodeBase</span><span class="o">.</span><span class="n">is_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">children</span>
@@ -157,9 +157,9 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">Product</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
         <span class="k">elif</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="ow">and</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Both objects must have shape for matmul&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Both objects must have shape for matmul"</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mismatching shapes </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> in matmul&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Mismatching shapes </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2"> in matmul"</span><span class="p">)</span>
         <span class="o">*</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span> <span class="o">=</span> <span class="n">indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
         <span class="n">_</span><span class="p">,</span> <span class="o">*</span><span class="n">j</span> <span class="o">=</span> <span class="n">indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
         <span class="n">expr</span> <span class="o">=</span> <span class="n">Product</span><span class="p">(</span><span class="n">Indexed</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="p">(</span><span class="o">*</span><span class="n">i</span><span class="p">,</span> <span class="n">k</span><span class="p">)),</span> <span class="n">Indexed</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="o">*</span><span class="n">j</span><span class="p">)))</span>
@@ -169,22 +169,22 @@
         <span class="k">return</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span><span class="o">.</span><span class="fm">__matmul__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__abs__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">MathFunction</span><span class="p">,</span> <span class="s2">&quot;abs&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">MathFunction</span><span class="p">,</span> <span class="s2">"abs"</span><span class="p">),</span> <span class="bp">self</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__pow__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Power</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&lt;"</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__gt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&gt;&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&gt;"</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__le__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&lt;=&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&lt;="</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__ge__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">&quot;&gt;=&quot;</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">Comparison</span><span class="p">,</span> <span class="s2">"&gt;="</span><span class="p">),</span> <span class="bp">self</span><span class="p">,</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">))</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">T</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -194,7 +194,7 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__truediv__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="n">other</span> <span class="o">=</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Denominator must be scalar&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Denominator must be scalar"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Division</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rtruediv__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
@@ -203,7 +203,7 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__floordiv__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="n">other</span> <span class="o">=</span> <span class="n">as_gem_uint</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Denominator must be scalar&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Denominator must be scalar"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">FloorDiv</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rfloordiv__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
@@ -212,7 +212,7 @@
     <span class="k">def</span><span class="w"> </span><span class="fm">__mod__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="n">other</span> <span class="o">=</span> <span class="n">as_gem_uint</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Denominator must be scalar&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Denominator must be scalar"</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">componentwise</span><span class="p">(</span><span class="n">Remainder</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__rmod__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
@@ -233,9 +233,9 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Terminal</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for terminal GEM nodes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract class for terminal GEM nodes."""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;_dtype&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'_dtype'</span><span class="p">,)</span>
 
     <span class="n">children</span> <span class="o">=</span> <span class="p">()</span>
 
@@ -243,7 +243,7 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">dtype</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Data type of the node.</span>
+<span class="w">        </span><span class="sd">"""Data type of the node.</span>
 
 <span class="sd">        We only need to set dtype (or _dtype) on terminal nodes, and</span>
 <span class="sd">        other nodes inherit dtype from their children.</span>
@@ -256,15 +256,15 @@
 <span class="sd">        dtype can be `None` otherwise, and _assign_dtype() will assign</span>
 <span class="sd">        the default dtype to those nodes.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">&#39;_dtype&#39;</span><span class="p">):</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s1">'_dtype'</span><span class="p">):</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dtype</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Must set _dtype on terminal node, </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Must set _dtype on terminal node, </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Scalar</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for scalar-valued GEM nodes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract class for scalar-valued GEM nodes."""</span>
 
     <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">()</span>
 
@@ -274,10 +274,10 @@
 <div class="viewcode-block" id="Failure">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Failure">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Failure</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for failure GEM nodes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract class for failure GEM nodes."""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;shape&#39;</span><span class="p">,</span> <span class="s1">&#39;exception&#39;</span><span class="p">)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;shape&#39;</span><span class="p">,</span> <span class="s1">&#39;exception&#39;</span><span class="p">)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'shape'</span><span class="p">,</span> <span class="s1">'exception'</span><span class="p">)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'shape'</span><span class="p">,</span> <span class="s1">'exception'</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">exception</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span>
@@ -287,23 +287,23 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Constant</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for constant types.</span>
+<span class="w">    </span><span class="sd">"""Abstract base class for constant types.</span>
 
 <span class="sd">    Convention:</span>
 <span class="sd">     - array: numpy array of values</span>
 <span class="sd">     - value: float or complex value (scalars only)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">pass</span>
 
 
 <div class="viewcode-block" id="Zero">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Zero">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Zero</span><span class="p">(</span><span class="n">Constant</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Symbolic zero tensor&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Symbolic zero tensor"""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;shape&#39;</span><span class="p">,)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;shape&#39;</span><span class="p">,)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dtype&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'shape'</span><span class="p">,)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'shape'</span><span class="p">,)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dtype'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(),</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span>
@@ -319,11 +319,11 @@
 <div class="viewcode-block" id="Identity">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Identity">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Identity</span><span class="p">(</span><span class="n">Constant</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Identity matrix&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Identity matrix"""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dim&#39;</span><span class="p">,)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dim&#39;</span><span class="p">,)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dtype&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dim'</span><span class="p">,)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dim'</span><span class="p">,)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dtype'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">=</span> <span class="n">dim</span>
@@ -342,11 +342,11 @@
 <div class="viewcode-block" id="Literal">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Literal">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Literal</span><span class="p">(</span><span class="n">Constant</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Tensor-valued constant&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Tensor-valued constant"""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;array&#39;</span><span class="p">,)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;array&#39;</span><span class="p">,)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dtype&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'array'</span><span class="p">,)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'array'</span><span class="p">,)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dtype'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">array</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">(</span><span class="n">Literal</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
@@ -356,7 +356,7 @@
         <span class="k">if</span> <span class="n">dtype</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="c1"># Assume float or complex.</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">casting</span><span class="o">=</span><span class="s2">&quot;safe&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">casting</span><span class="o">=</span><span class="s2">"safe"</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="n">array</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">complex</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -397,11 +397,11 @@
 <div class="viewcode-block" id="Variable">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Variable">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Variable</span><span class="p">(</span><span class="n">Terminal</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Symbolic variable tensor&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Symbolic variable tensor"""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;shape&#39;</span><span class="p">)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;shape&#39;</span><span class="p">)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dtype&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'name'</span><span class="p">,</span> <span class="s1">'shape'</span><span class="p">)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'name'</span><span class="p">,</span> <span class="s1">'shape'</span><span class="p">)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dtype'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
@@ -413,7 +413,7 @@
 <div class="viewcode-block" id="Sum">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Sum">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Sum</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
@@ -442,7 +442,7 @@
 <div class="viewcode-block" id="Product">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Product">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Product</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
@@ -474,7 +474,7 @@
 <div class="viewcode-block" id="Division">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Division">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Division</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
@@ -482,7 +482,7 @@
 
         <span class="c1"># Constant folding</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;division by zero&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"division by zero"</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">Zero</span><span class="p">()</span>
 
@@ -501,17 +501,17 @@
 <div class="viewcode-block" id="FloorDiv">
 <a class="viewcode-back" href="../../gem.html#gem.gem.FloorDiv">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FloorDiv</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span>
         <span class="n">dtype</span> <span class="o">=</span> <span class="n">Node</span><span class="o">.</span><span class="n">inherit_dtype_from_children</span><span class="p">((</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">))</span>
         <span class="k">if</span> <span class="n">dtype</span> <span class="o">!=</span> <span class="n">uint_type</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dtype (</span><span class="si">{</span><span class="n">dtype</span><span class="si">}</span><span class="s2">) != unit_type (</span><span class="si">{</span><span class="n">uint_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dtype (</span><span class="si">{</span><span class="n">dtype</span><span class="si">}</span><span class="s2">) != unit_type (</span><span class="si">{</span><span class="n">uint_type</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
         <span class="c1"># Constant folding</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;division by zero&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"division by zero"</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">Zero</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">Constant</span><span class="p">)</span> <span class="ow">and</span> <span class="n">b</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -527,17 +527,17 @@
 <div class="viewcode-block" id="Remainder">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Remainder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Remainder</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span>
         <span class="n">dtype</span> <span class="o">=</span> <span class="n">Node</span><span class="o">.</span><span class="n">inherit_dtype_from_children</span><span class="p">((</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">))</span>
         <span class="k">if</span> <span class="n">dtype</span> <span class="o">!=</span> <span class="n">uint_type</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dtype (</span><span class="si">{</span><span class="n">dtype</span><span class="si">}</span><span class="s2">) != uint_type (</span><span class="si">{</span><span class="n">uint_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dtype (</span><span class="si">{</span><span class="n">dtype</span><span class="si">}</span><span class="s2">) != uint_type (</span><span class="si">{</span><span class="n">uint_type</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
         <span class="c1"># Constant folding</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;division by zero&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"division by zero"</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">Zero</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">Constant</span><span class="p">)</span> <span class="ow">and</span> <span class="n">b</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -553,7 +553,7 @@
 <div class="viewcode-block" id="Power">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Power">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Power</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">base</span><span class="p">,</span> <span class="n">exponent</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">base</span><span class="o">.</span><span class="n">shape</span>
@@ -563,7 +563,7 @@
         <span class="c1"># Constant folding</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">base</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exponent</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;cannot solve 0^0&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"cannot solve 0^0"</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">Zero</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exponent</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
             <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
@@ -579,14 +579,14 @@
 <div class="viewcode-block" id="MathFunction">
 <a class="viewcode-back" href="../../gem.html#gem.gem.MathFunction">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MathFunction</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;children&#39;</span><span class="p">)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'name'</span><span class="p">,</span> <span class="s1">'children'</span><span class="p">)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'name'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">arg</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">()</span> <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">&#39;conj&#39;</span><span class="p">,</span> <span class="s1">&#39;real&#39;</span><span class="p">,</span> <span class="s1">&#39;imag&#39;</span><span class="p">}:</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="s1">'conj'</span><span class="p">,</span> <span class="s1">'real'</span><span class="p">,</span> <span class="s1">'imag'</span><span class="p">}:</span>
             <span class="n">arg</span><span class="p">,</span> <span class="o">=</span> <span class="n">args</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="n">Zero</span><span class="p">):</span>
                 <span class="k">return</span> <span class="n">arg</span>
@@ -601,7 +601,7 @@
 <div class="viewcode-block" id="MinValue">
 <a class="viewcode-back" href="../../gem.html#gem.gem.MinValue">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MinValue</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
@@ -614,7 +614,7 @@
 <div class="viewcode-block" id="MaxValue">
 <a class="viewcode-back" href="../../gem.html#gem.gem.MaxValue">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MaxValue</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
@@ -627,15 +627,15 @@
 <div class="viewcode-block" id="Comparison">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Comparison">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Comparison</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;operator&#39;</span><span class="p">,</span> <span class="s1">&#39;children&#39;</span><span class="p">)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;operator&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'operator'</span><span class="p">,</span> <span class="s1">'children'</span><span class="p">)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'operator'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">b</span><span class="o">.</span><span class="n">shape</span>
 
-        <span class="k">if</span> <span class="n">op</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&gt;=&quot;</span><span class="p">,</span> <span class="s2">&quot;==&quot;</span><span class="p">,</span> <span class="s2">&quot;!=&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;=&quot;</span><span class="p">]:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;invalid operator&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">op</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"&gt;"</span><span class="p">,</span> <span class="s2">"&gt;="</span><span class="p">,</span> <span class="s2">"=="</span><span class="p">,</span> <span class="s2">"!="</span><span class="p">,</span> <span class="s2">"&lt;"</span><span class="p">,</span> <span class="s2">"&lt;="</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"invalid operator"</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">operator</span> <span class="o">=</span> <span class="n">op</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span>
@@ -646,7 +646,7 @@
 <div class="viewcode-block" id="LogicalNot">
 <a class="viewcode-back" href="../../gem.html#gem.gem.LogicalNot">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LogicalNot</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">expression</span><span class="o">.</span><span class="n">shape</span>
@@ -658,7 +658,7 @@
 <div class="viewcode-block" id="LogicalAnd">
 <a class="viewcode-back" href="../../gem.html#gem.gem.LogicalAnd">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LogicalAnd</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
@@ -671,7 +671,7 @@
 <div class="viewcode-block" id="LogicalOr">
 <a class="viewcode-back" href="../../gem.html#gem.gem.LogicalOr">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LogicalOr</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">a</span><span class="o">.</span><span class="n">shape</span>
@@ -684,7 +684,7 @@
 <div class="viewcode-block" id="Conditional">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Conditional">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Conditional</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">condition</span><span class="p">,</span> <span class="n">then</span><span class="p">,</span> <span class="n">else_</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">condition</span><span class="o">.</span><span class="n">shape</span>
@@ -703,7 +703,7 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">IndexBase</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for indices.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract base class for indices."""</span>
     <span class="k">pass</span>
 
 
@@ -713,12 +713,12 @@
 <div class="viewcode-block" id="Index">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Index">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Index</span><span class="p">(</span><span class="n">IndexBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Free index&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Free index"""</span>
 
     <span class="c1"># Not true object count, just for naming purposes</span>
     <span class="n">_count</span> <span class="o">=</span> <span class="mi">0</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;extent&#39;</span><span class="p">,</span> <span class="s1">&#39;count&#39;</span><span class="p">)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'name'</span><span class="p">,</span> <span class="s1">'extent'</span><span class="p">,</span> <span class="s1">'count'</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">extent</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
@@ -733,18 +733,18 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">extent</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">extent</span> <span class="o">=</span> <span class="n">value</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">extent</span> <span class="o">!=</span> <span class="n">value</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Inconsistent index extents!&quot;</span><span class="p">)</span></div>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Inconsistent index extents!"</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;i_</span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span>
+            <span class="k">return</span> <span class="s2">"i_</span><span class="si">%d</span><span class="s2">"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;Index(</span><span class="si">%r</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span>
-        <span class="k">return</span> <span class="s2">&quot;Index(</span><span class="si">%r</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+            <span class="k">return</span> <span class="s2">"Index(</span><span class="si">%r</span><span class="s2">)"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span>
+        <span class="k">return</span> <span class="s2">"Index(</span><span class="si">%r</span><span class="s2">)"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="c1"># Allow sorting of free indices in Python 3</span>
@@ -761,16 +761,16 @@
 <div class="viewcode-block" id="VariableIndex">
 <a class="viewcode-back" href="../../gem.html#gem.gem.VariableIndex">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">VariableIndex</span><span class="p">(</span><span class="n">IndexBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;An index that is constant during a single execution of the</span>
-<span class="sd">    kernel, but whose value is not known at compile time.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""An index that is constant during a single execution of the</span>
+<span class="sd">    kernel, but whose value is not known at compile time."""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;expression&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'expression'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">expression</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">Node</span><span class="p">)</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">expression</span><span class="o">.</span><span class="n">shape</span>
         <span class="k">if</span> <span class="n">expression</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">uint_type</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;expression.dtype (</span><span class="si">{</span><span class="n">expression</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">) != uint_type (</span><span class="si">{</span><span class="n">uint_type</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"expression.dtype (</span><span class="si">{</span><span class="n">expression</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">) != uint_type (</span><span class="si">{</span><span class="n">uint_type</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">expression</span> <span class="o">=</span> <span class="n">expression</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
@@ -790,7 +790,7 @@
         <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expression</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;</span><span class="si">%r</span><span class="s2">(</span><span class="si">%r</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">expression</span><span class="p">,)</span>
+        <span class="k">return</span> <span class="s2">"</span><span class="si">%r</span><span class="s2">(</span><span class="si">%r</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">expression</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">__reduce__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">expression</span><span class="p">,)</span></div>
@@ -800,8 +800,8 @@
 <div class="viewcode-block" id="Indexed">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Indexed">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Indexed</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,</span> <span class="s1">&#39;multiindex&#39;</span><span class="p">,</span> <span class="s1">&#39;indirect_children&#39;</span><span class="p">)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;multiindex&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,</span> <span class="s1">'multiindex'</span><span class="p">,</span> <span class="s1">'indirect_children'</span><span class="p">)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'multiindex'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">aggregate</span><span class="p">,</span> <span class="n">multiindex</span><span class="p">):</span>
         <span class="c1"># Accept numpy or any integer, but cast to int.</span>
@@ -815,7 +815,7 @@
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">Index</span><span class="p">):</span>
                 <span class="n">index</span><span class="o">.</span><span class="n">set_extent</span><span class="p">(</span><span class="n">extent</span><span class="p">)</span>
             <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="n">extent</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">&quot;Invalid literal index&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">IndexError</span><span class="p">(</span><span class="s2">"Invalid literal index"</span><span class="p">)</span>
 
         <span class="c1"># Empty multiindex</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">multiindex</span><span class="p">:</span>
@@ -868,7 +868,7 @@
 <div class="viewcode-block" id="Indexed.index_ordering">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Indexed.index_ordering">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">index_ordering</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Running indices in the order of indexing in this node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Running indices in the order of indexing in this node."""</span>
         <span class="n">free_indices</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">multiindex</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">Index</span><span class="p">):</span>
@@ -883,14 +883,14 @@
 <div class="viewcode-block" id="FlexiblyIndexed">
 <a class="viewcode-back" href="../../gem.html#gem.gem.FlexiblyIndexed">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FlexiblyIndexed</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flexible indexing of :py:class:`Variable`s to implement views and</span>
-<span class="sd">    reshapes (splitting dimensions only).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Flexible indexing of :py:class:`Variable`s to implement views and</span>
+<span class="sd">    reshapes (splitting dimensions only)."""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,</span> <span class="s1">&#39;dim2idxs&#39;</span><span class="p">,</span> <span class="s1">&#39;indirect_children&#39;</span><span class="p">)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dim2idxs&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,</span> <span class="s1">'dim2idxs'</span><span class="p">,</span> <span class="s1">'indirect_children'</span><span class="p">)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dim2idxs'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span> <span class="n">dim2idxs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a flexibly indexed node.</span>
+<span class="w">        </span><span class="sd">"""Construct a flexibly indexed node.</span>
 
 <span class="sd">        Parameters</span>
 <span class="sd">        ----------</span>
@@ -909,7 +909,7 @@
 
 <span class="sd">            variable[1 + i*12 + j*4 + k][0]</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">assert</span> <span class="n">variable</span><span class="o">.</span><span class="n">shape</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">variable</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">dim2idxs</span><span class="p">)</span>
         <span class="n">dim2idxs_</span> <span class="o">=</span> <span class="p">[]</span>
@@ -936,20 +936,20 @@
                     <span class="c1"># TODO: Attach dtype to each Node.</span>
                     <span class="c1"># Here, we should simply be able to do:</span>
                     <span class="c1"># &gt;&gt;&gt; offset_ += index * stride</span>
-                    <span class="c1"># but &quot;+&quot; and &quot;*&quot; are not currently correctly overloaded</span>
+                    <span class="c1"># but "+" and "*" are not currently correctly overloaded</span>
                     <span class="c1"># for indices (integers); they assume floats.</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
-                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found non-Integral offset : </span><span class="si">{</span><span class="n">offset</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Found non-Integral offset : </span><span class="si">{</span><span class="n">offset</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
                     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stride</span><span class="p">,</span> <span class="n">Constant</span><span class="p">):</span>
                         <span class="n">offset_</span> <span class="o">+=</span> <span class="n">index</span> <span class="o">*</span> <span class="n">stride</span><span class="o">.</span><span class="n">value</span>
                     <span class="k">else</span><span class="p">:</span>
                         <span class="n">offset_</span> <span class="o">+=</span> <span class="n">index</span> <span class="o">*</span> <span class="n">stride</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unexpected index type for flexible indexing&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unexpected index type for flexible indexing"</span><span class="p">)</span>
                 <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stride</span><span class="p">,</span> <span class="n">Node</span><span class="p">):</span>
                     <span class="n">free_indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">stride</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">offset_</span> <span class="o">+</span> <span class="n">last</span><span class="p">,</span> <span class="n">Integral</span><span class="p">)</span> <span class="ow">and</span> <span class="n">offset_</span> <span class="o">+</span> <span class="n">last</span> <span class="o">&gt;=</span> <span class="n">dim</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Offset </span><span class="si">{0}</span><span class="s2"> and indices </span><span class="si">{1}</span><span class="s2"> exceed dimension </span><span class="si">{2}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Offset </span><span class="si">{0}</span><span class="s2"> and indices </span><span class="si">{1}</span><span class="s2"> exceed dimension </span><span class="si">{2}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">idxs</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
             <span class="n">dim2idxs_</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">offset_</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">idxs_</span><span class="p">)))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="p">(</span><span class="n">variable</span><span class="p">,)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dim2idxs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">dim2idxs_</span><span class="p">)</span>
@@ -968,7 +968,7 @@
 <div class="viewcode-block" id="FlexiblyIndexed.index_ordering">
 <a class="viewcode-back" href="../../gem.html#gem.gem.FlexiblyIndexed.index_ordering">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">index_ordering</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Running indices in the order of indexing in this node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Running indices in the order of indexing in this node."""</span>
         <span class="n">free_indices</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">offset</span><span class="p">,</span> <span class="n">idxs</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim2idxs</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">offset</span><span class="p">,</span> <span class="n">Node</span><span class="p">):</span>
@@ -988,8 +988,8 @@
 <div class="viewcode-block" id="ComponentTensor">
 <a class="viewcode-back" href="../../gem.html#gem.gem.ComponentTensor">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ComponentTensor</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,</span> <span class="s1">&#39;multiindex&#39;</span><span class="p">,</span> <span class="s1">&#39;shape&#39;</span><span class="p">)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;multiindex&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,</span> <span class="s1">'multiindex'</span><span class="p">,</span> <span class="s1">'shape'</span><span class="p">)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'multiindex'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">expression</span><span class="p">,</span> <span class="n">multiindex</span><span class="p">):</span>
         <span class="k">assert</span> <span class="ow">not</span> <span class="n">expression</span><span class="o">.</span><span class="n">shape</span>
@@ -1027,8 +1027,8 @@
 <div class="viewcode-block" id="IndexSum">
 <a class="viewcode-back" href="../../gem.html#gem.gem.IndexSum">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">IndexSum</span><span class="p">(</span><span class="n">Scalar</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,</span> <span class="s1">&#39;multiindex&#39;</span><span class="p">)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;multiindex&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,</span> <span class="s1">'multiindex'</span><span class="p">)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'multiindex'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">summand</span><span class="p">,</span> <span class="n">multiindex</span><span class="p">):</span>
         <span class="c1"># Sum zeros</span>
@@ -1070,7 +1070,7 @@
 <div class="viewcode-block" id="ListTensor">
 <a class="viewcode-back" href="../../gem.html#gem.gem.ListTensor">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ListTensor</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;array&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'array'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">array</span><span class="p">):</span>
         <span class="n">array</span> <span class="o">=</span> <span class="n">asarray</span><span class="p">(</span><span class="n">array</span><span class="p">)</span>
@@ -1122,7 +1122,7 @@
 
         <span class="c1"># Constant folding</span>
         <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">Constant</span><span class="p">)</span> <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">array</span><span class="o">.</span><span class="n">flat</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="n">attrgetter</span><span class="p">(</span><span class="s1">&#39;value&#39;</span><span class="p">))(</span><span class="n">array</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="n">attrgetter</span><span class="p">(</span><span class="s1">'value'</span><span class="p">))(</span><span class="n">array</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">)</span>
 
         <span class="bp">self</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">ListTensor</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="n">array</span>
@@ -1146,12 +1146,12 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;ListTensor(</span><span class="si">%r</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">return</span> <span class="s2">"ListTensor(</span><span class="si">%r</span><span class="s2">)"</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">array</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
 
 <div class="viewcode-block" id="ListTensor.is_equal">
 <a class="viewcode-back" href="../../gem.html#gem.gem.ListTensor.is_equal">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Common subexpression eliminating equality predicate.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Common subexpression eliminating equality predicate."""</span>
         <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">False</span>
         <span class="k">if</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">array</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">array</span><span class="p">):</span>
@@ -1171,13 +1171,13 @@
 <div class="viewcode-block" id="Concatenate">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Concatenate">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Concatenate</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flattens and concatenates GEM expressions by shape.</span>
+<span class="w">    </span><span class="sd">"""Flattens and concatenates GEM expressions by shape.</span>
 
 <span class="sd">    Similar to what UFL MixedElement does to value shape.  For</span>
 <span class="sd">    example, if children have shapes (2, 2), (), and (3,) then the</span>
 <span class="sd">    concatenated expression has shape (8,).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,)</span>
+<span class="sd">    """</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">):</span>
         <span class="n">dtype</span> <span class="o">=</span> <span class="n">Node</span><span class="o">.</span><span class="n">inherit_dtype_from_children</span><span class="p">(</span><span class="n">children</span><span class="p">)</span>
@@ -1198,9 +1198,9 @@
 <div class="viewcode-block" id="Delta">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Delta">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Delta</span><span class="p">(</span><span class="n">Scalar</span><span class="p">,</span> <span class="n">Terminal</span><span class="p">):</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;i&#39;</span><span class="p">,</span> <span class="s1">&#39;j&#39;</span><span class="p">)</span>
-    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;i&#39;</span><span class="p">,</span> <span class="s1">&#39;j&#39;</span><span class="p">)</span>
-    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;dtype&#39;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'i'</span><span class="p">,</span> <span class="s1">'j'</span><span class="p">)</span>
+    <span class="n">__front__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'i'</span><span class="p">,</span> <span class="s1">'j'</span><span class="p">)</span>
+    <span class="n">__back__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'dtype'</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
@@ -1237,8 +1237,8 @@
 <div class="viewcode-block" id="Inverse">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Inverse">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Inverse</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The inverse of a square matrix.&quot;&quot;&quot;</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,</span> <span class="s1">&#39;shape&#39;</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""The inverse of a square matrix."""</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,</span> <span class="s1">'shape'</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">tensor</span><span class="p">):</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
@@ -1260,11 +1260,11 @@
 <div class="viewcode-block" id="Solve">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Solve">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Solve</span><span class="p">(</span><span class="n">Node</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solution of a square matrix equation with (potentially) multiple right hand sides.</span>
+<span class="w">    </span><span class="sd">"""Solution of a square matrix equation with (potentially) multiple right hand sides.</span>
 
 <span class="sd">    Represents the X obtained by solving AX = B.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">&#39;children&#39;</span><span class="p">,</span> <span class="s1">&#39;shape&#39;</span><span class="p">)</span>
+<span class="sd">    """</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'children'</span><span class="p">,</span> <span class="s1">'shape'</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">):</span>
         <span class="c1"># Shape requirements</span>
@@ -1281,7 +1281,7 @@
 <div class="viewcode-block" id="OrientationVariableIndex">
 <a class="viewcode-back" href="../../gem.html#gem.gem.OrientationVariableIndex">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">OrientationVariableIndex</span><span class="p">(</span><span class="n">VariableIndex</span><span class="p">,</span> <span class="n">FIATOrientation</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;VariableIndex representing a fiat orientation.</span>
+<span class="w">    </span><span class="sd">"""VariableIndex representing a fiat orientation.</span>
 
 <span class="sd">    Notes</span>
 <span class="sd">    -----</span>
@@ -1289,7 +1289,7 @@
 <span class="sd">    `VariableIndex.expression` as index arithmetic</span>
 <span class="sd">    is not supported (indices are not `Node`).</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__floordiv__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
         <span class="n">other</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">expression</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">VariableIndex</span><span class="p">)</span> <span class="k">else</span> <span class="n">as_gem_uint</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
@@ -1310,20 +1310,20 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">unique</span><span class="p">(</span><span class="n">indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sorts free indices and eliminates duplicates.</span>
+<span class="w">    </span><span class="sd">"""Sorts free indices and eliminates duplicates.</span>
 
 <span class="sd">    :arg indices: iterable of indices</span>
 <span class="sd">    :returns: sorted tuple of unique free indices</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">indices</span><span class="p">),</span> <span class="n">key</span><span class="o">=</span><span class="nb">id</span><span class="p">))</span>
 
 
 <div class="viewcode-block" id="index_sum">
 <a class="viewcode-back" href="../../gem.html#gem.gem.index_sum">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">index_sum</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Eliminates indices from the free indices of an expression by</span>
+<span class="w">    </span><span class="sd">"""Eliminates indices from the free indices of an expression by</span>
 <span class="sd">    summing over them.  Skips any index that is not a free index of</span>
-<span class="sd">    the expression.&quot;&quot;&quot;</span>
+<span class="sd">    the expression."""</span>
     <span class="n">multiindex</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">index</span> <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">indices</span>
                        <span class="k">if</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">expression</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">IndexSum</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">multiindex</span><span class="p">)</span></div>
@@ -1333,14 +1333,14 @@
 <div class="viewcode-block" id="partial_indexed">
 <a class="viewcode-back" href="../../gem.html#gem.gem.partial_indexed">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">partial_indexed</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generalised indexing into a tensor by eating shape off the front.</span>
+<span class="w">    </span><span class="sd">"""Generalised indexing into a tensor by eating shape off the front.</span>
 <span class="sd">    The number of indices may be less than or equal to the rank of the tensor,</span>
 <span class="sd">    so the result may have a non-empty shape.</span>
 
 <span class="sd">    :arg tensor: tensor-valued GEM expression</span>
 <span class="sd">    :arg indices: indices, at most as many as the rank of the tensor</span>
 <span class="sd">    :returns: a potentially tensor-valued expression</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">tensor</span>
     <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
@@ -1352,25 +1352,25 @@
     <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">shape</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">Indexed</span><span class="p">(</span><span class="n">tensor</span><span class="p">,</span> <span class="n">indices</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;More indices than rank!&quot;</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"More indices than rank!"</span><span class="p">)</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">strides_of</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculate cumulative strides from per-dimension capacities.</span>
+<span class="w">    </span><span class="sd">"""Calculate cumulative strides from per-dimension capacities.</span>
 
 <span class="sd">    For example:</span>
 
 <span class="sd">        [2, 3, 4] ==&gt; [12, 4, 1]</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">temp</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">flipud</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">cumprod</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">flipud</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">shape</span><span class="p">)[</span><span class="mi">1</span><span class="p">:])))</span>
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">temp</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">decompose_variable_view</span><span class="p">(</span><span class="n">expression</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract information from a shaped node.</span>
-<span class="sd">       Decompose ComponentTensor + FlexiblyIndexed.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Extract information from a shaped node.</span>
+<span class="sd">       Decompose ComponentTensor + FlexiblyIndexed."""</span>
     <span class="k">if</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="p">(</span><span class="n">Variable</span><span class="p">,</span> <span class="n">Inverse</span><span class="p">,</span> <span class="n">Solve</span><span class="p">))):</span>
         <span class="n">variable</span> <span class="o">=</span> <span class="n">expression</span>
         <span class="n">indexes</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span> <span class="k">for</span> <span class="n">extent</span> <span class="ow">in</span> <span class="n">expression</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
@@ -1385,7 +1385,7 @@
         <span class="n">indexes</span> <span class="o">=</span> <span class="n">expression</span><span class="o">.</span><span class="n">multiindex</span>
         <span class="n">dim2idxs</span> <span class="o">=</span> <span class="n">expression</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">dim2idxs</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot handle </span><span class="si">{}</span><span class="s2"> objects.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Cannot handle </span><span class="si">{}</span><span class="s2"> objects."</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
 
     <span class="k">return</span> <span class="n">variable</span><span class="p">,</span> <span class="n">dim2idxs</span><span class="p">,</span> <span class="n">indexes</span>
 
@@ -1393,11 +1393,11 @@
 <div class="viewcode-block" id="reshape">
 <a class="viewcode-back" href="../../gem.html#gem.gem.reshape">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">reshape</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="o">*</span><span class="n">shapes</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reshape a variable (splitting indices only).</span>
+<span class="w">    </span><span class="sd">"""Reshape a variable (splitting indices only).</span>
 
 <span class="sd">    :arg expression: view of a :py:class:`Variable`</span>
 <span class="sd">    :arg shapes: one shape tuple for each dimension of the variable.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">variable</span><span class="p">,</span> <span class="n">dim2idxs</span><span class="p">,</span> <span class="n">indexes</span> <span class="o">=</span> <span class="n">decompose_variable_view</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span>
     <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">indexes</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">shapes</span><span class="p">)</span>
     <span class="n">shape_of</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">indexes</span><span class="p">,</span> <span class="n">shapes</span><span class="p">))</span>
@@ -1412,7 +1412,7 @@
             <span class="n">dim</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">extent</span>
             <span class="n">shape</span> <span class="o">=</span> <span class="n">shape_of</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
             <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">!=</span> <span class="n">dim</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Shape </span><span class="si">{}</span><span class="s2"> does not match extent </span><span class="si">{}</span><span class="s2">.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Shape </span><span class="si">{}</span><span class="s2"> does not match extent </span><span class="si">{}</span><span class="s2">."</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
             <span class="n">strides</span> <span class="o">=</span> <span class="n">strides_of</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">extent</span><span class="p">,</span> <span class="n">stride_</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">shape</span><span class="p">,</span> <span class="n">strides</span><span class="p">):</span>
                 <span class="n">index_</span> <span class="o">=</span> <span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">extent</span><span class="p">)</span>
@@ -1428,11 +1428,11 @@
 <div class="viewcode-block" id="view">
 <a class="viewcode-back" href="../../gem.html#gem.gem.view">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">view</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="o">*</span><span class="n">slices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;View a part of a shaped object.</span>
+<span class="w">    </span><span class="sd">"""View a part of a shaped object.</span>
 
 <span class="sd">    :arg expression: a node that has a shape</span>
 <span class="sd">    :arg slices: one slice object for each dimension of the expression.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">variable</span><span class="p">,</span> <span class="n">dim2idxs</span><span class="p">,</span> <span class="n">indexes</span> <span class="o">=</span> <span class="n">decompose_variable_view</span><span class="p">(</span><span class="n">expression</span><span class="p">)</span>
     <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">indexes</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">slices</span><span class="p">)</span>
     <span class="n">slice_of</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">indexes</span><span class="p">,</span> <span class="n">slices</span><span class="p">))</span>
@@ -1450,9 +1450,9 @@
             <span class="n">start</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">start</span> <span class="ow">or</span> <span class="mi">0</span>
             <span class="n">stop</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">stop</span> <span class="ow">or</span> <span class="n">dim</span>
             <span class="k">if</span> <span class="n">stop</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown extent!&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unknown extent!"</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">dim</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">stop</span> <span class="o">&gt;</span> <span class="n">dim</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Slice exceeds dimension extent!&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Slice exceeds dimension extent!"</span><span class="p">)</span>
             <span class="n">step</span> <span class="o">=</span> <span class="n">s</span><span class="o">.</span><span class="n">step</span> <span class="ow">or</span> <span class="mi">1</span>
             <span class="n">offset_</span> <span class="o">+=</span> <span class="n">start</span> <span class="o">*</span> <span class="n">stride</span>
             <span class="n">extent</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="n">stop</span> <span class="o">-</span> <span class="n">start</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">step</span>
@@ -1475,17 +1475,17 @@
 <div class="viewcode-block" id="indices">
 <a class="viewcode-back" href="../../gem.html#gem.gem.indices">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">indices</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Make some :class:`Index` objects.</span>
+<span class="w">    </span><span class="sd">"""Make some :class:`Index` objects.</span>
 
 <span class="sd">    :arg n: The number of indices to make.</span>
 <span class="sd">    :returns: A tuple of `n` :class:`Index` objects.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Index</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">))</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">componentwise</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="o">*</span><span class="n">exprs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Apply gem op to exprs component-wise and wrap up in a ComponentTensor.</span>
+<span class="w">    </span><span class="sd">"""Apply gem op to exprs component-wise and wrap up in a ComponentTensor.</span>
 
 <span class="sd">    :arg op: function that returns a gem Node.</span>
 <span class="sd">    :arg exprs: expressions to apply op to.</span>
@@ -1496,10 +1496,10 @@
 <span class="sd">    scalar. Shaped expressions are indexed, the op is applied to the</span>
 <span class="sd">    scalar expressions and the result is wrapped up in a ComponentTensor.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">shapes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">exprs</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shapes</span> <span class="o">-</span> <span class="p">{()})</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;expressions must have matching shape (or else be scalar)&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"expressions must have matching shape (or else be scalar)"</span><span class="p">)</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">shapes</span><span class="p">)</span>
     <span class="n">i</span> <span class="o">=</span> <span class="n">indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
     <span class="n">exprs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">Indexed</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">if</span> <span class="n">e</span><span class="o">.</span><span class="n">shape</span> <span class="k">else</span> <span class="n">e</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">exprs</span><span class="p">)</span>
@@ -1509,7 +1509,7 @@
 <div class="viewcode-block" id="as_gem">
 <a class="viewcode-back" href="../../gem.html#gem.gem.as_gem">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">as_gem</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Attempt to convert an expression into GEM of scalar type.</span>
+<span class="w">    </span><span class="sd">"""Attempt to convert an expression into GEM of scalar type.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
@@ -1526,7 +1526,7 @@
 <span class="sd">    ValueError</span>
 <span class="sd">        If conversion was not possible.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Node</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">expr</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Number</span><span class="p">):</span>
@@ -1540,12 +1540,12 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Do not know how to convert </span><span class="si">%r</span><span class="s2"> to GEM&quot;</span> <span class="o">%</span> <span class="n">expr</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Do not know how to convert </span><span class="si">%r</span><span class="s2"> to GEM"</span> <span class="o">%</span> <span class="n">expr</span><span class="p">)</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">as_gem_uint</span><span class="p">(</span><span class="n">expr</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Attempt to convert an expression into GEM of uint type.</span>
+<span class="w">    </span><span class="sd">"""Attempt to convert an expression into GEM of uint type.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
@@ -1562,19 +1562,19 @@
 <span class="sd">    ValueError</span>
 <span class="sd">        If conversion was not possible.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Node</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">expr</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">Integral</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">Literal</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">uint_type</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Do not know how to convert </span><span class="si">%r</span><span class="s2"> to GEM&quot;</span> <span class="o">%</span> <span class="n">expr</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Do not know how to convert </span><span class="si">%r</span><span class="s2"> to GEM"</span> <span class="o">%</span> <span class="n">expr</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="extract_type">
 <a class="viewcode-back" href="../../gem.html#gem.gem.extract_type">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">extract_type</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">klass</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collects objects of type klass in expressions.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Collects objects of type klass in expressions."""</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">node</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">traversal</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">klass</span><span class="p">))</span></div>
 
 
@@ -1582,7 +1582,7 @@
 <div class="viewcode-block" id="Piecewise">
 <a class="viewcode-back" href="../../gem.html#gem.gem.Piecewise">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">Piecewise</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Represents a piecewise function.</span>
+<span class="w">    </span><span class="sd">"""Represents a piecewise function.</span>
 
 <span class="sd">    Parameters</span>
 <span class="sd">    ----------</span>
@@ -1594,7 +1594,7 @@
 <span class="sd">    Node</span>
 <span class="sd">        A nested Conditional.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">expr</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">pieces</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
@@ -1603,7 +1603,7 @@
             <span class="k">break</span>
         <span class="n">pieces</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">as_gem</span><span class="p">(</span><span class="n">v</span><span class="p">),</span> <span class="n">as_gem</span><span class="p">(</span><span class="n">c</span><span class="p">)))</span>
     <span class="k">if</span> <span class="n">expr</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">expr</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">))</span>
+        <span class="n">expr</span> <span class="o">=</span> <span class="n">Literal</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">))</span>
     <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">pieces</span><span class="p">):</span>
         <span class="n">expr</span> <span class="o">=</span> <span class="n">Conditional</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">expr</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">expr</span></div>

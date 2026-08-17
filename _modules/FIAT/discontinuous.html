@@ -49,7 +49,7 @@
 <div class="viewcode-block" id="DiscontinuousElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DiscontinuousElement</span><span class="p">(</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A copy of an existing element where all dofs are associated with the cell&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""A copy of an existing element where all dofs are associated with the cell"""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_element</span> <span class="o">=</span> <span class="n">element</span>
@@ -78,60 +78,60 @@
 <div class="viewcode-block" id="DiscontinuousElement.degree">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.degree">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s2">&quot;Return the degree of the (embedding) polynomial space.&quot;</span>
+        <span class="s2">"Return the degree of the (embedding) polynomial space."</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.get_nodal_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_nodal_basis">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_nodal_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the nodal basis, encoded as a PolynomialSet object,</span>
-<span class="sd">        for the finite element.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return the nodal basis, encoded as a PolynomialSet object,</span>
+<span class="sd">        for the finite element."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_nodal_basis</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_coeffs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the expansion coefficients for the basis of the</span>
-<span class="sd">        finite element.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return the expansion coefficients for the basis of the</span>
+<span class="sd">        finite element."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.num_sub_elements">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.num_sub_elements">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">num_sub_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s2">&quot;Return the number of sub-elements.&quot;</span>
+        <span class="s2">"Return the number of sub-elements."</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">num_sub_elements</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.tabulate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return tabulated values of derivatives up to given order of</span>
-<span class="sd">        basis functions at given points.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return tabulated values of derivatives up to given order of</span>
+<span class="sd">        basis functions at given points."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.value_shape">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s2">&quot;Return the value shape of the finite element functions.&quot;</span>
+        <span class="s2">"Return the value shape of the finite element functions."</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.dmats">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.dmats">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">dmats</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return dmats: expansion coefficients for basis function</span>
-<span class="sd">        derivatives.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return dmats: expansion coefficients for basis function</span>
+<span class="sd">        derivatives."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">dmats</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="DiscontinuousElement.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous.DiscontinuousElement.get_num_members">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_num_members</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arg</span><span class="p">):</span>
-        <span class="s2">&quot;Return number of members of the expansion set.&quot;</span>
+        <span class="s2">"Return number of members of the expansion set."</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_element</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">()</span></div>
 </div>
 

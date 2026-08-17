@@ -36,12 +36,12 @@
           <div class="body" role="main">
             
   <h1>Source code for gem.impero_utils</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Utilities for building an Impero AST from an ordered list of</span>
+<span></span><span class="sd">"""Utilities for building an Impero AST from an ordered list of</span>
 <span class="sd">terminal Impero operations, and for building any additional data</span>
 <span class="sd">required for straightforward C code generation.</span>
 
 <span class="sd">What this module does is independent of the generated code target.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">collections</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span>
@@ -58,13 +58,13 @@
 <span class="c1">#     temporaries - List of GEM expressions which have assigned temporaries</span>
 <span class="c1">#     declare     - Where to declare temporaries to get correct C code</span>
 <span class="c1">#     indices     - Indices for declarations and referencing values</span>
-<span class="n">ImperoC</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span><span class="s1">&#39;ImperoC&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;tree&#39;</span><span class="p">,</span> <span class="s1">&#39;temporaries&#39;</span><span class="p">,</span> <span class="s1">&#39;declare&#39;</span><span class="p">,</span> <span class="s1">&#39;indices&#39;</span><span class="p">])</span>
+<span class="n">ImperoC</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">namedtuple</span><span class="p">(</span><span class="s1">'ImperoC'</span><span class="p">,</span> <span class="p">[</span><span class="s1">'tree'</span><span class="p">,</span> <span class="s1">'temporaries'</span><span class="p">,</span> <span class="s1">'declare'</span><span class="p">,</span> <span class="s1">'indices'</span><span class="p">])</span>
 
 
 <div class="viewcode-block" id="NoopError">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.NoopError">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">NoopError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;No operations in the kernel.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""No operations in the kernel."""</span>
     <span class="k">pass</span></div>
 
 
@@ -72,7 +72,7 @@
 <div class="viewcode-block" id="preprocess_gem">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.preprocess_gem">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">preprocess_gem</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">replace_delta</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">remove_componenttensors</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lower GEM nodes that cannot be translated to C directly.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Lower GEM nodes that cannot be translated to C directly."""</span>
     <span class="k">if</span> <span class="n">remove_componenttensors</span><span class="p">:</span>
         <span class="n">expressions</span> <span class="o">=</span> <span class="n">optimise</span><span class="o">.</span><span class="n">remove_componenttensors</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">replace_delta</span><span class="p">:</span>
@@ -85,7 +85,7 @@
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.compile_gem">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">compile_gem</span><span class="p">(</span><span class="n">assignments</span><span class="p">,</span> <span class="n">prefix_ordering</span><span class="p">,</span> <span class="n">remove_zeros</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                 <span class="n">emit_return_accumulate</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compiles GEM to Impero.</span>
+<span class="w">    </span><span class="sd">"""Compiles GEM to Impero.</span>
 
 <span class="sd">    :arg assignments: list of (return variable, expression DAG root) pairs</span>
 <span class="sd">    :arg prefix_ordering: outermost loop indices</span>
@@ -94,7 +94,7 @@
 <span class="sd">         :func:`~.scheduling.emit_operations`)? If False,</span>
 <span class="sd">         split into Accumulate/Return pairs. Set to False if the</span>
 <span class="sd">         output tensor of kernels is not guaranteed to be zero on entry.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Remove zeros</span>
     <span class="k">if</span> <span class="n">remove_zeros</span><span class="p">:</span>
         <span class="k">def</span><span class="w"> </span><span class="nf">nonzero</span><span class="p">(</span><span class="n">assignment</span><span class="p">):</span>
@@ -145,8 +145,8 @@
 <div class="viewcode-block" id="make_prefix_ordering">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.make_prefix_ordering">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_prefix_ordering</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">prefix_ordering</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates an ordering of ``indices`` which starts with those</span>
-<span class="sd">    indices in ``prefix_ordering``.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Creates an ordering of ``indices`` which starts with those</span>
+<span class="sd">    indices in ``prefix_ordering``."""</span>
     <span class="c1"># Need to return deterministically ordered indices</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">prefix_ordering</span><span class="p">)</span> <span class="o">+</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">indices</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">prefix_ordering</span><span class="p">)</span></div>
 
@@ -155,8 +155,8 @@
 <div class="viewcode-block" id="make_index_orderer">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.make_index_orderer">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_index_orderer</span><span class="p">(</span><span class="n">index_ordering</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a function which given a set of indices returns those</span>
-<span class="sd">    indices in the order as they appear in ``index_ordering``.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns a function which given a set of indices returns those</span>
+<span class="sd">    indices in the order as they appear in ``index_ordering``."""</span>
     <span class="n">idx2pos</span> <span class="o">=</span> <span class="p">{</span><span class="n">idx</span><span class="p">:</span> <span class="n">pos</span> <span class="k">for</span> <span class="n">pos</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">index_ordering</span><span class="p">)}</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">apply_ordering</span><span class="p">(</span><span class="n">indices</span><span class="p">):</span>
@@ -168,7 +168,7 @@
 <div class="viewcode-block" id="inline_temporaries">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.inline_temporaries">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">inline_temporaries</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">ops</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Inline temporaries which could be inlined without blowing up</span>
+<span class="w">    </span><span class="sd">"""Inline temporaries which could be inlined without blowing up</span>
 <span class="sd">    the code.</span>
 
 <span class="sd">    :arg expressions: a multi-root GEM expression DAG, used for</span>
@@ -176,7 +176,7 @@
 <span class="sd">    :arg ops: ordered list of Impero terminals</span>
 <span class="sd">    :returns: a filtered ``ops``, without the unnecessary</span>
 <span class="sd">              :class:`impero.Evaluate`s</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">refcount</span> <span class="o">=</span> <span class="n">collect_refcount</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span>
 
     <span class="n">candidates</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># candidates for inlining</span>
@@ -200,8 +200,8 @@
 <div class="viewcode-block" id="collect_temporaries">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.collect_temporaries">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">collect_temporaries</span><span class="p">(</span><span class="n">tree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collects GEM expressions to assign to temporaries from a list</span>
-<span class="sd">    of Impero terminals.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Collects GEM expressions to assign to temporaries from a list</span>
+<span class="sd">    of Impero terminals."""</span>
     <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">traversal</span><span class="p">((</span><span class="n">tree</span><span class="p">,)):</span>
         <span class="c1"># IndexSum temporaries should be added either at Initialise or</span>
@@ -218,7 +218,7 @@
 <div class="viewcode-block" id="make_loop_tree">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.make_loop_tree">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_loop_tree</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">get_indices</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Creates an Impero AST with loops from a list of operations and</span>
+<span class="w">    </span><span class="sd">"""Creates an Impero AST with loops from a list of operations and</span>
 <span class="sd">    their respective free indices.</span>
 
 <span class="sd">    :arg ops: a list of Impero terminal nodes</span>
@@ -226,7 +226,7 @@
 <span class="sd">                      of free indices</span>
 <span class="sd">    :arg level: depth of loop nesting</span>
 <span class="sd">    :returns: Impero AST with loops, without declarations</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">keyfunc</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">op</span><span class="p">:</span> <span class="n">op</span><span class="o">.</span><span class="n">loop_shape</span><span class="p">(</span><span class="n">get_indices</span><span class="p">)[</span><span class="n">level</span><span class="p">:</span><span class="n">level</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">statements</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">first_index</span><span class="p">,</span> <span class="n">op_group</span> <span class="ow">in</span> <span class="n">groupby</span><span class="p">(</span><span class="n">ops</span><span class="p">,</span> <span class="n">keyfunc</span><span class="p">):</span>
@@ -244,14 +244,14 @@
 <div class="viewcode-block" id="place_declarations">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.place_declarations">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">place_declarations</span><span class="p">(</span><span class="n">tree</span><span class="p">,</span> <span class="n">temporaries</span><span class="p">,</span> <span class="n">get_indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Determines where and how to declare temporaries for an Impero AST.</span>
+<span class="w">    </span><span class="sd">"""Determines where and how to declare temporaries for an Impero AST.</span>
 
 <span class="sd">    :arg tree: Impero AST to determine the declarations for</span>
 <span class="sd">    :arg temporaries: list of GEM expressions which are assigned to</span>
 <span class="sd">                      temporaries</span>
 <span class="sd">    :arg get_indices: callable mapping from GEM nodes to an ordering</span>
 <span class="sd">                      of free indices</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">numbering</span> <span class="o">=</span> <span class="p">{</span><span class="n">t</span><span class="p">:</span> <span class="n">n</span> <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">temporaries</span><span class="p">)}</span>
     <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">numbering</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">temporaries</span><span class="p">)</span>
 
@@ -268,7 +268,7 @@
 
     <span class="nd">@singledispatch</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">recurse</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">loop_indices</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Visit an Impero AST to collect declarations.</span>
+<span class="w">        </span><span class="sd">"""Visit an Impero AST to collect declarations.</span>
 
 <span class="sd">        :arg expr: Impero tree node</span>
 <span class="sd">        :arg loop_indices: loop indices (in order) from the outer</span>
@@ -276,8 +276,8 @@
 <span class="sd">        :returns: :class:`collections.Counter` with the reference</span>
 <span class="sd">                  counts for each temporary in the subtree whose root</span>
 <span class="sd">                  is ``expr``</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;unsupported expression type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"unsupported expression type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
 
     <span class="nd">@recurse</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">imp</span><span class="o">.</span><span class="n">Terminal</span><span class="p">)</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">recurse_terminal</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">loop_indices</span><span class="p">):</span>
@@ -342,7 +342,7 @@
 <div class="viewcode-block" id="temp_refcount">
 <a class="viewcode-back" href="../../gem.html#gem.impero_utils.temp_refcount">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">temp_refcount</span><span class="p">(</span><span class="n">temporaries</span><span class="p">,</span> <span class="n">op</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Collects the number of times temporaries are referenced when</span>
+<span class="w">    </span><span class="sd">"""Collects the number of times temporaries are referenced when</span>
 <span class="sd">    generating code for an Impero terminal.</span>
 
 <span class="sd">    :arg temporaries: set of temporaries</span>
@@ -350,12 +350,12 @@
 <span class="sd">    :returns: :class:`collections.Counter` object mapping some of</span>
 <span class="sd">               elements from ``temporaries`` to the number of times</span>
 <span class="sd">               they will referenced from ``op``</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">counter</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">recurse</span><span class="p">(</span><span class="n">o</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Traverses expression until reaching temporaries, counting</span>
-<span class="sd">        temporary references.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Traverses expression until reaching temporaries, counting</span>
+<span class="sd">        temporary references."""</span>
         <span class="k">if</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">temporaries</span><span class="p">:</span>
             <span class="n">counter</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="k">else</span><span class="p">:</span>
@@ -363,9 +363,9 @@
                 <span class="n">recurse</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">recurse_top</span><span class="p">(</span><span class="n">o</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Traverses expression until reaching temporaries, counting</span>
+<span class="w">        </span><span class="sd">"""Traverses expression until reaching temporaries, counting</span>
 <span class="sd">        temporary references. Always descends into children at least</span>
-<span class="sd">        once, even when the root is a temporary.&quot;&quot;&quot;</span>
+<span class="sd">        once, even when the root is a temporary."""</span>
         <span class="k">if</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">temporaries</span><span class="p">:</span>
             <span class="n">counter</span><span class="p">[</span><span class="n">o</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">o</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
@@ -384,7 +384,7 @@
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">imp</span><span class="o">.</span><span class="n">Noop</span><span class="p">):</span>
         <span class="k">pass</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;unhandled operation: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"unhandled operation: </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
 
     <span class="k">return</span> <span class="n">counter</span></div>
 

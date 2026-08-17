@@ -56,7 +56,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">ArgyrisDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Argyris only defined on triangles&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Argyris only defined on triangles"</span><span class="p">)</span>
 
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -72,7 +72,7 @@
             <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">PointDerivative</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">verts</span><span class="p">[</span><span class="n">v</span><span class="p">],</span> <span class="n">alpha</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">alphas</span><span class="p">)</span>
             <span class="n">entity_ids</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">v</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
-        <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;integral&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">"integral"</span><span class="p">:</span>
             <span class="c1"># edge dofs</span>
             <span class="n">k</span> <span class="o">=</span> <span class="n">degree</span> <span class="o">-</span> <span class="mi">5</span>
             <span class="n">rline</span> <span class="o">=</span> <span class="n">ufc_simplex</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
@@ -102,7 +102,7 @@
                     <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">IntegralMoment</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">phi</span><span class="p">)</span> <span class="k">for</span> <span class="n">phi</span> <span class="ow">in</span> <span class="n">phis</span><span class="p">)</span>
                     <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
-        <span class="k">elif</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;point&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">"point"</span><span class="p">:</span>
             <span class="c1"># edge dofs</span>
             <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
                 <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
@@ -123,7 +123,7 @@
                     <span class="n">nodes</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">PointEvaluation</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pt</span><span class="p">)</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">internalpts</span><span class="p">)</span>
                     <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid variant for Argyris&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid variant for Argyris"</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">entity_ids</span><span class="p">)</span></div>
 
 
@@ -131,28 +131,28 @@
 <div class="viewcode-block" id="Argyris">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.argyris.Argyris">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Argyris</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""</span>
 <span class="sd">    The Argyris finite element.</span>
 
 <span class="sd">    :arg ref_el: The reference element.</span>
 <span class="sd">    :arg degree: The degree.</span>
 <span class="sd">    :arg variant: optional variant specifying the types of nodes.</span>
 
-<span class="sd">    variant can be chosen from [&quot;point&quot;, &quot;integral&quot;, &quot;integral(q)&quot;]</span>
-<span class="sd">    &quot;point&quot; -&gt; dofs are evaluated by point evaluation.</span>
-<span class="sd">    &quot;integral&quot; -&gt; dofs are evaluated by quadrature rules with the minimum</span>
+<span class="sd">    variant can be chosen from ["point", "integral", "integral(q)"]</span>
+<span class="sd">    "point" -&gt; dofs are evaluated by point evaluation.</span>
+<span class="sd">    "integral" -&gt; dofs are evaluated by quadrature rules with the minimum</span>
 <span class="sd">    degree required for unisolvence.</span>
-<span class="sd">    &quot;integral(q)&quot; -&gt; dofs are evaluated by quadrature rules with the minimum</span>
+<span class="sd">    "integral(q)" -&gt; dofs are evaluated by quadrature rules with the minimum</span>
 <span class="sd">    degree required for unisolvence plus q.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 
         <span class="n">splitting</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span> <span class="o">=</span> <span class="n">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> is not implemented as a macroelement.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> is not implemented as a macroelement."</span><span class="p">)</span>
 
-        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span>
+        <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">ArgyrisDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">interpolant_deg</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>
 

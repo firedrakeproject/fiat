@@ -52,13 +52,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.barycentric_interpolation</span><span class="w"> </span><span class="kn">import</span> <span class="n">LagrangeLineExpansionSet</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;NodalEnrichedElement&#39;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'NodalEnrichedElement'</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="NodalEnrichedElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.nodal_enriched.NodalEnrichedElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">NodalEnrichedElement</span><span class="p">(</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;NodalEnriched element is a direct sum of a sequence of</span>
+<span class="w">    </span><span class="sd">"""NodalEnriched element is a direct sum of a sequence of</span>
 <span class="sd">    finite elements. Primal basis is reorthogonalized to the</span>
 <span class="sd">    dual basis for nodality.</span>
 
@@ -69,14 +69,14 @@
 <span class="sd">          their primal bases are mutually linearly independent,</span>
 <span class="sd">        * the supplied elements are unisolvent with nodal basis and</span>
 <span class="sd">          their dual bases are mutually linearly independent.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">elements</span><span class="p">):</span>
 
         <span class="c1"># Test elements are nodal</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">is_nodal</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not all elements given for construction &quot;</span>
-                             <span class="s2">&quot;of NodalEnrichedElement are nodal&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Not all elements given for construction "</span>
+                             <span class="s2">"of NodalEnrichedElement are nodal"</span><span class="p">)</span>
 
         <span class="c1"># Extract common data</span>
         <span class="n">embedded_degrees</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">]</span>
@@ -162,12 +162,12 @@
     <span class="n">counter</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">degree</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">coeffss</span><span class="p">,</span> <span class="n">degrees</span><span class="p">):</span>
         <span class="n">ids</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">if</span> <span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">continuity</span> <span class="o">==</span> <span class="s2">"C0"</span><span class="p">:</span>
             <span class="n">dims</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">entity_ids</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">dims</span> <span class="o">=</span> <span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">(),)</span>
         <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">dims</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">continuity</span> <span class="o">==</span> <span class="s2">"C0"</span><span class="p">:</span>
                 <span class="n">dimPk</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">degree</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">dimPk</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">comb</span><span class="p">(</span><span class="n">degree</span> <span class="o">+</span> <span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span>

@@ -4485,7 +4485,7 @@ o (total orientation)     : (2 ** dim) * eo + io</p>
 <div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">finat</span>
 
-<span class="n">cell</span> <span class="o">=</span> <span class="n">FIAT</span><span class="o">.</span><span class="n">ufc_cell</span><span class="p">(</span><span class="s2">&quot;interval&quot;</span><span class="p">)</span>
+<span class="n">cell</span> <span class="o">=</span> <span class="n">FIAT</span><span class="o">.</span><span class="n">ufc_cell</span><span class="p">(</span><span class="s2">"interval"</span><span class="p">)</span>
 <span class="n">elem</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 <span class="n">elem</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">TensorProductElement</span><span class="p">([</span><span class="n">elem</span><span class="p">,</span> <span class="n">elem</span><span class="p">])</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">elem</span><span class="o">.</span><span class="n">entity_permutations</span><span class="p">)</span>

@@ -36,11 +36,11 @@
           <div class="body" role="main">
             
   <h1>Source code for gem.coffee</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;This module contains an implementation of the COFFEE optimisation</span>
+<span></span><span class="sd">"""This module contains an implementation of the COFFEE optimisation</span>
 <span class="sd">algorithm operating on a GEM representation.</span>
 
 <span class="sd">This file is NOT for code generation as a COFFEE AST.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">repeat</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
@@ -53,20 +53,20 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">groupby</span>
 
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;optimise_monomial_sum&#39;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'optimise_monomial_sum'</span><span class="p">]</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">monomial_sum_to_expression</span><span class="p">(</span><span class="n">monomial_sum</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a monomial sum to a GEM expression.</span>
+<span class="w">    </span><span class="sd">"""Convert a monomial sum to a GEM expression.</span>
 
 <span class="sd">    :arg monomial_sum: an iterable of :class:`Monomial`s</span>
 
 <span class="sd">    :returns: GEM expression</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">indexsums</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># The result is summation of indexsums</span>
     <span class="c1"># Group monomials according to their sum indices</span>
     <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">monomial_sum</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">sum_indices</span><span class="p">))</span>
-    <span class="c1"># Create IndexSum&#39;s from each monomial group</span>
+    <span class="c1"># Create IndexSum's from each monomial group</span>
     <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">monomials</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">:</span>
         <span class="n">sum_indices</span> <span class="o">=</span> <span class="n">monomials</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">sum_indices</span>
         <span class="n">products</span> <span class="o">=</span> <span class="p">[</span><span class="n">make_product</span><span class="p">(</span><span class="n">monomial</span><span class="o">.</span><span class="n">atomics</span> <span class="o">+</span> <span class="p">(</span><span class="n">monomial</span><span class="o">.</span><span class="n">rest</span><span class="p">,))</span> <span class="k">for</span> <span class="n">monomial</span> <span class="ow">in</span> <span class="n">monomials</span><span class="p">]</span>
@@ -75,23 +75,23 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">index_extent</span><span class="p">(</span><span class="n">factor</span><span class="p">,</span> <span class="n">linear_indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the product of the extents of linear indices of a GEM expression</span>
+<span class="w">    </span><span class="sd">"""Compute the product of the extents of linear indices of a GEM expression</span>
 
 <span class="sd">    :arg factor: GEM expression</span>
 <span class="sd">    :arg linear_indices: set of linear indices</span>
 
 <span class="sd">    :returns: product of extents of linear indices</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">i</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">factor</span><span class="o">.</span><span class="n">free_indices</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">linear_indices</span><span class="p">])</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">sort_monomials</span><span class="p">(</span><span class="n">monomials</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Sort monomials to produce a better initial guess for :func:`find_optimal_atomics`.</span>
+<span class="w">    </span><span class="sd">"""Sort monomials to produce a better initial guess for :func:`find_optimal_atomics`.</span>
 
 <span class="sd">    :arg monomials: A list of :class:`Monomial`s</span>
 
 <span class="sd">    :returns: the reordered list of monomials.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">monomials</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">monomials</span>
     <span class="c1"># Construct a monomial subset with non-intersecting atomics</span>
@@ -110,7 +110,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">find_optimal_atomics</span><span class="p">(</span><span class="n">monomials</span><span class="p">,</span> <span class="n">linear_indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Find optimal atomic common subexpressions, which produce least number of</span>
+<span class="w">    </span><span class="sd">"""Find optimal atomic common subexpressions, which produce least number of</span>
 <span class="sd">    terms in the resultant IndexSum when factorised.</span>
 
 <span class="sd">    :arg monomials: A list of :class:`Monomial`s, all of which should have</span>
@@ -118,7 +118,7 @@
 <span class="sd">    :arg linear_indices: tuple of linear indices</span>
 
 <span class="sd">    :returns: list of atomic GEM expressions</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">monomials</span> <span class="o">=</span> <span class="n">sort_monomials</span><span class="p">(</span><span class="n">monomials</span><span class="p">)</span>
 
     <span class="n">atomics</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">monomial</span><span class="o">.</span><span class="n">atomics</span> <span class="k">for</span> <span class="n">monomial</span> <span class="ow">in</span> <span class="n">monomials</span><span class="p">)))</span>
@@ -169,15 +169,15 @@
     <span class="k">try</span><span class="p">:</span>
         <span class="n">solve</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
-        <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">&#39;tsfc&#39;</span><span class="p">)</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Solution to ILP problem may not be optimal: search &quot;</span>
-                       <span class="s2">&quot;interrupted after examining </span><span class="si">%d</span><span class="s2"> solutions.&quot;</span><span class="p">,</span> <span class="n">max_it</span><span class="p">)</span>
+        <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s1">'tsfc'</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">"Solution to ILP problem may not be optimal: search "</span>
+                       <span class="s2">"interrupted after examining </span><span class="si">%d</span><span class="s2"> solutions."</span><span class="p">,</span> <span class="n">max_it</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">atomics</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">optimal_solution</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">factorise_atomics</span><span class="p">(</span><span class="n">monomials</span><span class="p">,</span> <span class="n">optimal_atomics</span><span class="p">,</span> <span class="n">linear_indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Group and factorise monomials using a list of atomics as common</span>
+<span class="w">    </span><span class="sd">"""Group and factorise monomials using a list of atomics as common</span>
 <span class="sd">    subexpressions. Create new monomials for each group and optimise them recursively.</span>
 
 <span class="sd">    :arg monomials: an iterable of :class:`Monomial`s, all of which should have</span>
@@ -186,7 +186,7 @@
 <span class="sd">    :arg linear_indices: tuple of linear indices</span>
 
 <span class="sd">    :returns: an iterable of :class:`Monomials`s after factorisation</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">optimal_atomics</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">monomials</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">monomials</span>
 
@@ -195,7 +195,7 @@
         <span class="k">for</span> <span class="n">oa</span> <span class="ow">in</span> <span class="n">optimal_atomics</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">oa</span> <span class="ow">in</span> <span class="n">monomial</span><span class="o">.</span><span class="n">atomics</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">oa</span>
-        <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Expect at least one optimal atomic per monomial.&quot;</span>
+        <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"Expect at least one optimal atomic per monomial."</span>
     <span class="n">factor_group</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">monomials</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">group_key</span><span class="p">)</span>
 
     <span class="c1"># We should not drop monomials</span>
@@ -238,14 +238,14 @@
 <div class="viewcode-block" id="optimise_monomial_sum">
 <a class="viewcode-back" href="../../gem.html#gem.coffee.optimise_monomial_sum">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">optimise_monomial_sum</span><span class="p">(</span><span class="n">monomial_sum</span><span class="p">,</span> <span class="n">linear_indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Choose optimal common atomic subexpressions and factorise a</span>
+<span class="w">    </span><span class="sd">"""Choose optimal common atomic subexpressions and factorise a</span>
 <span class="sd">    :class:`MonomialSum` object to create a GEM expression.</span>
 
 <span class="sd">    :arg monomial_sum: a :class:`MonomialSum` object</span>
 <span class="sd">    :arg linear_indices: tuple of linear indices</span>
 
 <span class="sd">    :returns: factorised GEM expression</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">monomial_sum</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">sum_indices</span><span class="p">))</span>
     <span class="n">new_monomials</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">monomials</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">:</span>
@@ -255,7 +255,7 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">optimise_monomials</span><span class="p">(</span><span class="n">monomials</span><span class="p">,</span> <span class="n">linear_indices</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Choose optimal common atomic subexpressions and factorise an iterable</span>
+<span class="w">    </span><span class="sd">"""Choose optimal common atomic subexpressions and factorise an iterable</span>
 <span class="sd">    of monomials.</span>
 
 <span class="sd">    :arg monomials: a list of :class:`Monomial`s, all of which should have</span>
@@ -263,9 +263,9 @@
 <span class="sd">    :arg linear_indices: tuple of linear indices</span>
 
 <span class="sd">    :returns: an iterable of factorised :class:`Monomials`s</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">sum_indices</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">monomials</span><span class="p">))</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">,</span> \
-        <span class="s2">&quot;All monomials required to have same sum indices for factorisation&quot;</span>
+        <span class="s2">"All monomials required to have same sum indices for factorisation"</span>
 
     <span class="n">result</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">monomials</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">m</span><span class="o">.</span><span class="n">atomics</span><span class="p">]</span>  <span class="c1"># skipped monomials</span>
     <span class="n">active_monomials</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">monomials</span> <span class="k">if</span> <span class="n">m</span><span class="o">.</span><span class="n">atomics</span><span class="p">]</span>

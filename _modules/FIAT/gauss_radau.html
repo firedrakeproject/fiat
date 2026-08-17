@@ -52,10 +52,10 @@
 <div class="viewcode-block" id="GaussRadauDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.gauss_radau.GaussRadauDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">GaussRadauDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for 1D discontinuous elements with nodes at the</span>
-<span class="sd">    Gauss-Radau points.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The dual basis for 1D discontinuous elements with nodes at the</span>
+<span class="sd">    Gauss-Radau points."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">right</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-        <span class="c1"># Do DG connectivity because it&#39;s bonkers to do one-sided assembly even</span>
+        <span class="c1"># Do DG connectivity because it's bonkers to do one-sided assembly even</span>
         <span class="c1"># though we have an endpoint in the point set!</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[],</span> <span class="mi">1</span><span class="p">:</span> <span class="p">[]},</span>
                       <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">degree</span><span class="o">+</span><span class="mi">1</span><span class="p">))}}</span>
@@ -69,10 +69,10 @@
 <div class="viewcode-block" id="GaussRadau">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.gauss_radau.GaussRadau">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">GaussRadau</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D discontinuous element with nodes at the Gauss-Radau points.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D discontinuous element with nodes at the Gauss-Radau points."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">LINE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Gauss-Radau elements are only defined in one dimension.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Gauss-Radau elements are only defined in one dimension."</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">GaussRadauDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>  <span class="c1"># n-form</span>

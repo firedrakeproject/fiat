@@ -37,7 +37,7 @@
             
   <h1>Source code for FIAT.hellan_herrmann_johnson</h1><div class="highlight"><pre>
 <span></span><span class="c1"># -*- coding: utf-8 -*-</span>
-<span class="sd">&quot;&quot;&quot;Implementation of the Hellan-Herrmann-Johnson finite elements.&quot;&quot;&quot;</span>
+<span class="sd">"""Implementation of the Hellan-Herrmann-Johnson finite elements."""</span>
 
 <span class="c1"># Copyright (C) 2016-2018 Lizao Li &lt;lzlarryli@gmail.com&gt;</span>
 <span class="c1">#</span>
@@ -65,7 +65,7 @@
 
         <span class="n">cell_to_faces</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_connectivity</span><span class="p">()[(</span><span class="n">sd</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
         <span class="n">n</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">ref_el</span><span class="o">.</span><span class="n">compute_scaled_normal</span><span class="p">,</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">])))</span>
-        <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;point&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">"point"</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
                 <span class="n">cur</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)</span>
                 <span class="c1"># n^T u n evaluated on a Pk lattice</span>
@@ -98,7 +98,7 @@
                                  <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">pts</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">((</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">2</span><span class="p">)))</span>
                     <span class="n">entity_ids</span><span class="p">[</span><span class="n">sd</span><span class="p">][</span><span class="n">entity</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">cur</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">nodes</span><span class="p">)))</span>
 
-        <span class="k">elif</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">&quot;integral&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">variant</span> <span class="o">==</span> <span class="s2">"integral"</span><span class="p">:</span>
             <span class="c1"># Face dofs</span>
             <span class="n">ref_facet</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
             <span class="n">Q_ref</span> <span class="o">=</span> <span class="n">parse_quadrature_scheme</span><span class="p">(</span><span class="n">ref_facet</span><span class="p">,</span> <span class="n">qdegree</span> <span class="o">+</span> <span class="n">degree</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
@@ -138,13 +138,13 @@
 <div class="viewcode-block" id="HellanHerrmannJohnson">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.hellan_herrmann_johnson.HellanHerrmannJohnson">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HellanHerrmannJohnson</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The definition of Hellan-Herrmann-Johnson element.</span>
+<span class="w">    </span><span class="sd">"""The definition of Hellan-Herrmann-Johnson element.</span>
 <span class="sd">       HHJ(k) is the space of symmetric-matrix-valued polynomials of degree k</span>
 <span class="sd">       or less with normal-normal continuity.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree &gt;= 0&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree &gt;= 0"</span><span class="p">)</span>
 
         <span class="n">splitting</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">qdegree</span> <span class="o">=</span> <span class="n">check_format_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -159,7 +159,7 @@
         <span class="n">dual</span> <span class="o">=</span> <span class="n">HellanHerrmannJohnsonDual</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="p">,</span> <span class="n">qdegree</span><span class="p">,</span> <span class="n">quad_scheme</span><span class="p">)</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">mapping</span> <span class="o">=</span> <span class="s2">&quot;double contravariant piola&quot;</span>
+        <span class="n">mapping</span> <span class="o">=</span> <span class="s2">"double contravariant piola"</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="n">mapping</span><span class="p">)</span></div>
 
 </pre></div>

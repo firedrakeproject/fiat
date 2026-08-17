@@ -50,15 +50,15 @@
 <div class="viewcode-block" id="AbstractPointSet">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.AbstractPointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AbstractPointSet</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A way of specifying a known set of points, perhaps with some</span>
+<span class="w">    </span><span class="sd">"""A way of specifying a known set of points, perhaps with some</span>
 <span class="sd">    (tensor) structure.</span>
 
 <span class="sd">    Points, when stored, have shape point_set_shape + (point_dimension,)</span>
 <span class="sd">    where point_set_shape is () for scalar, (N,) for N element vector,</span>
 <span class="sd">    (N, M) for N x M matrix etc.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">hashlib</span><span class="o">.</span><span class="n">md5</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">digest</span><span class="p">(),</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">&quot;big&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">hashlib</span><span class="o">.</span><span class="n">md5</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">digest</span><span class="p">(),</span> <span class="n">byteorder</span><span class="o">=</span><span class="s2">"big"</span><span class="p">)</span>
 
     <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -67,47 +67,47 @@
     <span class="nd">@property</span>
     <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;A flattened numpy array of points or :class:`UnknownPointsArray`</span>
-<span class="sd">        object with shape (# of points, point dimension).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""A flattened numpy array of points or :class:`UnknownPointsArray`</span>
+<span class="sd">        object with shape (# of points, point dimension)."""</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Point dimension.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Point dimension."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">indices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;GEM indices with matching shape and extent to the structure of the</span>
-<span class="sd">        point set.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""GEM indices with matching shape and extent to the structure of the</span>
+<span class="sd">        point set."""</span>
 
     <span class="nd">@property</span>
     <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">expression</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;GEM expression describing the points, with free indices</span>
-<span class="sd">        ``self.indices`` and shape (point dimension,).&quot;&quot;&quot;</span></div>
+<span class="w">        </span><span class="sd">"""GEM expression describing the points, with free indices</span>
+<span class="sd">        ``self.indices`` and shape (point dimension,)."""</span></div>
 
 
 
 <div class="viewcode-block" id="PointSingleton">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.PointSingleton">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PointSingleton</span><span class="p">(</span><span class="n">AbstractPointSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A point set representing a single point.</span>
+<span class="w">    </span><span class="sd">"""A point set representing a single point.</span>
 
-<span class="sd">    These have a ``gem.Literal`` expression and no indices.&quot;&quot;&quot;</span>
+<span class="sd">    These have a ``gem.Literal`` expression and no indices."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">point</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a PointSingleton from a single point.</span>
+<span class="w">        </span><span class="sd">"""Build a PointSingleton from a single point.</span>
 
 <span class="sd">        :arg point: A single point of shape (D,) where D is the dimension of</span>
-<span class="sd">            the point.&quot;&quot;&quot;</span>
+<span class="sd">            the point."""</span>
         <span class="n">point</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">point</span><span class="p">)</span>
         <span class="c1"># 1 point ought to be a 1D array - see docstring above and points method</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">point</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">point</span> <span class="o">=</span> <span class="n">point</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">safe_repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">point</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">safe_repr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">point</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -126,15 +126,15 @@
 <div class="viewcode-block" id="UnknownPointsArray">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.UnknownPointsArray">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">UnknownPointsArray</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A placeholder for a set of unknown points with appropriate length</span>
+<span class="w">    </span><span class="sd">"""A placeholder for a set of unknown points with appropriate length</span>
 <span class="sd">    and size but without indexable values. For use with an</span>
 <span class="sd">    :class:`AbstractPointSet` whose points are not known at compile</span>
-<span class="sd">    time.&quot;&quot;&quot;</span>
+<span class="sd">    time."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""</span>
 <span class="sd">        :arg shape: The shape of the unknown set of N points of shape</span>
 <span class="sd">            (N, D) where D is the dimension of each point.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span>
 
@@ -146,7 +146,7 @@
 <div class="viewcode-block" id="UnknownPointSet">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.UnknownPointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">UnknownPointSet</span><span class="p">(</span><span class="n">AbstractPointSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A point set representing a vector of points with unknown</span>
+<span class="w">    </span><span class="sd">"""A point set representing a vector of points with unknown</span>
 <span class="sd">    locations but known :class:`gem.gem.Variable` expression.</span>
 
 <span class="sd">    The ``.points`` property is an :class:`UnknownPointsArray` object with</span>
@@ -154,22 +154,22 @@
 <span class="sd">    dimension.</span>
 
 <span class="sd">    The ``.expression`` property is a derived :func:`gem.gem.partial_indexed` with</span>
-<span class="sd">    shape (D,) and free indices for the points N.&quot;&quot;&quot;</span>
+<span class="sd">    shape (D,) and free indices for the points N."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points_expr</span><span class="p">):</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build a PointSingleton from a gem expression for a single point.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Build a PointSingleton from a gem expression for a single point.</span>
 
 <span class="sd">        :arg points_expr: A ``gem.Variable`` expression representing a</span>
 <span class="sd">            vector of N points in D dimensions. Should have shape (N, D)</span>
 <span class="sd">            and no free indices. For runtime tabulation the variable</span>
-<span class="sd">            name should begin with \&#39;rt_:\&#39;.&quot;&quot;&quot;</span>
+<span class="sd">            name should begin with \'rt_:\'."""</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">points_expr</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Variable</span><span class="p">)</span>
         <span class="k">assert</span> <span class="n">points_expr</span><span class="o">.</span><span class="n">free_indices</span> <span class="o">==</span> <span class="p">()</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">points_expr</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_points_expr</span> <span class="o">=</span> <span class="n">points_expr</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_points_expr</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_points_expr</span><span class="si">!r}</span><span class="s2">)"</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -188,20 +188,20 @@
 <div class="viewcode-block" id="PointSet">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.PointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PointSet</span><span class="p">(</span><span class="n">AbstractPointSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A basic point set with no internal structure representing a vector of</span>
-<span class="sd">    points.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""A basic point set with no internal structure representing a vector of</span>
+<span class="sd">    points."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a PointSet from a vector of points</span>
+<span class="w">        </span><span class="sd">"""Build a PointSet from a vector of points</span>
 
 <span class="sd">        :arg points: A vector of N points of shape (N, D) where D is the</span>
-<span class="sd">            dimension of each point.&quot;&quot;&quot;</span>
+<span class="sd">            dimension of each point."""</span>
         <span class="n">points</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">points</span> <span class="o">=</span> <span class="n">points</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="si">!r}</span><span class="s2">)"</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -218,7 +218,7 @@
 <div class="viewcode-block" id="PointSet.almost_equal">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.PointSet.almost_equal">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">almost_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Approximate numerical equality of point sets&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Approximate numerical equality of point sets"""</span>
         <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> \
             <span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span> <span class="ow">and</span> \
             <span class="n">numpy</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">points</span><span class="p">,</span> <span class="n">rtol</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span></div>
@@ -229,10 +229,10 @@
 <div class="viewcode-block" id="GaussLegendrePointSet">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.GaussLegendrePointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">GaussLegendrePointSet</span><span class="p">(</span><span class="n">PointSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gauss-Legendre quadrature points on the interval.</span>
+<span class="w">    </span><span class="sd">"""Gauss-Legendre quadrature points on the interval.</span>
 
 <span class="sd">    This facilitates implementing discontinuous spectral elements.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span></div>
@@ -242,10 +242,10 @@
 <div class="viewcode-block" id="GaussLobattoLegendrePointSet">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.GaussLobattoLegendrePointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">GaussLobattoLegendrePointSet</span><span class="p">(</span><span class="n">PointSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gauss-Lobatto-Legendre quadrature points on the interval.</span>
+<span class="w">    </span><span class="sd">"""Gauss-Lobatto-Legendre quadrature points on the interval.</span>
 
 <span class="sd">    This facilitates implementing continuous spectral elements.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">points</span><span class="p">)</span>
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">points</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span></div>
@@ -255,10 +255,10 @@
 <div class="viewcode-block" id="KMVPointSet">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.KMVPointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">KMVPointSet</span><span class="p">(</span><span class="n">PointSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;KMV quadrature points on the simplex.</span>
+<span class="w">    </span><span class="sd">"""KMV quadrature points on the simplex.</span>
 
 <span class="sd">    This facilitates implementing continuous spectral elements.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">points</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">points</span><span class="p">)</span></div>
 
@@ -272,7 +272,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">factors</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">factors</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="si">!r}</span><span class="s2">)"</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -295,7 +295,7 @@
 <div class="viewcode-block" id="TensorPointSet.almost_equal">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.TensorPointSet.almost_equal">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">almost_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Approximate numerical equality of point sets&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Approximate numerical equality of point sets"""</span>
         <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> \
             <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">factors</span><span class="p">)</span> <span class="ow">and</span> \
             <span class="nb">all</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">almost_equal</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span>
@@ -307,7 +307,7 @@
 <div class="viewcode-block" id="FacetPointSet">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.FacetPointSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FacetPointSet</span><span class="p">(</span><span class="n">AbstractPointSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A point set on facets.</span>
+<span class="w">    </span><span class="sd">"""A point set on facets.</span>
 
 <span class="sd">    A FacetPointSet is constructed by mapping a lower-dimensional PointSet</span>
 <span class="sd">    onto all facets of a higher-dimensional cell.</span>
@@ -319,17 +319,17 @@
 <span class="sd">    ps : PointSet</span>
 <span class="sd">        A lower-dimensional point set.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">ps</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cell</span> <span class="o">=</span> <span class="n">cell</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ps</span> <span class="o">=</span> <span class="n">ps</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ps</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">ps</span><span class="si">!r}</span><span class="s2">)"</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">entities</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The list of all cell entites matching the reference point set dimension.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The list of all cell entites matching the reference point set dimension."""</span>
         <span class="n">to_int</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="nb">sum</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="n">x</span>
         <span class="n">top</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">topology</span>
         <span class="k">return</span> <span class="p">[(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">)</span>
@@ -339,7 +339,7 @@
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The array with the reference points mapped onto each facet.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The array with the reference points mapped onto each facet."""</span>
         <span class="n">ref_pts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ps</span><span class="o">.</span><span class="n">points</span>
         <span class="n">pts</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">get_entity_transform</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">entity</span><span class="p">)(</span><span class="n">ref_pts</span><span class="p">)</span>
                <span class="k">for</span> <span class="n">dim</span><span class="p">,</span> <span class="n">entity</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">entities</span><span class="p">]</span>
@@ -347,17 +347,17 @@
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">indices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;An Index tuple of the facet index and the reference point indices.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""An Index tuple of the facet index and the reference point indices."""</span>
         <span class="k">return</span> <span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">entities</span><span class="p">)),</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">ps</span><span class="o">.</span><span class="n">indices</span><span class="p">)</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">expression</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Symbolic point expression is not yet implemented for FacetPointSet.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Symbolic point expression is not yet implemented for FacetPointSet."</span><span class="p">)</span>
 
 <div class="viewcode-block" id="FacetPointSet.almost_equal">
 <a class="viewcode-back" href="../../finat.html#finat.point_set.FacetPointSet.almost_equal">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">almost_equal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="mf">1e-12</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Approximate numerical equality of point sets&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Approximate numerical equality of point sets"""</span>
         <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">type</span><span class="p">(</span><span class="n">other</span><span class="p">)</span> <span class="ow">and</span> \
             <span class="bp">self</span><span class="o">.</span><span class="n">cell</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">cell</span> <span class="ow">and</span> \
             <span class="bp">self</span><span class="o">.</span><span class="n">ps</span><span class="o">.</span><span class="n">almost_equal</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">ps</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span></div>

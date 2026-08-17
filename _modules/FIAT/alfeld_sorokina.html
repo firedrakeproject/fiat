@@ -55,11 +55,11 @@
 <div class="viewcode-block" id="AlfeldSorokinaSpace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.alfeld_sorokina.AlfeldSorokinaSpace">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">AlfeldSorokinaSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a vector-valued C0 PolynomialSet on an Alfeld split with C0</span>
-<span class="sd">    divergence. This works on any simplex and for all polynomial degrees.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Return a vector-valued C0 PolynomialSet on an Alfeld split with C0</span>
+<span class="sd">    divergence. This works on any simplex and for all polynomial degrees."""</span>
     <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">AlfeldSplit</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_complex</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
-    <span class="n">C0</span> <span class="o">=</span> <span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span>
+    <span class="n">C0</span> <span class="o">=</span> <span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span>
     <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">C0</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
     <span class="n">num_members</span> <span class="o">=</span> <span class="n">C0</span><span class="o">.</span><span class="n">get_num_members</span><span class="p">()</span>
     <span class="n">coeffs</span> <span class="o">=</span> <span class="n">C0</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
@@ -92,7 +92,7 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">AlfeldSorokinaDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree = 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> only defined for degree = 2"</span><span class="p">)</span>
 
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -118,16 +118,16 @@
 <div class="viewcode-block" id="AlfeldSorokina">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.alfeld_sorokina.AlfeldSorokina">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AlfeldSorokina</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Alfeld-Sorokina C0 quadratic macroelement with C0 divergence.</span>
+<span class="w">    </span><span class="sd">"""The Alfeld-Sorokina C0 quadratic macroelement with C0 divergence.</span>
 
 <span class="sd">    This element belongs to a Stokes complex, and is paired with CG1(Alfeld).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">AlfeldSorokinaDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">AlfeldSorokinaSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># (n-1)-form</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span>
-                         <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
+                         <span class="n">mapping</span><span class="o">=</span><span class="s2">"contravariant piola"</span><span class="p">)</span></div>
 
 </pre></div>
 

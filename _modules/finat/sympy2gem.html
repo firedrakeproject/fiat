@@ -54,7 +54,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.sympy2gem.sympy2gem">[docs]</a>
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;sympy/symengine node expected, got </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
+    <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"sympy/symengine node expected, got </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
 
 
 
@@ -63,7 +63,7 @@
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Expr</span><span class="p">)</span>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">symengine</span><span class="o">.</span><span class="n">Expr</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_expr</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;no handler for sympy/symengine node type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"no handler for sympy/symengine node type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">node</span><span class="p">))</span></div>
 
 
 
@@ -147,7 +147,7 @@
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Abs</span><span class="p">)</span>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">symengine</span><span class="o">.</span><span class="n">Abs</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_abs</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">MathFunction</span><span class="p">(</span><span class="s2">&quot;abs&quot;</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">MathFunction</span><span class="p">(</span><span class="s2">"abs"</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 
@@ -183,7 +183,7 @@
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Eq</span><span class="p">)</span>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">symengine</span><span class="o">.</span><span class="n">Eq</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_eq</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">&quot;==&quot;</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">"=="</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 
@@ -191,7 +191,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.sympy2gem.sympy2gem_gt">[docs]</a>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Gt</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_gt</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">&quot;&gt;&quot;</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">"&gt;"</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 
@@ -199,7 +199,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.sympy2gem.sympy2gem_ge">[docs]</a>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Ge</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_ge</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">&quot;&gt;=&quot;</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">"&gt;="</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 
@@ -208,7 +208,7 @@
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Lt</span><span class="p">)</span>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">symengine</span><span class="o">.</span><span class="n">Lt</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_lt</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">&quot;&lt;&quot;</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">"&lt;"</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 
@@ -217,7 +217,7 @@
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">sympy</span><span class="o">.</span><span class="n">Le</span><span class="p">)</span>
 <span class="nd">@sympy2gem</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">symengine</span><span class="o">.</span><span class="n">Le</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">sympy2gem_le</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">&quot;&lt;=&quot;</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">(</span><span class="s2">"&lt;="</span><span class="p">,</span> <span class="o">*</span><span class="nb">map</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="o">.</span><span class="n">args</span><span class="p">))</span></div>
 
 
 

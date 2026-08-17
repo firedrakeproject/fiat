@@ -52,9 +52,9 @@
 <div class="viewcode-block" id="DiscontinuousTaylorDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_taylor.DiscontinuousTaylorDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DiscontinuousTaylorDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Taylor elements.  This class works for</span>
+<span class="w">    </span><span class="sd">"""The dual basis for Taylor elements.  This class works for</span>
 <span class="sd">    intervals.  Nodes are function and derivative evaluation</span>
-<span class="sd">    at the midpoint.&quot;&quot;&quot;</span>
+<span class="sd">    at the midpoint."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
@@ -83,7 +83,7 @@
 <div class="viewcode-block" id="HigherOrderDiscontinuousTaylor">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_taylor.HigherOrderDiscontinuousTaylor">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HigherOrderDiscontinuousTaylor</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The discontinuous Taylor finite element. Use a Taylor basis for DG.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The discontinuous Taylor finite element. Use a Taylor basis for DG."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>

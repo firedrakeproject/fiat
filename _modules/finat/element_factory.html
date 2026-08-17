@@ -66,128 +66,128 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT</span><span class="w"> </span><span class="kn">import</span> <span class="n">ufc_cell</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;as_fiat_cell&quot;</span><span class="p">,</span> <span class="s2">&quot;create_base_element&quot;</span><span class="p">,</span>
-           <span class="s2">&quot;create_element&quot;</span><span class="p">,</span> <span class="s2">&quot;supported_elements&quot;</span><span class="p">)</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"as_fiat_cell"</span><span class="p">,</span> <span class="s2">"create_base_element"</span><span class="p">,</span>
+           <span class="s2">"create_element"</span><span class="p">,</span> <span class="s2">"supported_elements"</span><span class="p">)</span>
 
 
 <span class="c1"># List of supported elements and mapping to element classes</span>
-<span class="n">supported_elements</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Argyris&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Argyris</span><span class="p">,</span>
-                      <span class="s2">&quot;Bell&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Bell</span><span class="p">,</span>
-                      <span class="s2">&quot;Bernardi-Raugel&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BernardiRaugel</span><span class="p">,</span>
-                      <span class="s2">&quot;Bernardi-Raugel Bubble&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BernardiRaugelBubble</span><span class="p">,</span>
-                      <span class="s2">&quot;Bernstein&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Bernstein</span><span class="p">,</span>
-                      <span class="s2">&quot;Brezzi-Douglas-Fortin-Marini&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasFortinMarini</span><span class="p">,</span>
-                      <span class="s2">&quot;Brezzi-Douglas-Marini Cube Face&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasMariniCubeFace</span><span class="p">,</span>
-                      <span class="s2">&quot;Brezzi-Douglas-Marini&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasMarini</span><span class="p">,</span>
-                      <span class="s2">&quot;Brezzi-Douglas-Marini Cube Edge&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasMariniCubeEdge</span><span class="p">,</span>
-                      <span class="s2">&quot;Bubble&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Bubble</span><span class="p">,</span>
-                      <span class="s2">&quot;FacetBubble&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FacetBubble</span><span class="p">,</span>
-                      <span class="s2">&quot;Crouzeix-Raviart&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">CrouzeixRaviart</span><span class="p">,</span>
-                      <span class="s2">&quot;Direct Serendipity&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DirectSerendipity</span><span class="p">,</span>
-                      <span class="s2">&quot;Discontinuous Lagrange&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span><span class="p">,</span>
-                      <span class="s2">&quot;Discontinuous Lagrange L2&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span><span class="p">,</span>
-                      <span class="s2">&quot;Discontinuous Taylor&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousTaylor</span><span class="p">,</span>
-                      <span class="s2">&quot;Discontinuous Raviart-Thomas&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousElement</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">RaviartThomas</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)),</span>
-                      <span class="s2">&quot;DPC&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DPC</span><span class="p">,</span>
-                      <span class="s2">&quot;DPC L2&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DPC</span><span class="p">,</span>
-                      <span class="s2">&quot;Hermite&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Hermite</span><span class="p">,</span>
-                      <span class="s2">&quot;Hsieh-Clough-Tocher&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HsiehCloughTocher</span><span class="p">,</span>
-                      <span class="s2">&quot;Reduced-Hsieh-Clough-Tocher&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ReducedHsiehCloughTocher</span><span class="p">,</span>
-                      <span class="s2">&quot;QuadraticPowellSabin6&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">QuadraticPowellSabin6</span><span class="p">,</span>
-                      <span class="s2">&quot;QuadraticPowellSabin12&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">QuadraticPowellSabin12</span><span class="p">,</span>
-                      <span class="s2">&quot;Alfeld-Sorokina&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">AlfeldSorokina</span><span class="p">,</span>
-                      <span class="s2">&quot;Arnold-Qin&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ArnoldQin</span><span class="p">,</span>
-                      <span class="s2">&quot;Reduced-Arnold-Qin&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ReducedArnoldQin</span><span class="p">,</span>
-                      <span class="s2">&quot;Christiansen-Hu&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ChristiansenHu</span><span class="p">,</span>
-                      <span class="s2">&quot;Guzman-Neilan 1st kind H1&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanFirstKindH1</span><span class="p">,</span>
-                      <span class="s2">&quot;Guzman-Neilan 2nd kind H1&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanSecondKindH1</span><span class="p">,</span>
-                      <span class="s2">&quot;Guzman-Neilan H1(div)&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanH1div</span><span class="p">,</span>
-                      <span class="s2">&quot;Guzman-Neilan Bubble&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanBubble</span><span class="p">,</span>
-                      <span class="s2">&quot;Johnson-Mercier&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">JohnsonMercier</span><span class="p">,</span>
-                      <span class="s2">&quot;Lagrange&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Lagrange</span><span class="p">,</span>
-                      <span class="s2">&quot;Kong-Mulder-Veldhuizen&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">KongMulderVeldhuizen</span><span class="p">,</span>
-                      <span class="s2">&quot;Gauss-Lobatto-Legendre&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLobattoLegendre</span><span class="p">,</span>
-                      <span class="s2">&quot;Gauss-Legendre&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLegendre</span><span class="p">,</span>
-                      <span class="s2">&quot;Gauss-Legendre L2&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLegendre</span><span class="p">,</span>
-                      <span class="s2">&quot;Morley&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Morley</span><span class="p">,</span>
-                      <span class="s2">&quot;Nedelec 1st kind H(curl)&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Nedelec</span><span class="p">,</span>
-                      <span class="s2">&quot;Nedelec 2nd kind H(curl)&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">NedelecSecondKind</span><span class="p">,</span>
-                      <span class="s2">&quot;Raviart-Thomas&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">RaviartThomas</span><span class="p">,</span>
-                      <span class="s2">&quot;Real&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Real</span><span class="p">,</span>
-                      <span class="s2">&quot;S&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Serendipity</span><span class="p">,</span>
-                      <span class="s2">&quot;SminusF&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityFace</span><span class="p">,</span>
-                      <span class="s2">&quot;SminusDiv&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityDiv</span><span class="p">,</span>
-                      <span class="s2">&quot;SminusE&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityEdge</span><span class="p">,</span>
-                      <span class="s2">&quot;SminusCurl&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityCurl</span><span class="p">,</span>
-                      <span class="s2">&quot;Regge&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Regge</span><span class="p">,</span>
-                      <span class="s2">&quot;HDiv Trace&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HDivTrace</span><span class="p">,</span>
-                      <span class="s2">&quot;Hellan-Herrmann-Johnson&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HellanHerrmannJohnson</span><span class="p">,</span>
-                      <span class="s2">&quot;Gopalakrishnan-Lederer-Schoberl 1st kind&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GopalakrishnanLedererSchoberlFirstKind</span><span class="p">,</span>
-                      <span class="s2">&quot;Gopalakrishnan-Lederer-Schoberl 2nd kind&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GopalakrishnanLedererSchoberlSecondKind</span><span class="p">,</span>
-                      <span class="s2">&quot;Conforming Arnold-Winther&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ArnoldWinther</span><span class="p">,</span>
-                      <span class="s2">&quot;Nonconforming Arnold-Winther&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ArnoldWintherNC</span><span class="p">,</span>
-                      <span class="s2">&quot;Hu-Zhang&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HuZhang</span><span class="p">,</span>
-                      <span class="s2">&quot;Mardal-Tai-Winther&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">MardalTaiWinther</span><span class="p">,</span>
-                      <span class="s2">&quot;Walkington&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Walkington</span><span class="p">,</span>
-                      <span class="s2">&quot;Nonconforming Wu-Xu&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">WuXuH3NC</span><span class="p">,</span>
-                      <span class="s2">&quot;Nonconforming Robust Wu-Xu&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">WuXuRobustH3NC</span><span class="p">,</span>
-                      <span class="s2">&quot;Bramble-Zlamal C2&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrambleZlamalC2</span><span class="p">,</span>
-                      <span class="s2">&quot;Alfeld C2&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">AlfeldC2</span><span class="p">,</span>
+<span class="n">supported_elements</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"Argyris"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Argyris</span><span class="p">,</span>
+                      <span class="s2">"Bell"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Bell</span><span class="p">,</span>
+                      <span class="s2">"Bernardi-Raugel"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BernardiRaugel</span><span class="p">,</span>
+                      <span class="s2">"Bernardi-Raugel Bubble"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BernardiRaugelBubble</span><span class="p">,</span>
+                      <span class="s2">"Bernstein"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Bernstein</span><span class="p">,</span>
+                      <span class="s2">"Brezzi-Douglas-Fortin-Marini"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasFortinMarini</span><span class="p">,</span>
+                      <span class="s2">"Brezzi-Douglas-Marini Cube Face"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasMariniCubeFace</span><span class="p">,</span>
+                      <span class="s2">"Brezzi-Douglas-Marini"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasMarini</span><span class="p">,</span>
+                      <span class="s2">"Brezzi-Douglas-Marini Cube Edge"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrezziDouglasMariniCubeEdge</span><span class="p">,</span>
+                      <span class="s2">"Bubble"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Bubble</span><span class="p">,</span>
+                      <span class="s2">"FacetBubble"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FacetBubble</span><span class="p">,</span>
+                      <span class="s2">"Crouzeix-Raviart"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">CrouzeixRaviart</span><span class="p">,</span>
+                      <span class="s2">"Direct Serendipity"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DirectSerendipity</span><span class="p">,</span>
+                      <span class="s2">"Discontinuous Lagrange"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span><span class="p">,</span>
+                      <span class="s2">"Discontinuous Lagrange L2"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span><span class="p">,</span>
+                      <span class="s2">"Discontinuous Taylor"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousTaylor</span><span class="p">,</span>
+                      <span class="s2">"Discontinuous Raviart-Thomas"</span><span class="p">:</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousElement</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">RaviartThomas</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)),</span>
+                      <span class="s2">"DPC"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DPC</span><span class="p">,</span>
+                      <span class="s2">"DPC L2"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DPC</span><span class="p">,</span>
+                      <span class="s2">"Hermite"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Hermite</span><span class="p">,</span>
+                      <span class="s2">"Hsieh-Clough-Tocher"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HsiehCloughTocher</span><span class="p">,</span>
+                      <span class="s2">"Reduced-Hsieh-Clough-Tocher"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ReducedHsiehCloughTocher</span><span class="p">,</span>
+                      <span class="s2">"QuadraticPowellSabin6"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">QuadraticPowellSabin6</span><span class="p">,</span>
+                      <span class="s2">"QuadraticPowellSabin12"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">QuadraticPowellSabin12</span><span class="p">,</span>
+                      <span class="s2">"Alfeld-Sorokina"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">AlfeldSorokina</span><span class="p">,</span>
+                      <span class="s2">"Arnold-Qin"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ArnoldQin</span><span class="p">,</span>
+                      <span class="s2">"Reduced-Arnold-Qin"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ReducedArnoldQin</span><span class="p">,</span>
+                      <span class="s2">"Christiansen-Hu"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ChristiansenHu</span><span class="p">,</span>
+                      <span class="s2">"Guzman-Neilan 1st kind H1"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanFirstKindH1</span><span class="p">,</span>
+                      <span class="s2">"Guzman-Neilan 2nd kind H1"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanSecondKindH1</span><span class="p">,</span>
+                      <span class="s2">"Guzman-Neilan H1(div)"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanH1div</span><span class="p">,</span>
+                      <span class="s2">"Guzman-Neilan Bubble"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GuzmanNeilanBubble</span><span class="p">,</span>
+                      <span class="s2">"Johnson-Mercier"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">JohnsonMercier</span><span class="p">,</span>
+                      <span class="s2">"Lagrange"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Lagrange</span><span class="p">,</span>
+                      <span class="s2">"Kong-Mulder-Veldhuizen"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">KongMulderVeldhuizen</span><span class="p">,</span>
+                      <span class="s2">"Gauss-Lobatto-Legendre"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLobattoLegendre</span><span class="p">,</span>
+                      <span class="s2">"Gauss-Legendre"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLegendre</span><span class="p">,</span>
+                      <span class="s2">"Gauss-Legendre L2"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLegendre</span><span class="p">,</span>
+                      <span class="s2">"Morley"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Morley</span><span class="p">,</span>
+                      <span class="s2">"Nedelec 1st kind H(curl)"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Nedelec</span><span class="p">,</span>
+                      <span class="s2">"Nedelec 2nd kind H(curl)"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">NedelecSecondKind</span><span class="p">,</span>
+                      <span class="s2">"Raviart-Thomas"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">RaviartThomas</span><span class="p">,</span>
+                      <span class="s2">"Real"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Real</span><span class="p">,</span>
+                      <span class="s2">"S"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Serendipity</span><span class="p">,</span>
+                      <span class="s2">"SminusF"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityFace</span><span class="p">,</span>
+                      <span class="s2">"SminusDiv"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityDiv</span><span class="p">,</span>
+                      <span class="s2">"SminusE"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityEdge</span><span class="p">,</span>
+                      <span class="s2">"SminusCurl"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">TrimmedSerendipityCurl</span><span class="p">,</span>
+                      <span class="s2">"Regge"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Regge</span><span class="p">,</span>
+                      <span class="s2">"HDiv Trace"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HDivTrace</span><span class="p">,</span>
+                      <span class="s2">"Hellan-Herrmann-Johnson"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HellanHerrmannJohnson</span><span class="p">,</span>
+                      <span class="s2">"Gopalakrishnan-Lederer-Schoberl 1st kind"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GopalakrishnanLedererSchoberlFirstKind</span><span class="p">,</span>
+                      <span class="s2">"Gopalakrishnan-Lederer-Schoberl 2nd kind"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">GopalakrishnanLedererSchoberlSecondKind</span><span class="p">,</span>
+                      <span class="s2">"Conforming Arnold-Winther"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ArnoldWinther</span><span class="p">,</span>
+                      <span class="s2">"Nonconforming Arnold-Winther"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">ArnoldWintherNC</span><span class="p">,</span>
+                      <span class="s2">"Hu-Zhang"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">HuZhang</span><span class="p">,</span>
+                      <span class="s2">"Mardal-Tai-Winther"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">MardalTaiWinther</span><span class="p">,</span>
+                      <span class="s2">"Walkington"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">Walkington</span><span class="p">,</span>
+                      <span class="s2">"Nonconforming Wu-Xu"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">WuXuH3NC</span><span class="p">,</span>
+                      <span class="s2">"Nonconforming Robust Wu-Xu"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">WuXuRobustH3NC</span><span class="p">,</span>
+                      <span class="s2">"Bramble-Zlamal C2"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">BrambleZlamalC2</span><span class="p">,</span>
+                      <span class="s2">"Alfeld C2"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">AlfeldC2</span><span class="p">,</span>
                       <span class="c1"># These require special treatment</span>
-                      <span class="s2">&quot;Q&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                      <span class="s2">&quot;DQ&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                      <span class="s2">&quot;DQ L2&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                      <span class="s2">&quot;RTCE&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                      <span class="s2">&quot;RTCF&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                      <span class="s2">&quot;NCE&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                      <span class="s2">&quot;NCF&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                      <span class="s2">"Q"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                      <span class="s2">"DQ"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                      <span class="s2">"DQ L2"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                      <span class="s2">"RTCE"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                      <span class="s2">"RTCF"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                      <span class="s2">"NCE"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+                      <span class="s2">"NCF"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
                       <span class="p">}</span>
-<span class="sd">&quot;&quot;&quot;A :class:`.dict` mapping UFL element family names to their</span>
+<span class="sd">"""A :class:`.dict` mapping UFL element family names to their</span>
 <span class="sd">FInAT-equivalent constructors.  If the value is ``None``, the UFL</span>
-<span class="sd">element is supported, but must be handled specially because it doesn&#39;t</span>
-<span class="sd">have a direct FInAT equivalent.&quot;&quot;&quot;</span>
+<span class="sd">element is supported, but must be handled specially because it doesn't</span>
+<span class="sd">have a direct FInAT equivalent."""</span>
 
 
 <div class="viewcode-block" id="as_fiat_cell">
 <a class="viewcode-back" href="../../finat.html#finat.element_factory.as_fiat_cell">[docs]</a>
 <span class="nd">@cache</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">as_fiat_cell</span><span class="p">(</span><span class="n">cell</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a ufl cell to a FIAT cell.</span>
+<span class="w">    </span><span class="sd">"""Convert a ufl cell to a FIAT cell.</span>
 
-<span class="sd">    :arg cell: the :class:`ufl.Cell` to convert.&quot;&quot;&quot;</span>
+<span class="sd">    :arg cell: the :class:`ufl.Cell` to convert."""</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">ufl</span><span class="o">.</span><span class="n">AbstractCell</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Expecting a UFL Cell&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Expecting a UFL Cell"</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ufc_cell</span><span class="p">(</span><span class="n">cell</span><span class="p">)</span></div>
 
 
 
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">convert</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Handler for converting UFL elements to FInAT elements.</span>
+<span class="w">    </span><span class="sd">"""Handler for converting UFL elements to FInAT elements.</span>
 
 <span class="sd">    :arg element: The UFL element to convert.</span>
 
 <span class="sd">    Do not use this function directly, instead call</span>
-<span class="sd">    :func:`create_element`.&quot;&quot;&quot;</span>
+<span class="sd">    :func:`create_element`."""</span>
     <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="ow">in</span> <span class="n">supported_elements</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Element </span><span class="si">%s</span><span class="s2"> supported, but no handler provided&quot;</span> <span class="o">%</span> <span class="n">element</span><span class="p">)</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unsupported element type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">element</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Element </span><span class="si">%s</span><span class="s2"> supported, but no handler provided"</span> <span class="o">%</span> <span class="n">element</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unsupported element type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">element</span><span class="p">))</span>
 
 
 <span class="n">cg_interval_variants</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;fdm&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMLagrange</span><span class="p">,</span>
-    <span class="s2">&quot;fdm_ipdg&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMLagrange</span><span class="p">,</span>
-    <span class="s2">&quot;fdm_quadrature&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMQuadrature</span><span class="p">,</span>
-    <span class="s2">&quot;fdm_broken&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMBrokenH1</span><span class="p">,</span>
-    <span class="s2">&quot;fdm_hermite&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMHermite</span><span class="p">,</span>
+    <span class="s2">"fdm"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMLagrange</span><span class="p">,</span>
+    <span class="s2">"fdm_ipdg"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMLagrange</span><span class="p">,</span>
+    <span class="s2">"fdm_quadrature"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMQuadrature</span><span class="p">,</span>
+    <span class="s2">"fdm_broken"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMBrokenH1</span><span class="p">,</span>
+    <span class="s2">"fdm_hermite"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMHermite</span><span class="p">,</span>
 <span class="p">}</span>
 
 
 <span class="n">dg_interval_variants</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;fdm&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMDiscontinuousLagrange</span><span class="p">,</span>
-    <span class="s2">&quot;fdm_quadrature&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMDiscontinuousLagrange</span><span class="p">,</span>
-    <span class="s2">&quot;fdm_ipdg&quot;</span><span class="p">:</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousElement</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">FDMLagrange</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)),</span>
-    <span class="s2">&quot;fdm_broken&quot;</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMBrokenL2</span><span class="p">,</span>
+    <span class="s2">"fdm"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMDiscontinuousLagrange</span><span class="p">,</span>
+    <span class="s2">"fdm_quadrature"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMDiscontinuousLagrange</span><span class="p">,</span>
+    <span class="s2">"fdm_ipdg"</span><span class="p">:</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousElement</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">FDMLagrange</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)),</span>
+    <span class="s2">"fdm_broken"</span><span class="p">:</span> <span class="n">finat</span><span class="o">.</span><span class="n">FDMBrokenL2</span><span class="p">,</span>
 <span class="p">}</span>
 
 
@@ -195,34 +195,34 @@
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">FiniteElement</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_finiteelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">cell</span> <span class="o">=</span> <span class="n">as_fiat_cell</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;Quadrature&quot;</span><span class="p">,</span> <span class="s2">&quot;Boundary Quadrature&quot;</span><span class="p">}:</span>
+    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"Quadrature"</span><span class="p">,</span> <span class="s2">"Boundary Quadrature"</span><span class="p">}:</span>
         <span class="n">degree</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">()</span>
-        <span class="n">scheme</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">quadrature_scheme</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;default&quot;</span>
+        <span class="n">scheme</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">quadrature_scheme</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"default"</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">scheme</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Quadrature scheme and degree must be specified!&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Quadrature scheme and degree must be specified!"</span><span class="p">)</span>
 
-        <span class="n">codim</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Boundary Quadrature&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">codim</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"Boundary Quadrature"</span> <span class="k">else</span> <span class="mi">0</span>
         <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">make_quadrature_element</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">scheme</span><span class="p">,</span> <span class="n">codim</span><span class="p">),</span> <span class="nb">set</span><span class="p">()</span>
 
     <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">supported_elements</span><span class="p">[</span><span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()]</span>
 
-    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;quadrilateral&quot;</span><span class="p">,</span> <span class="s2">&quot;hexahedron&quot;</span><span class="p">}:</span>
+    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"quadrilateral"</span><span class="p">,</span> <span class="s2">"hexahedron"</span><span class="p">}:</span>
         <span class="c1"># Reconstruct Real and Bernstein on tensor product cells</span>
-        <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Real&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"Real"</span><span class="p">:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="kc">None</span>
-            <span class="n">element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">FiniteElement</span><span class="p">(</span><span class="s2">&quot;DQ&quot;</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Bernstein&quot;</span><span class="p">:</span>
+            <span class="n">element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">FiniteElement</span><span class="p">(</span><span class="s2">"DQ"</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"Bernstein"</span><span class="p">:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="k">if</span> <span class="n">make_finat_element</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">&quot;quadrilateral&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">"quadrilateral"</span><span class="p">:</span>
             <span class="c1"># Handle quadrilateral short names like RTCF and RTCE.</span>
             <span class="n">element</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="n">cell</span><span class="o">=</span><span class="n">quadrilateral_tpc</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">&quot;hexahedron&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">"hexahedron"</span><span class="p">:</span>
             <span class="c1"># Handle hexahedron short names like NCF and NCE.</span>
             <span class="n">element</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="n">cell</span><span class="o">=</span><span class="n">hexahedron_tpc</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> is supported, but handled incorrectly&quot;</span> <span class="o">%</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"</span><span class="si">%s</span><span class="s2"> is supported, but handled incorrectly"</span> <span class="o">%</span>
                              <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">())</span>
         <span class="n">finat_elem</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">FlattenedDimensions</span><span class="p">(</span><span class="n">finat_elem</span><span class="p">),</span> <span class="n">deps</span>
@@ -231,57 +231,57 @@
     <span class="n">finat_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">kind</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">variant</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">kind</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">kind</span> <span class="o">=</span> <span class="s1">&#39;spectral&#39;</span>  <span class="c1"># default variant</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="s1">'spectral'</span>  <span class="c1"># default variant</span>
 
-    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Lagrange&quot;</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;spectral&#39;</span><span class="p">,</span> <span class="s1">&#39;mimetic&#39;</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"Lagrange"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">'spectral'</span><span class="p">,</span> <span class="s1">'mimetic'</span><span class="p">]:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLobattoLegendre</span>
-        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">&quot;interval&quot;</span> <span class="ow">and</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">cg_interval_variants</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">"interval"</span> <span class="ow">and</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">cg_interval_variants</span><span class="p">:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">cg_interval_variants</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span>
-        <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">kind</span><span class="o">.</span><span class="n">startswith</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;integral&#39;</span><span class="p">,</span> <span class="s1">&#39;demkowicz&#39;</span><span class="p">,</span> <span class="s1">&#39;fdm&#39;</span><span class="p">])):</span>
+        <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">kind</span><span class="o">.</span><span class="n">startswith</span><span class="p">,</span> <span class="p">[</span><span class="s1">'integral'</span><span class="p">,</span> <span class="s1">'demkowicz'</span><span class="p">,</span> <span class="s1">'fdm'</span><span class="p">])):</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">IntegratedLegendre</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
-        <span class="k">elif</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mgd&#39;</span><span class="p">,</span> <span class="s1">&#39;feec&#39;</span><span class="p">,</span> <span class="s1">&#39;qb&#39;</span><span class="p">,</span> <span class="s1">&#39;mse&#39;</span><span class="p">]:</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">'mgd'</span><span class="p">,</span> <span class="s1">'feec'</span><span class="p">,</span> <span class="s1">'qb'</span><span class="p">,</span> <span class="s1">'mse'</span><span class="p">]:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">RuntimeTabulated</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">]</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;restriction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;restriction&quot;</span><span class="p">]</span>
-            <span class="n">deps</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">,</span> <span class="s2">&quot;restriction&quot;</span><span class="p">}</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"shift_axes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shift_axes"</span><span class="p">]</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"restriction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"restriction"</span><span class="p">]</span>
+            <span class="n">deps</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"shift_axes"</span><span class="p">,</span> <span class="s2">"restriction"</span><span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Let FIAT handle the general case</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">Lagrange</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
 
-    <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;Discontinuous Lagrange&quot;</span><span class="p">,</span> <span class="s2">&quot;Discontinuous Lagrange L2&quot;</span><span class="p">]:</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s1">&#39;spectral&#39;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"Discontinuous Lagrange"</span><span class="p">,</span> <span class="s2">"Discontinuous Lagrange L2"</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s1">'spectral'</span><span class="p">:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">GaussLegendre</span>
-        <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s1">&#39;mimetic&#39;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s1">'mimetic'</span><span class="p">:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">Histopolation</span>
-        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">&quot;interval&quot;</span> <span class="ow">and</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">dg_interval_variants</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">cellname</span> <span class="o">==</span> <span class="s2">"interval"</span> <span class="ow">and</span> <span class="n">kind</span> <span class="ow">in</span> <span class="n">dg_interval_variants</span><span class="p">:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">dg_interval_variants</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span>
-        <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">kind</span><span class="o">.</span><span class="n">startswith</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;integral&#39;</span><span class="p">,</span> <span class="s1">&#39;demkowicz&#39;</span><span class="p">,</span> <span class="s1">&#39;fdm&#39;</span><span class="p">])):</span>
+        <span class="k">elif</span> <span class="nb">any</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">kind</span><span class="o">.</span><span class="n">startswith</span><span class="p">,</span> <span class="p">[</span><span class="s1">'integral'</span><span class="p">,</span> <span class="s1">'demkowicz'</span><span class="p">,</span> <span class="s1">'fdm'</span><span class="p">])):</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">Legendre</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
-        <span class="k">elif</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;mgd&#39;</span><span class="p">,</span> <span class="s1">&#39;feec&#39;</span><span class="p">,</span> <span class="s1">&#39;qb&#39;</span><span class="p">,</span> <span class="s1">&#39;mse&#39;</span><span class="p">]:</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">'mgd'</span><span class="p">,</span> <span class="s1">'feec'</span><span class="p">,</span> <span class="s1">'qb'</span><span class="p">,</span> <span class="s1">'mse'</span><span class="p">]:</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">RuntimeTabulated</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">]</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;restriction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;restriction&quot;</span><span class="p">]</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;continuous&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
-            <span class="n">deps</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">,</span> <span class="s2">&quot;restriction&quot;</span><span class="p">}</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"shift_axes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shift_axes"</span><span class="p">]</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"restriction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"restriction"</span><span class="p">]</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"continuous"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">deps</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"shift_axes"</span><span class="p">,</span> <span class="s2">"restriction"</span><span class="p">}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Let FIAT handle the general case</span>
             <span class="n">make_finat_element</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">DiscontinuousLagrange</span>
-            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
+            <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
 
-    <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;HDiv Trace&quot;</span><span class="p">,</span> <span class="s2">&quot;Bubble&quot;</span><span class="p">,</span> <span class="s2">&quot;FacetBubble&quot;</span><span class="p">}:</span>
-        <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
+    <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">family</span><span class="p">()</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"HDiv Trace"</span><span class="p">,</span> <span class="s2">"Bubble"</span><span class="p">,</span> <span class="s2">"FacetBubble"</span><span class="p">}:</span>
+        <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">kind</span>
 
     <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">variant</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;variant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">variant</span><span class="p">()</span>
+        <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"variant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">variant</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">quadrature_scheme</span><span class="p">()</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">&quot;quad_scheme&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">quadrature_scheme</span><span class="p">()</span>
+        <span class="n">finat_kwargs</span><span class="p">[</span><span class="s2">"quad_scheme"</span><span class="p">]</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">quadrature_scheme</span><span class="p">()</span>
 
     <span class="k">return</span> <span class="n">make_finat_element</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">element</span><span class="o">.</span><span class="n">degree</span><span class="p">(),</span> <span class="o">**</span><span class="n">finat_kwargs</span><span class="p">),</span> <span class="n">deps</span>
 
@@ -320,22 +320,22 @@
     <span class="n">inner_elem</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">sub_elements</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">reference_value_shape</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">inner_elem</span><span class="o">.</span><span class="n">value_shape</span><span class="p">)]</span>
-    <span class="n">shape_innermost</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shape_innermost&quot;</span><span class="p">]</span>
+    <span class="n">shape_innermost</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shape_innermost"</span><span class="p">]</span>
     <span class="k">return</span> <span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">TensorFiniteElement</span><span class="p">(</span><span class="n">inner_elem</span><span class="p">,</span> <span class="n">shape</span><span class="p">,</span> <span class="ow">not</span> <span class="n">shape_innermost</span><span class="p">),</span>
-            <span class="n">deps</span> <span class="o">|</span> <span class="p">{</span><span class="s2">&quot;shape_innermost&quot;</span><span class="p">})</span>
+            <span class="n">deps</span> <span class="o">|</span> <span class="p">{</span><span class="s2">"shape_innermost"</span><span class="p">})</span>
 
 
 <span class="nd">@convert</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">ufl</span><span class="o">.</span><span class="n">TensorProductElement</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_tensorproductelement</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="n">cell</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">cell</span>
     <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">cell</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">ufl</span><span class="o">.</span><span class="n">TensorProductCell</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;TensorProductElement not on TensorProductCell?&quot;</span><span class="p">)</span>
-    <span class="n">shift_axes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">]</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"TensorProductElement not on TensorProductCell?"</span><span class="p">)</span>
+    <span class="n">shift_axes</span> <span class="o">=</span> <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shift_axes"</span><span class="p">]</span>
     <span class="n">dim_offset</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">elements</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">deps</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">factor_elements</span><span class="p">:</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;shift_axes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">shift_axes</span> <span class="o">+</span> <span class="n">dim_offset</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"shift_axes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">shift_axes</span> <span class="o">+</span> <span class="n">dim_offset</span>
         <span class="n">dim_offset</span> <span class="o">+=</span> <span class="n">elem</span><span class="o">.</span><span class="n">cell</span><span class="o">.</span><span class="n">topological_dimension</span>
         <span class="n">finat_elem</span><span class="p">,</span> <span class="n">ds</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="n">elements</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">finat_elem</span><span class="p">)</span>
@@ -374,13 +374,13 @@
 <div class="viewcode-block" id="create_element">
 <a class="viewcode-back" href="../../finat.html#finat.element_factory.create_element">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="n">shape_innermost</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">shift_axes</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">restriction</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a FInAT element (suitable for tabulating with) given a UFL element.</span>
+<span class="w">    </span><span class="sd">"""Create a FInAT element (suitable for tabulating with) given a UFL element.</span>
 
 <span class="sd">    :arg ufl_element: The UFL element to create a FInAT element from.</span>
 <span class="sd">    :arg shape_innermost: Vector/tensor indices come after basis function indices</span>
 <span class="sd">    :arg restriction: cell restriction in interior facet integrals</span>
 <span class="sd">                      (only for runtime tabulated elements)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">finat_element</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">_create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span>
                                           <span class="n">shape_innermost</span><span class="o">=</span><span class="n">shape_innermost</span><span class="p">,</span>
                                           <span class="n">shift_axes</span><span class="o">=</span><span class="n">shift_axes</span><span class="p">,</span>
@@ -390,12 +390,12 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A caching wrapper around :py:func:`convert`.</span>
+<span class="w">    </span><span class="sd">"""A caching wrapper around :py:func:`convert`.</span>
 
 <span class="sd">    Takes a UFL element and an unspecified set of parameter options,</span>
 <span class="sd">    and returns the converted element with the set of keyword names</span>
 <span class="sd">    that were relevant for conversion.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="c1"># Look up conversion in cache</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">cache</span> <span class="o">=</span> <span class="n">_cache</span><span class="p">[</span><span class="n">ufl_element</span><span class="p">]</span>
@@ -410,7 +410,7 @@
 
     <span class="c1"># Convert if cache miss</span>
     <span class="k">if</span> <span class="n">ufl_element</span><span class="o">.</span><span class="n">cell</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Don&#39;t know how to build element when cell is not given&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Don't know how to build element when cell is not given"</span><span class="p">)</span>
 
     <span class="n">finat_element</span><span class="p">,</span> <span class="n">deps</span> <span class="o">=</span> <span class="n">convert</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
@@ -425,10 +425,10 @@
 <div class="viewcode-block" id="create_base_element">
 <a class="viewcode-back" href="../../finat.html#finat.element_factory.create_base_element">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">create_base_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a &quot;scalar&quot; base FInAT element given a UFL element.</span>
+<span class="w">    </span><span class="sd">"""Create a "scalar" base FInAT element given a UFL element.</span>
 <span class="sd">    Takes a UFL element and an unspecified set of parameter options,</span>
 <span class="sd">    and returns the converted element.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">finat_element</span> <span class="o">=</span> <span class="n">create_element</span><span class="p">(</span><span class="n">ufl_element</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">finat_element</span><span class="p">,</span> <span class="n">finat</span><span class="o">.</span><span class="n">TensorFiniteElement</span><span class="p">):</span>
         <span class="n">finat_element</span> <span class="o">=</span> <span class="n">finat_element</span><span class="o">.</span><span class="n">base_element</span>

@@ -63,7 +63,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.polynomial_set</span><span class="w"> </span><span class="kn">import</span> <span class="n">mis</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">flatten_reference_cube</span>
 
-<span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x y z&#39;</span><span class="p">)</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span> <span class="o">=</span> <span class="n">symbols</span><span class="p">(</span><span class="s1">'x y z'</span><span class="p">)</span>
 <span class="n">variables</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">z</span><span class="p">)</span>
 <span class="n">leg</span> <span class="o">=</span> <span class="n">legendre</span>
 
@@ -93,13 +93,13 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">TrimmedSerendipity</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed serendipity elements only valid for k &gt;= 1&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"Trimmed serendipity elements only valid for k &gt;= 1"</span><span class="p">)</span>
 
         <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="n">dim</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fdim</span> <span class="o">=</span> <span class="n">dim</span>
         <span class="k">if</span> <span class="n">dim</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed serendipity elements only valid for dimensions 2 and 3&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"Trimmed serendipity elements only valid for dimensions 2 and 3"</span><span class="p">)</span>
 
         <span class="n">flat_topology</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
@@ -167,13 +167,13 @@
 <div class="viewcode-block" id="TrimmedSerendipity.dual_basis">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.Sminus.TrimmedSerendipity.dual_basis">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;dual_basis is not implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"dual_basis is not implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.get_coeffs">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.Sminus.TrimmedSerendipity.get_coeffs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_coeffs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;get_coeffs not implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"get_coeffs not implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TrimmedSerendipity.tabulate">
@@ -217,7 +217,7 @@
 
 
 <span class="c1"># Splitting the E Lambda function into two seperate functions for E Lambda and E tilde Lambda.</span>
-<span class="c1"># Correlating with Andrew&#39;s paper, leg(j, x_mid) should be a polynomial x^i, leg(j, y_mid) should be y^i,</span>
+<span class="c1"># Correlating with Andrew's paper, leg(j, x_mid) should be a polynomial x^i, leg(j, y_mid) should be y^i,</span>
 <span class="c1"># dy[0] should represent y-1, dy[1] should represent y+1 (and similar for the dx and x+/- 1).</span>
 <span class="c1"># Still not sure why we use for loops in only the EL tuple but not the ELTilde tuple.</span>
 
@@ -511,13 +511,13 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">TrimmedSerendipityEdge</span><span class="p">(</span><span class="n">TrimmedSerendipity</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed Serendipity_k edge elements only valid for k &gt;= 1&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"Trimmed Serendipity_k edge elements only valid for k &gt;= 1"</span><span class="p">)</span>
 
         <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="n">dim</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">dim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">dim</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed Serendipity_k edge elements only valid for dimensions 2 and 3&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"Trimmed Serendipity_k edge elements only valid for dimensions 2 and 3"</span><span class="p">)</span>
 
         <span class="n">verts</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
 
@@ -559,7 +559,7 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">Array</span><span class="p">(</span><span class="n">Sminus_list</span><span class="p">)}</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">Array</span><span class="p">(</span><span class="n">Sminus_list</span><span class="p">)}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;covariant piola&quot;</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"covariant piola"</span><span class="p">)</span></div>
 
 
 
@@ -568,12 +568,12 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">TrimmedSerendipityFace</span><span class="p">(</span><span class="n">TrimmedSerendipity</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed serendipity face elements only valid for k &gt;= 1&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"Trimmed serendipity face elements only valid for k &gt;= 1"</span><span class="p">)</span>
 
         <span class="n">flat_el</span> <span class="o">=</span> <span class="n">flatten_reference_cube</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="n">dim</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">dim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Trimmed serendipity face elements only valid for dimensions 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">"Trimmed serendipity face elements only valid for dimensions 2"</span><span class="p">)</span>
 
         <span class="n">verts</span> <span class="o">=</span> <span class="n">flat_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
 
@@ -591,7 +591,7 @@
         <span class="n">Sminus_list</span> <span class="o">=</span> <span class="n">EL</span> <span class="o">+</span> <span class="n">FL</span>
         <span class="n">Sminus_list</span> <span class="o">=</span> <span class="p">[[</span><span class="o">-</span><span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">a</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">Sminus_list</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">basis</span> <span class="o">=</span> <span class="p">{(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span> <span class="n">Array</span><span class="p">(</span><span class="n">Sminus_list</span><span class="p">)}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">&quot;contravariant piola&quot;</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="o">=</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="s2">"contravariant piola"</span><span class="p">)</span></div>
 
 </pre></div>
 

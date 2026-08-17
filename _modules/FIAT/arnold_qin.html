@@ -55,13 +55,13 @@
 <div class="viewcode-block" id="ArnoldQinSpace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.arnold_qin.ArnoldQinSpace">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">ArnoldQinSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a basis for the Arnold-Qin space</span>
+<span class="w">    </span><span class="sd">"""Return a basis for the Arnold-Qin space</span>
 <span class="sd">    curl(HCT-red) + P0 x if reduced = True, and</span>
-<span class="sd">    curl(HCT) + P0 x if reduced = False.&quot;&quot;&quot;</span>
+<span class="sd">    curl(HCT) + P0 x if reduced = False."""</span>
     <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">TRIANGLE</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Arnold-Qin only defined on triangles&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Arnold-Qin only defined on triangles"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Arnold-Qin only defined for degree = 2&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Arnold-Qin only defined for degree = 2"</span><span class="p">)</span>
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="n">HCT</span> <span class="o">=</span> <span class="n">HsiehCloughTocher</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">ref_complex</span> <span class="o">=</span> <span class="n">HCT</span><span class="o">.</span><span class="n">get_reference_complex</span><span class="p">()</span>
@@ -77,7 +77,7 @@
     <span class="k">if</span> <span class="n">reduced</span><span class="p">:</span>
         <span class="n">curl_at_qpts</span> <span class="o">=</span> <span class="n">curl_at_qpts</span><span class="p">[:</span><span class="mi">9</span><span class="p">]</span>
 
-    <span class="n">C0</span> <span class="o">=</span> <span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;bubble&quot;</span><span class="p">)</span>
+    <span class="n">C0</span> <span class="o">=</span> <span class="n">CkPolynomialSet</span><span class="p">(</span><span class="n">ref_complex</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"bubble"</span><span class="p">)</span>
     <span class="n">C0_at_qpts</span> <span class="o">=</span> <span class="n">C0</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span> <span class="o">*</span> <span class="n">sd</span><span class="p">]</span>
     <span class="n">duals</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">C0_at_qpts</span><span class="p">,</span> <span class="n">qwts</span><span class="p">)</span>
     <span class="n">M</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">duals</span><span class="p">,</span> <span class="n">C0_at_qpts</span><span class="o">.</span><span class="n">T</span><span class="p">)</span>
@@ -99,16 +99,16 @@
 <div class="viewcode-block" id="ArnoldQin">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.arnold_qin.ArnoldQin">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ArnoldQin</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Arnold-Qin C0(Alfeld) quadratic macroelement with divergence in P0.</span>
-<span class="sd">    This element belongs to a Stokes complex, and is paired with unsplit DG0.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The Arnold-Qin C0(Alfeld) quadratic macroelement with divergence in P0.</span>
+<span class="sd">    This element belongs to a Stokes complex, and is paired with unsplit DG0."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">reduced</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">ArnoldQinSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">reduced</span><span class="p">:</span>
             <span class="n">order</span> <span class="o">=</span> <span class="mi">1</span>
-            <span class="n">mapping</span> <span class="o">=</span> <span class="s2">&quot;contravariant piola&quot;</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="s2">"contravariant piola"</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">order</span> <span class="o">=</span> <span class="n">degree</span>
-            <span class="n">mapping</span> <span class="o">=</span> <span class="s2">&quot;affine&quot;</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="s2">"affine"</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">BernardiRaugelDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="n">degree</span><span class="p">)</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># (n-1)-form</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">formdegree</span><span class="p">,</span> <span class="n">mapping</span><span class="o">=</span><span class="n">mapping</span><span class="p">)</span></div>

@@ -51,7 +51,7 @@
 <div class="viewcode-block" id="get_lagrange_points">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.get_lagrange_points">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_lagrange_points</span><span class="p">(</span><span class="n">nodes</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract singleton point for each node.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Extract singleton point for each node."""</span>
     <span class="n">points</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">nodes</span><span class="p">:</span>
         <span class="n">pt</span><span class="p">,</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get_point_dict</span><span class="p">()</span>
@@ -63,10 +63,10 @@
 <div class="viewcode-block" id="barycentric_interpolation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.barycentric_interpolation">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">barycentric_interpolation</span><span class="p">(</span><span class="n">nodes</span><span class="p">,</span> <span class="n">wts</span><span class="p">,</span> <span class="n">dmat</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluates a Lagrange basis on a line reference element</span>
+<span class="w">    </span><span class="sd">"""Evaluates a Lagrange basis on a line reference element</span>
 <span class="sd">    via the second barycentric interpolation formula. See Berrut and Trefethen (2004)</span>
 <span class="sd">    https://doi.org/10.1137/S0036144502417715 Eq. (4.2) &amp; (9.4)</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">pts</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">object</span><span class="p">:</span>
         <span class="c1"># Do not use barycentric interpolation at unknown points</span>
         <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="o">-</span><span class="n">nodes</span><span class="p">,</span> <span class="n">pts</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
@@ -75,7 +75,7 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Use the second barycentric interpolation formula</span>
         <span class="n">phi</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="o">-</span><span class="n">nodes</span><span class="p">,</span> <span class="n">pts</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
-        <span class="k">with</span> <span class="n">numpy</span><span class="o">.</span><span class="n">errstate</span><span class="p">(</span><span class="n">divide</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">invalid</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">numpy</span><span class="o">.</span><span class="n">errstate</span><span class="p">(</span><span class="n">divide</span><span class="o">=</span><span class="s1">'ignore'</span><span class="p">,</span> <span class="n">invalid</span><span class="o">=</span><span class="s1">'ignore'</span><span class="p">):</span>
             <span class="n">numpy</span><span class="o">.</span><span class="n">reciprocal</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
             <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">wts</span><span class="p">[:,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
             <span class="n">numpy</span><span class="o">.</span><span class="n">multiply</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">numpy</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span> <span class="n">phi</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">phi</span><span class="p">)</span>
@@ -94,8 +94,8 @@
 <div class="viewcode-block" id="make_dmat">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.make_dmat">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">make_dmat</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns Lagrange differentiation matrix and barycentric weights</span>
-<span class="sd">    associated with x[j].&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns Lagrange differentiation matrix and barycentric weights</span>
+<span class="sd">    associated with x[j]."""</span>
     <span class="n">dmat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">add</span><span class="o">.</span><span class="n">outer</span><span class="p">(</span><span class="o">-</span><span class="n">x</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
     <span class="n">numpy</span><span class="o">.</span><span class="n">fill_diagonal</span><span class="p">(</span><span class="n">dmat</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
     <span class="n">wts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">dmat</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
@@ -109,10 +109,10 @@
 <div class="viewcode-block" id="LagrangeLineExpansionSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangeLineExpansionSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">LagrangeLineExpansionSet</span><span class="p">(</span><span class="n">expansions</span><span class="o">.</span><span class="n">LineExpansionSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lagrange polynomial expansion set for given points the line.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Lagrange polynomial expansion set for given points the line."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">points</span> <span class="o">=</span> <span class="n">pts</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;d&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">pts</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"d"</span><span class="p">)</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">cell_node_map</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">compute_cell_point_map</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dmats</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell_node_map</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell_node_map</span><span class="p">]</span>
@@ -124,7 +124,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">degree</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">wts</span><span class="p">)</span> <span class="k">for</span> <span class="n">wts</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">recurrence_order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">degree</span> <span class="o">+</span> <span class="mi">1</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">xk</span><span class="p">)</span> <span class="k">for</span> <span class="n">xk</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;C0&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">continuity</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">)</span> <span class="o">==</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">xk</span><span class="p">)</span> <span class="k">for</span> <span class="n">xk</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">nodes</span><span class="p">)</span> <span class="k">else</span> <span class="s2">"C0"</span>
 
 <div class="viewcode-block" id="LagrangeLineExpansionSet.get_num_members">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.barycentric_interpolation.LagrangeLineExpansionSet.get_num_members">[docs]</a>
@@ -161,7 +161,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">()):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">!=</span> <span class="n">reference_element</span><span class="o">.</span><span class="n">LINE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid reference element type.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Invalid reference element type."</span><span class="p">)</span>
 
         <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">LagrangeLineExpansionSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">pts</span><span class="p">)</span>
         <span class="n">degree</span> <span class="o">=</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">degree</span>
@@ -172,10 +172,10 @@
 
         <span class="c1"># set up coefficients</span>
         <span class="k">if</span> <span class="n">shape</span> <span class="o">==</span> <span class="p">():</span>
-            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_members</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;d&quot;</span><span class="p">)</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_members</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"d"</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">coeffs_shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">num_members</span><span class="p">,</span> <span class="o">*</span><span class="n">shape</span><span class="p">,</span> <span class="n">num_exp_functions</span><span class="p">)</span>
-            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">coeffs_shape</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">coeffs_shape</span><span class="p">,</span> <span class="s2">"d"</span><span class="p">)</span>
             <span class="n">cur</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="n">exp_bf</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_exp_functions</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">shape</span><span class="p">):</span>

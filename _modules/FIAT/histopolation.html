@@ -55,7 +55,7 @@
 <div class="viewcode-block" id="HistopolationDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.histopolation.HistopolationDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HistopolationDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;The dual basis for 1D histopolation elements.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""The dual basis for 1D histopolation elements.</span>
 
 <span class="sd">    We define window functions w_j that satisfy</span>
 
@@ -68,7 +68,7 @@
 <span class="sd">    is the usual histopolation dual basis.</span>
 
 <span class="sd">    The DOFs are defined as integral moments against w_j.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="p">[],</span> <span class="mi">1</span><span class="p">:</span> <span class="p">[]},</span>
                       <span class="mi">1</span><span class="p">:</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">degree</span><span class="o">+</span><span class="mi">1</span><span class="p">))}}</span>
@@ -102,10 +102,10 @@
 <div class="viewcode-block" id="Histopolation">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.histopolation.Histopolation">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Histopolation</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D discontinuous element with integral DOFs on GLL subgrid.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""1D discontinuous element with integral DOFs on GLL subgrid."""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">LINE</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Histopolation elements are only defined in one dimension.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Histopolation elements are only defined in one dimension."</span><span class="p">)</span>
 
         <span class="n">dual</span> <span class="o">=</span> <span class="n">HistopolationDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">LagrangePolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">dual</span><span class="o">.</span><span class="n">rule</span><span class="o">.</span><span class="n">pts</span><span class="p">)</span>

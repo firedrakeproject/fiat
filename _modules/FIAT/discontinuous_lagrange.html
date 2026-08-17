@@ -123,8 +123,8 @@
         <span class="n">on_facet_d</span> <span class="o">=</span> <span class="p">(</span><span class="n">a</span><span class="p">[:,</span> <span class="n">d</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
         <span class="n">g1</span> <span class="o">+=</span> <span class="n">d</span> <span class="o">*</span> <span class="n">on_facet_d</span>
     <span class="c1"># The above logic is consistent with the FIAT entity numbering</span>
-    <span class="c1"># convention (&quot;entities that are not incident to vertex 0 are</span>
-    <span class="c1"># numbered first, then ...&quot;), but vertices are not numbered using</span>
+    <span class="c1"># convention ("entities that are not incident to vertex 0 are</span>
+    <span class="c1"># numbered first, then ..."), but vertices are not numbered using</span>
     <span class="c1"># the same logic in FIAT, so we need to fix:</span>
     <span class="n">g1</span><span class="p">[</span><span class="n">g0</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="n">g1</span><span class="p">[</span><span class="n">g0</span> <span class="o">==</span> <span class="mi">0</span><span class="p">]</span>
     <span class="c1"># &gt;&gt;&gt; g1</span>
@@ -188,12 +188,12 @@
 <div class="viewcode-block" id="BrokenLagrangeDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.BrokenLagrangeDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">BrokenLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Lagrange elements.  This class works for</span>
+<span class="w">    </span><span class="sd">"""The dual basis for Lagrange elements.  This class works for</span>
 <span class="sd">    simplices of any dimension.  Nodes are point evaluation at</span>
 <span class="sd">    equispaced points.  This is the broken version where</span>
-<span class="sd">    all nodes are topologically associated with the cell itself&quot;&quot;&quot;</span>
+<span class="sd">    all nodes are topologically associated with the cell itself"""</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">"equispaced"</span><span class="p">):</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
@@ -219,9 +219,9 @@
 <div class="viewcode-block" id="DiscontinuousLagrangeDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.DiscontinuousLagrangeDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DiscontinuousLagrangeDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for discontinuous elements with nodes at recursively-defined points.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""The dual basis for discontinuous elements with nodes at recursively-defined points.</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="s2">"equispaced"</span><span class="p">):</span>
         <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">entity_ids</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">entity_permutations</span> <span class="o">=</span> <span class="p">{}</span>
@@ -249,7 +249,7 @@
 <div class="viewcode-block" id="DiscontinuousLagrange">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.discontinuous_lagrange.DiscontinuousLagrange">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DiscontinuousLagrange</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The discontinuous Lagrange finite element.</span>
+<span class="w">    </span><span class="sd">"""The discontinuous Lagrange finite element.</span>
 
 <span class="sd">    :arg ref_el:  The reference element, which could be a standard FIAT simplex or a split complex</span>
 <span class="sd">    :arg degree:  The polynomial degree</span>
@@ -257,13 +257,13 @@
 <span class="sd">                  and the splitting strategy if a macro element is desired.</span>
 <span class="sd">                  Either option may be omitted.  The default point type is equispaced</span>
 <span class="sd">                  and the default splitting strategy is None.</span>
-<span class="sd">                  Example: variant=&#39;gl&#39; gives a standard unsplit point distribution with</span>
+<span class="sd">                  Example: variant='gl' gives a standard unsplit point distribution with</span>
 <span class="sd">                              spectral points.</span>
-<span class="sd">                           variant=&#39;equispaced,Iso(2)&#39; with degree=1 gives the P2:P1 iso element.</span>
-<span class="sd">                           variant=&#39;Alfeld&#39; can be used to obtain a barycentrically refined</span>
+<span class="sd">                           variant='equispaced,Iso(2)' with degree=1 gives the P2:P1 iso element.</span>
+<span class="sd">                           variant='Alfeld' can be used to obtain a barycentrically refined</span>
 <span class="sd">                              macroelement for Scott-Vogelius.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+<span class="sd">    """</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"equispaced"</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">splitting</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">discontinuous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">is_macrocell</span><span class="p">():</span>
@@ -271,11 +271,11 @@
                 <span class="k">return</span> <span class="n">P0</span><span class="o">.</span><span class="n">P0</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">&quot;equispaced&quot;</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="s2">"equispaced"</span><span class="p">):</span>
         <span class="n">splitting</span><span class="p">,</span> <span class="n">point_variant</span> <span class="o">=</span> <span class="n">parse_lagrange_variant</span><span class="p">(</span><span class="n">variant</span><span class="p">,</span> <span class="n">discontinuous</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">splitting</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">ref_el</span> <span class="o">=</span> <span class="n">splitting</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">point_variant</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;equispaced&quot;</span><span class="p">,</span> <span class="s2">&quot;gll&quot;</span><span class="p">,</span> <span class="s2">&quot;lgc&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">point_variant</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"equispaced"</span><span class="p">,</span> <span class="s2">"gll"</span><span class="p">,</span> <span class="s2">"lgc"</span><span class="p">):</span>
             <span class="n">dual</span> <span class="o">=</span> <span class="n">BrokenLagrangeDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="n">point_variant</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">dual</span> <span class="o">=</span> <span class="n">DiscontinuousLagrangeDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">point_variant</span><span class="o">=</span><span class="n">point_variant</span><span class="p">)</span>

@@ -53,9 +53,9 @@
 <div class="viewcode-block" id="MorleyDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.morley.MorleyDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MorleyDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The dual basis for Morley elements.  This class works for</span>
+<span class="w">    </span><span class="sd">"""The dual basis for Morley elements.  This class works for</span>
 <span class="sd">    simplices of any dimension.  Nodes are average on codim=2 entities</span>
-<span class="sd">    and average of normal derivative on codim=1 entities.&quot;&quot;&quot;</span>
+<span class="sd">    and average of normal derivative on codim=1 entities."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
@@ -95,13 +95,13 @@
 <div class="viewcode-block" id="Morley">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.morley.Morley">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Morley</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Morley finite element.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The Morley finite element."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="n">TRIANGLE</span><span class="p">,</span> <span class="n">TETRAHEDRON</span><span class="p">}:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Morley only defined on simplices of dimension &gt;= 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Morley only defined on simplices of dimension &gt;= 2"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">degree</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;{type(self).__name__} only defined for degree == 2&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"{type(self).__name__} only defined for degree == 2"</span><span class="p">)</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="n">dual</span> <span class="o">=</span> <span class="n">MorleyDualSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poly_set</span><span class="p">,</span> <span class="n">dual</span><span class="p">,</span> <span class="n">degree</span><span class="p">)</span></div>

@@ -36,9 +36,9 @@
           <div class="body" role="main">
             
   <h1>Source code for gem.interpreter</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""</span>
 <span class="sd">An interpreter for GEM trees.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">operator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrderedDict</span>
@@ -48,11 +48,11 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem</span><span class="w"> </span><span class="kn">import</span> <span class="n">gem</span><span class="p">,</span> <span class="n">node</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="n">replace_delta</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;evaluate&quot;</span><span class="p">,</span> <span class="p">)</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"evaluate"</span><span class="p">,</span> <span class="p">)</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Result</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;An array object that tracks which axes of the array correspond to</span>
+<span class="w">    </span><span class="sd">"""An array object that tracks which axes of the array correspond to</span>
 <span class="sd">    gem free indices (and what those free indices are).</span>
 
 <span class="sd">    :arg arr: The array.</span>
@@ -60,20 +60,20 @@
 
 <span class="sd">    The first ``len(fids)`` axes of the provided array correspond to</span>
 <span class="sd">    the free indices, the remaining axes are the shape of each entry.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">arr</span><span class="p">,</span> <span class="n">fids</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">arr</span> <span class="o">=</span> <span class="n">arr</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">fids</span> <span class="o">=</span> <span class="n">fids</span> <span class="k">if</span> <span class="n">fids</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">broadcast</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fids</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Given some free indices, return a broadcasted array which</span>
+<span class="w">        </span><span class="sd">"""Given some free indices, return a broadcasted array which</span>
 <span class="sd">        contains extra dimensions that correspond to indices in fids</span>
 <span class="sd">        that are not in ``self.fids``.</span>
 
 <span class="sd">        Note that inserted dimensions will have length one.</span>
 
 <span class="sd">        :arg fids: The free indices for broadcasting.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># Select free indices</span>
         <span class="n">axes</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">fi</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span> <span class="ow">in</span> <span class="n">fids</span> <span class="k">if</span> <span class="n">fi</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">axes</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="p">)</span>
@@ -87,13 +87,13 @@
         <span class="k">return</span> <span class="n">arr</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">filter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">fids</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Given an index tuple and some free indices, return a</span>
-<span class="sd">        &quot;filtered&quot; index tuple which removes entries that correspond</span>
+<span class="w">        </span><span class="sd">"""Given an index tuple and some free indices, return a</span>
+<span class="sd">        "filtered" index tuple which removes entries that correspond</span>
 <span class="sd">        to indices in fids that are not in ``self.fids``.</span>
 
 <span class="sd">        :arg idx: The index tuple to filter.</span>
 <span class="sd">        :arg fids: The free indices for the index tuple.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">idx</span><span class="p">[</span><span class="n">fids</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">i</span><span class="p">)]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="p">)</span> <span class="o">+</span> <span class="n">idx</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">fids</span><span class="p">):]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
@@ -104,34 +104,34 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">tshape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The total shape of the result array.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The total shape of the result array."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">shape</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fshape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The shape of the free index part of the result array.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The shape of the free index part of the result array."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tshape</span><span class="p">[:</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="p">)]</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The shape of the shape part of the result array.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The shape of the shape part of the result array."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">tshape</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="p">):]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;Result(</span><span class="si">%r</span><span class="s2">, </span><span class="si">%r</span><span class="s2">)&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">"Result(</span><span class="si">%r</span><span class="s2">, </span><span class="si">%r</span><span class="s2">)"</span> <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">arr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fids</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="nb">repr</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">empty</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">children</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build an empty Result object.</span>
+<span class="w">        </span><span class="sd">"""Build an empty Result object.</span>
 
 <span class="sd">        :arg children: The children used to determine the shape and</span>
 <span class="sd">            free indices.</span>
 <span class="sd">        :kwarg dtype: The data type of the result array.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">dtype</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dtype&quot;</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
+<span class="sd">        """</span>
+        <span class="n">dtype</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dtype"</span><span class="p">,</span> <span class="nb">float</span><span class="p">)</span>
         <span class="k">assert</span> <span class="nb">all</span><span class="p">(</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">c</span><span class="o">.</span><span class="n">shape</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">children</span><span class="p">)</span>
         <span class="n">fids</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">fids</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">children</span><span class="p">)):</span>
@@ -143,48 +143,48 @@
 
 <span class="nd">@singledispatch</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate an expression using a provided callback handler.</span>
+<span class="w">    </span><span class="sd">"""Evaluate an expression using a provided callback handler.</span>
 
 <span class="sd">    :arg expression: The expression to evaluation.</span>
 <span class="sd">    :arg self: The callback handler (should provide bindings).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unhandled node type </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">expression</span><span class="p">))</span>
+<span class="sd">    """</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Unhandled node type </span><span class="si">%s</span><span class="s2">"</span> <span class="o">%</span> <span class="nb">type</span><span class="p">(</span><span class="n">expression</span><span class="p">))</span>
 
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_zero</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Zeros produce an array of zeros.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Zeros produce an array of zeros."""</span>
     <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">))</span>
 
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Failure</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_failure</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Failure nodes produce NaNs.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Failure nodes produce NaNs."""</span>
     <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">))</span>
 
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Constant</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_constant</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constants return their array.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Constants return their array."""</span>
     <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">array</span><span class="p">)</span>
 
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_delta</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lower delta and evaluate.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Lower delta and evaluate."""</span>
     <span class="n">e</span><span class="p">,</span> <span class="o">=</span> <span class="n">replace_delta</span><span class="p">((</span><span class="n">e</span><span class="p">,))</span>
     <span class="k">return</span> <span class="bp">self</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
 
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Variable</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_variable</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Look up variables in the provided bindings.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Look up variables in the provided bindings."""</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bindings</span><span class="p">[</span><span class="n">e</span><span class="p">]</span>
     <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Binding for </span><span class="si">%s</span><span class="s2"> not found&quot;</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Binding for </span><span class="si">%s</span><span class="s2"> not found"</span> <span class="o">%</span> <span class="n">e</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">val</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="n">e</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Binding for </span><span class="si">%s</span><span class="s2"> has wrong shape.  </span><span class="si">%s</span><span class="s2">, not </span><span class="si">%s</span><span class="s2">.&quot;</span> <span class="o">%</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Binding for </span><span class="si">%s</span><span class="s2"> has wrong shape.  </span><span class="si">%s</span><span class="s2">, not </span><span class="si">%s</span><span class="s2">."</span> <span class="o">%</span>
                          <span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
     <span class="k">return</span> <span class="n">Result</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
 
@@ -211,11 +211,11 @@
     <span class="n">ops</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="o">*</span><span class="n">ops</span><span class="p">)</span>
     <span class="n">names</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;abs&quot;</span><span class="p">:</span> <span class="nb">abs</span><span class="p">,</span>
-        <span class="s2">&quot;log&quot;</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">,</span>
-        <span class="s2">&quot;real&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">attrgetter</span><span class="p">(</span><span class="s2">&quot;real&quot;</span><span class="p">),</span>
-        <span class="s2">&quot;imag&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">attrgetter</span><span class="p">(</span><span class="s2">&quot;imag&quot;</span><span class="p">),</span>
-        <span class="s2">&quot;conj&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">methodcaller</span><span class="p">(</span><span class="s2">&quot;conjugate&quot;</span><span class="p">),</span>
+        <span class="s2">"abs"</span><span class="p">:</span> <span class="nb">abs</span><span class="p">,</span>
+        <span class="s2">"log"</span><span class="p">:</span> <span class="n">numpy</span><span class="o">.</span><span class="n">log</span><span class="p">,</span>
+        <span class="s2">"real"</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">attrgetter</span><span class="p">(</span><span class="s2">"real"</span><span class="p">),</span>
+        <span class="s2">"imag"</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">attrgetter</span><span class="p">(</span><span class="s2">"imag"</span><span class="p">),</span>
+        <span class="s2">"conj"</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">methodcaller</span><span class="p">(</span><span class="s2">"conjugate"</span><span class="p">),</span>
     <span class="p">}</span>
     <span class="n">op</span> <span class="o">=</span> <span class="n">names</span><span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
     <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">tshape</span><span class="p">):</span>
@@ -238,12 +238,12 @@
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Comparison</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_comparison</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
     <span class="n">ops</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
-    <span class="n">op</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;&gt;&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">gt</span><span class="p">,</span>
-          <span class="s2">&quot;&gt;=&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">ge</span><span class="p">,</span>
-          <span class="s2">&quot;==&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">eq</span><span class="p">,</span>
-          <span class="s2">&quot;!=&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">ne</span><span class="p">,</span>
-          <span class="s2">&quot;&lt;&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span>
-          <span class="s2">&quot;&lt;=&quot;</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">le</span><span class="p">}[</span><span class="n">e</span><span class="o">.</span><span class="n">operator</span><span class="p">]</span>
+    <span class="n">op</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"&gt;"</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">gt</span><span class="p">,</span>
+          <span class="s2">"&gt;="</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">ge</span><span class="p">,</span>
+          <span class="s2">"=="</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">eq</span><span class="p">,</span>
+          <span class="s2">"!="</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">ne</span><span class="p">,</span>
+          <span class="s2">"&lt;"</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">lt</span><span class="p">,</span>
+          <span class="s2">"&lt;="</span><span class="p">:</span> <span class="n">operator</span><span class="o">.</span><span class="n">le</span><span class="p">}[</span><span class="n">e</span><span class="o">.</span><span class="n">operator</span><span class="p">]</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="o">*</span><span class="n">ops</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">tshape</span><span class="p">):</span>
         <span class="n">result</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">op</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">o</span><span class="p">[</span><span class="n">o</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">fids</span><span class="p">)]</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">))</span>
@@ -253,7 +253,7 @@
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">LogicalNot</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_logicalnot</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
     <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-    <span class="k">assert</span> <span class="n">val</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">val</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">"bool"</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">val</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">tshape</span><span class="p">):</span>
         <span class="n">result</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">val</span><span class="p">[</span><span class="n">val</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">fids</span><span class="p">)]</span>
@@ -263,8 +263,8 @@
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">LogicalAnd</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_logicaland</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
     <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
-    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">)</span>
-    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">"bool"</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">"bool"</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">tshape</span><span class="p">):</span>
         <span class="n">result</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">fids</span><span class="p">)]</span> <span class="ow">and</span> \
@@ -275,8 +275,8 @@
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">LogicalOr</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_logicalor</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
     <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
-    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">)</span>
-    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">a</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">"bool"</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">b</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">"bool"</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">tshape</span><span class="p">):</span>
         <span class="n">result</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">a</span><span class="p">[</span><span class="n">a</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">fids</span><span class="p">)]</span> <span class="ow">or</span> \
@@ -287,7 +287,7 @@
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Conditional</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_conditional</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
     <span class="n">cond</span><span class="p">,</span> <span class="n">then</span><span class="p">,</span> <span class="n">else_</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
-    <span class="k">assert</span> <span class="n">cond</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">&quot;bool&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">cond</span><span class="o">.</span><span class="n">arr</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="s2">"bool"</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">Result</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span> <span class="n">then</span><span class="p">,</span> <span class="n">else_</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">ndindex</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">tshape</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">cond</span><span class="p">[</span><span class="n">cond</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">fids</span><span class="p">)]:</span>
@@ -299,7 +299,7 @@
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_indexed</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Indexing maps shape to free indices&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Indexing maps shape to free indices"""</span>
     <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">fids</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">multiindex</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">))</span>
 
@@ -326,11 +326,11 @@
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_componenttensor</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Component tensors map free indices to shape.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Component tensors map free indices to shape."""</span>
     <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">axes</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">fids</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="c1"># First grab the free indices that aren&#39;t bound</span>
+    <span class="c1"># First grab the free indices that aren't bound</span>
     <span class="k">for</span> <span class="n">a</span><span class="p">,</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">fids</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">f</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">multiindex</span><span class="p">:</span>
             <span class="n">axes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
@@ -346,7 +346,7 @@
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_indexsum</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Index sums reduce over the given axis.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Index sums reduce over the given axis."""</span>
     <span class="n">val</span> <span class="o">=</span> <span class="bp">self</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">idx</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="n">val</span><span class="o">.</span><span class="n">fids</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">multiindex</span><span class="p">))</span>
     <span class="n">rfids</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">fi</span> <span class="k">for</span> <span class="n">fi</span> <span class="ow">in</span> <span class="n">val</span><span class="o">.</span><span class="n">fids</span> <span class="k">if</span> <span class="n">fi</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">multiindex</span><span class="p">)</span>
@@ -355,7 +355,7 @@
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_listtensor</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;List tensors just turn into arrays.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""List tensors just turn into arrays."""</span>
     <span class="n">ops</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
     <span class="n">tmp</span> <span class="o">=</span> <span class="n">Result</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="o">*</span><span class="n">ops</span><span class="p">)</span>
     <span class="n">arrs</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">broadcast_to</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">broadcast</span><span class="p">(</span><span class="n">tmp</span><span class="o">.</span><span class="n">fids</span><span class="p">),</span> <span class="n">tmp</span><span class="o">.</span><span class="n">fshape</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">]</span>
@@ -365,7 +365,7 @@
 
 <span class="nd">@_evaluate</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Concatenate</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_evaluate_concatenate</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="bp">self</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Concatenate nodes flatten and concatenate shapes.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Concatenate nodes flatten and concatenate shapes."""</span>
     <span class="n">ops</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="p">(</span><span class="n">o</span><span class="p">)</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">children</span><span class="p">]</span>
     <span class="n">fids</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">OrderedDict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="n">o</span><span class="o">.</span><span class="n">fids</span> <span class="k">for</span> <span class="n">o</span> <span class="ow">in</span> <span class="n">ops</span><span class="p">))))</span>
     <span class="n">fshape</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">fids</span><span class="p">)</span>
@@ -385,14 +385,14 @@
 <div class="viewcode-block" id="evaluate">
 <a class="viewcode-back" href="../../gem.html#gem.interpreter.evaluate">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">evaluate</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">bindings</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Evaluate some GEM expressions given variable bindings.</span>
+<span class="w">    </span><span class="sd">"""Evaluate some GEM expressions given variable bindings.</span>
 
 <span class="sd">    :arg expressions: A single GEM expression, or iterable of</span>
 <span class="sd">        expressions to evaluate.</span>
 <span class="sd">    :kwarg bindings: An optional dict mapping GEM :class:`gem.Variable`</span>
 <span class="sd">        nodes to data.</span>
 <span class="sd">    :returns: a list of the evaluated expressions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">exprs</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>

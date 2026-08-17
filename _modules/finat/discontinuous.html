@@ -46,7 +46,7 @@
 <div class="viewcode-block" id="DiscontinuousElement">
 <a class="viewcode-back" href="../../finat.html#finat.discontinuous.DiscontinuousElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DiscontinuousElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Element wrapper that makes a FInAT element discontinuous.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Element wrapper that makes a FInAT element discontinuous."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
@@ -91,7 +91,7 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">entity_dofs</span><span class="p">()</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">entity_closure_dofs</span><span class="p">():</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">element</span><span class="o">.</span><span class="n">entity_permutations</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for a general </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"entity_permutations not yet implemented for a general </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <div class="viewcode-block" id="DiscontinuousElement.space_dimension">
 <a class="viewcode-back" href="../../finat.html#finat.discontinuous.DiscontinuousElement.space_dimension">[docs]</a>

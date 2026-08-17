@@ -47,11 +47,11 @@
 <div class="viewcode-block" id="MixedElement">
 <a class="viewcode-back" href="../../finat.html#finat.mixed.MixedElement">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">MixedElement</span><span class="p">(</span><span class="n">elements</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructor function for FEniCS-style mixed elements.</span>
+<span class="w">    </span><span class="sd">"""Constructor function for FEniCS-style mixed elements.</span>
 
 <span class="sd">    Implements mixed element using :py:class:`EnrichedElement` and</span>
 <span class="sd">    value shape transformations with :py:class:`MixedSubElement`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">sizes</span> <span class="o">=</span> <span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">value_shape</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
              <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">]</span>
     <span class="n">offsets</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">offset</span><span class="p">)</span> <span class="k">for</span> <span class="n">offset</span> <span class="ow">in</span> <span class="n">numpy</span><span class="o">.</span><span class="n">cumsum</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">sizes</span><span class="p">)]</span>
@@ -64,8 +64,8 @@
 <div class="viewcode-block" id="MixedSubElement">
 <a class="viewcode-back" href="../../finat.html#finat.mixed.MixedSubElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MixedSubElement</span><span class="p">(</span><span class="n">FiniteElementBase</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Element wrapper that flattens value shape and places the flattened</span>
-<span class="sd">    vector in a longer vector of zeros.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Element wrapper that flattens value shape and places the flattened</span>
+<span class="sd">    vector in a longer vector of zeros."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">element</span><span class="p">,</span> <span class="n">size</span><span class="p">,</span> <span class="n">offset</span><span class="p">):</span>
         <span class="k">assert</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">offset</span> <span class="o">&lt;=</span> <span class="n">size</span>

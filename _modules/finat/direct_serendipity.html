@@ -60,7 +60,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.DirectSerendipity">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DirectSerendipity</span><span class="p">(</span><span class="n">DirectlyDefinedElement</span><span class="p">,</span> <span class="n">FiniteElementBase</span><span class="p">):</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
-        <span class="n">cite</span><span class="p">(</span><span class="s2">&quot;Arbogast2017&quot;</span><span class="p">)</span>
+        <span class="n">cite</span><span class="p">(</span><span class="s2">"Arbogast2017"</span><span class="p">)</span>
 
         <span class="c1"># These elements only known currently on quads</span>
         <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cell</span><span class="p">,</span> <span class="n">UFCQuadrilateral</span><span class="p">)</span>
@@ -135,13 +135,13 @@
 <div class="viewcode-block" id="DirectSerendipity.basis_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.DirectSerendipity.basis_evaluation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at known points on the</span>
+<span class="w">        </span><span class="sd">'''Return code for evaluating the element at known points on the</span>
 <span class="sd">        reference element.</span>
 
 <span class="sd">        :param order: return derivatives up to this order.</span>
 <span class="sd">        :param ps: the point set.</span>
 <span class="sd">        :param entity: the cell entity on which to tabulate.</span>
-<span class="sd">        &#39;&#39;&#39;</span>
+<span class="sd">        '''</span>
         <span class="c1"># Build everything in sympy</span>
         <span class="n">vs</span><span class="p">,</span> <span class="n">xx</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_basis</span>
 
@@ -174,13 +174,13 @@
 <div class="viewcode-block" id="DirectSerendipity.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.DirectSerendipity.point_evaluation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">point</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Not done yet, sorry!&quot;</span><span class="p">)</span></div>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Not done yet, sorry!"</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="DirectSerendipity.mapping">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.DirectSerendipity.mapping">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="s2">&quot;physical&quot;</span></div>
+        <span class="k">return</span> <span class="s2">"physical"</span></div>
 </div>
 
 
@@ -195,7 +195,7 @@
 <div class="viewcode-block" id="ds1_sym">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.ds1_sym">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">ds1_sym</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">vs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sp</span><span class="o">=</span><span class="n">symbolics</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs lowest-order case of Arbogast&#39;s directly defined C^0 serendipity</span>
+<span class="w">    </span><span class="sd">"""Constructs lowest-order case of Arbogast's directly defined C^0 serendipity</span>
 <span class="sd">    elements, which are a special case.</span>
 
 <span class="sd">    :arg ct: The cell topology of the reference quadrilateral.</span>
@@ -203,16 +203,16 @@
 <span class="sd">        If it is None, this function constructs symbols for the vertices.</span>
 
 <span class="sd">    :returns: a 3-tuple containing symbols for the physical cell coordinates and the</span>
-<span class="sd">        physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
+<span class="sd">        physical cell independent variables (e.g. "x" and "y") and a list</span>
 <span class="sd">        of the four basis functions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">vs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x:4&#39;</span><span class="p">),</span>
-                                    <span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;y:4&#39;</span><span class="p">))))</span>
+        <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">'x:4'</span><span class="p">),</span>
+                                    <span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">'y:4'</span><span class="p">))))</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">vs</span><span class="p">)</span>
 
-    <span class="n">xx</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s2">&quot;x,y&quot;</span><span class="p">))</span>
+    <span class="n">xx</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s2">"x,y"</span><span class="p">))</span>
 
     <span class="n">ts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
@@ -280,8 +280,8 @@
 <div class="viewcode-block" id="newton_dd">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.newton_dd">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">newton_dd</span><span class="p">(</span><span class="n">nds</span><span class="p">,</span> <span class="n">fs</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs Newton&#39;s divided differences for the input arrays,</span>
-<span class="sd">    which may include symbolic values.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Constructs Newton's divided differences for the input arrays,</span>
+<span class="sd">    which may include symbolic values."""</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">nds</span><span class="p">)</span>
     <span class="n">mat</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
     <span class="n">mat</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">fs</span><span class="p">[:]</span>
@@ -295,9 +295,9 @@
 <div class="viewcode-block" id="newton_poly">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.newton_poly">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">newton_poly</span><span class="p">(</span><span class="n">nds</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="n">xsym</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs  Lagrange interpolating polynomial passing through</span>
+<span class="w">    </span><span class="sd">"""Constructs  Lagrange interpolating polynomial passing through</span>
 <span class="sd">    x values nds and y values fs.  Returns a a symbolic object in terms</span>
-<span class="sd">    of independent variable xsym.&quot;&quot;&quot;</span>
+<span class="sd">    of independent variable xsym."""</span>
     <span class="n">coeffs</span> <span class="o">=</span> <span class="n">newton_dd</span><span class="p">(</span><span class="n">nds</span><span class="p">,</span> <span class="n">fs</span><span class="p">)</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">coeffs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">coeffs</span><span class="p">)</span>
@@ -310,13 +310,13 @@
 <div class="viewcode-block" id="diff">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.diff">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">diff</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">xx</span><span class="p">,</span> <span class="n">alpha</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Differentiate expr with respect to xx.</span>
+<span class="w">    </span><span class="sd">"""Differentiate expr with respect to xx.</span>
 
 <span class="sd">    :arg expr: symengine/symengine Expression to differentiate.</span>
 <span class="sd">    :arg xx: iterable of coordinates to differentiate with respect to.</span>
 <span class="sd">    :arg alpha: derivative multiindex, one entry for each entry of xx</span>
 <span class="sd">        indicating how many derivatives in that direction.</span>
-<span class="sd">    :returns: New symengine/symengine expression.&quot;&quot;&quot;</span>
+<span class="sd">    :returns: New symengine/symengine expression."""</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">sympy</span><span class="o">.</span><span class="n">Expr</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">expr</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="o">*</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">alpha</span><span class="p">)))</span>
     <span class="k">else</span><span class="p">:</span>
@@ -327,7 +327,7 @@
 <div class="viewcode-block" id="dsr_sym">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.dsr_sym">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">dsr_sym</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">vs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sp</span><span class="o">=</span><span class="n">symbolics</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs higher-order (&gt;= 2) case of Arbogast&#39;s directly defined C^0 serendipity</span>
+<span class="w">    </span><span class="sd">"""Constructs higher-order (&gt;= 2) case of Arbogast's directly defined C^0 serendipity</span>
 <span class="sd">    elements, which include all polynomials of degree r plus a couple of rational</span>
 <span class="sd">    functions.</span>
 
@@ -336,15 +336,15 @@
 <span class="sd">        If it is None, this function constructs symbols for the vertices.</span>
 
 <span class="sd">    :returns: a 3-tuple containing symbols for the physical cell coordinates and the</span>
-<span class="sd">        physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
+<span class="sd">        physical cell independent variables (e.g. "x" and "y") and a list</span>
 <span class="sd">        of the four basis functions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">vs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># do vertices symbolically</span>
-        <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;x:4&#39;</span><span class="p">),</span>
-                                    <span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">&#39;y:4&#39;</span><span class="p">))))</span>
+        <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">'x:4'</span><span class="p">),</span>
+                                    <span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s1">'y:4'</span><span class="p">))))</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">vs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">vs</span><span class="p">)</span>
-    <span class="n">xx</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s2">&quot;x,y&quot;</span><span class="p">))</span>
+    <span class="n">xx</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">symbols</span><span class="p">(</span><span class="s2">"x,y"</span><span class="p">))</span>
 
     <span class="n">ts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
@@ -389,7 +389,7 @@
         <span class="n">v2</span> <span class="o">=</span> <span class="n">vs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span> <span class="o">+</span> <span class="n">dx0</span> <span class="o">+</span> <span class="p">(</span><span class="n">r</span><span class="o">-</span><span class="mi">3</span><span class="p">)</span> <span class="o">*</span> <span class="n">dx1</span>
 
         <span class="c1"># Pardon the fortran, but these are barycentric coordinates...</span>
-        <span class="n">bary</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;object&quot;</span><span class="p">)</span>
+        <span class="n">bary</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"object"</span><span class="p">)</span>
         <span class="n">y12</span> <span class="o">=</span> <span class="n">v1</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">v2</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
         <span class="n">x21</span> <span class="o">=</span> <span class="n">v2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">v1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">x02</span> <span class="o">=</span> <span class="n">v0</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">v2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -403,7 +403,7 @@
 
         <span class="c1"># And this bit directly constructs the Lagrange polynomials</span>
         <span class="c1"># of degree r-4 on the triangular lattice inside the triangle.</span>
-        <span class="c1"># This trick is restricted to equispaced points, but we&#39;re on a much</span>
+        <span class="c1"># This trick is restricted to equispaced points, but we're on a much</span>
         <span class="c1"># lower degree than r.  This bypasses symbolic inversion/etc otherwise</span>
         <span class="c1"># required to build the Lagrange polynomials.</span>
         <span class="n">rm4</span> <span class="o">=</span> <span class="n">r</span> <span class="o">-</span> <span class="mi">4</span>
@@ -433,11 +433,11 @@
 
     <span class="n">nodes1d</span> <span class="o">=</span> <span class="p">[</span><span class="n">sp</span><span class="o">.</span><span class="n">Rational</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">r</span><span class="p">)]</span>
 
-    <span class="n">s</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">Symbol</span><span class="p">(</span><span class="s1">&#39;s&#39;</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">Symbol</span><span class="p">(</span><span class="s1">'s'</span><span class="p">)</span>
 
     <span class="c1"># for each edge:</span>
     <span class="c1"># I need its adjacent two edges and its opposite edge</span>
-    <span class="c1"># and its &quot;tunnel R&quot; RH or RV</span>
+    <span class="c1"># and its "tunnel R" RH or RV</span>
     <span class="c1"># This is very 2d specific.</span>
     <span class="n">opposite_edges</span> <span class="o">=</span> <span class="p">{</span><span class="n">e</span><span class="p">:</span> <span class="p">[</span><span class="n">eother</span> <span class="k">for</span> <span class="n">eother</span> <span class="ow">in</span> <span class="n">ct</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
                           <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">ct</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">e</span><span class="p">])</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">ct</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">eother</span><span class="p">])</span> <span class="o">==</span> <span class="nb">set</span><span class="p">()][</span><span class="mi">0</span><span class="p">]</span>
@@ -555,7 +555,7 @@
 <div class="viewcode-block" id="ds_sym">
 <a class="viewcode-back" href="../../finat.html#finat.direct_serendipity.ds_sym">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">ds_sym</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">vs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">sp</span><span class="o">=</span><span class="n">symbolics</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Symbolically Constructs Arbogast&#39;s directly defined C^0 serendipity elements,</span>
+<span class="w">    </span><span class="sd">"""Symbolically Constructs Arbogast's directly defined C^0 serendipity elements,</span>
 <span class="sd">    which include all polynomials of degree r plus a couple of rational functions.</span>
 
 <span class="sd">    :arg ct: The cell topology of the reference quadrilateral.</span>
@@ -563,9 +563,9 @@
 <span class="sd">        If it is None, this function constructs symbols for the vertices.</span>
 
 <span class="sd">    :returns: a 3-tuple containing symbols for the physical cell coordinates and the</span>
-<span class="sd">        physical cell independent variables (e.g. &quot;x&quot; and &quot;y&quot;) and a list</span>
+<span class="sd">        physical cell independent variables (e.g. "x" and "y") and a list</span>
 <span class="sd">        of the four basis functions.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">r</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">ds1_sym</span><span class="p">(</span><span class="n">ct</span><span class="p">,</span> <span class="n">vs</span><span class="o">=</span><span class="n">vs</span><span class="p">,</span> <span class="n">sp</span><span class="o">=</span><span class="n">sp</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>

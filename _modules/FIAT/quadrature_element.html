@@ -57,7 +57,7 @@
 <div class="viewcode-block" id="QuadratureElement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature_element.QuadratureElement">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QuadratureElement</span><span class="p">(</span><span class="n">FiniteElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A set of quadrature points pretending to be a finite element.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""A set of quadrature points pretending to be a finite element."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="c1"># Create entity dofs.</span>
@@ -79,26 +79,26 @@
 <div class="viewcode-block" id="QuadratureElement.value_shape">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature_element.QuadratureElement.value_shape">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="s2">&quot;The QuadratureElement is scalar valued&quot;</span>
+        <span class="s2">"The QuadratureElement is scalar valued"</span>
         <span class="k">return</span> <span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="QuadratureElement.tabulate">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.quadrature_element.QuadratureElement.tabulate">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">tabulate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">points</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the identity matrix of size (num_quad_points, num_quad_points),</span>
-<span class="sd">        in a format that monomialintegration and monomialtabulation understands.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return the identity matrix of size (num_quad_points, num_quad_points),</span>
+<span class="sd">        in a format that monomialintegration and monomialtabulation understands."""</span>
 
         <span class="k">if</span> <span class="n">entity</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">entity</span> <span class="o">!=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">(),</span> <span class="mi">0</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;QuadratureElement does not &quot;tabulate&quot; on subentities.&#39;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">'QuadratureElement does not "tabulate" on subentities.'</span><span class="p">)</span>
 
         <span class="c1"># Derivatives are not defined on a QuadratureElement</span>
         <span class="k">if</span> <span class="n">order</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Derivatives are not defined on a QuadratureElement.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Derivatives are not defined on a QuadratureElement."</span><span class="p">)</span>
 
         <span class="c1"># Check that incoming points are equal to the quadrature points.</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">points</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_points</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">abs</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">points</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_points</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mf">1e-12</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">&quot;Mismatch of quadrature points!&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">AssertionError</span><span class="p">(</span><span class="s2">"Mismatch of quadrature points!"</span><span class="p">)</span>
 
         <span class="c1"># Return the identity matrix of size len(self._points).</span>
         <span class="n">values</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_points</span><span class="p">))</span>

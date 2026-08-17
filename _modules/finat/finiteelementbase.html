@@ -54,35 +54,35 @@
 
     <span class="nd">@abstractproperty</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;The reference cell on which the element is defined.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''The reference cell on which the element is defined.'''</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">complex</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;The reference cell complex over which bases are defined.</span>
-<span class="sd">           Can be different than self.cell in the case of macro elements.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''The reference cell complex over which bases are defined.</span>
+<span class="sd">           Can be different than self.cell in the case of macro elements.'''</span>
 
     <span class="nd">@abstractproperty</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">degree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;The degree of the embedding polynomial space.</span>
+<span class="w">        </span><span class="sd">'''The degree of the embedding polynomial space.</span>
 
 <span class="sd">        In the tensor case this is a tuple.</span>
-<span class="sd">        &#39;&#39;&#39;</span>
+<span class="sd">        '''</span>
 
     <span class="nd">@abstractproperty</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">formdegree</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Degree of the associated form (FEEC)&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''Degree of the associated form (FEEC)'''</span>
 
 <div class="viewcode-block" id="FiniteElementBase.entity_dofs">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.entity_dofs">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">entity_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the map of topological entities to degrees of</span>
-<span class="sd">        freedom for the finite element.&#39;&#39;&#39;</span></div>
+<span class="w">        </span><span class="sd">'''Return the map of topological entities to degrees of</span>
+<span class="sd">        freedom for the finite element.'''</span></div>
 
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">entity_permutations</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Returns a nested dictionary that gives, for each dimension,</span>
+<span class="w">        </span><span class="sd">'''Returns a nested dictionary that gives, for each dimension,</span>
 <span class="sd">        for each entity, and for each possible entity orientation, the</span>
 <span class="sd">        DoF permutation array that maps the entity local DoF ordering</span>
 <span class="sd">        to the canonical global DoF ordering.</span>
@@ -102,8 +102,8 @@
 <span class="sd">        a single entity on dimension ``1`` (interval), which has two</span>
 <span class="sd">        possible orientations representing non-reflected and reflected</span>
 <span class="sd">        intervals.</span>
-<span class="sd">        &#39;&#39;&#39;</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="sd">        '''</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"entity_permutations not yet implemented for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -117,9 +117,9 @@
 <div class="viewcode-block" id="FiniteElementBase.entity_closure_dofs">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.entity_closure_dofs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">entity_closure_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the map of topological entities to degrees of</span>
+<span class="w">        </span><span class="sd">'''Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom on the closure of those entities for the finite</span>
-<span class="sd">        element.&#39;&#39;&#39;</span>
+<span class="sd">        element.'''</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_closure_dofs</span></div>
 
 
@@ -163,9 +163,9 @@
 <div class="viewcode-block" id="FiniteElementBase.entity_support_dofs">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.entity_support_dofs">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">entity_support_dofs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the map of topological entities to degrees of</span>
+<span class="w">        </span><span class="sd">'''Return the map of topological entities to degrees of</span>
 <span class="sd">        freedom that have non-zero support on those entities for the</span>
-<span class="sd">        finite element.&#39;&#39;&#39;</span>
+<span class="sd">        finite element.'''</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_entity_support_dofs</span></div>
 
 
@@ -173,32 +173,32 @@
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.space_dimension">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">space_dimension</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return the dimension of the finite element space.&#39;&#39;&#39;</span></div>
+<span class="w">        </span><span class="sd">'''Return the dimension of the finite element space.'''</span></div>
 
 
     <span class="nd">@abstractproperty</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">index_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple indicating the number of degrees of freedom in the</span>
+<span class="w">        </span><span class="sd">'''A tuple indicating the number of degrees of freedom in the</span>
 <span class="sd">        element. For example a scalar quadratic Lagrange element on a triangle</span>
 <span class="sd">        would return (6,) while a vector valued version of the same element</span>
-<span class="sd">        would return (6, 2)&#39;&#39;&#39;</span>
+<span class="sd">        would return (6, 2)'''</span>
 
     <span class="nd">@abstractproperty</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">value_shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple indicating the shape of the element.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''A tuple indicating the shape of the element.'''</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">fiat_equivalent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;The FIAT element equivalent to this FInAT element.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''The FIAT element equivalent to this FInAT element.'''</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Cannot make equivalent FIAT element for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"Cannot make equivalent FIAT element for </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
 <div class="viewcode-block" id="FiniteElementBase.get_indices">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.get_indices">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple of GEM :class:`Index` of the correct extents to loop over</span>
-<span class="sd">        the basis functions of this element.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''A tuple of GEM :class:`Index` of the correct extents to loop over</span>
+<span class="sd">        the basis functions of this element.'''</span>
 
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">index_shape</span><span class="p">)</span></div>
 
@@ -206,8 +206,8 @@
 <div class="viewcode-block" id="FiniteElementBase.get_value_indices">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.get_value_indices">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_value_indices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;A tuple of GEM :class:`~gem.Index` of the correct extents to loop over</span>
-<span class="sd">        the value shape of this element.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''A tuple of GEM :class:`~gem.Index` of the correct extents to loop over</span>
+<span class="sd">        the value shape of this element.'''</span>
 
         <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span><span class="p">)</span></div>
 
@@ -216,7 +216,7 @@
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.basis_evaluation">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at known points on the</span>
+<span class="w">        </span><span class="sd">'''Return code for evaluating the element at known points on the</span>
 <span class="sd">        reference element.</span>
 
 <span class="sd">        :param order: return derivatives up to this order.</span>
@@ -225,14 +225,14 @@
 <span class="sd">        :param coordinate_mapping: a</span>
 <span class="sd">           :class:`~.physically_mapped.PhysicalGeometry` object that</span>
 <span class="sd">           provides physical geometry callbacks (may be None).</span>
-<span class="sd">        &#39;&#39;&#39;</span></div>
+<span class="sd">        '''</span></div>
 
 
 <div class="viewcode-block" id="FiniteElementBase.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.point_evaluation">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">point_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">refcoords</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return code for evaluating the element at an arbitrary points on</span>
+<span class="w">        </span><span class="sd">'''Return code for evaluating the element at an arbitrary points on</span>
 <span class="sd">        the reference element.</span>
 
 <span class="sd">        :param order: return derivatives up to this order.</span>
@@ -244,12 +244,12 @@
 <span class="sd">        :param coordinate_mapping: a</span>
 <span class="sd">           :class:`~.physically_mapped.PhysicalGeometry` object that</span>
 <span class="sd">           provides physical geometry callbacks (may be None).</span>
-<span class="sd">        &#39;&#39;&#39;</span></div>
+<span class="sd">        '''</span></div>
 
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Return a dual evaluation gem weight tensor Q and point set x to dual</span>
+<span class="w">        </span><span class="sd">'''Return a dual evaluation gem weight tensor Q and point set x to dual</span>
 <span class="sd">        evaluate a function fn at.</span>
 
 <span class="sd">        The general dual evaluation is then Q * fn(x) (the contraction of Q</span>
@@ -283,7 +283,7 @@
 
 <span class="sd">        If the dual basis is of a tensor finite element with some shape</span>
 <span class="sd">        (S1, S2, ..., Sn) then the tensor element tQ is constructed from the</span>
-<span class="sd">        base element&#39;s Q by taking the outer product with appropriately sized</span>
+<span class="sd">        base element's Q by taking the outer product with appropriately sized</span>
 <span class="sd">        identity matrices:</span>
 
 <span class="sd">        .. code-block:: text</span>
@@ -304,15 +304,15 @@
 <span class="sd">            properties. Therefore any FIAT dual bases with derivative nodes</span>
 <span class="sd">            represented via a ``Functional.deriv_dict`` property does not</span>
 <span class="sd">            currently have a FInAT dual basis.</span>
-<span class="sd">        &#39;&#39;&#39;</span>
+<span class="sd">        '''</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Dual basis not defined for element </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">"Dual basis not defined for element </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span>
         <span class="p">)</span>
 
 <div class="viewcode-block" id="FiniteElementBase.dual_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.dual_evaluation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Get a GEM expression for performing the dual basis evaluation at</span>
+<span class="w">        </span><span class="sd">'''Get a GEM expression for performing the dual basis evaluation at</span>
 <span class="sd">        the nodes of the reference element. Currently only works for flat</span>
 <span class="sd">        elements: tensor elements are implemented in</span>
 <span class="sd">        :class:`TensorFiniteElement`.</span>
@@ -329,7 +329,7 @@
 <span class="sd">                  return expression for the code which is compiled from</span>
 <span class="sd">                  ``dual_evaluation_gem_expression`` (alongside any argument</span>
 <span class="sd">                  multiindices already encoded within ``fn``)</span>
-<span class="sd">        &#39;&#39;&#39;</span>
+<span class="sd">        '''</span>
         <span class="n">Q</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
         <span class="n">Q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_transformation</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
 
@@ -357,7 +357,7 @@
 <div class="viewcode-block" id="FiniteElementBase.dual_transformation">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.dual_transformation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">dual_transformation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">Q</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Transforms reference dual evaluation into physical dual evaluation.</span>
+<span class="w">        </span><span class="sd">"""Transforms reference dual evaluation into physical dual evaluation.</span>
 
 <span class="sd">        :param Q: The reference dual evaluation gem weight tensor</span>
 <span class="sd">            mapping quadrature points to reference degrees of freedom.</span>
@@ -365,19 +365,19 @@
 <span class="sd">           :class:`~.physically_mapped.PhysicalGeometry` object that</span>
 <span class="sd">           provides physical geometry callbacks (may be None).</span>
 <span class="sd">        :returns: The physical dual evaluation gem weight tensor.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">Q</span></div>
 
 
     <span class="nd">@abstractproperty</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Appropriate mapping from the reference cell to a physical cell for</span>
-<span class="sd">        all basis functions of the finite element.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''Appropriate mapping from the reference cell to a physical cell for</span>
+<span class="sd">        all basis functions of the finite element.'''</span>
 
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">has_pointwise_dual_basis</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&#39;&#39;&#39;Whether this element&#39;s dual basis consists only of point</span>
-<span class="sd">        evaluation functionals.&#39;&#39;&#39;</span>
+<span class="w">        </span><span class="sd">'''Whether this element's dual basis consists only of point</span>
+<span class="sd">        evaluation functionals.'''</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">Q</span><span class="p">,</span> <span class="n">ps</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
         <span class="k">except</span> <span class="ne">NotImplementedError</span><span class="p">:</span>
@@ -402,12 +402,12 @@
 <div class="viewcode-block" id="entity_support_dofs">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.entity_support_dofs">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">entity_support_dofs</span><span class="p">(</span><span class="n">elem</span><span class="p">,</span> <span class="n">entity_dim</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&#39;&#39;&#39;Return the map of entity id to the degrees of freedom for which</span>
+<span class="w">    </span><span class="sd">'''Return the map of entity id to the degrees of freedom for which</span>
 <span class="sd">    the corresponding basis functions take non-zero values.</span>
 
 <span class="sd">    :arg elem: FInAT finite element</span>
 <span class="sd">    :arg entity_dim: Dimension of the cell subentity.</span>
-<span class="sd">    &#39;&#39;&#39;</span>
+<span class="sd">    '''</span>
     <span class="k">return</span> <span class="n">elem</span><span class="o">.</span><span class="n">entity_support_dofs</span><span class="p">()[</span><span class="n">entity_dim</span><span class="p">]</span></div>
 
 </pre></div>

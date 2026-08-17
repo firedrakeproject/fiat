@@ -69,13 +69,13 @@
 <div class="viewcode-block" id="WuXuH3NCSpace">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuH3NCSpace">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">WuXuH3NCSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">robust</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a basis for the the Wu Xu H^3 nonconforming spaces</span>
+<span class="w">    </span><span class="sd">"""Constructs a basis for the the Wu Xu H^3 nonconforming spaces</span>
 
 <span class="sd">    P^{(3,1)}(T) = P_3(T) + b_T P_1(T), if robust = False</span>
 
 <span class="sd">    P^{(3,2)}(T) = P_3(T) + b_T P_1(T) + b_T^2 P_1(T), if robust = True</span>
 
-<span class="sd">    where b_T is the standard cubic bubble.&quot;&quot;&quot;</span>
+<span class="sd">    where b_T is the standard cubic bubble."""</span>
 
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="k">assert</span> <span class="n">sd</span> <span class="o">==</span> <span class="mi">2</span>
@@ -89,21 +89,21 @@
     <span class="n">dimp3</span> <span class="o">=</span> <span class="n">polydim</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
     <span class="n">dimpk</span> <span class="o">=</span> <span class="n">polydim</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">embedded_degree</span><span class="p">)</span>
 
-    <span class="c1"># Here&#39;s the first bit we&#39;ll work with.  It&#39;s already expressed in terms</span>
-    <span class="c1"># of the ON basis for Pk, so we&#39;re golden.</span>
+    <span class="c1"># Here's the first bit we'll work with.  It's already expressed in terms</span>
+    <span class="c1"># of the ON basis for Pk, so we're golden.</span>
     <span class="n">p3frompk</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">take</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">dimp3</span><span class="p">)))</span>
 
-    <span class="c1"># Rather than creating the barycentric coordinates ourself, let&#39;s</span>
+    <span class="c1"># Rather than creating the barycentric coordinates ourself, let's</span>
     <span class="c1"># reuse the existing bubble functionality</span>
     <span class="n">bT</span> <span class="o">=</span> <span class="n">Bubble</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
     <span class="n">p1</span> <span class="o">=</span> <span class="n">Lagrange</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
-    <span class="c1"># next, we&#39;ll have to project b_T P1 and b_T^2 P1 onto Pk</span>
+    <span class="c1"># next, we'll have to project b_T P1 and b_T^2 P1 onto Pk</span>
     <span class="n">Q</span> <span class="o">=</span> <span class="n">create_quadrature</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">embedded_degree</span><span class="p">)</span>
     <span class="n">Qpts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_points</span><span class="p">())</span>
     <span class="n">Qwts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">get_weights</span><span class="p">())</span>
 
-    <span class="c1"># it&#39;s just one bubble function: let&#39;s get a 1d array!</span>
+    <span class="c1"># it's just one bubble function: let's get a 1d array!</span>
     <span class="n">bT_at_qpts</span> <span class="o">=</span> <span class="n">bT</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">][</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span>
     <span class="n">p1_at_qpts</span> <span class="o">=</span> <span class="n">p1</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">Qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
 
@@ -111,7 +111,7 @@
     <span class="c1"># polynomial set</span>
     <span class="n">pk_at_qpts</span> <span class="o">=</span> <span class="n">pk</span><span class="o">.</span><span class="n">tabulate</span><span class="p">(</span><span class="n">Qpts</span><span class="p">)[(</span><span class="mi">0</span><span class="p">,)</span><span class="o">*</span><span class="n">sd</span><span class="p">]</span>
 
-    <span class="n">bubble_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="n">dimpk</span><span class="p">),</span> <span class="s2">&quot;d&quot;</span><span class="p">)</span>
+    <span class="n">bubble_coeffs</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">6</span><span class="p">,</span> <span class="n">dimpk</span><span class="p">),</span> <span class="s2">"d"</span><span class="p">)</span>
 
     <span class="c1"># first three: bT P1, last three will be bT^2 P1</span>
     <span class="n">foo</span> <span class="o">=</span> <span class="n">bT_at_qpts</span> <span class="o">*</span> <span class="n">p1_at_qpts</span> <span class="o">*</span> <span class="n">Qwts</span>
@@ -132,8 +132,8 @@
 <div class="viewcode-block" id="WuXuRobustH3NCDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuRobustH3NCDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">WuXuRobustH3NCDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dual basis for WuXu H3 nonconforming element consisting of</span>
-<span class="sd">    vertex values and gradients and first and second normals at edge midpoints.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Dual basis for WuXu H3 nonconforming element consisting of</span>
+<span class="sd">    vertex values and gradients and first and second normals at edge midpoints."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -168,8 +168,8 @@
 <div class="viewcode-block" id="WuXuH3NCDualSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuH3NCDualSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">WuXuH3NCDualSet</span><span class="p">(</span><span class="n">dual_set</span><span class="o">.</span><span class="n">DualSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dual basis for WuXu H3 nonconforming element consisting of</span>
-<span class="sd">    vertex values and gradients and second normals at edge midpoints.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Dual basis for WuXu H3 nonconforming element consisting of</span>
+<span class="sd">    vertex values and gradients and second normals at edge midpoints."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -203,7 +203,7 @@
 <div class="viewcode-block" id="WuXuRobustH3NC">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuRobustH3NC">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">WuXuRobustH3NC</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Wu-Xu robust H3 nonconforming finite element&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The Wu-Xu robust H3 nonconforming finite element"""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">7</span><span class="p">):</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">WuXuH3NCSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">robust</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">assert</span> <span class="n">degree</span> <span class="o">==</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">degree</span>
@@ -215,7 +215,7 @@
 <div class="viewcode-block" id="WuXuH3NC">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.wuxu.WuXuH3NC">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">WuXuH3NC</span><span class="p">(</span><span class="n">finite_element</span><span class="o">.</span><span class="n">CiarletElement</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The Wu-Xu H3 nonconforming finite element&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The Wu-Xu H3 nonconforming finite element"""</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
         <span class="n">poly_set</span> <span class="o">=</span> <span class="n">WuXuH3NCSpace</span><span class="p">(</span><span class="n">ref_el</span><span class="p">)</span>
         <span class="k">assert</span> <span class="n">degree</span> <span class="o">==</span> <span class="n">poly_set</span><span class="o">.</span><span class="n">degree</span>

@@ -49,13 +49,13 @@
 <div class="viewcode-block" id="bary_to_xy">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.bary_to_xy">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">bary_to_xy</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">bary</span><span class="p">,</span> <span class="n">result</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maps barycentric coordinates to physical points.</span>
+<span class="w">    </span><span class="sd">"""Maps barycentric coordinates to physical points.</span>
 
 <span class="sd">    :arg verts: A tuple of points.</span>
 <span class="sd">    :arg bary: A row-stacked numpy array of barycentric coordinates.</span>
 <span class="sd">    :arg result: A row-stacked numpy array of physical points.</span>
 <span class="sd">    :returns: result</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">bary</span><span class="p">,</span> <span class="n">verts</span><span class="p">,</span> <span class="n">out</span><span class="o">=</span><span class="n">result</span><span class="p">)</span></div>
 
 
@@ -63,13 +63,13 @@
 <div class="viewcode-block" id="xy_to_bary">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.xy_to_bary">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">xy_to_bary</span><span class="p">(</span><span class="n">verts</span><span class="p">,</span> <span class="n">pts</span><span class="p">,</span> <span class="n">result</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Maps physical points to barycentric coordinates.</span>
+<span class="w">    </span><span class="sd">"""Maps physical points to barycentric coordinates.</span>
 
 <span class="sd">    :arg verts: A tuple of points.</span>
 <span class="sd">    :arg pts: A row-stacked numpy array of physical points.</span>
 <span class="sd">    :arg result: A row-stacked numpy array of barycentric coordinates.</span>
 <span class="sd">    :returns: result</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">verts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">verts</span><span class="p">)</span>
     <span class="n">pts</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">pts</span><span class="p">)</span>
     <span class="n">npts</span> <span class="o">=</span> <span class="n">pts</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -89,11 +89,11 @@
 <div class="viewcode-block" id="facet_support">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.facet_support">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">facet_support</span><span class="p">(</span><span class="n">facet_coords</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="mf">1.e-12</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the support of a facet.</span>
+<span class="w">    </span><span class="sd">"""Returns the support of a facet.</span>
 
 <span class="sd">    :arg facet_coords: An iterable of tuples (barycentric coordinates) describing the facet.</span>
 <span class="sd">    :returns: A tuple of vertex ids where some coordinate is nonzero.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">facet_coords</span> <span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">xi</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">xi</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">tol</span><span class="p">)))</span></div>
 
 
@@ -101,7 +101,7 @@
 <div class="viewcode-block" id="invert_cell_topology">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.invert_cell_topology">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">invert_cell_topology</span><span class="p">(</span><span class="n">T</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns a dict of dicts mapping dimension x vertices to entity id.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Returns a dict of dicts mapping dimension x vertices to entity id."""</span>
     <span class="k">return</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="p">{</span><span class="n">T</span><span class="p">[</span><span class="n">dim</span><span class="p">][</span><span class="n">entity</span><span class="p">]:</span> <span class="n">entity</span> <span class="k">for</span> <span class="n">entity</span> <span class="ow">in</span> <span class="n">T</span><span class="p">[</span><span class="n">dim</span><span class="p">]}</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">T</span><span class="p">}</span></div>
 
 
@@ -136,12 +136,12 @@
 <div class="viewcode-block" id="SplitSimplicialComplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.SplitSimplicialComplex">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">SplitSimplicialComplex</span><span class="p">(</span><span class="n">SimplicialComplex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class to implement a split on a Simplex.</span>
+<span class="w">    </span><span class="sd">"""Abstract class to implement a split on a Simplex.</span>
 
 <span class="sd">    :arg parent: The parent Simplex to split.</span>
 <span class="sd">    :arg vertices: The vertices of the simplicial complex.</span>
 <span class="sd">    :arg topology: The topology of the simplicial complex.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="p">,</span> <span class="n">vertices</span><span class="p">,</span> <span class="n">topology</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_parent_complex</span> <span class="o">=</span> <span class="n">parent</span>
         <span class="k">while</span> <span class="n">parent</span><span class="o">.</span><span class="n">get_parent</span><span class="p">():</span>
@@ -210,48 +210,48 @@
 <div class="viewcode-block" id="SplitSimplicialComplex.get_child_to_parent">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.SplitSimplicialComplex.get_child_to_parent">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_child_to_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Maps split complex facet tuple to its parent entity tuple.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Maps split complex facet tuple to its parent entity tuple."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_child_to_parent</span></div>
 
 
 <div class="viewcode-block" id="SplitSimplicialComplex.get_parent_to_children">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.SplitSimplicialComplex.get_parent_to_children">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_parent_to_children</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Maps parent facet tuple to a list of tuples of entites in the split complex.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Maps parent facet tuple to a list of tuples of entites in the split complex."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent_to_children</span></div>
 
 
 <div class="viewcode-block" id="SplitSimplicialComplex.get_cell_connectivity">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.SplitSimplicialComplex.get_cell_connectivity">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_cell_connectivity</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connectitivity from cell in a complex to global facet ids and</span>
+<span class="w">        </span><span class="sd">"""Connectitivity from cell in a complex to global facet ids and</span>
 <span class="sd">        respects the entity numbering on the reference cell.</span>
 
 <span class="sd">        N.B. cell_connectivity[cell][dim] has the same contents as</span>
 <span class="sd">        self.connectivity[(sd, dim)][cell], except those are sorted.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cell_connectivity</span></div>
 
 
 <div class="viewcode-block" id="SplitSimplicialComplex.get_interior_facets">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.SplitSimplicialComplex.get_interior_facets">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_interior_facets</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the list of entities of the given dimension that are</span>
-<span class="sd">        supported on the parent&#39;s interior.</span>
+<span class="w">        </span><span class="sd">"""Returns the list of entities of the given dimension that are</span>
+<span class="sd">        supported on the parent's interior.</span>
 
 <span class="sd">        :arg dimension: subentity dimension (integer)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_interior_facets</span><span class="p">[</span><span class="n">dimension</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="SplitSimplicialComplex.construct_subelement">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.SplitSimplicialComplex.construct_subelement">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">construct_subelement</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference element of a cell subentity</span>
+<span class="w">        </span><span class="sd">"""Constructs the reference element of a cell subentity</span>
 <span class="sd">        specified by subelement dimension.</span>
 
 <span class="sd">        :arg dimension: subentity dimension (integer)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parent</span><span class="p">()</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span></div>
 
 
@@ -285,13 +285,13 @@
 <div class="viewcode-block" id="IsoSplit">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.IsoSplit">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">IsoSplit</span><span class="p">(</span><span class="n">SplitSimplicialComplex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits simplex into the simplicial complex obtained by</span>
+<span class="w">    </span><span class="sd">"""Splits simplex into the simplicial complex obtained by</span>
 <span class="sd">    connecting points on a regular lattice.</span>
 
 <span class="sd">    :arg ref_el: The parent Simplex to split.</span>
 <span class="sd">    :kwarg degree: The number of subdivisions along each edge of the simplex.</span>
 <span class="sd">    :kwarg variant: The point distribution variant.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">variant</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">degree</span> <span class="o">=</span> <span class="n">degree</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">variant</span> <span class="o">=</span> <span class="n">variant</span>
@@ -324,9 +324,9 @@
 <div class="viewcode-block" id="IsoSplit.construct_subcomplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.IsoSplit.construct_subcomplex">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">construct_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference subcomplex of the parent complex</span>
+<span class="w">        </span><span class="sd">"""Constructs the reference subcomplex of the parent complex</span>
 <span class="sd">        specified by subcomplex dimension.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">dimension</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">():</span>
             <span class="k">return</span> <span class="bp">self</span>
         <span class="n">ref_el</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">dimension</span><span class="p">)</span>
@@ -342,9 +342,9 @@
 <div class="viewcode-block" id="PowellSabinSplit">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.PowellSabinSplit">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PowellSabinSplit</span><span class="p">(</span><span class="n">SplitSimplicialComplex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a simplicial complex by connecting barycenters of subentities</span>
+<span class="w">    </span><span class="sd">"""Splits a simplicial complex by connecting barycenters of subentities</span>
 <span class="sd">    to the barycenter of the superentities of the given dimension or higher.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">dimension</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">split_dimension</span> <span class="o">=</span> <span class="n">dimension</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
@@ -383,9 +383,9 @@
 <div class="viewcode-block" id="PowellSabinSplit.construct_subcomplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.PowellSabinSplit.construct_subcomplex">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">construct_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference subcomplex of the parent complex</span>
+<span class="w">        </span><span class="sd">"""Constructs the reference subcomplex of the parent complex</span>
 <span class="sd">        specified by subcomplex dimension.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">dimension</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_dimension</span><span class="p">():</span>
             <span class="k">return</span> <span class="bp">self</span>
         <span class="n">parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_parent_complex</span><span class="p">()</span>
@@ -402,9 +402,9 @@
 <div class="viewcode-block" id="AlfeldSplit">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.AlfeldSplit">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AlfeldSplit</span><span class="p">(</span><span class="n">PowellSabinSplit</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a simplicial complex by connecting cell vertices to their</span>
+<span class="w">    </span><span class="sd">"""Splits a simplicial complex by connecting cell vertices to their</span>
 <span class="sd">    barycenter.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">_split_cache</span><span class="p">[</span><span class="bp">cls</span><span class="p">]</span>
@@ -421,9 +421,9 @@
 <div class="viewcode-block" id="WorseyFarinSplit">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.WorseyFarinSplit">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">WorseyFarinSplit</span><span class="p">(</span><span class="n">PowellSabinSplit</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a simplicial complex by connecting cell and facet vertices to their</span>
+<span class="w">    </span><span class="sd">"""Splits a simplicial complex by connecting cell and facet vertices to their</span>
 <span class="sd">    barycenter. This reduces to Powell-Sabin on the triangle, and Alfeld on the interval.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">_split_cache</span><span class="p">[</span><span class="bp">cls</span><span class="p">]</span>
@@ -440,9 +440,9 @@
 <div class="viewcode-block" id="PowellSabin12Split">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.PowellSabin12Split">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PowellSabin12Split</span><span class="p">(</span><span class="n">SplitSimplicialComplex</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Splits a triangle (only!) by connecting each vertex to the opposite</span>
+<span class="w">    </span><span class="sd">"""Splits a triangle (only!) by connecting each vertex to the opposite</span>
 <span class="sd">    edge midpoint and edge midpoints to each other.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">):</span>
         <span class="k">assert</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span> <span class="o">==</span> <span class="n">TRIANGLE</span>
         <span class="n">verts</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_vertices</span><span class="p">()</span>
@@ -470,9 +470,9 @@
 <div class="viewcode-block" id="PowellSabin12Split.construct_subcomplex">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.PowellSabin12Split.construct_subcomplex">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">construct_subcomplex</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimension</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Constructs the reference subcomplex of the parent cell subentity</span>
+<span class="w">        </span><span class="sd">"""Constructs the reference subcomplex of the parent cell subentity</span>
 <span class="sd">        specified by subcomplex dimension.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">if</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span>
         <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
@@ -480,7 +480,7 @@
         <span class="k">elif</span> <span class="n">dimension</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Illegal dimension&quot;</span><span class="p">)</span></div>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Illegal dimension"</span><span class="p">)</span></div>
 </div>
 
 
@@ -488,7 +488,7 @@
 <div class="viewcode-block" id="MacroQuadratureRule">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.MacroQuadratureRule">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MacroQuadratureRule</span><span class="p">(</span><span class="n">QuadratureRule</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Composite quadrature rule on parent facets that respects the splitting.</span>
+<span class="w">    </span><span class="sd">"""Composite quadrature rule on parent facets that respects the splitting.</span>
 
 <span class="sd">    :arg ref_el: A simplicial complex.</span>
 <span class="sd">    :arg Q_ref: A QuadratureRule on the reference simplex.</span>
@@ -496,7 +496,7 @@
 <span class="sd">                         defaults to all facets.</span>
 
 <span class="sd">    :returns: A quadrature rule on the sub entities of the simplicial complex.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">Q_ref</span><span class="p">,</span> <span class="n">parent_facets</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="n">parent_dim</span> <span class="o">=</span> <span class="n">Q_ref</span><span class="o">.</span><span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">parent_facets</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -545,7 +545,7 @@
 <div class="viewcode-block" id="CkPolynomialSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.CkPolynomialSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">CkPolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a C^k-continuous PolynomialSet on a simplicial complex.</span>
+<span class="w">    </span><span class="sd">"""Constructs a C^k-continuous PolynomialSet on a simplicial complex.</span>
 
 <span class="sd">    :arg ref_el: The simplicial complex.</span>
 <span class="sd">    :arg degree: The polynomial degree.</span>
@@ -555,12 +555,12 @@
 <span class="sd">    :kwarg shape: The value shape.</span>
 <span class="sd">    :kwarg variant: The variant for the underlying ExpansionSet.</span>
 <span class="sd">    :kwarg scale: The scale for the underlying ExpansionSet.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">vorder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)):</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;order&#39; must be either an int or dict, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">order</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"'order' must be either an int or dict, not </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">order</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
@@ -571,10 +571,10 @@
             <span class="n">order</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">k</span> <span class="ow">in</span> <span class="p">{</span><span class="mi">0</span><span class="p">,</span> <span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">}</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">order</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Only face or vertex constraints have been implemented.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Only face or vertex constraints have been implemented."</span><span class="p">)</span>
 
         <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">expansions</span><span class="o">.</span><span class="n">ExpansionSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="s2">"C0"</span> <span class="k">else</span> <span class="mi">0</span>
 
         <span class="c1"># Impose C^forder continuity across interior facets</span>
         <span class="n">facet_el</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
@@ -637,21 +637,21 @@
 <div class="viewcode-block" id="hdiv_conforming_coefficients">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.hdiv_conforming_coefficients">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">hdiv_conforming_coefficients</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constrains a PolynomialSet to have vanishing normal jumps on the</span>
+<span class="w">    </span><span class="sd">"""Constrains a PolynomialSet to have vanishing normal jumps on the</span>
 <span class="sd">       interior facets of a simplicial complex.</span>
 
 <span class="sd">    :arg U: A PolynomialSet, it may be vector- or tensor-valued.</span>
 <span class="sd">    :arg order: The maximum order of differentiation on the normal jump constraints.</span>
 
 <span class="sd">    :returns: The coefficients of the constrained PolynomialSet.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.quadrature_schemes</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_quadrature</span>
     <span class="n">degree</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">degree</span>
     <span class="n">ref_el</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_reference_element</span><span class="p">()</span>
     <span class="n">coeffs</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_coeffs</span><span class="p">()</span>
     <span class="n">shape</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_shape</span><span class="p">()</span>
     <span class="n">expansion_set</span> <span class="o">=</span> <span class="n">U</span><span class="o">.</span><span class="n">get_expansion_set</span><span class="p">()</span>
-    <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="s2">&quot;C0&quot;</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">expansion_set</span><span class="o">.</span><span class="n">continuity</span> <span class="o">==</span> <span class="s2">"C0"</span> <span class="k">else</span> <span class="mi">0</span>
 
     <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
     <span class="n">facet_el</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">construct_subelement</span><span class="p">(</span><span class="n">sd</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
@@ -684,7 +684,7 @@
 <div class="viewcode-block" id="HDivPolynomialSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.HDivPolynomialSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HDivPolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a vector-valued PolynomialSet with continuous</span>
+<span class="w">    </span><span class="sd">"""Constructs a vector-valued PolynomialSet with continuous</span>
 <span class="sd">       normal components on a simplicial complex.</span>
 
 <span class="sd">    :arg ref_el: The simplicial complex.</span>
@@ -692,7 +692,7 @@
 <span class="sd">    :kwarg order: The order of continuity across subcells.</span>
 <span class="sd">    :kwarg variant: The variant for the underlying ExpansionSet.</span>
 <span class="sd">    :kwarg scale: The scale for the underlying ExpansionSet.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
         <span class="n">U</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">sd</span><span class="p">,),</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -704,7 +704,7 @@
 <div class="viewcode-block" id="HDivSymPolynomialSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.HDivSymPolynomialSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HDivSymPolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a symmetric tensor-valued PolynomialSet with continuous</span>
+<span class="w">    </span><span class="sd">"""Constructs a symmetric tensor-valued PolynomialSet with continuous</span>
 <span class="sd">       normal components on a simplicial complex.</span>
 
 <span class="sd">    :arg ref_el: The simplicial complex.</span>
@@ -712,7 +712,7 @@
 <span class="sd">    :kwarg order: The order of continuity across subcells.</span>
 <span class="sd">    :kwarg variant: The variant for the underlying ExpansionSet.</span>
 <span class="sd">    :kwarg scale: The scale for the underlying ExpansionSet.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="n">U</span> <span class="o">=</span> <span class="n">polynomial_set</span><span class="o">.</span><span class="n">ONSymTensorPolynomialSet</span><span class="p">(</span><span class="n">ref_el</span><span class="p">,</span> <span class="n">degree</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
         <span class="n">coeffs</span> <span class="o">=</span> <span class="n">hdiv_conforming_coefficients</span><span class="p">(</span><span class="n">U</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
@@ -723,7 +723,7 @@
 <div class="viewcode-block" id="pullback">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.pullback">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">pullback</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">mapping</span><span class="p">,</span> <span class="n">J</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Jinv</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">Jdet</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Transforms a reference tabulation into physical space.</span>
+<span class="w">    </span><span class="sd">"""Transforms a reference tabulation into physical space.</span>
 
 <span class="sd">    :arg phi: The tabulation on reference space.</span>
 <span class="sd">    :arg mapping: A string indicating the pullback type.</span>
@@ -732,18 +732,18 @@
 <span class="sd">    :arg Jdet: The determinant of the Jacobian.</span>
 
 <span class="sd">    :returns: The tabulation on physical space.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">formdegree</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;affine&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,),</span>
-            <span class="s2">&quot;covariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,),</span>
-            <span class="s2">&quot;contravariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span>
-            <span class="s2">&quot;double covariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
-            <span class="s2">&quot;double contravariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
-            <span class="s2">&quot;covariant contravariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
-            <span class="s2">&quot;contravariant covariant piola&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">}[</span><span class="n">mapping</span><span class="p">]</span>
+            <span class="s2">"affine"</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span><span class="p">,),</span>
+            <span class="s2">"covariant piola"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,),</span>
+            <span class="s2">"contravariant piola"</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,),</span>
+            <span class="s2">"double covariant piola"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span>
+            <span class="s2">"double contravariant piola"</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">"covariant contravariant piola"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+            <span class="s2">"contravariant covariant piola"</span><span class="p">:</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">}[</span><span class="n">mapping</span><span class="p">]</span>
     <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized mapping </span><span class="si">{</span><span class="n">mapping</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized mapping </span><span class="si">{</span><span class="n">mapping</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">J</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">J</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">pinv</span><span class="p">(</span><span class="n">Jinv</span><span class="p">)</span>
@@ -773,12 +773,12 @@
 <div class="viewcode-block" id="MacroPolynomialSet">
 <a class="viewcode-back" href="../../FIAT.html#FIAT.macro.MacroPolynomialSet">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MacroPolynomialSet</span><span class="p">(</span><span class="n">polynomial_set</span><span class="o">.</span><span class="n">PolynomialSet</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Constructs a PolynomialSet by tiling a CiarletElement on a</span>
+<span class="w">    </span><span class="sd">"""Constructs a PolynomialSet by tiling a CiarletElement on a</span>
 <span class="sd">       SimplicialComplex.</span>
 
 <span class="sd">    :arg ref_el: The SimplicialComplex.</span>
 <span class="sd">    :arg element: The CiarletElement.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_el</span><span class="p">,</span> <span class="n">element</span><span class="p">):</span>
         <span class="n">top</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_topology</span><span class="p">()</span>
         <span class="n">sd</span> <span class="o">=</span> <span class="n">ref_el</span><span class="o">.</span><span class="n">get_spatial_dimension</span><span class="p">()</span>
