@@ -279,7 +279,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         Qi = Q[basis_indices + shape_indices]
         expri = expr[shape_indices]
         evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
-        # Factorise over the new contraction with x, keeping whole the
+        # Factorise over the new contraction with Qi, keeping whole the
         # contractions that fn already factorised
         evaluation = gem.optimise.contraction(evaluation, stop_at=is_contraction)
         return evaluation, basis_indices
