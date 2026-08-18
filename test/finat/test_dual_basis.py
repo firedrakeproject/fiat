@@ -3,6 +3,7 @@ import numpy
 import finat
 import gem
 from FIAT import ufc_simplex
+from gem.interpreter import evaluate
 
 
 @pytest.mark.parametrize("dim", (2, 3))
@@ -45,3 +46,69 @@ def test_enriched_element_dual_evaluation():
     assert isinstance(expr.children[0], gem.Concatenate)
     assert len(indices) == 1
     assert indices[0].extent == enriched.space_dimension()
+
+
+@pytest.fixture(scope="module")
+def hexahedron():
+    line = finat.Lagrange(ufc_simplex(1), 1)
+    return finat.TensorProductElement([finat.TensorProductElement([line, line]), line])
+
+
+def coefficient_evaluation(element, ps, dofs):
+    """Evaluate a coefficient at a point set, sum factorised as TSFC does."""
+    beta = element.get_indices()
+    zeta = element.get_value_indices()
+    dim = element.cell.get_spatial_dimension()
+    table = element.basis_evaluation(0, ps)[(0,) * dim]
+    dofs = gem.Literal(dofs.reshape([index.extent for index in beta]))
+    value = gem.Product(gem.Indexed(table, beta + zeta), gem.Indexed(dofs, beta))
+    return gem.ComponentTensor(gem.optimise.contraction(gem.IndexSum(value, beta)), zeta)
+
+
+def nodal_values(element, fn):
+    """Dual evaluate fn against a nodal element, giving its values at the nodes."""
+    expression, indices = element.dual_evaluation(fn)
+    result, = evaluate([gem.ComponentTensor(expression, indices)])
+    return result.arr
+
+
+@pytest.mark.parametrize("power", (2, 3, 4))
+def test_dual_evaluation_of_powers(hexahedron, power):
+    # Each evaluation contracts over the three tensor-product directions, so
+    # a product of them carries more indices than one sum factorisation can
+    # search.  The evaluations are already factorised, so keep them that way.
+    numpy.random.seed(0)
+    dofs = numpy.random.rand(hexahedron.space_dimension())
+
+    def evaluation(ps):
+        return coefficient_evaluation(hexahedron, ps, dofs)
+
+    def monomial(ps):
+        expression = evaluation(ps)
+        for _ in range(power - 1):
+            expression = gem.Product(expression, evaluation(ps))
+        return expression
+
+    assert numpy.allclose(nodal_values(hexahedron, monomial),
+                          nodal_values(hexahedron, evaluation) ** power)
+
+
+def test_dual_evaluation_of_coupled_evaluations(hexahedron):
+    # Contracting the value indices of two evaluations couples them into a
+    # single contraction, which no ordering of the factors can break up.
+    element = finat.TensorFiniteElement(hexahedron, (3,))
+    numpy.random.seed(0)
+    dofs = numpy.random.rand(element.space_dimension())
+
+    def evaluation(ps):
+        return coefficient_evaluation(element, ps, dofs)
+
+    def cubed(ps):
+        u = evaluation(ps)
+        i, j = gem.Index(extent=3), gem.Index(extent=3)
+        square = gem.IndexSum(gem.Product(gem.Indexed(u, (i,)), gem.Indexed(u, (i,))), (i,))
+        return gem.ComponentTensor(gem.Product(square, gem.Indexed(u, (j,))), (j,))
+
+    values = nodal_values(element, evaluation)
+    expected = numpy.einsum("...i,...i->...", values, values)[..., None] * values
+    assert numpy.allclose(nodal_values(element, cubed), expected)

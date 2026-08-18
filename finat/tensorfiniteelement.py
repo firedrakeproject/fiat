@@ -3,7 +3,8 @@ from itertools import chain
 import numpy
 
 import gem
-from gem.optimise import delta_elimination, sum_factorise, traverse_product
+from gem.optimise import (delta_elimination, is_contraction, sum_factorise,
+                          traverse_product)
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
@@ -177,8 +178,9 @@ class TensorFiniteElement(FiniteElementBase):
 
         expr = fn(x)
         # Apply targeted sum factorisation and delta elimination to
-        # the expression
-        sum_indices, factors = delta_elimination(*traverse_product(expr))
+        # the expression, preserving contractions that fn already
+        # factorised
+        sum_indices, factors = delta_elimination(*traverse_product(expr, stop_at=is_contraction))
         expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
         # expression is tensor valued.
@@ -200,7 +202,7 @@ class TensorFiniteElement(FiniteElementBase):
         # This doesn't work perfectly, the resulting code doesn't have
         # a minimal memory footprint, although the operation count
         # does appear to be minimal.
-        evaluation = gem.optimise.contraction(evaluation)
+        evaluation = gem.optimise.contraction(evaluation, stop_at=is_contraction)
         return evaluation, scalar_i + tensor_vi
 
     @property

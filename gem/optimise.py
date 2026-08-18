@@ -630,7 +630,31 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
-def contraction(expression, ignore=None):
+def is_contraction(expression: Node) -> bool:
+    """Test whether an expression is a tensor contraction.
+
+    Parameters
+    ----------
+    expression :
+        A GEM expression.
+
+    Returns
+    -------
+    bool
+        Whether the expression is a contraction.
+
+    Notes
+    -----
+    Pass this as ``stop_at`` to keep a contraction that is already sum
+    factorised out of a surrounding one. Flattening it discards its
+    factorisation, along with any subexpression it shares with another
+    factor, and inflates the number of indices to factorise over.
+
+    """
+    return isinstance(expression, IndexSum)
+
+
+def contraction(expression, ignore=None, stop_at=None):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
 
@@ -641,6 +665,10 @@ def contraction(expression, ignore=None):
         factorisation (otherwise all summation indices will be
         considered). Use this if your expression has many contraction
         indices.
+    :arg stop_at: Optional predicate on GEM expressions that are not to
+        be broken into further factors, see :func:`traverse_product`.
+        The contraction at the root is always broken up, as that is the
+        one being optimised.
 
     This routine was designed with finite element coefficient
     evaluation in mind.
@@ -654,7 +682,10 @@ def contraction(expression, ignore=None):
 
     # Flatten product tree, eliminate deltas, sum factorise
     def rebuild(expression):
-        sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+        root = expression
+        sum_indices, factors = traverse_product(
+            expression, index_replacer=index_replacer,
+            stop_at=None if stop_at is None else lambda e: e is not root and stop_at(e))
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         if ignore is not None:
