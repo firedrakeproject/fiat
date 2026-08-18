@@ -398,10 +398,11 @@ def _independent_contractions(sum_indices, groups):
     parent = {index: index for index in sum_indices}
 
     def find(index):
-        while parent[index] != index:
-            parent[index] = parent[parent[index]]
-            index = parent[index]
-        return index
+        if parent[index] == index:
+            return index
+
+        parent[index] = find(parent[index])
+        return parent[index]
 
     index_set = set(sum_indices)
     shared = [[i for i in group.free_indices if i in index_set] for group in groups]
