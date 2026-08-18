@@ -875,8 +875,11 @@ class ComponentTensor(Node):
 
         # Index folding
         if isinstance(expression, Indexed):
-            if multiindex == expression.multiindex:
-                return expression.children[0]
+            child, = expression.children
+            # Simplify ComponentTensor(Indexed(child, i), i) -> child
+            # Only fold if the child does not depend on the multiindex
+            if multiindex == expression.multiindex and not (set(multiindex) & set(child.free_indices)):
+                return child
 
         self = super(ComponentTensor, cls).__new__(cls)
         self.children = (expression,)
