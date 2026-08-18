@@ -279,12 +279,9 @@ class FiniteElementBase(metaclass=ABCMeta):
         Qi = Q[basis_indices + shape_indices]
         expri = expr[shape_indices]
         evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
-        # Now we want to factorise over the new contraction with x,
-        # ignoring any shape indices to avoid hitting the sum-
-        # factorisation index limit (this is a bit of a hack).
-        # Really need to do a more targeted job here.
-        evaluation = gem.optimise.contraction(evaluation, shape_indices,
-                                              stop_at=is_contraction)
+        # Factorise over the new contraction with x, keeping whole the
+        # contractions that fn already factorised
+        evaluation = gem.optimise.contraction(evaluation, stop_at=is_contraction)
         return evaluation, basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):

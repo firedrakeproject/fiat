@@ -654,17 +654,13 @@ def is_contraction(expression: Node) -> bool:
     return isinstance(expression, IndexSum)
 
 
-def contraction(expression, ignore=None, stop_at=None):
+def contraction(expression, stop_at=None):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
 
     - IndexSum-Delta cancellation
     - Sum factorisation
 
-    :arg ignore: Optional set of indices to ignore when applying sum
-        factorisation (otherwise all summation indices will be
-        considered). Use this if your expression has many contraction
-        indices.
     :arg stop_at: Optional predicate on GEM expressions that are not to
         be broken into further factors, see :func:`traverse_product`.
         The contraction at the root is always broken up, as that is the
@@ -688,15 +684,7 @@ def contraction(expression, ignore=None, stop_at=None):
             stop_at=None if stop_at is None else lambda e: e is not root and stop_at(e))
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
-        if ignore is not None:
-            # TODO: This is a really blunt instrument and one might
-            # plausibly want the ignored indices to be contracted on
-            # the inside rather than the outside.
-            extra = tuple(i for i in sum_indices if i in ignore)
-            to_factor = tuple(i for i in sum_indices if i not in ignore)
-            return IndexSum(sum_factorise(to_factor, factors), extra)
-        else:
-            return sum_factorise(sum_indices, factors)
+        return sum_factorise(sum_indices, factors)
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,
