@@ -526,6 +526,10 @@ def _sum_factorise_connected(sum_indices, groups):
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
+    if not groups:
+        extent = numpy.prod([index.extent for index in sum_indices], dtype=int)
+        return Literal(float(extent))
+
     if len(groups) <= 10:
         return _plan_contraction(sum_indices, groups)
 
@@ -573,9 +577,11 @@ def sum_factorise(sum_indices, factors):
     :arg factors: product factors
     :returns: optimised GEM expression
     """
-    if len(factors) == 0 and len(sum_indices) == 0:
-        # Empty product
-        return one
+    if len(factors) == 0:
+        # The empty product is one, so contracting it counts the tuples in the
+        # index space.
+        extent = numpy.prod([index.extent for index in sum_indices], dtype=int)
+        return Literal(float(extent))
 
     # Form groups by free indices
     groups = groupby(factors, key=lambda f: f.free_indices)
