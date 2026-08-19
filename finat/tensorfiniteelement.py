@@ -178,8 +178,7 @@ class TensorFiniteElement(FiniteElementBase):
 
         expr = fn(x)
         # Apply targeted sum factorisation and delta elimination to
-        # the expression, preserving contractions that fn already
-        # factorised
+        # the expression, preserving contractions that fn already factorised
         sum_indices, factors = delta_elimination(*traverse_product(expr, stop_at=is_contraction))
         expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
