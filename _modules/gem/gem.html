@@ -1008,8 +1008,11 @@
 
         <span class="c1"># Index folding</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">multiindex</span> <span class="o">==</span> <span class="n">expression</span><span class="o">.</span><span class="n">multiindex</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">expression</span><span class="o">.</span><span class="n">children</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">child</span><span class="p">,</span> <span class="o">=</span> <span class="n">expression</span><span class="o">.</span><span class="n">children</span>
+            <span class="c1"># Simplify ComponentTensor(Indexed(child, i), i) -&gt; child</span>
+            <span class="c1"># Only fold if the child does not depend on the multiindex</span>
+            <span class="k">if</span> <span class="n">multiindex</span> <span class="o">==</span> <span class="n">expression</span><span class="o">.</span><span class="n">multiindex</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">multiindex</span><span class="p">)</span> <span class="o">&amp;</span> <span class="nb">set</span><span class="p">(</span><span class="n">child</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)):</span>
+                <span class="k">return</span> <span class="n">child</span>
 
         <span class="bp">self</span> <span class="o">=</span> <span class="nb">super</span><span class="p">(</span><span class="n">ComponentTensor</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">children</span> <span class="o">=</span> <span class="p">(</span><span class="n">expression</span><span class="p">,)</span>
