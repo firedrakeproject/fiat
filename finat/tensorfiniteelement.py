@@ -179,6 +179,8 @@ class TensorFiniteElement(FiniteElementBase):
         expr = fn(x)
         # Apply targeted sum factorisation and delta elimination to
         # the expression, preserving contractions that fn already factorised
+        # FIXME: a single pass of gem.optimise.contraction will choke on too many indices
+        # This is a temporary workaround https://github.com/firedrakeproject/fiat/issues/283
         sum_indices, factors = delta_elimination(*traverse_product(expr, stop_at=is_contraction))
         expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
