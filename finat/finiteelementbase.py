@@ -4,8 +4,6 @@ from itertools import chain
 import gem
 import numpy
 from gem.interpreter import evaluate
-from gem.optimise import (delta_elimination, is_contraction, sum_factorise,
-                          traverse_product)
 from gem.utils import cached_property
 
 from finat.quadrature import make_quadrature
@@ -266,10 +264,6 @@ class FiniteElementBase(metaclass=ABCMeta):
         Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
 
         expr = fn(x)
-        # Apply targeted sum factorisation and delta elimination to
-        # the expression, preserving contractions that fn already factorised
-        sum_indices, factors = delta_elimination(*traverse_product(expr, stop_at=is_contraction))
-        expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
         # expression is tensor valued.
         assert expr.shape == Q.shape[len(Q.shape)-len(expr.shape):]
@@ -278,9 +272,7 @@ class FiniteElementBase(metaclass=ABCMeta):
         Qi = Q[basis_indices + shape_indices]
         expri = expr[shape_indices]
         evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
-        # Factorise over the new contraction with Qi, keeping whole the
-        # contractions that fn already factorised
-        evaluation = gem.optimise.contraction(evaluation, stop_at=is_contraction)
+        evaluation = gem.optimise.contraction(evaluation)
         return evaluation, basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):
