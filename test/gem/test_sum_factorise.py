@@ -3,6 +3,8 @@ import pytest
 
 import gem
 from gem.interpreter import evaluate
+from gem import optimise
+from gem.node import traversal
 from gem.optimise import sum_factorise
 
 
@@ -50,3 +52,33 @@ def test_too_many_indices_in_one_contraction():
     table = gem.Indexed(gem.Literal(numpy.ones((2,) * 7)), indices)
     with pytest.raises(NotImplementedError):
         sum_factorise(indices, [table])
+
+
+def test_contraction_preserves_factorised_contractions():
+    # A dual evaluation contracts the weights with an expression whose
+    # coefficient evaluations are already sum factorised.  Those carry the
+    # point index of the contraction, so flattening them yields a single
+    # connected contraction that is too large to factorise.
+    numpy.random.seed(0)
+    p, q = gem.Index(extent=4), gem.Index(extent=4)
+    ijk = tuple(gem.Index(extent=3) for _ in range(3))
+
+    table = gem.Indexed(gem.Literal(numpy.random.rand(3, 3, 3, 4)), ijk + (p,))
+    dofs = numpy.random.rand(3, 3, 3)
+    evaluation = optimise.contraction(gem.IndexSum(gem.Product(table, gem.Indexed(gem.Literal(dofs), ijk)), ijk))
+    assert optimise.is_contraction(evaluation)
+
+    weights = numpy.random.rand(4, 4)
+    cubed = gem.Product(gem.Product(gem.Indexed(gem.Literal(weights), (q, p)), evaluation),
+                        gem.Product(evaluation, evaluation))
+    expression = gem.IndexSum(cubed, (p,))
+
+    with pytest.raises(NotImplementedError):
+        optimise.contraction(expression)
+
+    optimised = optimise.contraction(expression, stop_at=optimise.is_contraction)
+    assert evaluation in set(traversal([optimised]))
+
+    result, = evaluate([gem.ComponentTensor(optimised, (q,))])
+    expected = weights.dot(numpy.einsum("ijkp,ijk->p", numpy.asarray(table.children[0].array), dofs) ** 3)
+    assert numpy.allclose(result.arr, expected)
