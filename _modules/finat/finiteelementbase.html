@@ -42,7 +42,8 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.interpreter</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="n">delta_elimination</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span> <span class="n">traverse_product</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">delta_elimination</span><span class="p">,</span> <span class="n">is_contraction</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span>
+                          <span class="n">traverse_product</span><span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">cached_property</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_quadrature</span>
@@ -335,8 +336,10 @@
 
         <span class="n">expr</span> <span class="o">=</span> <span class="n">fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
         <span class="c1"># Apply targeted sum factorisation and delta elimination to</span>
-        <span class="c1"># the expression</span>
-        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">delta_elimination</span><span class="p">(</span><span class="o">*</span><span class="n">traverse_product</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
+        <span class="c1"># the expression, preserving contractions that fn already factorised</span>
+        <span class="c1"># FIXME: a single pass of gem.optimise.contraction will choke on too many indices</span>
+        <span class="c1"># This is a temporary workaround https://github.com/firedrakeproject/fiat/issues/283</span>
+        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">delta_elimination</span><span class="p">(</span><span class="o">*</span><span class="n">traverse_product</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="n">is_contraction</span><span class="p">))</span>
         <span class="n">expr</span> <span class="o">=</span> <span class="n">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">)</span>
         <span class="c1"># NOTE: any shape indices in the expression are because the</span>
         <span class="c1"># expression is tensor valued.</span>
@@ -346,11 +349,9 @@
         <span class="n">Qi</span> <span class="o">=</span> <span class="n">Q</span><span class="p">[</span><span class="n">basis_indices</span> <span class="o">+</span> <span class="n">shape_indices</span><span class="p">]</span>
         <span class="n">expri</span> <span class="o">=</span> <span class="n">expr</span><span class="p">[</span><span class="n">shape_indices</span><span class="p">]</span>
         <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">Qi</span> <span class="o">*</span> <span class="n">expri</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span> <span class="o">+</span> <span class="n">shape_indices</span><span class="p">)</span>
-        <span class="c1"># Now we want to factorise over the new contraction with x,</span>
-        <span class="c1"># ignoring any shape indices to avoid hitting the sum-</span>
-        <span class="c1"># factorisation index limit (this is a bit of a hack).</span>
-        <span class="c1"># Really need to do a more targeted job here.</span>
-        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">optimise</span><span class="o">.</span><span class="n">contraction</span><span class="p">(</span><span class="n">evaluation</span><span class="p">,</span> <span class="n">shape_indices</span><span class="p">)</span>
+        <span class="c1"># Factorise over the new contraction with Qi, keeping whole the</span>
+        <span class="c1"># contractions that fn already factorised</span>
+        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">optimise</span><span class="o">.</span><span class="n">contraction</span><span class="p">(</span><span class="n">evaluation</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="n">is_contraction</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">basis_indices</span></div>
 
 

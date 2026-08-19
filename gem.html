@@ -1660,7 +1660,7 @@ otherwise Literal <a href="#id15"><span class="problematic" id="id16">`</span></
 
 <dl class="py function">
 <dt class="sig sig-object py" id="gem.optimise.contraction">
-<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">contraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ignore</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#contraction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.contraction" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">contraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#contraction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.contraction" title="Link to this definition">¶</a></dt>
 <dd><p>Optimise the contractions of the tensor product at the root of
 the expression, including:</p>
 <ul class="simple">
@@ -1669,10 +1669,10 @@ the expression, including:</p>
 </ul>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>ignore</strong> – Optional set of indices to ignore when applying sum
-factorisation (otherwise all summation indices will be
-considered). Use this if your expression has many contraction
-indices.</p>
+<dd class="field-odd"><p><strong>stop_at</strong> – Optional predicate on GEM expressions that are not to
+be broken into further factors, see <a class="reference internal" href="#gem.optimise.traverse_product" title="gem.optimise.traverse_product"><code class="xref py py-func docutils literal notranslate"><span class="pre">traverse_product()</span></code></a>.
+The contraction at the root is always broken up, as that is the
+one being optimised.</p>
 </dd>
 </dl>
 <p>This routine was designed with finite element coefficient
@@ -1717,6 +1717,33 @@ a GEM expression.</p>
 <span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">filtered_replace_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">node</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">subst</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#filtered_replace_indices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.filtered_replace_indices" title="Link to this definition">¶</a></dt>
 <dd><p>Wrapper for <a class="reference internal" href="#gem.optimise.replace_indices" title="gem.optimise.replace_indices"><code class="xref py py-func docutils literal notranslate"><span class="pre">replace_indices()</span></code></a>.  At each call removes
 substitution rules that do not apply.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="gem.optimise.is_contraction">
+<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">is_contraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#gem.gem.Node" title="gem.gem.Node"><span class="pre">Node</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="reference internal" href="_modules/gem/optimise.html#is_contraction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.is_contraction" title="Link to this definition">¶</a></dt>
+<dd><p>Test whether an expression is a tensor contraction.</p>
+<section id="id17">
+<h3>Parameters<a class="headerlink" href="#id17" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>expression :</dt><dd><p>A GEM expression.</p>
+</dd>
+</dl>
+</section>
+<section id="id18">
+<h3>Returns<a class="headerlink" href="#id18" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>bool</dt><dd><p>Whether the expression is a contraction.</p>
+</dd>
+</dl>
+</section>
+<section id="id19">
+<h3>Notes<a class="headerlink" href="#id19" title="Link to this heading">¶</a></h3>
+<p>Pass this as <code class="docutils literal notranslate"><span class="pre">stop_at</span></code> to keep a contraction that is already sum
+factorised out of a surrounding one. Flattening it discards its
+factorisation, along with any subexpression it shares with another
+factor, and inflates the number of indices to factorise over.</p>
+</section>
 </dd></dl>
 
 <dl class="py function">
@@ -2048,7 +2075,7 @@ distinguished factors (called atomics).</p>
 <dt class="sig sig-object py" id="gem.refactorise.MonomialSum">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">gem.refactorise.</span></span><span class="sig-name descname"><span class="pre">MonomialSum</span></span><a class="reference internal" href="_modules/gem/refactorise.html#MonomialSum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.refactorise.MonomialSum" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
-<p>Represents a sum of :py:class:<a href="#id17"><span class="problematic" id="id18">`</span></a>Monomial`s.</p>
+<p>Represents a sum of :py:class:<a href="#id20"><span class="problematic" id="id21">`</span></a>Monomial`s.</p>
 <p>The set of <a class="reference internal" href="#gem.refactorise.Monomial" title="gem.refactorise.Monomial"><code class="xref py py-class docutils literal notranslate"><span class="pre">Monomial</span></code></a> summands are represented as a
 mapping from a pair of unordered <code class="docutils literal notranslate"><span class="pre">sum_indices</span></code> and unordered
 <code class="docutils literal notranslate"><span class="pre">atomics</span></code> to a <code class="docutils literal notranslate"><span class="pre">rest</span></code> GEM expression.  This representation
@@ -2062,13 +2089,13 @@ makes it easier to merge similar monomials.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="gem.refactorise.MonomialSum.product">
 <span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/refactorise.html#MonomialSum.product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.refactorise.MonomialSum.product" title="Link to this definition">¶</a></dt>
-<dd><p>Product of multiple :py:class:<a href="#id19"><span class="problematic" id="id20">`</span></a>MonomialSum`s</p>
+<dd><p>Product of multiple :py:class:<a href="#id22"><span class="problematic" id="id23">`</span></a>MonomialSum`s</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="gem.refactorise.MonomialSum.sum">
 <span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">sum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/refactorise.html#MonomialSum.sum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.refactorise.MonomialSum.sum" title="Link to this definition">¶</a></dt>
-<dd><p>Sum of multiple :py:class:<a href="#id21"><span class="problematic" id="id22">`</span></a>MonomialSum`s</p>
+<dd><p>Sum of multiple :py:class:<a href="#id24"><span class="problematic" id="id25">`</span></a>MonomialSum`s</p>
 </dd></dl>
 
 </dd></dl>
@@ -2095,7 +2122,7 @@ classification drives the factorisation.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>list of :py:class:<a href="#id23"><span class="problematic" id="id24">`</span></a>MonomialSum`s</p>
+<dd class="field-even"><p>list of :py:class:<a href="#id26"><span class="problematic" id="id27">`</span></a>MonomialSum`s</p>
 </dd>
 <dt class="field-odd">Raises<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference internal" href="#gem.refactorise.FactorisationError" title="gem.refactorise.FactorisationError"><strong>FactorisationError</strong></a> – Failed to break up some “compound”
@@ -2371,15 +2398,15 @@ unconcatenation, and then add up the results.</p>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">gem.utils.</span></span><span class="sig-name descname"><span class="pre">safe_repr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tuple_</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span></dt>
 <dd><p>Return a ‘safe’ repr for an object, accounting for floating point error.</p>
-<section id="id25">
-<h3>Parameters<a class="headerlink" href="#id25" title="Link to this heading">¶</a></h3>
+<section id="id28">
+<h3>Parameters<a class="headerlink" href="#id28" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>obj :</dt><dd><p>The object to produce a repr for.</p>
 </dd>
 </dl>
 </section>
-<section id="id26">
-<h3>Returns<a class="headerlink" href="#id26" title="Link to this heading">¶</a></h3>
+<section id="id29">
+<h3>Returns<a class="headerlink" href="#id29" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>str :</dt><dd><p>A repr for the object.</p>
 </dd>
@@ -2713,6 +2740,7 @@ unconcatenation, and then add up the results.</p>
 <li><a class="reference internal" href="#gem.optimise.delta_elimination"><code class="docutils literal notranslate"><span class="pre">delta_elimination()</span></code></a></li>
 <li><a class="reference internal" href="#gem.optimise.ffc_rounding"><code class="docutils literal notranslate"><span class="pre">ffc_rounding()</span></code></a></li>
 <li><a class="reference internal" href="#gem.optimise.filtered_replace_indices"><code class="docutils literal notranslate"><span class="pre">filtered_replace_indices()</span></code></a></li>
+<li><a class="reference internal" href="#gem.optimise.is_contraction"><code class="docutils literal notranslate"><span class="pre">is_contraction()</span></code></a></li>
 <li><a class="reference internal" href="#gem.optimise.literal_rounding"><code class="docutils literal notranslate"><span class="pre">literal_rounding()</span></code></a></li>
 <li><a class="reference internal" href="#gem.optimise.literal_rounding_literal"><code class="docutils literal notranslate"><span class="pre">literal_rounding_literal()</span></code></a></li>
 <li><a class="reference internal" href="#gem.optimise.make_product"><code class="docutils literal notranslate"><span class="pre">make_product()</span></code></a></li>
