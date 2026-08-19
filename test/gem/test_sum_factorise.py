@@ -1,3 +1,5 @@
+from itertools import chain, combinations
+
 import numpy
 import pytest
 
@@ -47,18 +49,25 @@ def test_independent_contractions(nfactors, ndims):
 
 
 def test_too_many_indices_in_one_contraction():
-    # A single connected contraction is still bounded.
+    # A connected contraction of more factors than the planner takes falls
+    # back on searching the orderings, which is still bounded.
     indices = tuple(gem.Index(extent=2) for _ in range(7))
-    table = gem.Indexed(gem.Literal(numpy.ones((2,) * 7)), indices)
+    factors = []
+    for extra in chain(combinations(indices[1:], 1), combinations(indices[1:], 2)):
+        shared = indices[:1] + extra
+        factors.append(gem.Indexed(gem.Literal(numpy.ones((2,) * len(shared))), shared))
+        if len(factors) > optimise._MAX_PLANNED_FACTORS:
+            break
+
     with pytest.raises(NotImplementedError):
-        sum_factorise(indices, [table])
+        sum_factorise(indices, factors)
 
 
-def test_contraction_preserves_factorised_contractions():
+def test_contraction_preserves_repeated_contractions():
     # A dual evaluation contracts the weights with an expression whose
-    # coefficient evaluations are already sum factorised.  Those carry the
-    # point index of the contraction, so flattening them yields a single
-    # connected contraction that is too large to factorise.
+    # coefficient evaluations are already sum factorised.  Flattening an
+    # evaluation renames its indices apart, so one used several times
+    # would be evaluated once per use.
     numpy.random.seed(0)
     p, q = gem.Index(extent=4), gem.Index(extent=4)
     ijk = tuple(gem.Index(extent=3) for _ in range(3))
@@ -73,12 +82,43 @@ def test_contraction_preserves_factorised_contractions():
                         gem.Product(evaluation, evaluation))
     expression = gem.IndexSum(cubed, (p,))
 
-    with pytest.raises(NotImplementedError):
-        optimise.contraction(expression)
-
-    optimised = optimise.contraction(expression, stop_at=optimise.is_contraction)
+    optimised = optimise.contraction(expression)
     assert evaluation in set(traversal([optimised]))
+
+    # The evaluation is contracted once and reused, so the result holds
+    # only that contraction and the one over the points
+    contractions = [node for node in traversal([optimised])
+                    if isinstance(node, gem.IndexSum)]
+    assert len(contractions) == 2
 
     result, = evaluate([gem.ComponentTensor(optimised, (q,))])
     expected = weights.dot(numpy.einsum("ijkp,ijk->p", numpy.asarray(table.children[0].array), dofs) ** 3)
     assert numpy.allclose(result.arr, expected)
+
+
+def test_contractions_joined_by_a_shared_index():
+    # A value index joins two coefficient evaluations into one connected
+    # contraction of more indices than an ordering search can take, but
+    # its product tree is planned by splitting the factors.
+    numpy.random.seed(0)
+    p = gem.Index(extent=4)
+    ijk = tuple(gem.Index(extent=3) for _ in range(3))
+    lmn = tuple(gem.Index(extent=3) for _ in range(3))
+
+    tables = [numpy.random.rand(3, 3, 3, 4) for _ in range(2)]
+    coefficients = [numpy.random.rand(3, 3, 3) for _ in range(2)]
+    factors = []
+    for indices, table, coefficient in zip((ijk, lmn), tables, coefficients):
+        factors.append(gem.Indexed(gem.Literal(table), indices + (p,)))
+        factors.append(gem.Indexed(gem.Literal(coefficient), indices))
+
+    sum_indices = ijk + lmn + (p,)
+    assert len(sum_indices) > 6
+
+    expression = sum_factorise(sum_indices, factors)
+    assert expression.free_indices == ()
+
+    result, = evaluate([expression])
+    evaluations = [numpy.einsum("ijkp,ijk->p", table, coefficient)
+                   for table, coefficient in zip(tables, coefficients)]
+    assert numpy.allclose(result.arr, evaluations[0].dot(evaluations[1]))
