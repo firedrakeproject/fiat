@@ -493,14 +493,13 @@ def _plan_contraction(sum_indices, groups):
             expression = IndexSum(expression, indices)
         return expression, free, flops
 
-    # plans[subset] = (flops, peak intermediate size, expression, free indices)
+    # plans[subset] = (flops, expression, free indices)
     plans = {}
     for n, group in enumerate(groups):
         subset = 1 << n
         free = frozenset(group.free_indices)
-        peak = size(free)
         expression, free, flops = reduce_indices(group, free, reducible[subset])
-        plans[subset] = (flops, peak, expression, free)
+        plans[subset] = (flops, expression, free)
 
     for subset in range(1, full + 1):
         if subset in plans:
@@ -513,19 +512,18 @@ def _plan_contraction(sum_indices, groups):
             if part & lowest:
                 other = subset ^ part
                 left, right = plans[part], plans[other]
-                free = left[3] | right[3]
+                free = left[2] | right[2]
                 flops = left[0] + right[0] + size(free)
-                peak = max(left[1], right[1], size(free))
-                expression = Product(left[2], right[2])
+                expression = Product(left[1], right[1])
                 indices = reducible[subset] - reducible[part] - reducible[other]
                 expression, free, extra = reduce_indices(expression, free, indices)
-                candidate = (flops + extra, peak, expression, free)
-                if best is None or candidate[:2] < best[:2]:
+                candidate = (flops + extra, expression, free)
+                if best is None or candidate[0] < best[0]:
                     best = candidate
             part = (part - 1) & subset
         plans[subset] = best
 
-    return plans[full][2]
+    return plans[full][1]
 
 
 def _sum_factorise_connected(sum_indices, groups):
@@ -539,7 +537,7 @@ def _sum_factorise_connected(sum_indices, groups):
     if len(groups) <= _MAX_PLANNED_FACTORS:
         return _plan_contraction(sum_indices, groups)
 
-    if len(sum_indices) > 10:
+    if len(sum_indices) > 6:
         raise NotImplementedError("Too many indices for sum factorisation!")
 
     expression = None
