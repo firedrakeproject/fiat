@@ -9,7 +9,8 @@ from gem.interpreter import evaluate
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
-from finat.quadrature import make_quadrature, AbstractQuadratureRule, QuadratureRule
+from finat.quadrature import (make_quadrature, AbstractQuadratureRule,
+                              QuadratureRule, TensorProductQuadratureRule)
 
 
 def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
@@ -102,6 +103,53 @@ class QuadratureElement(FiniteElementBase):
         ps = self._rule.point_set
         sd = self.cell.get_spatial_dimension()
         return ps if ps.dimension == sd else FacetPointSet(self.cell, ps)
+
+    @cached_property
+    def _facet_factorisation(self):
+        """The products this element is the direct sum of, one per direction.
+
+        Returns
+        -------
+        tuple or None
+            A :class:`~finat.tensor_product.TensorProductElement` for each
+            direction the cell's facets lie in, in facet numbering order, or
+            ``None`` if the points are not on the facets of a product cell.
+
+        Notes
+        -----
+        The facets of a product lie in the direction of one factor at a time:
+        ``d(A x B) = dA x B  u  A x dB``.  One direction's facets are a
+        product, and only then do the points factor, which is what dual
+        evaluation needs of them; all the facets at once are not.
+
+        So the rule on a facet is a product of rules on all but one of the
+        factors, and the factor left out contributes its two vertices, which
+        are the whole of its own boundary.
+
+        The sum cannot be brought outermost as
+        :func:`~finat.enriched.as_enriched` does, because the summands number
+        their degrees of freedom in each product's order rather than this
+        element's; :meth:`dual_evaluation` renumbers them.
+
+        """
+        # Avoid circular import dependency
+        from finat.tensor_product import TensorProductElement
+
+        product = getattr(self.cell, "product", None)
+        if product is None or not isinstance(self._point_set, FacetPointSet):
+            return None
+
+        rule = self._rule
+        factors = rule.factors if isinstance(rule, TensorProductQuadratureRule) else (rule,)
+        assert len(factors) + 1 == len(product.cells)
+
+        summands = []
+        for k, cell in enumerate(product.cells):
+            ends = make_quadrature(cell.construct_subelement(0), 0)
+            rules = (*factors[:k], ends, *factors[k:])
+            summands.append(TensorProductElement(
+                [QuadratureElement(c, r) for c, r in zip(product.cells, rules)]))
+        return tuple(summands)
 
     @property
     def index_shape(self):
@@ -196,7 +244,23 @@ class QuadratureElement(FiniteElementBase):
         return Q, ps
 
     def dual_evaluation(self, fn, coordinate_mapping=None):
-        """Dual evaluate each summand of a union of points on its own points."""
+        """Dual evaluate on points that factor, a summand at a time."""
+        summands = self._facet_factorisation
+        if summands is not None:
+            branches = []
+            for k, summand in enumerate(summands):
+                expr, beta = summand.dual_evaluation(
+                    fn, coordinate_mapping=coordinate_mapping)
+                # Factor k numbers the facets of its direction and the others
+                # the points of the facet's own rule, in the same order.
+                # Bring the facet index outermost, as this element has it.
+                branches.append(gem.ComponentTensor(expr, (beta[k], *beta[:k], *beta[k+1:])))
+
+            # The facets of one direction are numbered consecutively, so the
+            # summands stack in order along the flattened basis index.
+            beta = gem.Index(extent=self.space_dimension())
+            return gem.Indexed(gem.Concatenate(*branches), (beta,)), (beta,)
+
         rule_ps = self._rule.point_set
         if not isinstance(rule_ps, UnionPointSet):
             return super().dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
