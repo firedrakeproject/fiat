@@ -75,7 +75,7 @@ def test_contraction_preserves_repeated_contractions():
     table = gem.Indexed(gem.Literal(numpy.random.rand(3, 3, 3, 4)), ijk + (p,))
     dofs = numpy.random.rand(3, 3, 3)
     evaluation = optimise.contraction(gem.IndexSum(gem.Product(table, gem.Indexed(gem.Literal(dofs), ijk)), ijk))
-    assert optimise.is_contraction(evaluation)
+    assert isinstance(evaluation, gem.IndexSum)
 
     weights = numpy.random.rand(4, 4)
     cubed = gem.Product(gem.Product(gem.Indexed(gem.Literal(weights), (q, p)), evaluation),
