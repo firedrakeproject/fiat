@@ -734,30 +734,6 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
-def is_contraction(expression: Node) -> bool:
-    """Test whether an expression is a tensor contraction.
-
-    Parameters
-    ----------
-    expression :
-        A GEM expression.
-
-    Returns
-    -------
-    bool
-        Whether the expression is a contraction.
-
-    Notes
-    -----
-    Pass this as ``stop_at`` to keep a contraction that is already sum
-    factorised out of a surrounding one. Flattening it discards its
-    factorisation, along with any subexpression it shares with another
-    factor, and inflates the number of indices to factorise over.
-
-    """
-    return isinstance(expression, IndexSum)
-
-
 def repeated_contractions(expression):
     """Find the contractions that occur more than once in a product tree.
 
