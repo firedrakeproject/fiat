@@ -425,6 +425,104 @@ def _independent_contractions(sum_indices, groups):
     return list(subproblems.values()), rest
 
 
+#: Largest number of factors for which a product tree is planned exactly.
+_MAX_PLANNED_FACTORS = 10
+
+
+def _plan_contraction(sum_indices, groups):
+    """Choose a product tree for one connected contraction.
+
+    Parameters
+    ----------
+    sum_indices :
+        Contraction indices of a single connected subproblem.
+    groups :
+        Product factors, grouped by free indices.
+
+    Returns
+    -------
+    Node
+        The contracted GEM expression.
+
+    Notes
+    -----
+    Every factor is a vertex and every contraction index joins the
+    factors carrying it.  A product tree is built by dynamic programming
+    over subsets of factors, and each index is reduced at the smallest
+    subtree holding every factor that carries it, which is the earliest
+    its reduction is legal.  Unlike a search over orderings of the
+    indices, this can reduce an index over part of the product and
+    multiply the rest in afterwards.
+
+    """
+    extents = {}
+    for index in sum_indices:
+        extents[index] = index.extent
+    for group in groups:
+        for index in group.free_indices:
+            extents[index] = index.extent
+
+    def size(indices):
+        return numpy.prod([extents[i] for i in indices], dtype=int)
+
+    # The factors each contraction index occurs in, as a bit mask
+    incidence = {}
+    for index in sum_indices:
+        incidence[index] = sum(1 << n for n, group in enumerate(groups)
+                               if index in group.free_indices)
+
+    full = (1 << len(groups)) - 1
+    # Indices reducible once a subset of the factors has been multiplied
+    reducible = {}
+    for subset in range(1, full + 1):
+        reducible[subset] = frozenset(index for index in sum_indices
+                                      if not incidence[index] & ~subset)
+
+    def reduce_indices(expression, free, indices):
+        """Sum out indices, largest extent first, costing each reduction."""
+        flops = 0
+        for index in sorted(indices, key=lambda i: extents[i], reverse=True):
+            flops += size(free)
+            free = free - {index}
+        if indices:
+            expression = IndexSum(expression, tuple(indices))
+        return expression, free, flops
+
+    # plans[subset] = (flops, peak intermediate size, expression, free indices)
+    plans = {}
+    for n, group in enumerate(groups):
+        subset = 1 << n
+        free = frozenset(group.free_indices)
+        peak = size(free)
+        expression, free, flops = reduce_indices(group, free, reducible[subset])
+        plans[subset] = (flops, peak, expression, free)
+
+    for subset in range(1, full + 1):
+        if subset in plans:
+            continue
+        best = None
+        # Split the subset in two, taking each unordered split once
+        lowest = subset & -subset
+        part = (subset - 1) & subset
+        while part:
+            if part & lowest:
+                other = subset ^ part
+                left, right = plans[part], plans[other]
+                free = left[3] | right[3]
+                flops = left[0] + right[0] + size(free)
+                peak = max(left[1], right[1], size(free))
+                expression = Product(left[2], right[2])
+                indices = reducible[subset] - reducible[part] - reducible[other]
+                expression, free, extra = reduce_indices(expression, free, indices)
+                candidate = (flops + extra, peak, expression, free)
+                if best is None or candidate[:2] < best[:2]:
+                    best = candidate
+            part = (part - 1) & subset
+        plans[subset] = best
+
+    return plans[full][2]
+
+
 def _sum_factorise_connected(sum_indices, groups):
     """Sum factorise a single connected contraction by exhaustive search.
 
@@ -433,6 +531,9 @@ def _sum_factorise_connected(sum_indices, groups):
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
+    if len(groups) <= _MAX_PLANNED_FACTORS:
+        return _plan_contraction(sum_indices, groups)
+
     if len(sum_indices) > 10:
         raise NotImplementedError("Too many indices for sum factorisation!")
 
