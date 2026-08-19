@@ -1,7 +1,7 @@
 """A set of routines implementing various transformations on GEM
 expressions."""
 
-from collections import OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict
 from functools import singledispatch, partial
 from itertools import combinations, permutations, zip_longest
 from numbers import Integral
@@ -654,6 +654,41 @@ def is_contraction(expression: Node) -> bool:
     return isinstance(expression, IndexSum)
 
 
+def repeated_contractions(expression):
+    """Find the contractions that occur more than once in a product tree.
+
+    Parameters
+    ----------
+    expression :
+        A GEM expression.
+
+    Returns
+    -------
+    frozenset
+        The :class:`~.IndexSum` nodes occurring more than once as a
+        factor of ``expression``.
+
+    Notes
+    -----
+    Flattening a contraction renames its indices apart, so a contraction
+    used more than once becomes that many independent contractions and
+    is evaluated once per use.  Keeping it whole preserves the sharing.
+
+    """
+    counts = Counter()
+    stack = [expression]
+    while stack:
+        expr = stack.pop()
+        if isinstance(expr, IndexSum):
+            counts[expr] += 1
+            stack.extend(expr.children)
+        elif isinstance(expr, Product):
+            stack.extend(expr.children)
+        elif isinstance(expr, Division):
+            stack.append(expr.children[0])
+    return frozenset(expr for expr, count in counts.items() if count > 1)
+
+
 def contraction(expression, stop_at=None):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
@@ -679,9 +714,11 @@ def contraction(expression, stop_at=None):
     # Flatten product tree, eliminate deltas, sum factorise
     def rebuild(expression):
         root = expression
+        keep = repeated_contractions(expression) if stop_at is None else None
+        predicate = keep.__contains__ if keep is not None else stop_at
         sum_indices, factors = traverse_product(
             expression, index_replacer=index_replacer,
-            stop_at=None if stop_at is None else lambda e: e is not root and stop_at(e))
+            stop_at=lambda e: e is not root and predicate(e))
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         return sum_factorise(sum_indices, factors)
