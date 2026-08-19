@@ -428,12 +428,12 @@ def _independent_contractions(sum_indices, groups):
 def _sum_factorise_connected(sum_indices, groups):
     """Sum factorise a single connected contraction by exhaustive search.
 
-    :arg sum_indices: free indices for contractions, which must not split
+    :arg sum_indices: free indices for contractions, already split
                       into independent subproblems
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
-    if len(sum_indices) > 6:
+    if len(sum_indices) > 10:
         raise NotImplementedError("Too many indices for sum factorisation!")
 
     expression = None
