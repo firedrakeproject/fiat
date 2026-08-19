@@ -478,14 +478,19 @@ def _plan_contraction(sum_indices, groups):
         reducible[subset] = frozenset(index for index in sum_indices
                                       if not incidence[index] & ~subset)
 
+    def order(indices):
+        """Sum out the widest index first, breaking ties reproducibly."""
+        return tuple(sorted(indices, key=lambda i: (-extents[i], i.count)))
+
     def reduce_indices(expression, free, indices):
         """Sum out indices, largest extent first, costing each reduction."""
         flops = 0
-        for index in sorted(indices, key=lambda i: extents[i], reverse=True):
+        indices = order(indices)
+        for index in indices:
             flops += size(free)
             free = free - {index}
         if indices:
-            expression = IndexSum(expression, tuple(indices))
+            expression = IndexSum(expression, indices)
         return expression, free, flops
 
     # plans[subset] = (flops, peak intermediate size, expression, free indices)
