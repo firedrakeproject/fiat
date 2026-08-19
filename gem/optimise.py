@@ -769,17 +769,12 @@ def repeated_contractions(expression):
     return frozenset(expr for expr, count in counts.items() if count > 1)
 
 
-def contraction(expression, stop_at=None):
+def contraction(expression):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
 
     - IndexSum-Delta cancellation
     - Sum factorisation
-
-    :arg stop_at: Optional predicate on GEM expressions that are not to
-        be broken into further factors, see :func:`traverse_product`.
-        The contraction at the root is always broken up, as that is the
-        one being optimised.
 
     This routine was designed with finite element coefficient
     evaluation in mind.
@@ -794,11 +789,12 @@ def contraction(expression, stop_at=None):
     # Flatten product tree, eliminate deltas, sum factorise
     def rebuild(expression):
         root = expression
-        keep = repeated_contractions(expression) if stop_at is None else None
-        predicate = keep.__contains__ if keep is not None else stop_at
+        # The contraction at the root is always broken up, as that is the
+        # one being optimised
+        keep = repeated_contractions(expression)
         sum_indices, factors = traverse_product(
             expression, index_replacer=index_replacer,
-            stop_at=lambda e: e is not root and predicate(e))
+            stop_at=lambda e: e is not root and e in keep)
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         return sum_factorise(sum_indices, factors)
