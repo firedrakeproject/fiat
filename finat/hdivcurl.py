@@ -93,6 +93,17 @@ class WrapperElementBase(FiniteElementBase):
         # value_shape indices)
         return gem.ComponentTensor(Q, beta + zeta), x
 
+    def dual_evaluation(self, fn, coordinate_mapping=None):
+        # A pullback of a direct sum is a direct sum, and only a direct sum
+        # can evaluate its summands on their own points.
+        # Avoid circular import dependency
+        from finat.enriched import as_enriched
+
+        summands = as_enriched(self)
+        if summands is None:
+            return super().dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+        return summands.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+
 
 class HDivElement(WrapperElementBase):
     """H(div) wrapper element for tensor product elements."""
