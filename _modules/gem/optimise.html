@@ -462,27 +462,60 @@
 
 
 
-<div class="viewcode-block" id="sum_factorise">
-<a class="viewcode-back" href="../../gem.html#gem.optimise.sum_factorise">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Optimise a tensor product through sum factorisation.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_independent_contractions</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">groups</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Split a contraction into independent subproblems.</span>
+
+<span class="sd">    Two contraction indices only interact if some factor carries both of</span>
+<span class="sd">    them, so the factors and the indices form a graph whose connected</span>
+<span class="sd">    components can be contracted separately.</span>
 
 <span class="sd">    :arg sum_indices: free indices for contractions</span>
-<span class="sd">    :arg factors: product factors</span>
+<span class="sd">    :arg groups: product factors, grouped by free indices</span>
+<span class="sd">    :returns: a pair of the list of (indices, groups) subproblems and the</span>
+<span class="sd">              list of groups carrying no contraction index</span>
+<span class="sd">    """</span>
+    <span class="c1"># Union-find over the contraction indices</span>
+    <span class="n">parent</span> <span class="o">=</span> <span class="p">{</span><span class="n">index</span><span class="p">:</span> <span class="n">index</span> <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">sum_indices</span><span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">find</span><span class="p">(</span><span class="n">index</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">parent</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">==</span> <span class="n">index</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">index</span>
+
+        <span class="n">parent</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">find</span><span class="p">(</span><span class="n">parent</span><span class="p">[</span><span class="n">index</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">parent</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+
+    <span class="n">index_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span>
+    <span class="n">shared</span> <span class="o">=</span> <span class="p">[[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">group</span><span class="o">.</span><span class="n">free_indices</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">index_set</span><span class="p">]</span> <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">indices</span> <span class="ow">in</span> <span class="n">shared</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="n">root</span><span class="p">,</span> <span class="n">other</span> <span class="o">=</span> <span class="n">find</span><span class="p">(</span><span class="n">indices</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">find</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">root</span> <span class="o">!=</span> <span class="n">other</span><span class="p">:</span>
+                <span class="n">parent</span><span class="p">[</span><span class="n">other</span><span class="p">]</span> <span class="o">=</span> <span class="n">root</span>
+
+    <span class="n">subproblems</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">((</span><span class="n">find</span><span class="p">(</span><span class="n">index</span><span class="p">),</span> <span class="p">([],</span> <span class="p">[]))</span> <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">sum_indices</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="n">sum_indices</span><span class="p">:</span>
+        <span class="n">subproblems</span><span class="p">[</span><span class="n">find</span><span class="p">(</span><span class="n">index</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+
+    <span class="n">rest</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">group</span><span class="p">,</span> <span class="n">indices</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">groups</span><span class="p">,</span> <span class="n">shared</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">indices</span><span class="p">:</span>
+            <span class="n">subproblems</span><span class="p">[</span><span class="n">find</span><span class="p">(</span><span class="n">indices</span><span class="p">[</span><span class="mi">0</span><span class="p">])][</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">rest</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">subproblems</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="n">rest</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sum_factorise_connected</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">groups</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Sum factorise a single connected contraction by exhaustive search.</span>
+
+<span class="sd">    :arg sum_indices: free indices for contractions, which must not split</span>
+<span class="sd">                      into independent subproblems</span>
+<span class="sd">    :arg groups: product factors, grouped by free indices</span>
 <span class="sd">    :returns: optimised GEM expression</span>
 <span class="sd">    """</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">factors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="c1"># Empty product</span>
-        <span class="k">return</span> <span class="n">one</span>
-
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">6</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Too many indices for sum factorisation!"</span><span class="p">)</span>
 
-    <span class="c1"># Form groups by free indices</span>
-    <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
-    <span class="n">groups</span> <span class="o">=</span> <span class="p">[</span><span class="n">Product</span><span class="p">(</span><span class="o">*</span><span class="n">terms</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">terms</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
-
-    <span class="c1"># Sum factorisation</span>
     <span class="n">expression</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">best_flops</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">inf</span>
 
@@ -514,6 +547,35 @@
             <span class="n">expression</span> <span class="o">=</span> <span class="n">expr</span>
             <span class="n">best_flops</span> <span class="o">=</span> <span class="n">flops</span>
 
+    <span class="k">return</span> <span class="n">expression</span>
+
+
+<div class="viewcode-block" id="sum_factorise">
+<a class="viewcode-back" href="../../gem.html#gem.optimise.sum_factorise">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Optimise a tensor product through sum factorisation.</span>
+
+<span class="sd">    :arg sum_indices: free indices for contractions</span>
+<span class="sd">    :arg factors: product factors</span>
+<span class="sd">    :returns: optimised GEM expression</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">factors</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="c1"># Empty product</span>
+        <span class="k">return</span> <span class="n">one</span>
+
+    <span class="c1"># Form groups by free indices</span>
+    <span class="n">groups</span> <span class="o">=</span> <span class="n">groupby</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
+    <span class="n">groups</span> <span class="o">=</span> <span class="p">[</span><span class="n">Product</span><span class="p">(</span><span class="o">*</span><span class="n">terms</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">terms</span> <span class="ow">in</span> <span class="n">groups</span><span class="p">]</span>
+
+    <span class="c1"># Contractions that share no factor are independent of each other, so</span>
+    <span class="c1"># factorise them separately rather than searching the orderings that</span>
+    <span class="c1"># interleave them.</span>
+    <span class="n">subproblems</span><span class="p">,</span> <span class="n">terms</span> <span class="o">=</span> <span class="n">_independent_contractions</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">groups</span><span class="p">)</span>
+    <span class="n">terms</span> <span class="o">=</span> <span class="n">terms</span> <span class="o">+</span> <span class="p">[</span><span class="n">_sum_factorise_connected</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">subgroups</span><span class="p">)</span>
+                     <span class="k">for</span> <span class="n">indices</span><span class="p">,</span> <span class="n">subgroups</span> <span class="ow">in</span> <span class="n">subproblems</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">terms</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">one</span>
+    <span class="n">expression</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">associate</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">terms</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">expression</span></div>
 
 
