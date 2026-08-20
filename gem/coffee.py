@@ -4,14 +4,17 @@ algorithm operating on a GEM representation.
 This file is NOT for code generation as a COFFEE AST.
 """
 
+from collections import defaultdict
 from itertools import chain, repeat
 import logging
 
 import numpy
 
-from gem.gem import IndexSum, one
-from gem.optimise import make_sum, make_product
-from gem.refactorise import Monomial
+from gem.gem import ComponentTensor, Index, Indexed, IndexSum, one
+from gem.node import MemoizerArg
+from gem.optimise import (filtered_replace_indices, has_arithmetic,
+                          make_sum, make_product)
+from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
 
 
@@ -197,6 +200,74 @@ def factorise_atomics(monomials, optimal_atomics, linear_indices):
     return new_monomials
 
 
+def _share_linear_maps(
+        monomial_sum: MonomialSum,
+        linear_indices: tuple[Index, ...]) -> MonomialSum:
+    """Share isomorphic maps of distinct multilinear axes.
+
+    Parameters
+    ----------
+    monomial_sum
+        Sum-of-products representation of a multilinear expression.
+    linear_indices
+        Free indices identifying argument axes.
+
+    Returns
+    -------
+    MonomialSum
+        Representation whose repeated linear maps access one tensor.
+
+    Notes
+    -----
+    Test and trial axes use distinct indices even when they apply the same
+    finite element map.  Renaming each axis to a canonical index exposes
+    that isomorphism without inspecting the element family.  Materialising
+    the canonical map is generalised code motion: the basis transformation
+    is evaluated once and both axes index its result.
+
+    """
+    linear_indices = tuple(linear_indices)
+    linear_set = frozenset(linear_indices)
+    canonical = {
+        index.extent: Index(extent=index.extent)
+        for index in linear_indices
+    }
+    replacer = MemoizerArg(filtered_replace_indices)
+    groups = defaultdict(list)
+    for monomial in monomial_sum:
+        for atomic in monomial.atomics:
+            involved = linear_set.intersection(atomic.free_indices)
+            if len(involved) != 1:
+                continue
+            index, = involved
+            normal = replacer(atomic, ((index, canonical[index.extent]),))
+            groups[normal].append((atomic, index))
+
+    replacements = {}
+    for normal, occurrences in groups.items():
+        indices = {index for _, index in occurrences}
+        if len(indices) < 2 or not has_arithmetic((normal,)):
+            continue
+        index = canonical[next(iter(indices)).extent]
+        tensor = ComponentTensor(normal, (index,))
+        replacements.update(
+            (atomic, Indexed(tensor, (original,)))
+            for atomic, original in occurrences)
+
+    if not replacements:
+        return monomial_sum
+
+    result = MonomialSum()
+    for monomial in monomial_sum:
+        result.add(
+            monomial.sum_indices,
+            tuple(replacements.get(atomic, atomic)
+                  for atomic in monomial.atomics),
+            monomial.rest,
+        )
+    return result
+
+
 def optimise_monomial_sum(monomial_sum, linear_indices):
     """Choose optimal common atomic subexpressions and factorise a
     :class:`MonomialSum` object to create a GEM expression.
@@ -206,6 +277,7 @@ def optimise_monomial_sum(monomial_sum, linear_indices):
 
     :returns: factorised GEM expression
     """
+    monomial_sum = _share_linear_maps(monomial_sum, linear_indices)
     groups = groupby(monomial_sum, key=lambda m: frozenset(m.sum_indices))
     new_monomials = []
     for _, monomials in groups:
