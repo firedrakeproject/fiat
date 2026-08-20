@@ -5,6 +5,7 @@ total number of floating point operations for a given script.
 
 import gem.gem as gem
 import gem.impero as imp
+from contextvars import ContextVar
 from functools import singledispatch
 import numpy
 import math
@@ -26,7 +27,11 @@ def statement_for(tree, temporaries):
     extent = tree.index.extent
     assert extent is not None
     child, = tree.children
-    flops = statement(child, temporaries)
+    token = _active_indices.set(_active_indices.get() | {tree.index})
+    try:
+        flops = statement(child, temporaries)
+    finally:
+        _active_indices.reset(token)
     return flops * extent
 
 
@@ -168,7 +173,14 @@ def flops_solve(expr, temporaries):
 
 @flops.register(gem.ComponentTensor)
 def flops_componenttensor(expr, temporaries):
-    raise ValueError("Not expecting ComponentTensor")
+    body, = expr.children
+    # Scheduling emits an assignment over the indices that no enclosing For
+    # already iterates.  Count those extents here; the loops that carry the
+    # rest count them.
+    implicit = tuple(index for index in expr.multiindex
+                     if index not in _active_indices.get())
+    extent = numpy.prod([index.extent for index in implicit], dtype=int)
+    return extent * expression_flops(body, temporaries)
 
 
 def expression_flops(expression, temporaries, top=False):
@@ -192,6 +204,14 @@ def count_flops(impero_c):
     :returns: approximate flop count for the tree.
     """
     try:
-        return statement(impero_c.tree, set(impero_c.temporaries))
+        token = _active_indices.set(frozenset())
+        try:
+            return statement(impero_c.tree, set(impero_c.temporaries))
+        finally:
+            _active_indices.reset(token)
     except (ValueError, NotImplementedError):
         return 0
+
+
+_active_indices = ContextVar("flop_count_active_indices",
+                             default=frozenset())
