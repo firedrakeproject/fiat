@@ -128,14 +128,17 @@ def inline_temporaries(expressions, ops):
     for op in ops:
         if isinstance(op, imp.Evaluate):
             expr = op.expression
-            if expr.shape == () and refcount[expr] == 1:
+            reduction_view = (isinstance(expr, gem.ComponentTensor)
+                              and isinstance(expr.children[0], gem.IndexSum))
+            if (expr.shape == () or reduction_view) and refcount[expr] == 1:
                 candidates.add(expr)
 
     # Prevent inlining that pulls expressions into inner loops
     for node in traversal(expressions):
         for child in node.children:
             if child in candidates and set(child.free_indices) < set(node.free_indices):
-                candidates.remove(child)
+                if not isinstance(child, gem.ComponentTensor):
+                    candidates.remove(child)
 
     # Filter out candidates
     return [op for op in ops if not (isinstance(op, imp.Evaluate) and op.expression in candidates)]

@@ -1371,3 +1371,92 @@ def aggressive_unroll(expression):
     expression, = unroll_indexsum((expression,), predicate=lambda index: True)
     expression, = remove_componenttensors((expression,))
     return expression
+
+
+def factorise_indirect_reductions(expression: Node) -> Node:
+    """Factor a reduction through a repeated indirect table lookup.
+
+    Parameters
+    ----------
+    expression
+        Root of a scalar GEM expression.
+
+    Returns
+    -------
+    Node
+        Expression with profitable dense reductions evaluated before gathers.
+
+    Notes
+    -----
+    For an indirect index c(i), linearity lets the reduction over q be
+    evaluated for a new dense table-row index before gathering at c(i).
+    The rewrite is selected only when GEM's cost model predicts less
+    arithmetic, with storage and node count breaking ties.
+
+    """
+    def replace(node, target, replacement, cache):
+        key = id(node)
+        if key in cache:
+            return cache[key]
+        children = tuple(replace(child, target, replacement, cache)
+                         for child in node.children)
+        if isinstance(node, Indexed):
+            multiindex = tuple(
+                replacement if index == target else index
+                for index in node.multiindex)
+            result = Indexed(children[0], multiindex)
+        elif children == node.children:
+            result = node
+        else:
+            result = node.reconstruct(*children)
+        cache[key] = result
+        return result
+
+    def choose(node):
+        body, = node.children
+        candidates = OrderedDict()
+        for indexed in traversal((body,)):
+            if not isinstance(indexed, Indexed):
+                continue
+            aggregate, = indexed.children
+            for index, extent in zip(indexed.multiindex, aggregate.shape):
+                if isinstance(index, VariableIndex):
+                    sources = frozenset(index.expression.free_indices)
+                    if sources and sources.isdisjoint(node.multiindex):
+                        candidates.setdefault(index, (extent, sources))
+
+        best = node
+        best_cost = estimate_cost((node,))
+        for indirect, (extent, sources) in candidates.items():
+            latent = Index(extent=extent)
+            dense_body = replace(body, indirect, latent, {})
+            if sources.intersection(dense_body.free_indices):
+                continue
+            dense = ComponentTensor(
+                IndexSum(dense_body, node.multiindex), (latent,))
+            candidate = Indexed(dense, (indirect,))
+            if candidate.free_indices != node.free_indices:
+                continue
+            cost = estimate_cost((candidate,))
+            if cost < best_cost:
+                best = candidate
+                best_cost = cost
+        return best
+
+    cache = {}
+
+    def visit(node):
+        key = id(node)
+        if key in cache:
+            return cache[key]
+        children = tuple(visit(child) for child in node.children)
+        if children == node.children:
+            result = node
+        else:
+            result = node.reconstruct(*children)
+        if isinstance(result, IndexSum):
+            result = choose(result)
+        cache[key] = result
+        return result
+
+    return visit(expression)
