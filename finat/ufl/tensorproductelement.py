@@ -13,8 +13,9 @@
 
 from itertools import chain
 
-from ufl.cell import TensorProductCell, as_cell
-from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees
+from ufl.cell import TensorProductCell
+from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees, as_cell
+
 from ufl.sobolevspace import DirectionalSobolevSpace
 
 
