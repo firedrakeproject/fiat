@@ -200,6 +200,34 @@ def test_preserved_linear_map_is_shared():
     assert numpy.allclose(result.arr, expected)
 
 
+def test_linear_map_sharing_normalises_order_and_scale() -> None:
+    i, j = gem.Index(extent=3), gem.Index(extent=3)
+    a_values = numpy.array([1.0, 2.0, 3.0])
+    b_values = numpy.array([4.0, 5.0, 6.0])
+    a = gem.Literal(a_values)
+    b = gem.Literal(b_values)
+    left_terms = (gem.Indexed(a, (i,)), gem.Indexed(b, (i,)))
+    right_terms = (gem.Indexed(b, (j,)), gem.Indexed(a, (j,)))
+    left_map = optimise.make_sum(left_terms * 2)
+    right_map = optimise.make_sum(right_terms * 2)
+    expression = gem.Product(left_map, right_map)
+
+    arguments = (i, j)
+    classifier = partial(_classify, frozenset(arguments))
+    preserved, = collect_monomials(
+        [expression], classifier, arguments)
+    optimised = optimise_monomial_sum(preserved, arguments)
+    tensors = [node for node in traversal((optimised,))
+               if isinstance(node, gem.ComponentTensor)]
+    assert len(tensors) == 1
+    body, = tensors[0].children
+    assert len(optimise.traverse_sum(body)) == 2
+
+    result, = evaluate([gem.ComponentTensor(optimised, arguments)])
+    expected = 4 * numpy.outer(a_values + b_values, a_values + b_values)
+    assert numpy.allclose(result.arr, expected)
+
+
 def test_expanded_and_preserved_agree():
     arguments, expanded, expected = monomial_sum(linear_indices=False)
     expression = optimise_monomial_sum(expanded, arguments)
