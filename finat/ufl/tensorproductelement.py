@@ -146,6 +146,5 @@ class TensorProductElement(FiniteElementBase):
 
     @property
     def embedded_subdegree(self):
-        """Doc."""
-    """The degree of the largest Lagrange space that is a subspace of this element."""
-    return min(e.embedded_subdegree for e in self.factor_elements)
+        """The degree of the largest Lagrange space that is a subspace of this element."""
+        return min(e.embedded_subdegree for e in self.factor_elements)
