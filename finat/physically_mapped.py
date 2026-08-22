@@ -3,6 +3,7 @@ from collections.abc import Iterable, Mapping
 
 import gem
 import numpy
+from gem.optimise import factorise_scalar_sums
 
 from finat.citations import cite
 
@@ -64,7 +65,8 @@ class MappedTabulation(Mapping):
         data = numpy.full((nrows, width), zero, dtype=object)
         for index, row in enumerate(nonzero_rows):
             columns[index, :len(row)] = tuple(column for column, _ in row)
-            data[index, :len(row)] = tuple(gem.as_gem(value) for _, value in row)
+            data[index, :len(row)] = tuple(
+                factorise_scalar_sums(gem.as_gem(value)) for _, value in row)
         self._width = width
         self._columns = gem.Literal(columns, dtype=gem.uint_type)
         values = []
