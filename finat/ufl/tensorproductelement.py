@@ -141,10 +141,11 @@ class TensorProductElement(FiniteElementBase):
 
     @property
     def embedded_superdegree(self):
-        """Doc."""
+        """The degree of the smallest Lagrange space that holds this element."""
         return max(e.embedded_superdegree for e in self.factor_elements)
 
     @property
     def embedded_subdegree(self):
         """Doc."""
-        return min(self.degree())
+    """The degree of the largest Lagrange space that is a subspace of this element."""
+    return min(e.embedded_subdegree for e in self.factor_elements)
