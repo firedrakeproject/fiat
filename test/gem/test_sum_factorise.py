@@ -267,3 +267,33 @@ def test_contraction_counts_index_absent_from_factors() -> None:
     result, = evaluate([expression])
 
     assert result.arr == 2 * numpy.arange(3.0).sum()
+
+
+def test_common_factor_is_extracted_from_scalar_sum() -> None:
+    common = gem.Variable("common", ())
+    left = gem.Variable("left", ())
+    right = gem.Variable("right", ())
+    expression = gem.Sum(
+        gem.Product(common, left), gem.Product(common, right))
+
+    expression = optimise.factorise_scalar_sums(expression)
+
+    _, factors = optimise.traverse_product(expression)
+    assert common in factors
+    result, = evaluate([expression], {
+        common: numpy.asarray(2.0),
+        left: numpy.asarray(3.0),
+        right: numpy.asarray(4.0),
+    })
+    assert result.arr == 14
+
+
+def test_scalar_factorisation_leaves_indexed_sum_to_planner() -> None:
+    i = gem.Index(extent=3)
+    common = gem.Variable("common", ())
+    left = gem.Indexed(gem.Literal(numpy.arange(3.0)), (i,))
+    right = gem.Indexed(gem.Literal(numpy.arange(3.0, 6.0)), (i,))
+    expression = gem.Sum(
+        gem.Product(common, left), gem.Product(common, right))
+
+    assert optimise.factorise_scalar_sums(expression) is expression

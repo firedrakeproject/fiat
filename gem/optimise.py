@@ -1209,6 +1209,85 @@ def aggressive_unroll(expression):
     return expression
 
 
+def factorise_scalar_sums(expression: Node) -> Node:
+    """Factor common products from scalar sums when this lowers GEM cost.
+
+    Parameters
+    ----------
+    expression
+        Root of a GEM expression.
+
+    Returns
+    -------
+    Node
+        Expression with profitable common product factors extracted.
+
+    Notes
+    -----
+    Scalar geometry and basis-transformation expressions are simplified below
+    the indexed contraction structure.  Contractions are indivisible factors:
+    their bound indices cannot move through an enclosing sum.  Sums carrying
+    free indices are left to the contraction planner, whose cost model includes
+    their iteration domains.
+
+    """
+    def choose(node):
+        if node.free_indices:
+            return node
+        summands = traverse_sum(node)
+        if len(summands) < 2:
+            return node
+
+        factorisations = []
+        for summand in summands:
+            _, factors = traverse_product(
+                summand,
+                stop_at=lambda factor: isinstance(factor, IndexSum),
+            )
+            factorisations.append(factors)
+
+        common = Counter(factorisations[0])
+        for factors in factorisations[1:]:
+            common &= Counter(factors)
+        if not common:
+            return node
+
+        common_factors = list(common.elements())
+        remainders = []
+        for factors in factorisations:
+            remaining_common = common.copy()
+            remaining = []
+            for factor in factors:
+                if remaining_common[factor]:
+                    remaining_common[factor] -= 1
+                else:
+                    remaining.append(factor)
+            remainders.append(make_product(remaining))
+
+        candidate = make_product(
+            (*common_factors, make_sum(remainders)))
+        if candidate.free_indices != node.free_indices:
+            return node
+        if estimate_cost((candidate,)) < estimate_cost((node,)):
+            return candidate
+        return node
+
+    cache = {}
+
+    def visit(node):
+        key = id(node)
+        if key in cache:
+            return cache[key]
+        children = tuple(visit(child) for child in node.children)
+        result = node if children == node.children else node.reconstruct(*children)
+        if isinstance(result, Sum):
+            result = choose(result)
+        cache[key] = result
+        return result
+
+    return visit(expression)
+
+
 def factorise_indirect_reductions(expression: Node) -> Node:
     """Factor a reduction through a repeated indirect table lookup.
 
