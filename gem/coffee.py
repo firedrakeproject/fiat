@@ -13,8 +13,7 @@ import numpy
 from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Literal, Node, one
 from gem.node import MemoizerArg
 from gem.cost import has_arithmetic
-from gem.optimise import (factorise_indirect_reductions,
-                          filtered_replace_indices,
+from gem.optimise import (filtered_replace_indices,
                           make_sum, make_product, traverse_sum)
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
@@ -345,8 +344,7 @@ def optimise_monomial_sum(monomial_sum, linear_indices):
     new_monomials = []
     for _, monomials in groups:
         new_monomials.extend(optimise_monomials(monomials, linear_indices))
-    expression = monomial_sum_to_expression(new_monomials)
-    return factorise_indirect_reductions(expression)
+    return monomial_sum_to_expression(new_monomials)
 
 
 def optimise_monomials(monomials, linear_indices):
