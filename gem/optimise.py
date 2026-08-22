@@ -272,6 +272,15 @@ def _select_expression(expressions, index):
         elif all(e.j == k and e.i == expr.i for k, e in enumerate(expressions)):
             return expr.reconstruct(expr.i, index)
 
+    if types == {IndexSum}:
+        extents = {tuple(i.extent for i in e.multiindex) for e in expressions}
+        if len(extents) == 1:
+            multiindex = tuple(Index(extent=extent) for extent in extents.pop())
+            summands = [Indexed(ComponentTensor(e.children[0], e.multiindex),
+                                multiindex)
+                        for e in expressions]
+            return IndexSum(_select_expression(summands, index), multiindex)
+
     if len(types) == 1:
         cls, = types
         if cls.__front__ or cls.__back__:
