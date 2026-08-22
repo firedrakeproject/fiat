@@ -1309,23 +1309,14 @@ def factorise_indirect_reductions(expression: Node) -> Node:
     arithmetic, with storage and node count breaking ties.
 
     """
-    def replace(node, target, replacement, cache):
-        key = id(node)
-        if key in cache:
-            return cache[key]
-        children = tuple(replace(child, target, replacement, cache)
-                         for child in node.children)
+    def replace(node, self, substitution):
+        target, replacement = substitution
         if isinstance(node, Indexed):
-            multiindex = tuple(
-                replacement if index == target else index
-                for index in node.multiindex)
-            result = Indexed(children[0], multiindex)
-        elif children == node.children:
-            result = node
-        else:
-            result = node.reconstruct(*children)
-        cache[key] = result
-        return result
+            child, = node.children
+            multiindex = tuple(replacement if index == target else index
+                               for index in node.multiindex)
+            return Indexed(self(child, substitution), multiindex)
+        return reuse_if_untouched_arg(node, self, substitution)
 
     def choose(node):
         body, = node.children
@@ -1340,11 +1331,14 @@ def factorise_indirect_reductions(expression: Node) -> Node:
                     if sources and sources.isdisjoint(node.multiindex):
                         candidates.setdefault(index, (extent, sources))
 
+        if not candidates:
+            return node
+
         best = node
         best_cost = estimate_cost((node,))
         for indirect, (extent, sources) in candidates.items():
             latent = Index(extent=extent)
-            dense_body = replace(body, indirect, latent, {})
+            dense_body = MemoizerArg(replace)(body, (indirect, latent))
             if sources.intersection(dense_body.free_indices):
                 continue
             dense = ComponentTensor(
@@ -1358,20 +1352,10 @@ def factorise_indirect_reductions(expression: Node) -> Node:
                 best_cost = cost
         return best
 
-    cache = {}
+    def visit(node, self):
+        node = reuse_if_untouched(node, self)
+        if isinstance(node, IndexSum):
+            node = choose(node)
+        return node
 
-    def visit(node):
-        key = id(node)
-        if key in cache:
-            return cache[key]
-        children = tuple(visit(child) for child in node.children)
-        if children == node.children:
-            result = node
-        else:
-            result = node.reconstruct(*children)
-        if isinstance(result, IndexSum):
-            result = choose(result)
-        cache[key] = result
-        return result
-
-    return visit(expression)
+    return Memoizer(visit)(expression)
