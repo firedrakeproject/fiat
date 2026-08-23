@@ -49,6 +49,7 @@ class MappedTabulation(Mapping):
             indices = range(M.shape[0])
         self.indices = tuple(indices)
         self._space_dim = len(self.indices)
+        self._value_dim = M.shape[1]
 
         nonzero_rows = []
         for source_row in self.indices:
@@ -82,22 +83,51 @@ class MappedTabulation(Mapping):
         self._values = gem.ListTensor(values)
         self._tabulation_cache = {}
 
-    def matvec(self, table: gem.Node) -> gem.Node:
-        r = gem.Index(extent=self._space_dim)
-        k = gem.Index(extent=self._width)
-        i = gem.VariableIndex(gem.Indexed(self._value_indices, (r, k)))
-        j = gem.VariableIndex(gem.Indexed(self._columns, (r, k)))
-        A = gem.Indexed(self._values, (i,))
+    def _entry(self, r: gem.Index, a: gem.Index) -> gem.Node:
+        """Entry ``M[r, a]`` of the basis transformation.
 
+        Parameters
+        ----------
+        r
+            Index over the rows retained by the element.
+        a
+            Index over the reference basis.
+
+        Returns
+        -------
+        gem.Node
+            A sum over the padded row of an interned entry against a Delta
+            selecting its column, so that contracting either axis of ``M``
+            is ordinary GEM algebra.
+
+        """
+        k = gem.Index(extent=self._width)
+        entry = gem.Indexed(
+            self._values,
+            (gem.VariableIndex(gem.Indexed(self._value_indices, (r, k))),))
+        column = gem.VariableIndex(gem.Indexed(self._columns, (r, k)))
+        return gem.IndexSum(gem.Product(entry, gem.Delta(column, a)), (k,))
+
+    def matrix(self) -> gem.Node:
+        """The basis transformation as a rank-2 GEM expression."""
+        r = gem.Index(extent=self._space_dim)
+        a = gem.Index(extent=self._value_dim)
+        return gem.ComponentTensor(self._entry(r, a), (r, a))
+
+    def matmul(self, table: gem.Node) -> gem.Node:
+        """Apply the basis transformation to a reference tabulation."""
+        r = gem.Index(extent=self._space_dim)
+        a = gem.Index(extent=self._value_dim)
         tail = gem.indices(len(table.shape) - 1)
-        mapped = gem.IndexSum(gem.Product(A, gem.Indexed(table, (j, *tail))), (k,))
+        mapped = gem.IndexSum(
+            gem.Product(self._entry(r, a), gem.Indexed(table, (a, *tail))), (a,))
         return gem.ComponentTensor(mapped, (r, *tail))
 
     def __getitem__(self, alpha):
         try:
             return self._tabulation_cache[alpha]
         except KeyError:
-            result = self.matvec(self.ref_tabulation[alpha])
+            result = self.matmul(self.ref_tabulation[alpha])
             return self._tabulation_cache.setdefault(alpha, result)
 
     def __iter__(self):

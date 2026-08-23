@@ -15,7 +15,7 @@ from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
-                     Index, VariableIndex, Indexed, FlexiblyIndexed,
+                     Index, IndexBase, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
                      MathFunction, MinValue, MaxValue, Power, Inverse, Solve,
                      partial_indexed, one)
@@ -102,7 +102,13 @@ replace_indices.register(Node)(reuse_if_untouched_arg)
 def _replace_indices_atomic(i, self, subst):
     if isinstance(i, VariableIndex):
         new_expr = self(i.expression, subst)
-        return i if new_expr == i.expression else VariableIndex(new_expr)
+        if new_expr == i.expression:
+            return i
+        # A variable index that substitution has made constant is a fixed
+        # index, and folding it lets the lookup itself be evaluated.
+        if isinstance(new_expr, Literal) and not new_expr.shape:
+            return int(new_expr.array)
+        return VariableIndex(new_expr)
     else:
         substitute = dict(subst)
         return substitute.get(i, i)
@@ -1034,6 +1040,185 @@ def repeated_contractions(expression):
     return frozenset(expr for expr, count in counts.items() if count > 1)
 
 
+def _cancellable_delta(node: Node) -> bool:
+    """Is there a Delta below ``node`` cancelling one of its own indices?
+
+    Parameters
+    ----------
+    node
+        An IndexSum.
+
+    Returns
+    -------
+    bool
+        Whether cancelling is possible below it.
+
+    """
+    contracted = frozenset(node.multiindex)
+    return any(isinstance(child, Delta)
+               and bool({child.i, child.j} & contracted)
+               for child in traversal(node.children))
+
+
+def _constant_map(index: IndexBase) -> tuple | None:
+    """The literal table behind a VariableIndex, and the indices addressing it.
+
+    Parameters
+    ----------
+    index
+        Index to inspect.
+
+    Returns
+    -------
+    tuple or None
+        ``(array, indices)`` when the index is a lookup into a Literal with a
+        plain multiindex, otherwise None.
+
+    """
+    if not isinstance(index, VariableIndex):
+        return None
+    expression = index.expression
+    if not isinstance(expression, Indexed):
+        return None
+    table, = expression.children
+    if not isinstance(table, Literal):
+        return None
+    if not all(isinstance(i, Index) for i in expression.multiindex):
+        return None
+    return table.array, expression.multiindex
+
+
+def _pull_back(
+        delta: Delta,
+        sum_indices: Iterable[Index],
+        factors: Iterable[Node],
+        replacer: MemoizerArg) -> tuple | None:
+    """Contract a Delta's own axes before its column axis.
+
+    ``sum_a (sum_rk v(r,k) delta(c(r,k), a)) T(a, q)`` is cancelled by
+    substituting ``a := c(r,k)``, which makes ``T`` depend on ``r`` and ``k``
+    and so forces that contraction inside the ``q`` loop.  When ``r`` and
+    ``k`` are contracted here and ``T`` carries indices of its own, summing
+    them first is cheaper: it yields a dense vector indexed by ``a``.
+
+    Parameters
+    ----------
+    delta
+        Candidate Delta, a factor of the product.
+    sum_indices
+        Indices contracted over the product.
+    factors
+        Product factors.
+    replacer
+        ``MemoizerArg(filtered_replace_indices)``.
+
+    Returns
+    -------
+    tuple or None
+        New ``(sum_indices, factors)``, or None when cancelling is better.
+
+    """
+    column = delta.j if isinstance(delta.i, VariableIndex) else delta.i
+    variable = delta.i if isinstance(delta.i, VariableIndex) else delta.j
+    if not isinstance(column, Index) or not isinstance(variable, VariableIndex):
+        return None
+    lookup = _constant_map(variable)
+    if lookup is None:
+        return None
+    table, source_indices = lookup
+    sources = frozenset(source_indices)
+    if column not in sum_indices or not sources <= set(sum_indices):
+        return None
+
+    others = [f for f in factors if f is not delta]
+    spanning = [f for f in others if column in f.free_indices]
+    pulled = [f for f in others if column not in f.free_indices]
+    if not spanning or not pulled:
+        return None
+    # Cancelling couples the spanning factors to the source indices.  That
+    # only costs anything when they carry indices of their own.
+    if not any(set(f.free_indices) - sources - {column} for f in spanning):
+        return None
+
+    vector = numpy.empty(column.extent, dtype=object)
+    contributions = defaultdict(list)
+    for position in numpy.ndindex(table.shape):
+        substitution = tuple(zip(source_indices, (int(p) for p in position)))
+        contributions[int(table[position])].append(substitution)
+    for value in range(column.extent):
+        terms = [make_product([replacer(f, substitution) for f in pulled])
+                 for substitution in contributions.get(value, ())]
+        # A reference basis function that no row maps onto contributes nothing.
+        vector[value] = make_sum(terms) if terms else Zero()
+
+    rest = tuple(i for i in sum_indices if i not in sources)
+    return rest, [Indexed(ListTensor(vector), (column,)), *spanning]
+
+
+def cancel_deltas(
+        sum_indices: Iterable[Index],
+        factors: Iterable[Node],
+        replacer: MemoizerArg) -> tuple[list, list]:
+    """Cancel contracted Deltas, pulling a map back through its own axes first.
+
+    Parameters
+    ----------
+    sum_indices
+        Indices contracted over the product.
+    factors
+        Product factors.
+    replacer
+        ``MemoizerArg(filtered_replace_indices)``.
+
+    Returns
+    -------
+    tuple
+        Remaining sum indices and factors.
+
+    """
+    for delta in [f for f in factors if isinstance(f, Delta)]:
+        specialised = _pull_back(delta, sum_indices, factors, replacer)
+        if specialised is not None:
+            sum_indices, factors = specialised
+            break
+    return delta_elimination(sum_indices, factors, index_replacer=replacer)
+
+
+def eliminate_deltas(expression: Node) -> Node:
+    """Cancel contracted Deltas that ``delta_elimination`` cannot reach.
+
+    Parameters
+    ----------
+    expression
+        Root of a scalar GEM expression.
+
+    Returns
+    -------
+    Node
+        Expression with those Deltas cancelled.
+
+    Notes
+    -----
+    ``delta_elimination`` only inspects top-level product factors, so a Delta
+    inside a preserved linear map is invisible to it.  Flattening the product
+    tree first exposes it, and hoists the contractions it sits under so that
+    substituting the Delta's variable index cannot capture them.
+
+    """
+    replacer = MemoizerArg(filtered_replace_indices)
+
+    def visit(node, self):
+        node = reuse_if_untouched(node, self)
+        if not isinstance(node, IndexSum) or not _cancellable_delta(node):
+            return node
+        sum_indices, factors = traverse_product(node, index_replacer=replacer)
+        sum_indices, factors = cancel_deltas(sum_indices, factors, replacer)
+        factors = [replacer(factor, ()) for factor in factors]
+        return IndexSum(make_product(factors), tuple(sum_indices))
+
+    return Memoizer(visit)(expression)
+
+
 def contraction(expression):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
@@ -1060,7 +1245,7 @@ def contraction(expression):
         sum_indices, factors = traverse_product(
             expression, index_replacer=index_replacer,
             stop_at=lambda e: e is not root and e in keep)
-        sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
+        sum_indices, factors = cancel_deltas(sum_indices, factors, index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         return sum_factorise(sum_indices, factors)
 

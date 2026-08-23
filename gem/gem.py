@@ -681,6 +681,15 @@ class VariableIndex(IndexBase):
         return type(self), (self.expression,)
 
 
+def _index_free_indices(index):
+    """Return the free indices represented by an index expression."""
+    if isinstance(index, Index):
+        return (index,)
+    if isinstance(index, VariableIndex):
+        return index.expression.free_indices
+    return ()
+
+
 class Indexed(Scalar):
     __slots__ = ('children', 'multiindex', 'indirect_children')
     __back__ = ('multiindex',)
@@ -1072,9 +1081,11 @@ class Delta(Scalar, Terminal):
         self = super(Delta, cls).__new__(cls)
         self.i = i
         self.j = j
-        # Set up free indices
-        free_indices = [index for index in (i, j) if isinstance(index, Index)]
-        self.free_indices = tuple(unique(free_indices))
+        # Set up free indices.  A VariableIndex is not itself a free index,
+        # but the expression it wraps may be free in others; those propagate
+        # here exactly as they do through Indexed.
+        self.free_indices = tuple(unique(chain.from_iterable(
+            _index_free_indices(index) for index in (i, j))))
         self._dtype = dtype
         return self
 
