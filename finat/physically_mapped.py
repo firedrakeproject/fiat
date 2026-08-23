@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from collections.abc import Iterable, Mapping
+from functools import cached_property
 
 import gem
 import numpy
@@ -83,6 +84,16 @@ class MappedTabulation(Mapping):
         self._values = gem.ListTensor(values)
         self._tabulation_cache = {}
 
+    @cached_property
+    def _reference_index(self) -> gem.Index:
+        """Contraction over the reference basis, shared by all tabulations."""
+        return gem.Index(extent=self._value_dim)
+
+    @cached_property
+    def _row_index(self) -> gem.Index:
+        """Contraction over a padded row, shared by all tabulations."""
+        return gem.Index(extent=self._width)
+
     def _entry(self, r: gem.Index, a: gem.Index) -> gem.Node:
         """Entry ``M[r, a]`` of the basis transformation.
 
@@ -101,7 +112,7 @@ class MappedTabulation(Mapping):
             is ordinary GEM algebra.
 
         """
-        k = gem.Index(extent=self._width)
+        k = self._row_index
         entry = gem.Indexed(
             self._values,
             (gem.VariableIndex(gem.Indexed(self._value_indices, (r, k))),))
@@ -111,13 +122,13 @@ class MappedTabulation(Mapping):
     def matrix(self) -> gem.Node:
         """The basis transformation as a rank-2 GEM expression."""
         r = gem.Index(extent=self._space_dim)
-        a = gem.Index(extent=self._value_dim)
+        a = self._reference_index
         return gem.ComponentTensor(self._entry(r, a), (r, a))
 
     def matmul(self, table: gem.Node) -> gem.Node:
         """Apply the basis transformation to a reference tabulation."""
         r = gem.Index(extent=self._space_dim)
-        a = gem.Index(extent=self._value_dim)
+        a = self._reference_index
         tail = gem.indices(len(table.shape) - 1)
         mapped = gem.IndexSum(
             gem.Product(self._entry(r, a), gem.Indexed(table, (a, *tail))), (a,))
