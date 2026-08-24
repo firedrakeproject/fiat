@@ -41,11 +41,11 @@ def test_enriched_element_dual_evaluation():
 
     # Check that calling dual_evaluation returns a valid Indexed expression
     fn = lambda x: gem.Literal(1.0)
-    expr, indices = enriched.dual_evaluation(fn)
+    expr, point_indices, basis_indices = enriched.dual_evaluation(fn)
     assert isinstance(expr, gem.Indexed)
     assert isinstance(expr.children[0], gem.Concatenate)
-    assert len(indices) == 1
-    assert indices[0].extent == enriched.space_dimension()
+    assert len(basis_indices) == 1
+    assert basis_indices[0].extent == enriched.space_dimension()
 
 
 @pytest.fixture(scope="module")
@@ -67,7 +67,8 @@ def coefficient_evaluation(element, ps, dofs):
 
 def nodal_values(element, fn):
     """Dual evaluate fn against a nodal element, giving its values at the nodes."""
-    expression, indices = element.dual_evaluation(fn)
+    expression, point_indices, basis_indices = element.dual_evaluation(fn)
+    indices = point_indices + basis_indices
     result, = evaluate([gem.ComponentTensor(expression, indices)])
     return result.arr
 
