@@ -272,30 +272,15 @@ def _collect_monomial_sums(
         classifier: Callable[[Node], str]) -> list[MonomialSum]:
     """Collect monomial sums using the supplied node classifier.
 
-    Parameters
-    ----------
-    expressions : iterable of Node
-        GEM expressions to refactorise.
-    classifier : callable
-        Function labelling each node as ``ATOMIC``, ``COMPOUND``, or
-        ``OTHER``.
-
-    Returns
-    -------
-    list of MonomialSum
-        Polynomial representations of the expressions.
-
-    Raises
-    ------
-    FactorisationError
-        If a compound expression cannot be expanded.
-
-    Notes
-    -----
     ``expressions`` must already have had its ComponentTensors removed, so
-    that a caller identifying nodes to classify sees the nodes this
-    collector will visit.
+    that a caller identifying nodes to classify sees the nodes this collector
+    will visit.
 
+    :arg expressions: GEM expressions to refactorise
+    :arg classifier: a function labelling each node as ``ATOMIC``,
+                     ``COMPOUND``, or ``OTHER``
+    :returns: list of :py:class:`MonomialSum`s
+    :raises FactorisationError: a compound expression cannot be expanded.
     """
 
     # Get ListTensors out of the way
@@ -322,36 +307,25 @@ def collect_monomials(
         expressions: Iterable[Node],
         classifier: Callable[[Node], str],
         linear_indices: Iterable[Index] = ()) -> list[MonomialSum]:
-    """Collect structure-preserving sum-of-products representations.
+    """Refactorises expressions into a sum-of-products form, using
+    distributivity rules (i.e. a*(b + c) -> a*b + a*c).  Expansion
+    proceeds until all "compound" expressions are broken up.
 
-    Parameters
-    ----------
-    expressions
-        GEM expressions to refactorise.
-    classifier
-        Function that labels GEM nodes for polynomial collection.
-    linear_indices
-        Free indices identifying the multilinear axes.  Sums depending on
-        exactly one such axis represent linear maps and remain atomic.
+    A sum over exactly one linear index is a finite element linear map, such
+    as a sparse basis transformation or a tensor-product tabulation factor,
+    and stays atomic.  A sum over several linear indices separates form
+    monomials, and is distributed.
 
-    Returns
-    -------
-    list of MonomialSum
-        One polynomial representation for each input expression.
+    :arg expressions: GEM expressions to refactorise
+    :arg classifier: a function that can classify any GEM expression
+                     as ``ATOMIC``, ``COMPOUND``, or ``OTHER``.  This
+                     classification drives the factorisation.
+    :arg linear_indices: free indices identifying the multilinear axes
 
-    Notes
-    -----
-    A one-axis sum is a finite element linear operand: examples include a
-    sparse basis transformation and a tensor-product tabulation factor.
-    Preserving it keeps domain-specific basis structure available for
-    contraction optimisation.  This does not make the map opaque: its GEM
-    expression remains available for scalar simplification and code motion.
+    :returns: list of :py:class:`MonomialSum`s
 
-    Sums involving several linear axes separate form monomials and are
-    distributed.  COFFEE subsequently chooses scalar factorisations across
-    the resulting operands.  Keeping these two stages distinct avoids a
-    Cartesian expansion of basis-map entries before loop placement.
-
+    :raises FactorisationError: Failed to break up some "compound"
+                                expressions with expansion.
     """
     # Remove ComponentTensors here, not in the collector.  Removing them
     # rebuilds nodes, and the maps found below must be the very nodes that
