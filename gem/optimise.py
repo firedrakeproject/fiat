@@ -382,25 +382,60 @@ def associate(operator, operands):
     return result, flops
 
 
-def sum_factorise(sum_indices, factors):
-    """Optimise a tensor product through sum factorisation.
+def _independent_contractions(sum_indices, groups):
+    """Split a contraction into independent subproblems.
+
+    Two contraction indices only interact if some factor carries both of
+    them, so the factors and the indices form a graph whose connected
+    components can be contracted separately.
 
     :arg sum_indices: free indices for contractions
-    :arg factors: product factors
+    :arg groups: product factors, grouped by free indices
+    :returns: a pair of the list of (indices, groups) subproblems and the
+              list of groups carrying no contraction index
+    """
+    # Union-find over the contraction indices
+    parent = {index: index for index in sum_indices}
+
+    def find(index):
+        if parent[index] == index:
+            return index
+
+        parent[index] = find(parent[index])
+        return parent[index]
+
+    index_set = set(sum_indices)
+    shared = [[i for i in group.free_indices if i in index_set] for group in groups]
+    for indices in shared:
+        for index in indices[1:]:
+            root, other = find(indices[0]), find(index)
+            if root != other:
+                parent[other] = root
+
+    subproblems = OrderedDict((find(index), ([], [])) for index in sum_indices)
+    for index in sum_indices:
+        subproblems[find(index)][0].append(index)
+
+    rest = []
+    for group, indices in zip(groups, shared):
+        if indices:
+            subproblems[find(indices[0])][1].append(group)
+        else:
+            rest.append(group)
+    return list(subproblems.values()), rest
+
+
+def _sum_factorise_connected(sum_indices, groups):
+    """Sum factorise a single connected contraction by exhaustive search.
+
+    :arg sum_indices: free indices for contractions, which must not split
+                      into independent subproblems
+    :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
-    if len(factors) == 0 and len(sum_indices) == 0:
-        # Empty product
-        return one
-
     if len(sum_indices) > 6:
         raise NotImplementedError("Too many indices for sum factorisation!")
 
-    # Form groups by free indices
-    groups = groupby(factors, key=lambda f: f.free_indices)
-    groups = [Product(*terms) for _, terms in groups]
-
-    # Sum factorisation
     expression = None
     best_flops = numpy.inf
 
@@ -432,6 +467,33 @@ def sum_factorise(sum_indices, factors):
             expression = expr
             best_flops = flops
 
+    return expression
+
+
+def sum_factorise(sum_indices, factors):
+    """Optimise a tensor product through sum factorisation.
+
+    :arg sum_indices: free indices for contractions
+    :arg factors: product factors
+    :returns: optimised GEM expression
+    """
+    if len(factors) == 0 and len(sum_indices) == 0:
+        # Empty product
+        return one
+
+    # Form groups by free indices
+    groups = groupby(factors, key=lambda f: f.free_indices)
+    groups = [Product(*terms) for _, terms in groups]
+
+    # Contractions that share no factor are independent of each other, so
+    # factorise them separately rather than searching the orderings that
+    # interleave them.
+    subproblems, terms = _independent_contractions(sum_indices, groups)
+    terms = terms + [_sum_factorise_connected(indices, subgroups)
+                     for indices, subgroups in subproblems]
+    if not terms:
+        return one
+    expression, _ = associate(Product, terms)
     return expression
 
 
@@ -568,17 +630,41 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
-def contraction(expression, ignore=None):
+def is_contraction(expression: Node) -> bool:
+    """Test whether an expression is a tensor contraction.
+
+    Parameters
+    ----------
+    expression :
+        A GEM expression.
+
+    Returns
+    -------
+    bool
+        Whether the expression is a contraction.
+
+    Notes
+    -----
+    Pass this as ``stop_at`` to keep a contraction that is already sum
+    factorised out of a surrounding one. Flattening it discards its
+    factorisation, along with any subexpression it shares with another
+    factor, and inflates the number of indices to factorise over.
+
+    """
+    return isinstance(expression, IndexSum)
+
+
+def contraction(expression, stop_at=None):
     """Optimise the contractions of the tensor product at the root of
     the expression, including:
 
     - IndexSum-Delta cancellation
     - Sum factorisation
 
-    :arg ignore: Optional set of indices to ignore when applying sum
-        factorisation (otherwise all summation indices will be
-        considered). Use this if your expression has many contraction
-        indices.
+    :arg stop_at: Optional predicate on GEM expressions that are not to
+        be broken into further factors, see :func:`traverse_product`.
+        The contraction at the root is always broken up, as that is the
+        one being optimised.
 
     This routine was designed with finite element coefficient
     evaluation in mind.
@@ -592,18 +678,13 @@ def contraction(expression, ignore=None):
 
     # Flatten product tree, eliminate deltas, sum factorise
     def rebuild(expression):
-        sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+        root = expression
+        sum_indices, factors = traverse_product(
+            expression, index_replacer=index_replacer,
+            stop_at=None if stop_at is None else lambda e: e is not root and stop_at(e))
         sum_indices, factors = delta_elimination(sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
-        if ignore is not None:
-            # TODO: This is a really blunt instrument and one might
-            # plausibly want the ignored indices to be contracted on
-            # the inside rather than the outside.
-            extra = tuple(i for i in sum_indices if i in ignore)
-            to_factor = tuple(i for i in sum_indices if i not in ignore)
-            return IndexSum(sum_factorise(to_factor, factors), extra)
-        else:
-            return sum_factorise(sum_indices, factors)
+        return sum_factorise(sum_indices, factors)
 
     # Sometimes the value shape is composed as a ListTensor, which
     # could get in the way of decomposing factors.  In particular,

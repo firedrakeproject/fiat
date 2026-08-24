@@ -4,7 +4,8 @@ from itertools import chain
 import gem
 import numpy
 from gem.interpreter import evaluate
-from gem.optimise import delta_elimination, sum_factorise, traverse_product
+from gem.optimise import (delta_elimination, is_contraction, sum_factorise,
+                          traverse_product)
 from gem.utils import cached_property
 
 from finat.quadrature import make_quadrature
@@ -266,8 +267,10 @@ class FiniteElementBase(metaclass=ABCMeta):
 
         expr = fn(x)
         # Apply targeted sum factorisation and delta elimination to
-        # the expression
-        sum_indices, factors = delta_elimination(*traverse_product(expr))
+        # the expression, preserving contractions that fn already factorised
+        # FIXME: a single pass of gem.optimise.contraction will choke on too many indices
+        # This is a temporary workaround https://github.com/firedrakeproject/fiat/issues/283
+        sum_indices, factors = delta_elimination(*traverse_product(expr, stop_at=is_contraction))
         expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
         # expression is tensor valued.
@@ -277,11 +280,9 @@ class FiniteElementBase(metaclass=ABCMeta):
         Qi = Q[basis_indices + shape_indices]
         expri = expr[shape_indices]
         evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
-        # Now we want to factorise over the new contraction with x,
-        # ignoring any shape indices to avoid hitting the sum-
-        # factorisation index limit (this is a bit of a hack).
-        # Really need to do a more targeted job here.
-        evaluation = gem.optimise.contraction(evaluation, shape_indices)
+        # Factorise over the new contraction with Qi, keeping whole the
+        # contractions that fn already factorised
+        evaluation = gem.optimise.contraction(evaluation, stop_at=is_contraction)
         return evaluation, basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):
