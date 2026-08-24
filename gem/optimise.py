@@ -1237,20 +1237,13 @@ def factorise_scalar_sums(expression: Node) -> Node:
             return candidate
         return node
 
-    cache = {}
+    def visit(node, self):
+        node = reuse_if_untouched(node, self)
+        if isinstance(node, Sum):
+            node = choose(node)
+        return node
 
-    def visit(node):
-        key = id(node)
-        if key in cache:
-            return cache[key]
-        children = tuple(visit(child) for child in node.children)
-        result = node if children == node.children else node.reconstruct(*children)
-        if isinstance(result, Sum):
-            result = choose(result)
-        cache[key] = result
-        return result
-
-    return visit(expression)
+    return Memoizer(visit)(expression)
 
 
 def _indirect_gathers(expression: Node) -> OrderedDict:
