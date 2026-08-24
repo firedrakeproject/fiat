@@ -425,35 +425,21 @@ def _independent_contractions(sum_indices, groups):
     return list(subproblems.values()), rest
 
 
-#: Largest number of factors for which a product tree is planned exactly.
-_MAX_PLANNED_FACTORS = 10
-
-
 def _plan_contraction(sum_indices, groups):
     """Choose a product tree for one connected contraction.
 
-    Parameters
-    ----------
-    sum_indices :
-        Contraction indices of a single connected subproblem.
-    groups :
-        Product factors, grouped by free indices.
+    Every factor is a vertex and every contraction index joins the factors
+    carrying it.  A product tree is built by dynamic programming over
+    subsets of factors, and each index is reduced at the smallest subtree
+    holding every factor that carries it, which is the earliest its
+    reduction is legal.  Unlike a search over orderings of the indices,
+    this can reduce an index over part of the product and multiply the
+    rest in afterwards.
 
-    Returns
-    -------
-    Node
-        The contracted GEM expression.
-
-    Notes
-    -----
-    Every factor is a vertex and every contraction index joins the
-    factors carrying it.  A product tree is built by dynamic programming
-    over subsets of factors, and each index is reduced at the smallest
-    subtree holding every factor that carries it, which is the earliest
-    its reduction is legal.  Unlike a search over orderings of the
-    indices, this can reduce an index over part of the product and
-    multiply the rest in afterwards.
-
+    :arg sum_indices: free indices for contractions, which must not split
+                      into independent subproblems
+    :arg groups: product factors, grouped by free indices
+    :returns: optimised GEM expression
     """
     extents = {}
     for index in sum_indices:
@@ -527,14 +513,17 @@ def _plan_contraction(sum_indices, groups):
 
 
 def _sum_factorise_connected(sum_indices, groups):
-    """Sum factorise a single connected contraction by exhaustive search.
+    """Sum factorise a single connected contraction.
 
-    :arg sum_indices: free indices for contractions, already split
+    Planning the tree costs 3**factors and searching the orderings costs
+    indices!, so take whichever the contraction is small enough for.
+
+    :arg sum_indices: free indices for contractions, which must not split
                       into independent subproblems
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
-    if len(groups) <= _MAX_PLANNED_FACTORS:
+    if len(groups) <= 10:
         return _plan_contraction(sum_indices, groups)
 
     if len(sum_indices) > 6:
@@ -737,23 +726,13 @@ def traverse_sum(expression, stop_at=None):
 def repeated_contractions(expression):
     """Find the contractions that occur more than once in a product tree.
 
-    Parameters
-    ----------
-    expression :
-        A GEM expression.
-
-    Returns
-    -------
-    frozenset
-        The :class:`~.IndexSum` nodes occurring more than once as a
-        factor of ``expression``.
-
-    Notes
-    -----
     Flattening a contraction renames its indices apart, so a contraction
-    used more than once becomes that many independent contractions and
-    is evaluated once per use.  Keeping it whole preserves the sharing.
+    used more than once becomes that many independent contractions and is
+    evaluated once per use.  Keeping it whole preserves the sharing.
 
+    :arg expression: a GEM expression
+    :returns: the :class:`~.IndexSum` nodes occurring more than once as a
+              factor of ``expression``
     """
     counts = Counter()
     stack = [expression]

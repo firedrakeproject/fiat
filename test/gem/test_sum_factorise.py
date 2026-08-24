@@ -1,4 +1,4 @@
-from itertools import chain, combinations
+from itertools import chain, combinations, islice
 
 import numpy
 import pytest
@@ -48,19 +48,52 @@ def test_independent_contractions(nfactors, ndims):
     assert numpy.allclose(result.arr, expected)
 
 
+def shared_index_contraction(nindices, nfactors, extent=2):
+    """Build one connected contraction of `nfactors` factors over `nindices`.
+
+    Every factor carries the first index, so the contraction is connected,
+    and each carries a different subset of the rest, so no two factors are
+    grouped together.
+    """
+    indices = tuple(gem.Index(extent=extent) for _ in range(nindices))
+    subsets = chain.from_iterable(combinations(indices[1:], n)
+                                  for n in range(1, nindices))
+    factors = []
+    for extra in islice(subsets, nfactors):
+        shared = indices[:1] + extra
+        table = numpy.random.rand(*(extent,) * len(shared))
+        factors.append(gem.Indexed(gem.Literal(table), shared))
+    assert len(factors) == nfactors
+    return indices, factors
+
+
 def test_too_many_indices_in_one_contraction():
     # A connected contraction of more factors than the planner takes falls
     # back on searching the orderings, which is still bounded.
-    indices = tuple(gem.Index(extent=2) for _ in range(7))
-    factors = []
-    for extra in chain(combinations(indices[1:], 1), combinations(indices[1:], 2)):
-        shared = indices[:1] + extra
-        factors.append(gem.Indexed(gem.Literal(numpy.ones((2,) * len(shared))), shared))
-        if len(factors) > optimise._MAX_PLANNED_FACTORS:
-            break
+    indices, factors = shared_index_contraction(7, 11)
 
     with pytest.raises(NotImplementedError):
         sum_factorise(indices, factors)
+
+
+def test_more_factors_than_indices():
+    # Factors and contraction indices are not tied to each other: each
+    # factor carrying a different subset of the indices takes a group of
+    # its own, so more factors than the planner takes can still share few
+    # enough indices for the ordering search.  Planning this tree costs
+    # 3**15 splits, which is what the search is here to avoid.
+    numpy.random.seed(0)
+    indices, factors = shared_index_contraction(5, 15)
+
+    expression = sum_factorise(indices, factors)
+    assert expression.free_indices == ()
+
+    letters = {index: chr(ord("a") + n) for n, index in enumerate(indices)}
+    spec = ",".join("".join(letters[i] for i in f.multiindex) for f in factors)
+    expected = numpy.einsum(spec + "->", *[f.children[0].array for f in factors])
+
+    result, = evaluate([expression])
+    assert numpy.allclose(result.arr, expected)
 
 
 def test_contraction_preserves_repeated_contractions():
