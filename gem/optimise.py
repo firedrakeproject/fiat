@@ -1452,74 +1452,79 @@ def factorise_scalar_sums(expression: Node) -> Node:
     return visit(expression)
 
 
-def factorise_indirect_reductions(expression: Node) -> Node:
-    """Factor a reduction through a repeated indirect table lookup.
+def _indirect_gathers(expression: Node) -> OrderedDict:
+    """Find the maps that an expression reads tables through.
 
-    Parameters
-    ----------
-    expression
-        Root of a scalar GEM expression.
-
-    Returns
-    -------
-    Node
-        Expression with profitable dense reductions evaluated before gathers.
-
-    Notes
-    -----
-    For an indirect index c(i), linearity lets the reduction over q be
-    evaluated for a new dense table-row index before gathering at c(i).
-    The rewrite is selected only when GEM's cost model predicts less
-    arithmetic, with storage and node count breaking ties.
-
+    :arg expression: the root of a scalar GEM expression
+    :returns: an ordered mapping from each :class:`~.VariableIndex` that
+              indexes a table to the number of rows it selects from
     """
-    def replace(node, self, substitution):
+    gathers = OrderedDict()
+    for node in traversal((expression,)):
+        if isinstance(node, Indexed):
+            aggregate, = node.children
+            for index, extent in zip(node.multiindex, aggregate.shape):
+                if isinstance(index, VariableIndex) and index.expression.free_indices:
+                    gathers.setdefault(index, extent)
+    return gathers
+
+
+def tabulate_indirect_contractions(expression: Node) -> Node:
+    """Evaluate a contraction one time for each row of its table.
+
+    An expression can read a table through a map.  Each argument of the map
+    selects one row, and two arguments can select the same row.  A
+    contraction that reads the table through the map thus repeats work.
+
+    This function evaluates the contraction for each row, then reads those
+    results through the map.  The rewrite is correct only if the map does not
+    change with the contracted indices, and no other part of the contraction
+    uses the argument.  It is faster only if the map has more arguments than
+    the table has rows.
+
+    :arg expression: the root of a scalar GEM expression
+    :returns: the expression with each such contraction evaluated one time
+              for each row
+    """
+    gathers = _indirect_gathers(expression)
+    if not gathers:
+        return expression
+
+    def rename(node, self, substitution):
         target, replacement = substitution
         if isinstance(node, Indexed):
-            child, = node.children
+            aggregate, = node.children
             multiindex = tuple(replacement if index == target else index
                                for index in node.multiindex)
-            return Indexed(self(child, substitution), multiindex)
+            return Indexed(self(aggregate, substitution), multiindex)
         return reuse_if_untouched_arg(node, self, substitution)
 
-    def choose(node):
+    def hoist(node):
         body, = node.children
-        candidates = OrderedDict()
-        for indexed in traversal((body,)):
-            if not isinstance(indexed, Indexed):
-                continue
-            aggregate, = indexed.children
-            for index, extent in zip(indexed.multiindex, aggregate.shape):
-                if isinstance(index, VariableIndex):
-                    sources = frozenset(index.expression.free_indices)
-                    if sources and sources.isdisjoint(node.multiindex):
-                        candidates.setdefault(index, (extent, sources))
+        free = frozenset(body.free_indices)
+        contracted = frozenset(node.multiindex)
 
-        if not candidates:
-            return node
+        candidates = []
+        for gather, nrows in gathers.items():
+            arguments = frozenset(gather.expression.free_indices)
+            if arguments <= free and arguments.isdisjoint(contracted):
+                saving = _iteration_count(arguments) - nrows
+                if saving > 0:
+                    candidates.append((saving, gather, arguments, nrows))
 
-        best = node
-        best_cost = estimate_cost((node,))
-        for indirect, (extent, sources) in candidates.items():
-            latent = Index(extent=extent)
-            dense_body = MemoizerArg(replace)(body, (indirect, latent))
-            if sources.intersection(dense_body.free_indices):
-                continue
-            dense = ComponentTensor(
-                IndexSum(dense_body, node.multiindex), (latent,))
-            candidate = Indexed(dense, (indirect,))
-            if candidate.free_indices != node.free_indices:
-                continue
-            cost = estimate_cost((candidate,))
-            if cost < best_cost:
-                best = candidate
-                best_cost = cost
-        return best
+        for _, gather, arguments, nrows in sorted(candidates, key=lambda c: -c[0]):
+            row = Index(extent=nrows)
+            per_row = MemoizerArg(rename)(body, (gather, row))
+            # The body must reach the arguments only through this gather.
+            if arguments.isdisjoint(per_row.free_indices):
+                table = ComponentTensor(IndexSum(per_row, node.multiindex), (row,))
+                return Indexed(table, (gather,))
+        return node
 
     def visit(node, self):
         node = reuse_if_untouched(node, self)
         if isinstance(node, IndexSum):
-            node = choose(node)
+            node = hoist(node)
         return node
 
     return Memoizer(visit)(expression)
