@@ -7,7 +7,7 @@ import pytest
 import gem
 from gem.interpreter import evaluate
 from gem import cost, optimise
-from gem.node import traversal
+from gem.node import post_traversal, traversal
 from gem.optimise import sum_factorise
 from gem.coffee import optimise_monomial_sum
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
@@ -330,3 +330,25 @@ def test_scalar_factorisation_leaves_indexed_sum_to_planner() -> None:
         gem.Product(common, left), gem.Product(common, right))
 
     assert optimise.factorise_scalar_sums(expression) is expression
+
+
+def test_contraction_plan_follows_the_callers_index_order() -> None:
+    """A plan depends only on the caller's ordering of the sum indices."""
+    def plan(reverse_creation):
+        if reverse_creation:
+            r = gem.Index(extent=4)
+            q = gem.Index(extent=4)
+        else:
+            q = gem.Index(extent=4)
+            r = gem.Index(extent=4)
+        # Both factors carry both indices, so the two reduce at the same
+        # subset and the tie decides their order within one IndexSum.
+        factors = [gem.Indexed(gem.Variable(name, (4, 4)), (q, r))
+                   for name in ("A", "B")]
+        expression = optimise.sum_factorise([q, r], factors)
+        role = {q: "q", r: "r"}
+        return [tuple(role[i] for i in node.multiindex)
+                for node in post_traversal((expression,))
+                if isinstance(node, gem.IndexSum)]
+
+    assert plan(False) == plan(True) == [("q", "r")]
