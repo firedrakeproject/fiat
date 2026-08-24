@@ -750,16 +750,8 @@ def traverse_sum(expression, stop_at=None):
 def _iteration_count(indices: Iterable[Index]) -> int:
     """Count the points of a rectangular iteration space.
 
-    Parameters
-    ----------
-    indices
-        Indices an operation depends on.
-
-    Returns
-    -------
-    int
-        Number of executions of the operation.
-
+    :arg indices: indices an operation depends on
+    :returns: the number of executions of the operation
     """
     return int(numpy.prod([index.extent for index in indices], dtype=int))
 
@@ -767,21 +759,11 @@ def _iteration_count(indices: Iterable[Index]) -> int:
 def _operation_count(node: Node) -> int:
     """Estimate the scalar operations performed by one GEM node.
 
-    Parameters
-    ----------
-    node
-        Scalar expression node.
-
-    Returns
-    -------
-    int
-        Operations over the node's complete iteration domain.
-
-    Notes
-    -----
     Negation folds into the operation that consumes it, so a product with
     ``-1`` costs nothing.
 
+    :arg node: scalar expression node
+    :returns: operations over the node's complete iteration domain
     """
     domain = _iteration_count(node.free_indices)
     if isinstance(node, Product):
@@ -813,21 +795,11 @@ def _operation_count(node: Node) -> int:
 def has_arithmetic(expressions: Iterable[Node]) -> bool:
     """Does a GEM DAG perform any scalar arithmetic?
 
-    Parameters
-    ----------
-    expressions
-        Roots of a scalar GEM expression DAG.
-
-    Returns
-    -------
-    bool
-        Whether any node costs arithmetic to evaluate.
-
-    Notes
-    -----
     Materialising a tabulation reference buys no arithmetic, so sharing one
     only adds storage.
 
+    :arg expressions: roots of a scalar GEM expression DAG
+    :returns: whether any node costs arithmetic to evaluate
     """
     return any(map(_operation_count, traversal(tuple(expressions))))
 
@@ -840,18 +812,11 @@ def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
     accumulation per point of its body domain.  Storage counts the result
     domains of contractions, the intermediates that scheduling exposes.
 
-    Parameters
-    ----------
-    expressions
-        Roots of a scalar GEM expression DAG.
-
-    Returns
-    -------
-    tuple of int
-        Operation count, total contraction storage, largest contraction, and
-        expression-node count.  Comparing the tuples lexicographically ranks
-        arithmetic first and breaks ties by storage.
-
+    :arg expressions: roots of a scalar GEM expression DAG
+    :returns: operation count, total contraction storage, largest
+              contraction, and expression-node count.  Comparing the tuples
+              lexicographically ranks arithmetic first and breaks ties by
+              storage.
     """
     nodes = tuple(traversal(tuple(expressions)))
     sizes = [_iteration_count(node.free_indices)
@@ -865,24 +830,11 @@ def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
 def _distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
-    Parameters
-    ----------
-    expr
-        GEM expression to distribute.
-    predicate
-        Predicate selecting the operations to distribute.
+    Memoisation is by object identity, which reuses each node of the DAG once.
 
-    Returns
-    -------
-    list of Node
-        Additive terms after distribution.
-
-    Notes
-    -----
-    Memoization uses object identity.  Structurally equal GEM nodes can have
-    deep expression trees, while distribution only needs to reuse actual DAG
-    nodes.
-
+    :arg expr: GEM expression to distribute
+    :arg predicate: predicate selecting the operations to distribute
+    :returns: the additive terms after distribution
     """
     results = {}
     active = {}
@@ -924,18 +876,9 @@ def _distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]
 def _is_linear_map(node: Node, linear_indices: frozenset) -> bool:
     """Is a node a linear map into one multilinear axis?
 
-    Parameters
-    ----------
-    node
-        GEM expression node.
-    linear_indices
-        Free indices identifying the multilinear axes.
-
-    Returns
-    -------
-    bool
-        Whether the node is a sum over exactly one such axis.
-
+    :arg node: GEM expression node
+    :arg linear_indices: free indices identifying the multilinear axes
+    :returns: whether the node is a sum over exactly one such axis
     """
     return (isinstance(node, Sum)
             and len(linear_indices.intersection(node.free_indices)) == 1)
@@ -946,23 +889,12 @@ def has_linear_maps(
         linear_indices: Iterable[Index]) -> bool:
     """Does a GEM DAG contain a finite element linear map?
 
-    Parameters
-    ----------
-    expressions
-        Roots of a multilinear GEM expression DAG.
-    linear_indices
-        Free indices identifying the multilinear axes.
+    One traversal answers this, so a caller can gate a second factorisation
+    on it.
 
-    Returns
-    -------
-    bool
-        Whether preserving one-axis sums can change the factorisation.
-
-    Notes
-    -----
-    Answering this costs one traversal, where building the preserved
-    factorisation to compare it costs a whole pass of monomial collection.
-
+    :arg expressions: roots of a multilinear GEM expression DAG
+    :arg linear_indices: free indices identifying the multilinear axes
+    :returns: whether preserving one-axis sums can change the factorisation
     """
     linear_indices = frozenset(linear_indices)
     return any(_is_linear_map(node, linear_indices)
@@ -976,22 +908,13 @@ def preserve_linear_maps(
     """Expose multilinear terms and retain each one-axis linear map.
 
     A sum that depends on one linear index represents a linear map into an
-    argument tabulation. A sum that depends on several linear indices
-    separates multilinear form terms. This function distributes the latter
+    argument tabulation.  A sum that depends on several linear indices
+    separates multilinear form terms.  This function distributes the latter
     sums and returns the former sums as factors.
 
-    Parameters
-    ----------
-    expression
-        Multilinear GEM expression.
-    linear_indices
-        Free indices identifying the linear axes.
-
-    Returns
-    -------
-    tuple
-        Additive terms and the linear-map factors that they contain.
-
+    :arg expression: multilinear GEM expression
+    :arg linear_indices: free indices identifying the linear axes
+    :returns: the additive terms, and the linear-map factors they contain
     """
     linear_indices = frozenset(linear_indices)
 
@@ -1043,16 +966,8 @@ def repeated_contractions(expression):
 def _cancellable_delta(node: Node) -> bool:
     """Is there a Delta below ``node`` cancelling one of its own indices?
 
-    Parameters
-    ----------
-    node
-        An IndexSum.
-
-    Returns
-    -------
-    bool
-        Whether cancelling is possible below it.
-
+    :arg node: an :class:`~.IndexSum`
+    :returns: whether cancelling is possible below it
     """
     contracted = frozenset(node.multiindex)
     return any(isinstance(child, Delta)
@@ -1063,17 +978,9 @@ def _cancellable_delta(node: Node) -> bool:
 def _constant_map(index: IndexBase) -> tuple | None:
     """The literal table behind a VariableIndex, and the indices addressing it.
 
-    Parameters
-    ----------
-    index
-        Index to inspect.
-
-    Returns
-    -------
-    tuple or None
-        ``(array, indices)`` when the index is a lookup into a Literal with a
-        plain multiindex, otherwise None.
-
+    :arg index: index to inspect
+    :returns: ``(array, indices)`` when the index is a lookup into a
+              :class:`~.Literal` with a plain multiindex, otherwise ``None``
     """
     if not isinstance(index, VariableIndex):
         return None
@@ -1101,22 +1008,12 @@ def _pull_back(
     ``k`` are contracted here and ``T`` carries indices of its own, summing
     them first is cheaper: it yields a dense vector indexed by ``a``.
 
-    Parameters
-    ----------
-    delta
-        Candidate Delta, a factor of the product.
-    sum_indices
-        Indices contracted over the product.
-    factors
-        Product factors.
-    replacer
-        ``MemoizerArg(filtered_replace_indices)``.
-
-    Returns
-    -------
-    tuple or None
-        New ``(sum_indices, factors)``, or None when cancelling is better.
-
+    :arg delta: candidate Delta, a factor of the product
+    :arg sum_indices: indices contracted over the product
+    :arg factors: product factors
+    :arg replacer: ``MemoizerArg(filtered_replace_indices)``
+    :returns: new ``(sum_indices, factors)``, or ``None`` when cancelling is
+              better
     """
     column = delta.j if isinstance(delta.i, VariableIndex) else delta.i
     variable = delta.i if isinstance(delta.i, VariableIndex) else delta.j
@@ -1161,20 +1058,10 @@ def cancel_deltas(
         replacer: MemoizerArg) -> tuple[list, list]:
     """Cancel contracted Deltas, pulling a map back through its own axes first.
 
-    Parameters
-    ----------
-    sum_indices
-        Indices contracted over the product.
-    factors
-        Product factors.
-    replacer
-        ``MemoizerArg(filtered_replace_indices)``.
-
-    Returns
-    -------
-    tuple
-        Remaining sum indices and factors.
-
+    :arg sum_indices: indices contracted over the product
+    :arg factors: product factors
+    :arg replacer: ``MemoizerArg(filtered_replace_indices)``
+    :returns: the remaining sum indices and factors
     """
     for delta in [f for f in factors if isinstance(f, Delta)]:
         specialised = _pull_back(delta, sum_indices, factors, replacer)
@@ -1187,23 +1074,13 @@ def cancel_deltas(
 def eliminate_deltas(expression: Node) -> Node:
     """Cancel contracted Deltas that ``delta_elimination`` cannot reach.
 
-    Parameters
-    ----------
-    expression
-        Root of a scalar GEM expression.
-
-    Returns
-    -------
-    Node
-        Expression with those Deltas cancelled.
-
-    Notes
-    -----
     ``delta_elimination`` only inspects top-level product factors, so a Delta
     inside a preserved linear map is invisible to it.  Flattening the product
     tree first exposes it, and hoists the contractions it sits under so that
     substituting the Delta's variable index cannot capture them.
 
+    :arg expression: root of a scalar GEM expression
+    :returns: the expression with those Deltas cancelled
     """
     replacer = MemoizerArg(filtered_replace_indices)
 
@@ -1376,24 +1253,14 @@ def aggressive_unroll(expression):
 def factorise_scalar_sums(expression: Node) -> Node:
     """Factor common products from scalar sums when this lowers GEM cost.
 
-    Parameters
-    ----------
-    expression
-        Root of a GEM expression.
-
-    Returns
-    -------
-    Node
-        Expression with profitable common product factors extracted.
-
-    Notes
-    -----
     Scalar geometry and basis-transformation expressions are simplified below
     the indexed contraction structure.  Contractions are indivisible factors:
     their bound indices cannot move through an enclosing sum.  Sums carrying
-    free indices are left to the contraction planner, whose cost model includes
-    their iteration domains.
+    free indices are left to the contraction planner, whose cost model
+    includes their iteration domains.
 
+    :arg expression: root of a GEM expression
+    :returns: the expression with profitable common product factors extracted
     """
     def choose(node):
         if node.free_indices:
