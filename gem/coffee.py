@@ -212,26 +212,16 @@ def _extract_repeated_linear_maps(
         linear_indices: tuple[Index, ...]) -> MonomialSum:
     """Move uniform multiplicities from linear maps into scalar factors.
 
-    Parameters
-    ----------
-    monomial_sum
-        Sum-of-products representation of a multilinear expression.
-    linear_indices
-        Free indices identifying argument axes.
-
-    Returns
-    -------
-    MonomialSum
-        Representation with primitive linear maps and scalar multiplicities.
-
-    Notes
-    -----
     A repeated additive map is a scalar multiple of the map formed from its
     distinct summands.  Keeping that scalar in the monomial remainder leaves
     the atomic factor as the finite element map that should be materialised.
 
+    :arg monomial_sum: sum-of-products representation of a multilinear
+                       expression
+    :arg linear_indices: free indices identifying argument axes
+    :returns: representation with primitive linear maps and scalar
+              multiplicities
     """
-
     linear_set = frozenset(linear_indices)
     result = MonomialSum()
     for monomial in monomial_sum:
@@ -262,26 +252,16 @@ def _share_linear_maps(
         linear_indices: tuple[Index, ...]) -> MonomialSum:
     """Share isomorphic maps of distinct multilinear axes.
 
-    Parameters
-    ----------
-    monomial_sum
-        Sum-of-products representation of a multilinear expression.
-    linear_indices
-        Free indices identifying argument axes.
-
-    Returns
-    -------
-    MonomialSum
-        Representation whose repeated linear maps access one tensor.
-
-    Notes
-    -----
     Test and trial axes use distinct indices even when they apply the same
-    finite element map.  Renaming each axis to a canonical index exposes
-    that isomorphism without inspecting the element family.  Materialising
-    the canonical map is generalised code motion: the basis transformation
-    is evaluated once and both axes index its result.
+    finite element map.  Renaming each axis to a canonical index exposes that
+    isomorphism without inspecting the element family.  Materialising the
+    canonical map is generalised code motion: the basis transformation is
+    evaluated once and both axes index its result.
 
+    :arg monomial_sum: sum-of-products representation of a multilinear
+                       expression
+    :arg linear_indices: free indices identifying argument axes
+    :returns: representation whose repeated linear maps access one tensor
     """
     linear_indices = tuple(linear_indices)
     monomial_sum = _extract_repeated_linear_maps(monomial_sum, linear_indices)

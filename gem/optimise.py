@@ -9,7 +9,7 @@ from numbers import Integral
 
 import numpy
 
-from gem.cost import index_space_literal
+from gem.cost import estimate_cost, index_space_literal, iteration_count
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal, traversal_children)
@@ -767,24 +767,11 @@ def traverse_sum(expression, stop_at=None):
 def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
-    Parameters
-    ----------
-    expr
-        GEM expression to distribute.
-    predicate
-        Predicate selecting the operations to distribute.
+    Memoisation is by object identity, which reuses each node of the DAG once.
 
-    Returns
-    -------
-    list of Node
-        Additive terms after distribution.
-
-    Notes
-    -----
-    Memoization uses object identity.  Structurally equal GEM nodes can have
-    deep expression trees, while distribution only needs to reuse actual DAG
-    nodes.
-
+    :arg expr: GEM expression to distribute
+    :arg predicate: predicate selecting the operations to distribute
+    :returns: the additive terms after distribution
     """
     results = {}
     active = {}
@@ -826,18 +813,9 @@ def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
 def _is_linear_map(node: Node, linear_indices: frozenset) -> bool:
     """Is a node a linear map into one multilinear axis?
 
-    Parameters
-    ----------
-    node
-        GEM expression node.
-    linear_indices
-        Free indices identifying the multilinear axes.
-
-    Returns
-    -------
-    bool
-        Whether the node is a sum over exactly one such axis.
-
+    :arg node: GEM expression node
+    :arg linear_indices: free indices identifying the multilinear axes
+    :returns: whether the node is a sum over exactly one such axis
     """
     return (isinstance(node, Sum)
             and len(linear_indices.intersection(node.free_indices)) == 1)
@@ -848,23 +826,12 @@ def has_linear_maps(
         linear_indices: Iterable[Index]) -> bool:
     """Does a GEM DAG contain a finite element linear map?
 
-    Parameters
-    ----------
-    expressions
-        Roots of a multilinear GEM expression DAG.
-    linear_indices
-        Free indices identifying the multilinear axes.
+    One traversal answers this, so a caller can gate a second factorisation
+    on it.
 
-    Returns
-    -------
-    bool
-        Whether preserving one-axis sums can change the factorisation.
-
-    Notes
-    -----
-    Answering this costs one traversal, where building the preserved
-    factorisation to compare it costs a whole pass of monomial collection.
-
+    :arg expressions: roots of a multilinear GEM expression DAG
+    :arg linear_indices: free indices identifying the multilinear axes
+    :returns: whether preserving one-axis sums can change the factorisation
     """
     linear_indices = frozenset(linear_indices)
     return any(_is_linear_map(node, linear_indices)
@@ -878,22 +845,13 @@ def preserve_linear_maps(
     """Expose multilinear terms and retain each one-axis linear map.
 
     A sum that depends on one linear index represents a linear map into an
-    argument tabulation. A sum that depends on several linear indices
-    separates multilinear form terms. This function distributes the latter
+    argument tabulation.  A sum that depends on several linear indices
+    separates multilinear form terms.  This function distributes the latter
     sums and returns the former sums as factors.
 
-    Parameters
-    ----------
-    expression
-        Multilinear GEM expression.
-    linear_indices
-        Free indices identifying the linear axes.
-
-    Returns
-    -------
-    tuple
-        Additive terms and the linear-map factors that they contain.
-
+    :arg expression: multilinear GEM expression
+    :arg linear_indices: free indices identifying the linear axes
+    :returns: the additive terms, and the linear-map factors they contain
     """
     linear_indices = frozenset(linear_indices)
 
@@ -958,17 +916,9 @@ def _delta_axes(node: Node, self: Memoizer) -> frozenset:
 def _constant_map(index: IndexBase) -> tuple | None:
     """The literal table behind a VariableIndex, and the indices addressing it.
 
-    Parameters
-    ----------
-    index
-        Index to inspect.
-
-    Returns
-    -------
-    tuple or None
-        ``(array, indices)`` when the index is a lookup into a Literal with a
-        plain multiindex, otherwise None.
-
+    :arg index: index to inspect
+    :returns: ``(array, indices)`` when the index is a lookup into a
+              :class:`~.Literal` with a plain multiindex, otherwise ``None``
     """
     if not isinstance(index, VariableIndex):
         return None
@@ -1237,24 +1187,14 @@ def aggressive_unroll(expression):
 def factorise_scalar_sums(expression: Node) -> Node:
     """Factor common products from scalar sums when this lowers GEM cost.
 
-    Parameters
-    ----------
-    expression
-        Root of a GEM expression.
-
-    Returns
-    -------
-    Node
-        Expression with profitable common product factors extracted.
-
-    Notes
-    -----
     Scalar geometry and basis-transformation expressions are simplified below
     the indexed contraction structure.  Contractions are indivisible factors:
     their bound indices cannot move through an enclosing sum.  Sums carrying
-    free indices are left to the contraction planner, whose cost model includes
-    their iteration domains.
+    free indices are left to the contraction planner, whose cost model
+    includes their iteration domains.
 
+    :arg expression: root of a GEM expression
+    :returns: the expression with profitable common product factors extracted
     """
     def choose(node):
         if node.free_indices:
@@ -1369,7 +1309,7 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
         for gather, nrows in gathers.items():
             arguments = frozenset(gather.expression.free_indices)
             if arguments <= free and arguments.isdisjoint(contracted):
-                saving = _iteration_count(arguments) - nrows
+                saving = iteration_count(arguments) - nrows
                 if saving > 0:
                     candidates.append((saving, gather, arguments, nrows))
 

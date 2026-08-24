@@ -22,25 +22,17 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
 
 
 class MappedTabulation(Mapping):
-    """Apply a sparse basis transformation to reference tabulations.
+    """A lazy tabulation dict that applies the basis transformation only
+    on the requested derivatives.
 
-    Parameters
-    ----------
-    M : gem.ListTensor
-        Basis-transformation matrix.
-    ref_tabulation : Mapping
-        Reference tabulations indexed by derivative order.
-    indices : iterable of int, optional
-        Rows retained by an element restriction.
+    Rows are padded to a common number of entries, so that a loop over the
+    basis index has an affine iteration domain.  Constant tables select the
+    reference column and one of the distinct symbolic coefficients, which
+    shares equal entries without materialising the matrix entry by entry.
 
-    Notes
-    -----
-    In order to generate good loopy kernels, rows are padded so that they have
-    the same number of entries.  Constant tables select the reference column
-    and one of the distinct symbolic coefficients.  Interning coefficients
-    preserves their sharing without materialising a symbolic matrix entry by
-    entry.
-
+    :arg M: a gem.ListTensor with the basis transformation matrix.
+    :arg ref_tabulation: a dict of tabulations on the reference cell.
+    :kwarg indices: an optional list of restriction indices on the basis functions.
     """
 
     def __init__(
@@ -99,20 +91,11 @@ class MappedTabulation(Mapping):
     def _entry(self, r: gem.Index, a: gem.Index) -> gem.Node:
         """Entry ``M[r, a]`` of the basis transformation.
 
-        Parameters
-        ----------
-        r
-            Index over the rows retained by the element.
-        a
-            Index over the reference basis.
-
-        Returns
-        -------
-        gem.Node
-            A sum over the padded row of an interned entry against a Delta
-            selecting its column, so that contracting either axis of ``M``
-            is ordinary GEM algebra.
-
+        :arg r: index over the rows retained by the element
+        :arg a: index over the reference basis
+        :returns: a sum over the padded row of an interned entry against a
+                  Delta selecting its column, so that contracting either axis
+                  of ``M`` is ordinary GEM algebra
         """
         k = self._row_index
         entry = gem.Indexed(
