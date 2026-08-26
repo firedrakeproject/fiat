@@ -179,28 +179,25 @@ class TensorFiniteElement(FiniteElementBase):
         if summands is not None:
             return summands.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
 
-        tQ, x = self.dual_basis
-        tQ = self._base_element.dual_transformation(tQ, coordinate_mapping)
-
-        expr = fn(x)
-        # NOTE: any shape indices in the expression are because the
-        # expression is tensor valued.
-        assert expr.shape == self.value_shape
-
-        scalar_i = self.base_element.get_indices()
-        scalar_vi = self.base_element.get_value_indices()
+        # The dual basis is the base element's coupled to an identity on the
+        # tensor value index, so the base element dual evaluates each of its
+        # components and the tensor index rides along as a basis index.  The
+        # base element must do it, as only it knows the points its
+        # functionals evaluate on.
         tensor_i = tuple(gem.Index(extent=d) for d in self._shape)
-        tensor_vi = tuple(gem.Index(extent=d) for d in self._shape)
+        scalar_vi = self.base_element.get_value_indices()
 
+        def component(ps):
+            expr = fn(ps)
+            assert expr.shape == self.value_shape
+            return gem.ComponentTensor(gem.Indexed(expr, tensor_i + scalar_vi), scalar_vi)
+
+        evaluation, point_indices, scalar_i = self._base_element.dual_evaluation(
+            component, coordinate_mapping=coordinate_mapping)
         if self._transpose:
-            index_ordering = tensor_i + scalar_i + tensor_vi + scalar_vi
+            return evaluation, point_indices, tensor_i + scalar_i
         else:
-            index_ordering = scalar_i + tensor_i + tensor_vi + scalar_vi
-
-        tQi = tQ[index_ordering]
-        expri = expr[tensor_i + scalar_vi]
-        evaluation = gem.IndexSum(tQi * expri, scalar_vi + tensor_i)
-        return evaluation, x.indices, scalar_i + tensor_vi
+            return evaluation, point_indices, scalar_i + tensor_i
 
     @property
     def mapping(self):
