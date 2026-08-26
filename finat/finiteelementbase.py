@@ -9,6 +9,36 @@ from gem.utils import cached_property
 from finat.quadrature import make_quadrature
 
 
+def broadcast_tensor(expression, multiindex):
+    """Turn a multiindex into a shape, broadcasting over the indices it lacks.
+
+    Parameters
+    ----------
+    expression : gem.Node
+        A scalar expression.
+    multiindex : tuple
+        The indices to turn into a shape.
+
+    Returns
+    -------
+    gem.Node
+        ``expression`` as a tensor of the extents of ``multiindex``.
+
+    Notes
+    -----
+    An expression need not depend on every index it ranges over -- a cellwise
+    constant does not depend on the point index, for one -- while
+    :class:`gem.ComponentTensor` demands that it does.  Broadcast over any
+    index the expression dropped by multiplying by one over it.
+
+    """
+    missing = tuple(i for i in multiindex if i not in expression.free_indices)
+    if missing:
+        ones = gem.Literal(numpy.ones(tuple(i.extent for i in missing)))
+        expression = gem.Product(expression, gem.Indexed(ones, missing))
+    return gem.ComponentTensor(expression, multiindex)
+
+
 class FiniteElementBase(metaclass=ABCMeta):
 
     @abstractproperty
@@ -162,6 +192,53 @@ class FiniteElementBase(metaclass=ABCMeta):
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
         '''
+
+    def _stack_tabulations(self, order, ps, entity=None, coordinate_mapping=None):
+        """Tabulate on each point set of a union, stacking on the point index.
+
+        Parameters
+        ----------
+        order : int
+            As :meth:`basis_evaluation`.
+        ps : ~finat.point_set.UnionPointSet
+            The union of points to tabulate on.
+        entity : tuple or None
+            As :meth:`basis_evaluation`.
+        coordinate_mapping : PhysicalGeometry or None
+            As :meth:`basis_evaluation`.
+
+        Returns
+        -------
+        dict
+            The tabulation on the whole of ``ps``, as
+            :meth:`basis_evaluation` returns.
+
+        Notes
+        -----
+        A union of points has no structure of its own, so an element that
+        needs structure to tabulate -- a tensor product, which cannot factor
+        the union, or a macroelement, whose points lie on several sub-cells --
+        tabulates on each point set of the union in turn, keeping whatever
+        structure each of them has, and joins the tables here.
+
+        """
+        tables = [self.basis_evaluation(order, sub, entity,
+                                        coordinate_mapping=coordinate_mapping)
+                  for sub in ps.point_sets]
+        keys, = set(map(frozenset, tables))
+        p, = ps.indices
+        multiindex = tuple(chain(self.get_indices(), self.get_value_indices()))
+
+        def concatenate(alpha):
+            # The point indices are free in each table, so promote them to a
+            # shape before concatenating the tables along it.
+            pieces = [broadcast_tensor(gem.Indexed(table[alpha], multiindex),
+                                       sub.indices)
+                      for table, sub in zip(tables, ps.point_sets)]
+            return gem.ComponentTensor(
+                gem.Indexed(gem.Concatenate(*pieces), (p,)), multiindex)
+
+        return {alpha: concatenate(alpha) for alpha in keys}
 
     @abstractmethod
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):

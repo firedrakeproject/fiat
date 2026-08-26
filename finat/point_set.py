@@ -233,6 +233,29 @@ class TensorPointSet(AbstractPointSet):
                 for s, o in zip(self.factors, other.factors))
 
 
+class UnionPointSet(PointSet):
+    """All of the points of several point sets, along a single point index.
+
+    This names the points of a dual basis that evaluates summand by summand,
+    so that a function space can be built on them.  Beyond the points
+    themselves it records only where each summand's points begin, so that a
+    summand can be tabulated on its own: contracting against a summand is the
+    business of that summand, and each keeps its own indices.
+
+    A union of unions is a union, so nested unions are flattened.
+    """
+
+    def __init__(self, point_sets):
+        self.point_sets = tuple(chain(*(
+            ps.point_sets if isinstance(ps, UnionPointSet) else (ps,)
+            for ps in point_sets)))
+        super().__init__(numpy.concatenate([ps.points
+                                            for ps in self.point_sets]))
+
+    def __repr__(self):
+        return f"{type(self).__name__}({self.point_sets!r})"
+
+
 class FacetPointSet(AbstractPointSet):
     """A point set on facets.
 

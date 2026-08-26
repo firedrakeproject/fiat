@@ -1,4 +1,4 @@
-from finat.point_set import UnknownPointSet, FacetPointSet
+from finat.point_set import UnknownPointSet, FacetPointSet, UnionPointSet
 
 import numpy
 
@@ -8,8 +8,8 @@ import gem
 from gem.interpreter import evaluate
 from gem.utils import cached_property
 
-from finat.finiteelementbase import FiniteElementBase
-from finat.quadrature import make_quadrature, AbstractQuadratureRule
+from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
+from finat.quadrature import make_quadrature, AbstractQuadratureRule, QuadratureRule
 
 
 def make_quadrature_element(fiat_ref_cell, degree, scheme="default", codim=0):
@@ -148,17 +148,38 @@ class QuadratureElement(FiniteElementBase):
         if order:
             raise ValueError("Derivatives are not defined on a QuadratureElement.")
 
-        if not self._rule.point_set.almost_equal(ps):
+        sd = self.cell.get_spatial_dimension()
+
+        # Tabulate each summand of a union of points on its own points.
+        if isinstance(ps, UnionPointSet):
+            return self._stack_tabulations(order, ps, entity, coordinate_mapping=coordinate_mapping)
+
+        basis_indices = self.get_indices()
+        ps_indices = ps.indices
+        if isinstance(self._point_set, FacetPointSet):
+            # A FacetPointSet carries a facet index, absent from the rule's.
+            ps_indices = (entity_id, *ps_indices)
+
+        rule_ps = self._rule.point_set
+        rule_blocks = rule_ps.point_sets if isinstance(rule_ps, UnionPointSet) else (rule_ps,)
+        matches = [k for k, block in enumerate(rule_blocks) if block.almost_equal(ps)]
+        if not matches:
             raise ValueError("Mismatch of quadrature points!")
 
-        # Return an outer product of identity matrices
-        basis_indices = self.get_indices()
-        point_indices = ps.indices
-        if len(basis_indices) > len(point_indices):
-            point_indices = (entity_id, *point_indices)
-        delta = gem.Delta(point_indices, basis_indices)
+        if isinstance(rule_ps, UnionPointSet):
+            # `ps` is one summand of the union: tabulate onto the rows of the
+            # identity it owns, and zero onto the others.  Concatenating along
+            # the basis index lets the contraction with a coefficient split.
+            k, = matches
+            beta = tuple(gem.Index(extent=index.extent) for index in ps_indices)
+            own = gem.ComponentTensor(gem.Delta(ps_indices, beta), beta)
+            branches = [own if j == k else gem.Zero(tuple(index.extent for index in other.indices))
+                        for j, other in enumerate(rule_ps.point_sets)]
+            delta = gem.Indexed(gem.Concatenate(*branches), basis_indices)
+        else:
+            # Return an outer product of identity matrices
+            delta = gem.Delta(ps_indices, basis_indices)
 
-        sd = self.cell.get_spatial_dimension()
         return {(0,) * sd: gem.ComponentTensor(delta, basis_indices)}
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
@@ -173,6 +194,30 @@ class QuadratureElement(FiniteElementBase):
         Q = gem.Delta(ps.indices, multiindex)
         Q = gem.ComponentTensor(Q, multiindex)
         return Q, ps
+
+    def dual_evaluation(self, fn, coordinate_mapping=None):
+        """Dual evaluate each summand of a union of points on its own points."""
+        rule_ps = self._rule.point_set
+        if not isinstance(rule_ps, UnionPointSet):
+            return super().dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+
+        weights = getattr(self._rule, 'weights', None)
+        if weights is None:
+            weights, = evaluate([self._rule.weight_expression])
+            weights = weights.arr.flatten()
+
+        evals = []
+        offset = 0
+        for summand in rule_ps.point_sets:
+            n = len(summand.points)
+            sub_rule = QuadratureRule(summand, weights[offset:offset + n], ref_el=self._rule.ref_el)
+            sub = QuadratureElement(self.cell, sub_rule)
+            expr, sub_indices = sub.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+            evals.append(broadcast_tensor(expr, sub_indices))
+            offset += n
+
+        basis_indices = self.get_indices()
+        return gem.Indexed(gem.Concatenate(*evals), basis_indices), basis_indices
 
     @property
     def mapping(self):
