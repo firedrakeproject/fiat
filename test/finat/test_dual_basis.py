@@ -9,6 +9,8 @@ import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
 from finat.point_set import UnionPointSet
+from finat.quadrature import QuadratureRule
+from finat.quadrature_element import QuadratureElement
 from gem.interpreter import evaluate
 from FIAT import ufc_simplex
 
@@ -91,6 +93,22 @@ def test_enriched_element_dual_basis():
 
     assert isinstance(enriched.dual_basis[1], UnionPointSet)
     check_dual_basis(enriched)
+
+
+def test_quadrature_element_on_union_of_points():
+    # Firedrake interpolates through a quadrature space on the points of the
+    # target's dual basis, which for a direct sum is a union.  That element
+    # has to evaluate on each point set of the union, just as the sum does.
+    cell = ufc_simplex(2)
+    fe = finat.Lagrange(cell, 3)
+    enriched = finat.EnrichedElement(
+        [finat.RestrictedElement(fe, restriction_domain=domain)
+         for domain in ("interior", "facet")], is_nodal_enriched=True)
+
+    _, ps = enriched.dual_basis
+    # The weights are not used, this quadrature scheme is not for integration.
+    rule = QuadratureRule(ps, numpy.full(len(ps.points), numpy.nan), ref_el=cell)
+    check_nodal(QuadratureElement(cell, rule))
 
 
 @pytest.mark.parametrize("family", ("RTCE", "RTCF", "NCE", "NCF"))

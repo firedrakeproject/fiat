@@ -74,11 +74,10 @@ def find_group(expressions, free_indices):
     must be removed.
 
     :arg expressions: a multi-root GEM expression DAG
-    :arg free_indices: the set of indices that may be split along, i.e.
-                       those carried by the assignment variables.
-                       Concatenate nodes indexed by anything else are
-                       left alone, as there is nothing to split them
-                       against.
+    :arg free_indices: the indices that may be split along, that is, those
+                       carried by the assignment variables.  A Concatenate
+                       indexed by anything else has nothing to be split
+                       against, and is left alone.
     :returns: a list of GEM nodes, or None
     """
     # Result variables
@@ -180,10 +179,7 @@ def replace_node(expression, mapping, cut=None):
 def _unconcatenate(cache, pairs):
     # Tail-call recursive core of unconcatenate.
     # Assumes that input has already been sanitised.
-    # Only indices carried by an assignment variable can be split; a
-    # Concatenate indexed by anything else (e.g. an index that has already
-    # been contracted away) has nothing to be split against, and is left
-    # for a later pass to deal with.
+    # Only an index carried by an assignment variable can be split against it.
     splittable = set().union(chain(*[v.free_indices for v, e in pairs]))
     concat_group = find_group([e for v, e in pairs], splittable)
     if concat_group is None:

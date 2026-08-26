@@ -236,13 +236,13 @@ class TensorPointSet(AbstractPointSet):
 class UnionPointSet(PointSet):
     """All of the points of several point sets, along a single point index.
 
-    This names the points of a dual basis that evaluates summand by summand,
-    so that a function space can be built on them.  Beyond the points
-    themselves it records only where each summand's points begin, so that a
-    summand can be tabulated on its own: contracting against a summand is the
-    business of that summand, and each keeps its own indices.
+    :arg point_sets: the point sets to take the union of, in the order they
+        occupy the point index.  A union of unions is flattened.
 
-    A union of unions is a union, so nested unions are flattened.
+    These are the points of a dual basis that evaluates summand by summand,
+    named so that a function space can be built on them.  The point sets are
+    kept because an element that needs their structure to tabulate -- a tensor
+    product, which cannot factor the union -- tabulates on each in turn.
     """
 
     def __init__(self, point_sets):

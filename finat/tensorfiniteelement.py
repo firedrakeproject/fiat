@@ -170,15 +170,7 @@ class TensorFiniteElement(FiniteElementBase):
         tQ = gem.ComponentTensor(Qi*deltas, index_ordering)
         return tQ, points
 
-    def dual_evaluation(self, fn, coordinate_mapping=None):
-        # Only a direct sum can evaluate its summands on their own points.
-        # Avoid circular import dependency
-        from finat.enriched import as_enriched
-
-        summands = as_enriched(self)
-        if summands is not None:
-            return summands.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
-
+    def _dual_evaluation(self, fn, coordinate_mapping=None):
         tQ, x = self.dual_basis
         tQ = self._base_element.dual_transformation(tQ, coordinate_mapping)
 

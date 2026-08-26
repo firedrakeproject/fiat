@@ -1,4 +1,4 @@
-from functools import singledispatch
+from functools import partial, singledispatch
 from itertools import chain
 
 import FIAT
@@ -120,54 +120,37 @@ def restrict_enriched(element, domain, take_closure):
     elif not any(isinstance(e, finat.mixed.MixedSubElement) for e in element.elements):
         elements = tuple(restrict(e, domain, take_closure)
                          for e in element.elements)
-        reconstruct = finat.EnrichedElement
+        # Restriction selects disjoint subsets of the DoFs, so the restricted
+        # subelements are nodal whenever the original ones are.
+        reconstruct = partial(finat.EnrichedElement,
+                              is_nodal_enriched=element.is_nodal_enriched)
     else:
         raise NotImplementedError("Not expecting enriched with mixture of MixedSubElement and others")
 
     elements = tuple(e for e in elements if e is not null_element)
     if elements:
-        kwargs = {}
-        if reconstruct is finat.EnrichedElement:
-            # Restriction selects disjoint subsets of the DoFs, so the
-            # restricted subelements are nodal whenever the original ones are.
-            kwargs["is_nodal_enriched"] = element.is_nodal_enriched
-        return reconstruct(elements, **kwargs)
+        return reconstruct(elements)
     else:
         return null_element
 
 
-def restrict_wrapped(element, domain, take_closure, wrapper):
+@restrict.register(finat.hdivcurl.WrapperElementBase)
+def restrict_hdivcurl(element, domain, take_closure):
     """Restrict an element that wraps another with a pullback.
 
     The pullback acts on each subelement separately, so it preserves
     whichever subelements the restriction selects, and with them the
     nodality of the restricted element.
-
-    :arg element: the wrapping :class:`finat.FiniteElementBase`
-    :arg domain: which entities to restrict to
-    :arg take_closure: whether to take the closure of the entities
-    :arg wrapper: the class to wrap the restricted element with
-    :returns: a new element, or ``null_element``
     """
     restricted = restrict(element.wrappee, domain, take_closure)
     if restricted is null_element:
         return null_element
     elif isinstance(restricted, finat.EnrichedElement):
         return finat.EnrichedElement(
-            [wrapper(e) for e in restricted.elements],
+            [type(element)(e) for e in restricted.elements],
             is_nodal_enriched=restricted.is_nodal_enriched)
     else:
-        return wrapper(restricted)
-
-
-@restrict.register(finat.HCurlElement)
-def restrict_hcurl(element, domain, take_closure):
-    return restrict_wrapped(element, domain, take_closure, finat.HCurlElement)
-
-
-@restrict.register(finat.HDivElement)
-def restrict_hdiv(element, domain, take_closure):
-    return restrict_wrapped(element, domain, take_closure, finat.HDivElement)
+        return type(element)(restricted)
 
 
 @restrict.register(finat.mixed.MixedSubElement)

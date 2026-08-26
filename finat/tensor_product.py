@@ -137,7 +137,8 @@ class TensorProductElement(FiniteElementBase):
             # A union of points does not factor, so tabulate on each of its
             # point sets, where the product structure survives to be sum
             # factorised.
-            return self._stack_tabulations(order, ps, entity, coordinate_mapping)
+            return self._stack_tabulations(order, ps, entity,
+                                           coordinate_mapping=coordinate_mapping)
 
         entities = self._factor_entity(entity)
         entity_dim, _ = zip(*entities)
@@ -187,17 +188,6 @@ class TensorProductElement(FiniteElementBase):
             tuple(chain(*alphas, *zetas))
         )
         return Q, ps
-
-    def dual_evaluation(self, fn, coordinate_mapping=None):
-        # A product with a summed factor is a direct sum, and only a direct
-        # sum can evaluate its summands on their own points.
-        # Avoid circular import dependency
-        from finat.enriched import as_enriched
-
-        summands = as_enriched(self)
-        if summands is None:
-            return super().dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
-        return summands.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
 
     @cached_property
     def mapping(self):

@@ -169,11 +169,10 @@ class EnrichedElement(FiniteElementBase):
     def _summands(self):
         """The summands that are not themselves direct sums, in basis order.
 
-        An element is rewritten as a direct sum one level at a time, so an
-        element this one enriches may be a sum in turn.  The summands that are
-        not are the ones that evaluate on their own points, and so the ones
-        whose points make up the union that :attr:`dual_basis` and
-        :meth:`dual_evaluation` both work against.
+        An element is brought out as a direct sum one level at a time, so a
+        summand may be a direct sum in turn.  These are the elements that
+        evaluate their dual basis on their own points, and whose points make
+        up the union that :attr:`dual_basis` works against.
         """
         summands = []
         for element in self.elements:
@@ -186,25 +185,11 @@ class EnrichedElement(FiniteElementBase):
     def dual_basis(self):
         """The weights of the dual basis, on the union of the summands' points.
 
-        Returns
-        -------
-        tuple
-            A ``(Q, x)`` pair, as
-            :attr:`~finat.finiteelementbase.FiniteElementBase.dual_basis`.
-
-        Notes
-        -----
         A summand's functionals evaluate only on that summand's points, so the
-        weights are block diagonal: they concatenate along the basis index, and
-        along the point index each summand's weights sit at its own offset in
-        the union, with zeros against every other summand's points.
-
-        The concatenation over the points cannot be split, as the point index
-        is contracted away, so the zeros off the diagonal are real entries.
-        :meth:`dual_evaluation` contracts each summand on its own points
-        rather than use these weights; they are here for the callers that
-        want a single weight tensor.
-
+        weights are block diagonal: each summand's weights sit at its own
+        offset in the union, and are zero against every other summand's
+        points.  :meth:`_dual_evaluation` contracts each summand on its own
+        points instead of carrying those zeros.
         """
         duals = [element.dual_basis for element in self._summands]
         x = UnionPointSet([xk for _, xk in duals])
@@ -229,34 +214,25 @@ class EnrichedElement(FiniteElementBase):
         Q = gem.Indexed(gem.Concatenate(*blocks), (beta,))
         return gem.ComponentTensor(Q, (beta,) + zeta), x
 
-    def dual_evaluation(self, fn, coordinate_mapping=None):
-        """Dual evaluate each element on its own points.
+    def _dual_evaluation(self, fn, coordinate_mapping=None):
+        """Dual evaluate each summand on its own points.
 
-        The summands do not all evaluate on the same points, so contracting
-        :attr:`dual_basis` would contract against the zeros it carries off its
-        diagonal: each element contracts on its own points instead, and the
-        results stack along the basis index the sum occupies, which is the one
-        :meth:`_compose_evaluations` also concatenates over.
+        :arg fn: Callable representing the function to dual evaluate.
+                 Callable should take in an :class:`AbstractPointSet` and
+                 return a GEM expression for evaluation of the function at
+                 those points.
+        :arg coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
+        :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
+           :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
+           returns.  The points are contracted here, so ``point_indices`` is
+           empty.
 
-        Concatenating over the basis index is what
-        :func:`~gem.unconcatenate.unconcatenate` is for: the index stays free
-        in the assignment, so it can be split downstream.  A concatenation
-        over the points could not be, as the points are contracted here.
-
-        Parameters
-        ----------
-        fn : Callable
-            As :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`.
-        coordinate_mapping : PhysicalGeometry or None
-            As :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`.
-
-        Returns
-        -------
-        tuple
-            An ``(expression, point_indices, basis_indices)`` triple, as
-            :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
-            returns.  The points are contracted here, so none is left free.
-
+        The summands do not share their points, so each one contracts on its
+        own, and the results stack along the basis index.  Concatenating over
+        a free index is what :func:`~gem.unconcatenate.unconcatenate` splits
+        downstream; a concatenation over the contracted points could not be.
         """
         if not self.is_nodal_enriched:
             raise NotImplementedError(
@@ -276,29 +252,16 @@ class EnrichedElement(FiniteElementBase):
 def as_enriched(element):
     """Rewrite an element as a direct sum, bringing the sum outermost.
 
-    Parameters
-    ----------
-    element : FiniteElementBase
-        The element to rewrite.
+    :arg element: the :class:`~finat.finiteelementbase.FiniteElementBase` to
+                  rewrite.
+    :returns: an :class:`EnrichedElement` with the same basis functions in the
+              same order as ``element``, or ``None`` if ``element`` is not a
+              direct sum.
 
-    Returns
-    -------
-    EnrichedElement or None
-        An element with the same basis functions in the same order as
-        ``element``, whose summands each evaluate their dual basis on their
-        own points, or ``None`` if ``element`` is not a direct sum.
-
-    Notes
-    -----
-    Only a direct sum can be dual evaluated summand by summand, so an element
-    with a summed part has to be rewritten with the sum outermost before its
-    dual basis can be evaluated.  The sum commutes with everything that can
-    hold it:
-
-    * a pullback is linear, so it distributes over the sum;
-    * a tensor product distributes over a sum in its first factor;
-    * the wrappers that leave the dual basis alone are transparent.
-
+    Only a direct sum can be dual evaluated summand by summand.  The sum
+    commutes with everything that can hold it: a pullback is linear, a tensor
+    product distributes over a sum in its first factor, and the wrappers that
+    leave the dual basis alone are transparent.
     """
     return None
 
@@ -324,8 +287,6 @@ def as_enriched_wrapper(element):
     summands = as_enriched(element.wrappee)
     if summands is None:
         return None
-    # The pullback is chosen from the mapping and form degree, which the
-    # summands share with their sum, so every summand takes the same one.
     return EnrichedElement([type(element)(e) for e in summands.elements],
                            is_nodal_enriched=summands.is_nodal_enriched)
 
@@ -345,11 +306,10 @@ def as_enriched_tensor_finite_element(element):
 def as_enriched_tensor_product(element):
     """Distribute the product over the sum its first factor is.
 
-    Only the first factor may be summed.  The summands of a sum in the first
-    factor own a contiguous range of the flat basis index, so they stack in
-    the order the product already numbers them; a sum in any later factor
-    would interleave with the factors before it, and stacking would renumber
-    the degrees of freedom.
+    The summands of a sum in the first factor own a contiguous range of the
+    flat basis index, so they stack in the order the product already numbers
+    them.  A sum in any later factor would interleave with the factors before
+    it, and stacking would renumber the degrees of freedom.
     """
     first, *rest = element.factors
     if any(as_enriched(factor) is not None for factor in rest):
