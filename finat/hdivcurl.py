@@ -20,7 +20,8 @@ class WrapperElementBase(FiniteElementBase):
         self.transform = transform
         """A transformation applied on the scalar/vector values of the
         wrapped element to produce an H(div) or H(curl) conforming
-        element."""
+        element.  Takes the wrapped value and the value index of the
+        result, and returns the component that index selects."""
 
     @property
     def cell(self):
@@ -61,11 +62,11 @@ class WrapperElementBase(FiniteElementBase):
     def _transform_evaluation(self, core_eval):
         beta = self.get_indices()
         zeta = self.get_value_indices()
+        z, = zeta
 
         def promote(table):
             v = gem.partial_indexed(table, beta)
-            u = gem.ListTensor(self.transform(v))
-            return gem.ComponentTensor(gem.Indexed(u, zeta), beta + zeta)
+            return gem.ComponentTensor(self.transform(v, z), beta + zeta)
 
         return {alpha: promote(table)
                 for alpha, table in core_eval.items()}
@@ -83,13 +84,14 @@ class WrapperElementBase(FiniteElementBase):
         Q, x = self.wrappee.dual_basis
         beta = self.get_indices()
         zeta = self.get_value_indices()
+        z, = zeta
         # Index out the basis indices from wrapee's Q, to get
         # something of wrappee.value_shape, then promote to new shape
         # with the same transform as done for basis evaluation
-        Q = gem.ListTensor(self.transform(gem.partial_indexed(Q, beta)))
+        Q = self.transform(gem.partial_indexed(Q, beta), z)
         # Finally wrap up Q in shape again (now with some extra
         # value_shape indices)
-        return gem.ComponentTensor(Q[zeta], beta + zeta), x
+        return gem.ComponentTensor(Q, beta + zeta), x
 
 
 class HDivElement(WrapperElementBase):
@@ -148,6 +150,21 @@ class HCurlElement(WrapperElementBase):
         return "covariant piola"
 
 
+def component(zeta, index, value):
+    """Place a scalar value in one component of a vector.
+
+    :arg zeta: the value index of the vector
+    :arg index: which component the value belongs to
+    :arg value: the scalar value
+    :returns: the component of the vector selected by ``zeta``
+
+    The component is selected with a :class:`gem.Delta` rather than by
+    padding a :class:`gem.ListTensor` with zeros, so that contracting two
+    of these over ``zeta`` cancels the components that do not coincide.
+    """
+    return gem.Product(gem.Delta(zeta, index), value)
+
+
 def select_hdiv_transformer(element):
     # Assume: something x interval
     assert len(element.factors) == 2
@@ -161,27 +178,27 @@ def select_hdiv_transformer(element):
     if ks == (0, 1):
         # Make the scalar value the leftward-pointing normal on the
         # y-aligned edges.
-        return lambda v: [gem.Product(gem.Literal(-1), v), gem.Zero()]
+        return lambda v, zeta: component(zeta, 0, gem.Product(gem.Literal(-1), v))
     elif ks == (1, 0):
         # Make the scalar value the upward-pointing normal on the
         # x-aligned edges.
-        return lambda v: [gem.Zero(), v]
+        return lambda v, zeta: component(zeta, 1, v)
     elif ks == (2, 0):
         # Same for 3D, so z-plane.
-        return lambda v: [gem.Zero(), gem.Zero(), v]
+        return lambda v, zeta: component(zeta, 2, v)
     elif ks == (1, 1):
         if element.mapping == "contravariant piola":
             # Pad the 2-vector normal on the "base" cell into a
             # 3-vector, maintaining direction.
-            return lambda v: [gem.Indexed(v, (0,)),
-                              gem.Indexed(v, (1,)),
-                              gem.Zero()]
+            return lambda v, zeta: gem.Sum(
+                component(zeta, 0, gem.Indexed(v, (0,))),
+                component(zeta, 1, gem.Indexed(v, (1,))))
         elif element.mapping == "covariant piola":
             # Rotate the 2-vector tangential component on the "base"
             # cell 90 degrees anticlockwise into a 3-vector and pad.
-            return lambda v: [gem.Indexed(v, (1,)),
-                              gem.Product(gem.Literal(-1), gem.Indexed(v, (0,))),
-                              gem.Zero()]
+            return lambda v, zeta: gem.Sum(
+                component(zeta, 0, gem.Indexed(v, (1,))),
+                component(zeta, 1, gem.Product(gem.Literal(-1), gem.Indexed(v, (0,)))))
         else:
             assert False, "Unexpected original mapping!"
     else:
@@ -202,24 +219,24 @@ def select_hcurl_transformer(element):
         if ks == (1, 0):
             # Can only be 2D.  Make the scalar value the
             # rightward-pointing tangential on the x-aligned edges.
-            return lambda v: [v, gem.Zero()]
+            return lambda v, zeta: component(zeta, 0, v)
         elif ks == (0, 1):
             # Can be any spatial dimension.  Make the scalar value the
             # upward-pointing tangential.
-            return lambda v: [gem.Zero()] * (dim - 1) + [v]
+            return lambda v, zeta: component(zeta, dim - 1, v)
         else:
             assert False
     elif element.mapping == "covariant piola":
         # Second factor must be continuous interval.  Just padding.
-        return lambda v: [gem.Indexed(v, (0,)),
-                          gem.Indexed(v, (1,)),
-                          gem.Zero()]
+        return lambda v, zeta: gem.Sum(
+            component(zeta, 0, gem.Indexed(v, (0,))),
+            component(zeta, 1, gem.Indexed(v, (1,))))
     elif element.mapping == "contravariant piola":
         # Second factor must be continuous interval.  Rotate the
         # 2-vector tangential component on the "base" cell 90 degrees
         # clockwise into a 3-vector and pad.
-        return lambda v: [gem.Product(gem.Literal(-1), gem.Indexed(v, (1,))),
-                          gem.Indexed(v, (0,)),
-                          gem.Zero()]
+        return lambda v, zeta: gem.Sum(
+            component(zeta, 0, gem.Product(gem.Literal(-1), gem.Indexed(v, (1,)))),
+            component(zeta, 1, gem.Indexed(v, (0,))))
     else:
         assert False, "Unexpected original mapping!"
