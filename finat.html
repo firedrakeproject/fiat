@@ -593,10 +593,12 @@ provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(dual_evaluation_gem_expression,</span> <span class="pre">basis_indices)</span></code>
-where the given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are those needed to form a
-return expression for the code which is compiled from
-<code class="docutils literal notranslate"><span class="pre">dual_evaluation_gem_expression</span></code> (alongside any argument
+<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(evaluation,</span> <span class="pre">point_indices,</span> <span class="pre">basis_indices)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">evaluation</span></code> is summed over the value shape but still has
+<code class="docutils literal notranslate"><span class="pre">point_indices</span></code> free, leaving the caller to choose how to
+contract over the points. The given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are
+those needed to form a return expression for the code which
+is compiled from <code class="docutils literal notranslate"><span class="pre">evaluation</span></code> (alongside any argument
 multiindices already encoded within <code class="docutils literal notranslate"><span class="pre">fn</span></code>)</p>
 </dd>
 </dl>
@@ -1208,10 +1210,12 @@ provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(dual_evaluation_gem_expression,</span> <span class="pre">basis_indices)</span></code>
-where the given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are those needed to form a
-return expression for the code which is compiled from
-<code class="docutils literal notranslate"><span class="pre">dual_evaluation_gem_expression</span></code> (alongside any argument
+<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(evaluation,</span> <span class="pre">point_indices,</span> <span class="pre">basis_indices)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">evaluation</span></code> is summed over the value shape but still has
+<code class="docutils literal notranslate"><span class="pre">point_indices</span></code> free, leaving the caller to choose how to
+contract over the points. The given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are
+those needed to form a return expression for the code which
+is compiled from <code class="docutils literal notranslate"><span class="pre">evaluation</span></code> (alongside any argument
 multiindices already encoded within <code class="docutils literal notranslate"><span class="pre">fn</span></code>)</p>
 </dd>
 </dl>
@@ -1976,10 +1980,12 @@ provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(dual_evaluation_gem_expression,</span> <span class="pre">basis_indices)</span></code>
-where the given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are those needed to form a
-return expression for the code which is compiled from
-<code class="docutils literal notranslate"><span class="pre">dual_evaluation_gem_expression</span></code> (alongside any argument
+<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(evaluation,</span> <span class="pre">point_indices,</span> <span class="pre">basis_indices)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">evaluation</span></code> is summed over the value shape but still has
+<code class="docutils literal notranslate"><span class="pre">point_indices</span></code> free, leaving the caller to choose how to
+contract over the points. The given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are
+those needed to form a return expression for the code which
+is compiled from <code class="docutils literal notranslate"><span class="pre">evaluation</span></code> (alongside any argument
 multiindices already encoded within <code class="docutils literal notranslate"><span class="pre">fn</span></code>)</p>
 </dd>
 </dl>
@@ -4670,10 +4676,12 @@ provides physical geometry callbacks (may be None).</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(dual_evaluation_gem_expression,</span> <span class="pre">basis_indices)</span></code>
-where the given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are those needed to form a
-return expression for the code which is compiled from
-<code class="docutils literal notranslate"><span class="pre">dual_evaluation_gem_expression</span></code> (alongside any argument
+<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(evaluation,</span> <span class="pre">point_indices,</span> <span class="pre">basis_indices)</span></code> where
+<code class="docutils literal notranslate"><span class="pre">evaluation</span></code> is summed over the value shape but still has
+<code class="docutils literal notranslate"><span class="pre">point_indices</span></code> free, leaving the caller to choose how to
+contract over the points. The given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are
+those needed to form a return expression for the code which
+is compiled from <code class="docutils literal notranslate"><span class="pre">evaluation</span></code> (alongside any argument
 multiindices already encoded within <code class="docutils literal notranslate"><span class="pre">fn</span></code>)</p>
 </dd>
 </dl>

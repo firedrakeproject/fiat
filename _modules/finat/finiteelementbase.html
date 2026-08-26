@@ -42,8 +42,6 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.interpreter</span><span class="w"> </span><span class="kn">import</span> <span class="n">evaluate</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">gem.optimise</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span><span class="n">delta_elimination</span><span class="p">,</span> <span class="n">is_contraction</span><span class="p">,</span> <span class="n">sum_factorise</span><span class="p">,</span>
-                          <span class="n">traverse_product</span><span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">gem.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">cached_property</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_quadrature</span>
@@ -325,22 +323,18 @@
 <span class="sd">        :param coordinate_mapping: a</span>
 <span class="sd">           :class:`~.physically_mapped.PhysicalGeometry` object that</span>
 <span class="sd">           provides physical geometry callbacks (may be None).</span>
-<span class="sd">        :returns: A tuple ``(dual_evaluation_gem_expression, basis_indices)``</span>
-<span class="sd">                  where the given ``basis_indices`` are those needed to form a</span>
-<span class="sd">                  return expression for the code which is compiled from</span>
-<span class="sd">                  ``dual_evaluation_gem_expression`` (alongside any argument</span>
+<span class="sd">        :returns: A tuple ``(evaluation, point_indices, basis_indices)`` where</span>
+<span class="sd">                  ``evaluation`` is summed over the value shape but still has</span>
+<span class="sd">                  ``point_indices`` free, leaving the caller to choose how to</span>
+<span class="sd">                  contract over the points. The given ``basis_indices`` are</span>
+<span class="sd">                  those needed to form a return expression for the code which</span>
+<span class="sd">                  is compiled from ``evaluation`` (alongside any argument</span>
 <span class="sd">                  multiindices already encoded within ``fn``)</span>
 <span class="sd">        '''</span>
         <span class="n">Q</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
         <span class="n">Q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_transformation</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
 
         <span class="n">expr</span> <span class="o">=</span> <span class="n">fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="c1"># Apply targeted sum factorisation and delta elimination to</span>
-        <span class="c1"># the expression, preserving contractions that fn already factorised</span>
-        <span class="c1"># FIXME: a single pass of gem.optimise.contraction will choke on too many indices</span>
-        <span class="c1"># This is a temporary workaround https://github.com/firedrakeproject/fiat/issues/283</span>
-        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">delta_elimination</span><span class="p">(</span><span class="o">*</span><span class="n">traverse_product</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="n">is_contraction</span><span class="p">))</span>
-        <span class="n">expr</span> <span class="o">=</span> <span class="n">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">)</span>
         <span class="c1"># NOTE: any shape indices in the expression are because the</span>
         <span class="c1"># expression is tensor valued.</span>
         <span class="k">assert</span> <span class="n">expr</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">shape</span><span class="p">):]</span>
@@ -348,11 +342,8 @@
         <span class="n">basis_indices</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">Q</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">expr</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
         <span class="n">Qi</span> <span class="o">=</span> <span class="n">Q</span><span class="p">[</span><span class="n">basis_indices</span> <span class="o">+</span> <span class="n">shape_indices</span><span class="p">]</span>
         <span class="n">expri</span> <span class="o">=</span> <span class="n">expr</span><span class="p">[</span><span class="n">shape_indices</span><span class="p">]</span>
-        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">Qi</span> <span class="o">*</span> <span class="n">expri</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span> <span class="o">+</span> <span class="n">shape_indices</span><span class="p">)</span>
-        <span class="c1"># Factorise over the new contraction with Qi, keeping whole the</span>
-        <span class="c1"># contractions that fn already factorised</span>
-        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">optimise</span><span class="o">.</span><span class="n">contraction</span><span class="p">(</span><span class="n">evaluation</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="n">is_contraction</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">basis_indices</span></div>
+        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">Qi</span> <span class="o">*</span> <span class="n">expri</span><span class="p">,</span> <span class="n">shape_indices</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span><span class="p">,</span> <span class="n">basis_indices</span></div>
 
 
 <div class="viewcode-block" id="FiniteElementBase.dual_transformation">

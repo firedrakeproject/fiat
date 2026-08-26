@@ -731,46 +731,14 @@
 
 
 
-<div class="viewcode-block" id="is_contraction">
-<a class="viewcode-back" href="../../gem.html#gem.optimise.is_contraction">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">is_contraction</span><span class="p">(</span><span class="n">expression</span><span class="p">:</span> <span class="n">Node</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Test whether an expression is a tensor contraction.</span>
-
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    expression :</span>
-<span class="sd">        A GEM expression.</span>
-
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    bool</span>
-<span class="sd">        Whether the expression is a contraction.</span>
-
-<span class="sd">    Notes</span>
-<span class="sd">    -----</span>
-<span class="sd">    Pass this as ``stop_at`` to keep a contraction that is already sum</span>
-<span class="sd">    factorised out of a surrounding one. Flattening it discards its</span>
-<span class="sd">    factorisation, along with any subexpression it shares with another</span>
-<span class="sd">    factor, and inflates the number of indices to factorise over.</span>
-
-<span class="sd">    """</span>
-    <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">IndexSum</span><span class="p">)</span></div>
-
-
-
 <div class="viewcode-block" id="contraction">
 <a class="viewcode-back" href="../../gem.html#gem.optimise.contraction">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">contraction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">stop_at</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">contraction</span><span class="p">(</span><span class="n">expression</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Optimise the contractions of the tensor product at the root of</span>
 <span class="sd">    the expression, including:</span>
 
 <span class="sd">    - IndexSum-Delta cancellation</span>
 <span class="sd">    - Sum factorisation</span>
-
-<span class="sd">    :arg stop_at: Optional predicate on GEM expressions that are not to</span>
-<span class="sd">        be broken into further factors, see :func:`traverse_product`.</span>
-<span class="sd">        The contraction at the root is always broken up, as that is the</span>
-<span class="sd">        one being optimised.</span>
 
 <span class="sd">    This routine was designed with finite element coefficient</span>
 <span class="sd">    evaluation in mind.</span>
@@ -784,10 +752,7 @@
 
     <span class="c1"># Flatten product tree, eliminate deltas, sum factorise</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">rebuild</span><span class="p">(</span><span class="n">expression</span><span class="p">):</span>
-        <span class="n">root</span> <span class="o">=</span> <span class="n">expression</span>
-        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">traverse_product</span><span class="p">(</span>
-            <span class="n">expression</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="n">index_replacer</span><span class="p">,</span>
-            <span class="n">stop_at</span><span class="o">=</span><span class="kc">None</span> <span class="k">if</span> <span class="n">stop_at</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">e</span><span class="p">:</span> <span class="n">e</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">root</span> <span class="ow">and</span> <span class="n">stop_at</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+        <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">traverse_product</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="n">index_replacer</span><span class="p">)</span>
         <span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span> <span class="o">=</span> <span class="n">delta_elimination</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">,</span> <span class="n">index_replacer</span><span class="o">=</span><span class="n">index_replacer</span><span class="p">)</span>
         <span class="n">factors</span> <span class="o">=</span> <span class="p">[</span><span class="n">index_replacer</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="p">())</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">factors</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">sum_factorise</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">factors</span><span class="p">)</span>
