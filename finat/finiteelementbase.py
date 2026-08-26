@@ -10,9 +10,9 @@ from finat.quadrature import make_quadrature
 
 
 def broadcast_tensor(expression, multiindex):
-    """Turn a multiindex into a shape, broadcasting over the indices it lacks.
+    """Reshape a tensor expression, broadcasting over the indices it lacks.
 
-    :arg expression: a scalar GEM expression.
+    :arg expression: an indexed tensor.
     :arg multiindex: the indices to turn into a shape.
     :returns: ``expression`` as a tensor of the extents of ``multiindex``.
 
@@ -193,9 +193,8 @@ class FiniteElementBase(metaclass=ABCMeta):
         :returns: the tabulation on the whole of ``ps``, as
            :meth:`basis_evaluation` returns.
 
-        A union of points has no structure of its own, so an element that
-        needs structure to tabulate tabulates on each point set in turn and
-        joins the tables here.
+        A union of points has no structure of its own, so structured elements
+        tabulate on each point set in turn and stack the tabulations here.
         """
         tables = [self.basis_evaluation(order, sub, entity,
                                         coordinate_mapping=coordinate_mapping)
