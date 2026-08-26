@@ -257,11 +257,6 @@ def as_enriched(element):
     :returns: an :class:`EnrichedElement` with the same basis functions in the
               same order as ``element``, or ``None`` if ``element`` is not a
               direct sum.
-
-    Only a direct sum can be dual evaluated summand by summand.  The sum
-    commutes with everything that can hold it: a pullback is linear, a tensor
-    product distributes over a sum in its first factor, and the wrappers that
-    leave the dual basis alone are transparent.
     """
     return None
 
