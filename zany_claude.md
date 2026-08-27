@@ -845,3 +845,100 @@ max diagonal block 5×5 (BrambleZlamalC2 order-4 jets), pattern leak ≤ 1e-14
 except BZC2 (~1e-10, its known FIAT-side conditioning).  Hand-coded
 transformations (HCT, PS, C2 elements, WuXu, Walkington) still override the
 engine and are untouched.
+
+---
+
+## Stage 6 (2026-08-27): flag frames — Walkington automated
+
+**Framing: the transformation is a second Vandermonde inversion.**  FIAT's
+first Vandermonde inversion expresses the reference nodal basis (dual to the
+reference DualSet) in the PolynomialSet expansion set.  The duality engine is
+the *second* inversion, one level up: :math:`B_{ij} = n_i(\hat\psi_j \circ
+F^{-1})` is the generalized Vandermonde of the *physical* DualSet against the
+pulled-back *reference nodal basis*, and inverting it expresses the physical
+nodal basis in that basis.  Same computation, new expansion set; everything
+element-specific is in how the physical node :math:`n_i` is written down —
+i.e. in the per-slot direction maps.
+
+**What failed for Walkington.**  Its extended element (65 = 45 + 20
+constraints) carries, per face, three edge constraint dofs: moments of
+:math:`\partial f/\partial \hat n_{fe}` along each edge against Legendre
+:math:`P_4`, where :math:`\hat n_{fe} = \hat t_e \times \hat n_f` is the
+**face-edge normal** (in-plane normal to the edge within the face).  FIAT
+owns them by *face*, but their points are supported on an *edge*: a frame
+over edge tangent + face-edge normal, where every previously automated
+element only ever framed dofs over facet normal + facet tangents.  The old
+facet slot map sent the in-plane direction through :math:`J` (mapped
+tangents), but the physical convention (what `FIAT.Walkington` on the
+physical cell does) is the physical face-edge normal — exactly the 12 edge
+rows of :math:`B` came out wrong, everything else (including the
+:math:`\partial^2/\partial\nu\partial t` face constraints, whose order-2
+direction :math:`\mathrm{sym}(\hat n\otimes\hat t)` is rank-1 in multi-index
+space and maps slotwise to :math:`\mathrm{sym}(\nu\otimes J\hat t)`) was
+already right.
+
+**The generalization: frames attach to flags, and normals are derived from
+mapped tangents.**  The facet frame is the length-1 case of a frame attached
+to a flag :math:`E \subseteq f \subset K` (support entity of the node's
+points :math:`\subseteq` owning facet :math:`\subset` cell).  The physical
+direction map is
+
+.. math:: \Phi = J\,\Big(I - \sum_k \hat n_k \hat n_k^T\Big)
+          + \sum_k \nu_k\, \hat n_k^T,
+
+tangents of the support entity by :math:`J`, each unit relative normal
+:math:`\hat n_k` of the flag to the physical unit relative normal
+:math:`\nu_k`.  The :math:`\nu_k` are *derived quantities of the mapped
+tangents*: the same cross-product formulas as on the reference cell, applied
+to pushed-forward generators (UFC consistency, hence orientation-robust with
+no sign logic).  Two identities keep :math:`J^{-1}\nu_k` polynomial-over-sqrt:
+
+1. :math:`Ja \times Jb = K(a\times b)` (cofactor lemma): facet normal
+   :math:`\nu = K\hat n/|K\hat n|`, so :math:`J^{-1}\nu = \mathrm{adj}(J)
+   K\hat n / (\det J\, |K\hat n|)` — the old facet formula.
+2. :math:`Ja \times Kb = J((J^TJ)a \times b)` (proved from 1 via
+   :math:`Ja = K(J^TJ a/\det J)` and :math:`Ka\times Kb = \det J\, J(a\times
+   b)`): face-edge normal :math:`\nu_e = \mathrm{unit}(J\hat t_e \times
+   K\hat n_f) = Jw/|Jw|` with :math:`w = ((J^TJ)\hat t_e)\times\hat n_f`, so
+   :math:`J^{-1}\nu_e = w/|Jw|` — **no adjugate at all**: the physical
+   face-edge normal is the :math:`J`-image of a reference in-plane vector.
+
+Then :math:`G = J^{-1}\Phi = (I - \sum_k \hat n_k\hat n_k^T) + \sum_k
+(u_k/d_k)\hat n_k^T` with per-normal numerator/denominator pairs, assembled
+over a common denominator (`_slot_map`, one loop for any number of normals;
+the single-normal case reproduces the old facet map, now on unit normals).
+The frame :math:`\{\hat t_e, \hat n_{fe}, \hat n_f\}` is orthogonal by
+construction, so the tangential projector is just :math:`I - \sum \hat n_k
+\hat n_k^T` (verified numerically along with both identities and the
+positive-ratio cofactor sign, all faces × edges, both orientations).
+
+**Dispatch stays data-driven.**  The support entity is recovered from the
+node's *points* by barycentric coordinates (`_support_entity`: minimal
+entity whose closure contains all points — the same lesson as the Cartesian
+point-group fix: dispatch on what the node's data looks like, never on which
+entity FIAT lists it under).  The flag frame engages only when ``facet`` and
+``support dim == sd - 2 >= 1``; every other case (2D, vertex-supported,
+facet-interior) keeps the old path bit-for-bit.
+
+**Verification.**
+* Numeric :math:`B` matches a from-scratch push-forward of the physical
+  `FIAT.Walkington` dual basis on all 65 rows, positive and negative
+  orientation (scratch `walk_probe.py`).
+* Symbolic engine :math:`M` == hand-coded `_basis_transformation` to
+  1.6e-14 with *identical* 789-nonzero sparsity.  This also corrects the
+  Stage 5 exclusion note in `test_claude_zany_piola.py`: the hand code
+  never disagreed with the physical fit — the *prototype* lacked the flag
+  frame (comment fixed; the prototype still excludes Walkington).
+* `test_zany_mapping.py::test_C1_tetrahedron[Walkington]` passes: the
+  direct physical-cell fit is a genuine ground truth here since the
+  extended tabulation has full rank, so all 65 columns of :math:`M` are
+  forced, constraint columns included.
+* Full finat suite 448 passed / 8 skipped; flake8 + pydocstyle clean.
+
+Convention notes: `finat.Walkington` keeps its underscored hand-coded
+`_basis_transformation` (branch convention, like Bell); with it,
+`FIAT.WalkingtonDualSet.nodal_completion` (the :math:`\partial^2/\partial
+t_i\partial t_j` face moments) is referenced by nothing else — the engine
+never needs a nodal completion, its residual elimination happens through
+the Vandermonde recursion.  Deleting both is a candidate cleanup once the
+hand codes are retired wholesale.

@@ -368,10 +368,10 @@ def composition_transformation(fiat_element, J, ndof=None, avg=True, tol=2e-10):
 # (HCT, Powell-Sabin, Alfeld/Bramble-Zlamal C2) never before reproduced by
 # the automated theory.  BrambleZlamalC2 needs a looser tolerance: FIAT's
 # own dual basis and tabulation only agree to ~4e-10 on its ill-conditioned
-# order-4 vertex jets.  Walkington is excluded: its extended tabulation has
-# full rank, so the constraint columns of the transformation are not a
-# convention, and the hand-coded transformation disagrees there both with
-# this prototype and with a direct physical-cell fit (see zany_claude.md).
+# order-4 vertex jets.  Walkington is excluded here only because this
+# prototype lacks the flag frame of its edge moments (normal to an edge
+# within a face); the production engine handles it (see zany_claude.md),
+# and test_zany_mapping checks it against a direct physical-cell fit.
 scalar_zoo = {
     2: [(finat.Morley, ()),
         (finat.Hermite, ()),

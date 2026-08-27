@@ -14,12 +14,21 @@ without frame algebra, for any element whose dual basis parses into
 
 * **Physical nodes by per-slot maps.**  The physical node shares the
   points and weights of its reference partner; only the directional
-  data changes, one tensor slot at a time.  A derivative slot of a
-  facet node maps its unit-normal component to the unit physical normal
-  :math:`K\hat{n}/|K\hat{n}|` (:math:`K = \operatorname{adj}(J)^T` the
-  cofactor matrix, which maps normals to normals) and its tangential
-  complement by :math:`J` (mapped tangents); away from facets
-  derivative slots keep their reference (Cartesian) directions.  A
+  data changes, one tensor slot at a time.  A derivative slot is
+  framed on the flag of entities from the support of the node's points
+  up to the cell: the tangent space of the support entity maps by
+  :math:`J` (mapped tangents) and each unit relative normal of the
+  flag maps to the physical unit relative normal, which is built from
+  the mapped tangents by the same cross-product formulas as on the
+  reference cell.  Two identities keep these polynomial in :math:`J`:
+  the facet normal within the cell is the cofactor image
+  :math:`\nu = K\hat{n}/|K\hat{n}|` (:math:`K = \operatorname{adj}(J)^T`
+  maps normals to normals), and the normal to a facet edge within the
+  facet (the edge moments of Walkington) is :math:`\nu_e =
+  J\hat{t}_e \times K\hat{n}/|\cdot| = Jw/|Jw|` with :math:`w =
+  ((J^TJ)\hat{t}_e) \times \hat{n}`, by :math:`Ja \times Kb =
+  J((J^TJ)a \times b)`; away from facets derivative slots keep their
+  reference (Cartesian) directions.  A
   contravariant value slot of a facet moment maps its scaled-normal
   component by :math:`K` (the cofactor lemma :math:`K\hat\nu^s =
   \nu^s` is exact) and its tangential complement by the reciprocal of
@@ -719,8 +728,25 @@ def _tabulate(fiat_element: FiniteElement, order: int, points: tuple,
         return tabs.setdefault(key, fiat_element.tabulate(order, points))
 
 
+def _support_entity(ref_el, points, tol: float = 1e-12) -> tuple:
+    """The minimal entity whose closure contains all the points.
+
+    :arg ref_el: The reference cell.
+    :arg points: The points.
+    :arg tol: Tolerance below which a barycentric coordinate vanishes.
+    :returns: The pair ``(dim, entity)``.
+    """
+    bary = ref_el.compute_barycentric_coordinates(numpy.asarray(points))
+    verts = set(numpy.flatnonzero(numpy.abs(bary).max(axis=0) > tol))
+    top = ref_el.get_topology()
+    for dim in sorted(top):
+        for entity in sorted(top[dim]):
+            if verts <= set(top[dim][entity]):
+                return dim, entity
+
+
 def _slot_map(ref_el, entity: int, J: numpy.ndarray,
-              derivative: bool, facet: bool) -> tuple:
+              derivative: bool, facet: bool, support: tuple = None) -> tuple:
     r"""Effective per-slot matrix pairing a physical node with the reference tabulation.
 
     Transposing the per-slot action of the push-forward onto the
@@ -729,10 +755,12 @@ def _slot_map(ref_el, entity: int, J: numpy.ndarray,
     direction map :math:`\Phi`, and :math:`G = (J/\det J)^T\Phi` for a
     contravariant value slot with physical weight map :math:`\Phi`.
     Away from a facet :math:`\Phi` is the identity (Cartesian data);
-    on a facet it maps the normal component by the cofactor law and the
-    tangential complement by the mapped tangents, as in the module
-    docstring.  The map is returned in numerator/denominator form so
-    that the numerators stay free of symbolic division.
+    on a facet it is the frame map of the flag ``support`` :math:`\subseteq`
+    ``entity`` :math:`\subset` cell: the tangent space of the support
+    entity maps by :math:`J` (mapped tangents) and each unit relative
+    normal of the flag maps to the physical unit relative normal, as in
+    the module docstring.  The map is returned in numerator/denominator
+    form so that the numerators stay free of symbolic division.
 
     :arg ref_el: The reference cell.
     :arg entity: The facet number (ignored unless ``facet``).
@@ -740,6 +768,8 @@ def _slot_map(ref_el, entity: int, J: numpy.ndarray,
     :arg derivative: Whether the slot is a derivative or a value slot.
     :arg facet: Whether the node data is in the facet frame rather than
         Cartesian.
+    :arg support: The ``(dim, entity)`` support of the node's points,
+        or None when it coincides with the facet.
     :returns: The pair ``(numerator, denominator)`` with
         ``G = numerator / denominator``.
     """
@@ -752,13 +782,34 @@ def _slot_map(ref_el, entity: int, J: numpy.ndarray,
     lit = _as_gem_array if symbolic else numpy.asarray
     K = adjJ.T
     if derivative:
+        # Relative normals of the flag, each as (nhat, u, d) with unit
+        # reference normal nhat and physical unit normal nu = J u / d.
         n = ref_el.compute_normal(entity)
-        nn = n @ n
+        n = n / (n @ n) ** 0.5
         Kn = K @ n
         q = (Kn @ Kn) ** 0.5
-        Gnum = (numpy.outer(adjJ @ Kn, lit(n * (nn ** 0.5 / nn)))
-                + lit(numpy.eye(sd) - numpy.outer(n, n) / nn) * (q * detJ))
-        return Gnum, detJ * q
+        # facet normal within the cell: the cofactor lemma gives
+        # nu = K nhat / |K nhat|, and J^{-1} K = adj(J) K / det J
+        normals = [(n, adjJ @ Kn, detJ * q)]
+        if support is not None and support[0] == sd - 2 >= 1:
+            # normal to the support edge within the facet:
+            # nu = (J t x K nhat)/|...| = J w / |J w| with
+            # w = ((J^T J) t) x nhat, by the identity Ja x Kb = J((J^T J)a x b)
+            t = ref_el.compute_edge_tangent(support[1])
+            nfe = numpy.cross(t, n)
+            nfe = nfe / (nfe @ nfe) ** 0.5
+            w = numpy.cross(J.T @ (J @ t), n)
+            Jw = J @ w
+            normals.append((nfe, w, (Jw @ Jw) ** 0.5))
+        # G = J^{-1} Phi = (I - sum_k nhat_k nhat_k^T) + sum_k (u_k/d_k) nhat_k^T
+        P = numpy.eye(sd) - sum(numpy.outer(nk, nk) for nk, _, _ in normals)
+        den = reduce(mul, (dk for _, _, dk in normals))
+        Gnum = lit(P) * den
+        for k, (nk, uk, _) in enumerate(normals):
+            scale = reduce(mul, (dj for j, (_, _, dj) in enumerate(normals)
+                                 if j != k), 1)
+            Gnum = Gnum + numpy.outer(uk, lit(nk)) * scale
+        return Gnum, den
     nu = ref_el.compute_scaled_normal(entity)
     nn = nu @ nu
     Knu = K @ nu
@@ -872,7 +923,11 @@ def _node_row(fiat_element: FiniteElement, ell: PhysicallyMappedFunctional,
         # Point values pull back exactly
         return None
     facet = dim == sd - 1
-    Gnum, den = _slot_map(ref_el, entity, J, derivative=True, facet=facet)
+    # a facet node supported on a facet sub-entity (e.g. the edge moments
+    # of Walkington) is framed on the flag support < facet < cell
+    support = _support_entity(ref_el, ell.points) if facet and sd > 2 else None
+    Gnum, den = _slot_map(ref_el, entity, J, derivative=True, facet=facet,
+                          support=support)
     direction = ell.pullback(Gnum).direction
     tab = _tabulate(fiat_element, ell.order, ell.points, tabs)
     N = numpy.stack([tab[alpha] @ ell.weights
