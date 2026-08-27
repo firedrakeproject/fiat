@@ -108,7 +108,23 @@ def test_quadrature_element_on_union_of_points():
     _, ps = enriched.dual_basis
     # The weights are not used, this quadrature scheme is not for integration.
     rule = QuadratureRule(ps, numpy.full(len(ps.points), numpy.nan), ref_el=cell)
-    check_nodal(QuadratureElement(cell, rule))
+    element = QuadratureElement(cell, rule)
+    # A vector-valued target interpolates through a wrapper of that element,
+    # which is distributed over the sum just the same.
+    vector = finat.TensorFiniteElement(element, (cell.get_spatial_dimension(),))
+    for e in (element, vector):
+        check_nodal(e)
+        # Each summand evaluates on its own points.  Handed the union instead,
+        # the callable tabulates into a Concatenate over the points, which is
+        # contracted away before anything downstream can split along it.
+        seen = []
+
+        def fn(point_set, e=e):
+            seen.append(point_set)
+            return gem.Literal(numpy.zeros(e.value_shape))
+
+        e.dual_evaluation(fn)
+        assert seen == list(ps.point_sets)
 
 
 @pytest.mark.parametrize("family", ("RTCE", "RTCF", "NCE", "NCF"))

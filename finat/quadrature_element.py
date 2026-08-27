@@ -8,7 +8,7 @@ import gem
 from gem.interpreter import evaluate
 from gem.utils import cached_property
 
-from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
+from finat.finiteelementbase import FiniteElementBase
 from finat.quadrature import make_quadrature, AbstractQuadratureRule, QuadratureRule
 
 
@@ -197,43 +197,35 @@ class QuadratureElement(FiniteElementBase):
         Q = gem.ComponentTensor(Q, multiindex)
         return Q, ps
 
-    def _dual_evaluation(self, fn, coordinate_mapping=None):
-        """Dual evaluate on each point set of a union separately.
+    @cached_property
+    def _summand_rules(self):
+        """The rules of the summands this element is a direct sum of.
 
-        :arg fn: Callable representing the function to dual evaluate.
-                 Callable should take in an :class:`AbstractPointSet` and
-                 return a GEM expression for evaluation of the function at
-                 those points.
-        :arg coordinate_mapping: a
-           :class:`~.physically_mapped.PhysicalGeometry` object that
-           provides physical geometry callbacks (may be None).
-        :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
-           :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
-           returns.  The points are contracted here, so ``point_indices`` is
-           empty.
+        Returns
+        -------
+        tuple
+            One :class:`~finat.quadrature.QuadratureRule` for each point set of
+            a :class:`~finat.point_set.UnionPointSet` rule, in the order they
+            are stacked, or an empty tuple if the rule has a single point set.
 
-        The points of a direct sum are the union of its summands' points, and
-        the summands do not share a set of points to evaluate ``fn`` on.  Call
-        ``fn`` on each point set in turn, as the direct sum itself does, and
-        stack the results along the basis index.
+        Notes
+        -----
+        A union of point sets is how the points of a direct sum are stacked, so
+        splitting it back up recovers a rule for each summand, each on the
+        points its own functionals evaluate on.
         """
         rule_ps = self._rule.point_set
         if not isinstance(rule_ps, UnionPointSet):
-            return super()._dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
+            return ()
 
-        evals = []
+        rules = []
         offset = 0
         for ps in rule_ps.point_sets:
             n = len(ps.points)
-            rule = QuadratureRule(ps, self._weights[offset:offset + n],
-                                  ref_el=self._rule.ref_el)
-            expr, point_indices, indices = QuadratureElement(self.cell, rule) \
-                .dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
-            evals.append(broadcast_tensor(gem.IndexSum(expr, point_indices), indices))
+            rules.append(QuadratureRule(ps, self._weights[offset:offset + n],
+                                        ref_el=self._rule.ref_el))
             offset += n
-
-        beta = self.get_indices()
-        return gem.Indexed(gem.Concatenate(*evals), beta), (), beta
+        return tuple(rules)
 
     @property
     def mapping(self):

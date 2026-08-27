@@ -13,6 +13,7 @@ from finat.discontinuous import DiscontinuousElement
 from finat.finiteelementbase import FiniteElementBase, broadcast_tensor
 from finat.hdivcurl import HCurlElement, HDivElement, WrapperElementBase
 from finat.point_set import UnionPointSet
+from finat.quadrature_element import QuadratureElement
 from finat.tensor_product import TensorProductElement
 from finat.tensorfiniteelement import TensorFiniteElement
 
@@ -284,6 +285,17 @@ def as_enriched_wrapper(element):
         return None
     return EnrichedElement([type(element)(e) for e in summands.elements],
                            is_nodal_enriched=summands.is_nodal_enriched)
+
+
+@as_enriched.register(QuadratureElement)
+def as_enriched_quadrature_element(element):
+    """Rewrite a rule on a union of point sets as a sum of one rule each."""
+    rules = element._summand_rules
+    if not rules:
+        return None
+    return EnrichedElement(
+        [QuadratureElement(element.cell, rule) for rule in rules],
+        is_nodal_enriched=True)
 
 
 @as_enriched.register(TensorFiniteElement)
