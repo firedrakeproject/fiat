@@ -15,7 +15,7 @@ class WuXuRobustH3NC(PhysicallyMappedElement, ScalarFiatElement):
         cite("WuXu2019")
         super().__init__(FIAT.WuXuRobustH3NC(cell))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         return wuxu_transformation(self, coordinate_mapping)
 
 
@@ -26,7 +26,7 @@ class WuXuH3NC(PhysicallyMappedElement, ScalarFiatElement):
         cite("WuXu2019")
         super().__init__(FIAT.WuXuH3NC(cell))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         return wuxu_transformation(self, coordinate_mapping)
 
 

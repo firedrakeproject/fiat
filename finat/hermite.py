@@ -11,7 +11,7 @@ class Hermite(PhysicallyMappedElement, ScalarFiatElement):
         cite("Ciarlet1972")
         super().__init__(FIAT.CubicHermite(cell))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         Js = [coordinate_mapping.jacobian_at(vertex)
               for vertex in self.cell.get_vertices()]
 
