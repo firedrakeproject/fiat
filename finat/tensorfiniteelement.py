@@ -3,7 +3,6 @@ from itertools import chain
 import numpy
 
 import gem
-from gem.optimise import delta_elimination, sum_factorise, traverse_product
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
@@ -176,10 +175,6 @@ class TensorFiniteElement(FiniteElementBase):
         tQ = self._base_element.dual_transformation(tQ, coordinate_mapping)
 
         expr = fn(x)
-        # Apply targeted sum factorisation and delta elimination to
-        # the expression
-        sum_indices, factors = delta_elimination(*traverse_product(expr))
-        expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
         # expression is tensor valued.
         assert expr.shape == self.value_shape
@@ -196,12 +191,8 @@ class TensorFiniteElement(FiniteElementBase):
 
         tQi = tQ[index_ordering]
         expri = expr[tensor_i + scalar_vi]
-        evaluation = gem.IndexSum(tQi * expri, x.indices + scalar_vi + tensor_i)
-        # This doesn't work perfectly, the resulting code doesn't have
-        # a minimal memory footprint, although the operation count
-        # does appear to be minimal.
-        evaluation = gem.optimise.contraction(evaluation)
-        return evaluation, scalar_i + tensor_vi
+        evaluation = gem.IndexSum(tQi * expri, scalar_vi + tensor_i)
+        return evaluation, x.indices, scalar_i + tensor_vi
 
     @property
     def mapping(self):

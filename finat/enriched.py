@@ -165,16 +165,17 @@ class EnrichedElement(FiniteElementBase):
                 f"Dual evaluation not defined for element {type(self).__name__}"
             )
         # Gather results from all sub-elements
-        # Each sub_result is (eval_expr, local_indices)
+        # Each sub_result is (eval_expr, point_indices, local_indices)
         sub_results = [sub.dual_evaluation(argument, coordinate_mapping=coordinate_mapping)
                        for sub in self.elements]
 
-        # Extract the evaluation sub-expressions
+        # Extract the evaluation sub-expressions, contracting each over its own points.
         # We must ensure that all subindices are in the free indices of subexpr
         # before wrapping in ComponentTensor. If some are missing (e.g. if the
         # expression simplified to a constant), we multiply by a dummy ones tensor.
         evals = []
-        for sub, (subexpr, subindices) in zip(self.elements, sub_results):
+        for subexpr, point_indices, subindices in sub_results:
+            subexpr = gem.IndexSum(subexpr, point_indices)
             missing_indices = tuple(idx for idx in subindices if idx not in subexpr.free_indices)
             if missing_indices:
                 shape = tuple(idx.extent for idx in missing_indices)
@@ -185,7 +186,7 @@ class EnrichedElement(FiniteElementBase):
 
         beta = self.get_indices()
         expr = gem.Indexed(gem.Concatenate(*evals), beta)
-        return expr, beta
+        return expr, (), beta
 
 
 def tree_map(f, *args):

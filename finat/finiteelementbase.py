@@ -4,7 +4,6 @@ from itertools import chain
 import gem
 import numpy
 from gem.interpreter import evaluate
-from gem.optimise import delta_elimination, sum_factorise, traverse_product
 from gem.utils import cached_property
 
 from finat.quadrature import make_quadrature
@@ -255,20 +254,18 @@ class FiniteElementBase(metaclass=ABCMeta):
         :param coordinate_mapping: a
            :class:`~.physically_mapped.PhysicalGeometry` object that
            provides physical geometry callbacks (may be None).
-        :returns: A tuple ``(dual_evaluation_gem_expression, basis_indices)``
-                  where the given ``basis_indices`` are those needed to form a
-                  return expression for the code which is compiled from
-                  ``dual_evaluation_gem_expression`` (alongside any argument
+        :returns: A tuple ``(evaluation, point_indices, basis_indices)`` where
+                  ``evaluation`` is summed over the value shape but still has
+                  ``point_indices`` free, leaving the caller to choose how to
+                  contract over the points. The given ``basis_indices`` are
+                  those needed to form a return expression for the code which
+                  is compiled from ``evaluation`` (alongside any argument
                   multiindices already encoded within ``fn``)
         '''
         Q, x = self.dual_basis
         Q = self.dual_transformation(Q, coordinate_mapping=coordinate_mapping)
 
         expr = fn(x)
-        # Apply targeted sum factorisation and delta elimination to
-        # the expression
-        sum_indices, factors = delta_elimination(*traverse_product(expr))
-        expr = sum_factorise(sum_indices, factors)
         # NOTE: any shape indices in the expression are because the
         # expression is tensor valued.
         assert expr.shape == Q.shape[len(Q.shape)-len(expr.shape):]
@@ -276,13 +273,8 @@ class FiniteElementBase(metaclass=ABCMeta):
         basis_indices = gem.indices(len(Q.shape) - len(expr.shape))
         Qi = Q[basis_indices + shape_indices]
         expri = expr[shape_indices]
-        evaluation = gem.IndexSum(Qi * expri, x.indices + shape_indices)
-        # Now we want to factorise over the new contraction with x,
-        # ignoring any shape indices to avoid hitting the sum-
-        # factorisation index limit (this is a bit of a hack).
-        # Really need to do a more targeted job here.
-        evaluation = gem.optimise.contraction(evaluation, shape_indices)
-        return evaluation, basis_indices
+        evaluation = gem.IndexSum(Qi * expri, shape_indices)
+        return evaluation, x.indices, basis_indices
 
     def dual_transformation(self, Q, coordinate_mapping=None):
         """Transforms reference dual evaluation into physical dual evaluation.
