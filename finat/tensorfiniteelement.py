@@ -171,28 +171,47 @@ class TensorFiniteElement(FiniteElementBase):
         return tQ, points
 
     def _dual_evaluation(self, fn, coordinate_mapping=None):
-        tQ, x = self.dual_basis
-        tQ = self._base_element.dual_transformation(tQ, coordinate_mapping)
+        """Dual evaluate the base element on one tensor component at a time.
 
-        expr = fn(x)
-        # NOTE: any shape indices in the expression are because the
-        # expression is tensor valued.
-        assert expr.shape == self.value_shape
+        :arg fn: Callable representing the function to dual evaluate.
+                 Callable should take in an :class:`AbstractPointSet` and
+                 return a GEM expression for evaluation of the function at
+                 those points.
+        :arg coordinate_mapping: a
+           :class:`~.physically_mapped.PhysicalGeometry` object that
+           provides physical geometry callbacks (may be None).
+        :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
+           :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
+           returns.
 
-        scalar_i = self.base_element.get_indices()
-        scalar_vi = self.base_element.get_value_indices()
+        The tensor wrapper couples a basis function to a value component
+        through an identity, so the components share the base element's dual
+        basis and the base element keeps whatever structure it dual evaluates
+        with -- a direct sum among it.
+        """
+        base = self.base_element
+        base_vi = base.get_value_indices()
         tensor_i = tuple(gem.Index(extent=d) for d in self._shape)
+
+        def component(ps):
+            expr = fn(ps)
+            assert expr.shape == self.value_shape
+            return gem.ComponentTensor(gem.Indexed(expr, tensor_i + base_vi), base_vi)
+
+        evaluation, point_indices, scalar_i = base.dual_evaluation(
+            component, coordinate_mapping=coordinate_mapping)
+        # Couple the component the base element saw to the basis function that
+        # carries it.  Contracting the pair keeps the component index out of
+        # the basis indices, where a free index into a ListTensor would defeat
+        # argument factorisation.
         tensor_vi = tuple(gem.Index(extent=d) for d in self._shape)
-
+        evaluation = gem.IndexSum(
+            gem.Product(gem.Delta(tensor_i, tensor_vi), evaluation), tensor_i)
         if self._transpose:
-            index_ordering = tensor_i + scalar_i + tensor_vi + scalar_vi
+            basis_indices = tensor_vi + scalar_i
         else:
-            index_ordering = scalar_i + tensor_i + tensor_vi + scalar_vi
-
-        tQi = tQ[index_ordering]
-        expri = expr[tensor_i + scalar_vi]
-        evaluation = gem.IndexSum(tQi * expri, scalar_vi + tensor_i)
-        return evaluation, x.indices, scalar_i + tensor_vi
+            basis_indices = scalar_i + tensor_vi
+        return evaluation, point_indices, basis_indices
 
     @property
     def mapping(self):

@@ -15,7 +15,6 @@ from finat.hdivcurl import HCurlElement, HDivElement, WrapperElementBase
 from finat.point_set import UnionPointSet
 from finat.quadrature_element import QuadratureElement
 from finat.tensor_product import TensorProductElement
-from finat.tensorfiniteelement import TensorFiniteElement
 
 
 class EnrichedElement(FiniteElementBase):
@@ -296,17 +295,6 @@ def as_enriched_quadrature_element(element):
     return EnrichedElement(
         [QuadratureElement(element.cell, rule) for rule in rules],
         is_nodal_enriched=True)
-
-
-@as_enriched.register(TensorFiniteElement)
-def as_enriched_tensor_finite_element(element):
-    """Distribute the vector/tensor wrapper over the sum its base element is."""
-    summands = as_enriched(element.base_element)
-    if summands is None:
-        return None
-    return EnrichedElement(
-        [TensorFiniteElement(e, element._shape, element._transpose) for e in summands.elements],
-        is_nodal_enriched=summands.is_nodal_enriched)
 
 
 @as_enriched.register(TensorProductElement)
