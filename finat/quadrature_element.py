@@ -213,6 +213,7 @@ class QuadratureElement(FiniteElementBase):
         A union of point sets is how the points of a direct sum are stacked, so
         splitting it back up recovers a rule for each summand, each on the
         points its own functionals evaluate on.
+
         """
         rule_ps = self._rule.point_set
         if not isinstance(rule_ps, UnionPointSet):
