@@ -47,7 +47,7 @@ class MixedElement(FiniteElementBase):
         else:
             quad_scheme = elements[0].quadrature_scheme()
             if not all(e.quadrature_scheme() == quad_scheme for e in elements):
-                raise ValueError("Quadrature scheme mismatch for sub elements of mixed element.")
+                quad_scheme = None
 
         # Compute value sizes in reference configuration
         reference_value_size_sum = sum(product(s.reference_value_shape) for s in self._sub_elements)

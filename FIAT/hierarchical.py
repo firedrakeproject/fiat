@@ -59,7 +59,7 @@ class LegendreDual(dual_set.DualSet):
 
 class Legendre(finite_element.CiarletElement):
     """Simplicial discontinuous element with Legendre polynomials."""
-    def __new__(cls, ref_el, degree, variant=None):
+    def __new__(cls, ref_el, degree, variant=None, quad_scheme=None):
         if degree == 0:
             splitting, variant, interpolant_deg = check_format_variant(variant, degree)
             if splitting is None and interpolant_deg == 0:
