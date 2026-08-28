@@ -18,6 +18,7 @@ from gem.optimise import (
 )
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
                              collect_monomials)
+from gem.gem import _jagged_lattice
 
 
 @pytest.fixture
@@ -34,6 +35,25 @@ def A():
 @pytest.fixture
 def X():
     return gem.Variable("X", (2, 2))
+
+
+def test_compact_simplex_lattice_product():
+    """Compact independent simplex lattices and preserve lexicographic rank."""
+    p = gem.JaggedIndex(extent=4)
+    q = gem.JaggedIndex(extent=4, parents=(p,))
+    r = gem.JaggedIndex(extent=4)
+    s = gem.JaggedIndex(extent=4, parents=(r,))
+
+    shape, layout = gem.compact_index_layout((p, q, r, s))
+
+    assert shape == (10, 10)
+    assert layout == ((p, q), (r, s))
+    points = _jagged_lattice((p, q))
+    ranks = [
+        gem.simplex_lattice_rank(
+            (p, q), {p: int(point[0]), q: int(point[1])})
+        for point in points]
+    assert ranks == list(range(10))
 
 
 def test_listtensor_from_indexed(X):

@@ -10,8 +10,9 @@ import logging
 
 import numpy
 
-from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Literal, Node, one
-from gem.node import MemoizerArg
+from gem.gem import (ComponentTensor, FlattenedTensor, Index, Indexed,
+                     IndexSum, Literal, Node, one)
+from gem.node import MemoizerArg, traversal
 from gem.cost import has_arithmetic
 from gem.optimise import (filtered_replace_indices,
                           make_sum, make_product, traverse_sum)
@@ -277,6 +278,9 @@ def _share_linear_maps(
         for atomic in monomial.atomics:
             involved = linear_set.intersection(atomic.free_indices)
             if len(involved) != 1:
+                continue
+            if any(isinstance(node, FlattenedTensor)
+                   for node in traversal((atomic,))):
                 continue
             index, = involved
             normal = replacer(atomic, ((index, canonical[index.extent]),))

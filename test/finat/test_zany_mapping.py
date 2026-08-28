@@ -11,6 +11,16 @@ from gem.optimise import contraction
 from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
 
 
+def test_numeric_zero_mapped_tabulation_is_sparse() -> None:
+    """Discard numeric zeros when constructing mapped rows."""
+    matrix = gem.Literal(np.eye(3))
+    mapped = MappedTabulation(matrix, {None: gem.Literal(np.eye(3))})
+
+    assert mapped._width == 1
+    assert np.array_equal(mapped._columns.array[:, 0], np.arange(3))
+    assert mapped._values.shape == (1,)
+
+
 def test_sparse_mapped_tabulation():
     """Apply a sparse basis map at the cost of its nonzeros."""
     coefficient = gem.Variable("coefficient", ())
