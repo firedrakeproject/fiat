@@ -7,6 +7,7 @@ import pprint
 
 from gem.interpreter import evaluate
 from gem.node import traversal
+from gem.optimise import contraction
 from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
 
 
@@ -25,7 +26,8 @@ def test_sparse_mapped_tabulation():
     # indexes a vector rather than materialising a symbolic matrix.
     assert mapped_tabulation._values.shape == (3,)
 
-    mapped = mapped_tabulation[None]
+    i, j = gem.indices(2)
+    mapped = contraction(gem.Indexed(mapped_tabulation[None], (i, j)))
 
     # The three unit entries cost no multiplication, and the one remaining
     # nonzero costs exactly one. Nothing is selected by a branch.
@@ -35,7 +37,10 @@ def test_sparse_mapped_tabulation():
     assert not any(isinstance(node, gem.Conditional)
                    for node in traversal((mapped,)))
 
-    actual, = evaluate([mapped], {coefficient: np.asarray(2.0)})
+    actual, = evaluate(
+        [gem.ComponentTensor(mapped, (i, j))],
+        {coefficient: np.asarray(2.0)},
+    )
     expected = np.asarray([[1.0, 0.0, 2.0], [0.0, 1.0, 0.0]]) \
         @ table_values
     assert np.array_equal(actual.arr, expected)
