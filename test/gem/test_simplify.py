@@ -48,12 +48,13 @@ def test_compact_simplex_lattice_product():
 
     assert shape == (10, 10)
     assert layout == ((p, q), (r, s))
+    # A lattice filling its box gains nothing from a rank lookup.
+    assert gem.compact_index_layout((p,)) == ((4,), (p,))
+
+    # Ranks agree with the order in which FlattenedTensor flattens.
+    ranks = gem.simplex_lattice_ranks((p, q))
     points = _jagged_lattice((p, q))
-    ranks = [
-        gem.simplex_lattice_rank(
-            (p, q), {p: int(point[0]), q: int(point[1])})
-        for point in points]
-    assert ranks == list(range(10))
+    assert [int(ranks[tuple(point)]) for point in points] == list(range(10))
 
 
 def test_listtensor_from_indexed(X):

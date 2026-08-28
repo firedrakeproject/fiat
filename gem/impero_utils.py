@@ -39,7 +39,7 @@ def preprocess_gem(expressions, replace_delta=True, remove_componenttensors=True
 
 
 def compile_gem(assignments, prefix_ordering, remove_zeros=False,
-                emit_return_accumulate=True, assignment_group_size=None):
+                emit_return_accumulate=True):
     """Compiles GEM to Impero.
 
     :arg assignments: list of (return variable, expression DAG root) pairs
@@ -49,8 +49,6 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
          :func:`~.scheduling.emit_operations`)? If False,
          split into Accumulate/Return pairs. Set to False if the
          output tensor of kernels is not guaranteed to be zero on entry.
-    :arg assignment_group_size: maximum assignments to schedule together;
-         by default, schedule every assignment together
     """
     # Remove zeros
     if remove_zeros:
@@ -103,15 +101,8 @@ def compile_gem(assignments, prefix_ordering, remove_zeros=False,
         return apply_ordering(indices)
 
     # Build operation ordering
-    if assignment_group_size is None:
-        ops = scheduling.emit_operations(
-            assignments, get_loop_indices, emit_return_accumulate)
-    else:
-        ops = list(chain.from_iterable(
-            scheduling.emit_operations(
-                assignments[start:start + assignment_group_size],
-                get_loop_indices, emit_return_accumulate)
-            for start in range(0, len(assignments), assignment_group_size)))
+    ops = scheduling.emit_operations(
+        assignments, get_loop_indices, emit_return_accumulate)
 
     # Empty kernel
     if len(ops) == 0:

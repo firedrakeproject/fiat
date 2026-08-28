@@ -17,7 +17,6 @@ indices.
 from abc import ABCMeta
 from itertools import chain, repeat
 from functools import lru_cache, partial, reduce
-from math import comb, factorial
 from operator import attrgetter
 from numbers import Integral, Number
 
@@ -39,7 +38,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
            'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise',
-           'compact_index_layout', 'simplex_lattice_rank']
+           'compact_index_layout', 'simplex_lattice_ranks']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -1087,64 +1086,68 @@ def compact_index_layout(
 
     Notes
     -----
-    One simplex component retains its rectangular layout. This keeps affine
-    access for short-lived contraction stages. A product of simplex lattices
-    uses one compact dimension per lattice and avoids exponential padding.
+    A simplex lattice is stored along one compact dimension holding just
+    its lattice points, in the same lexicographic order that
+    `FlattenedTensor` flattens a jagged tensor. Rectangular padding is
+    exponential in the lattice dimension, so it is avoided whenever the
+    lattice is smaller than the box enclosing it.
 
     """
-    components = _index_components(indices)
-    simplex_components = tuple(filter(_is_simplex_lattice, components))
-    if len(simplex_components) < 2:
-        return tuple(index.extent for index in indices), indices
-
     shape = []
     layout = []
-    for component in components:
-        if _is_simplex_lattice(component):
-            shape.append(comb(
-                component[0].extent + len(component) - 1,
-                len(component)))
-            layout.append(component)
-        else:
+    for component in _index_components(indices):
+        points = _compact_extent(component)
+        if points is None:
             shape.extend(index.extent for index in component)
             layout.extend(component)
+        else:
+            shape.append(points)
+            layout.append(component)
     return tuple(shape), tuple(layout)
 
 
-def simplex_lattice_rank(
-        component: tuple[Index, ...], values: dict[Index, object]) -> object:
-    """Return the lexicographic rank of one simplex lattice point.
+def _compact_extent(component: tuple[Index, ...]) -> int | None:
+    """Return the compact extent of a simplex lattice, or None to pad.
+
+    A lattice that already fills its box gains nothing from compaction:
+    the rank lookup would just be the identity.
+
+    """
+    if not _is_simplex_lattice(component):
+        return None
+    points = len(_jagged_lattice(component))
+    if points >= numpy.prod([index.extent for index in component]):
+        return None
+    return points
+
+
+@lru_cache(maxsize=128)
+def _lattice_ranks(layout: tuple) -> numpy.ndarray:
+    """Rank of every point of one structural jagged iteration domain."""
+    points = _lattice_points(layout)
+    ranks = numpy.zeros(tuple(extent for extent, _ in layout), dtype=uint_type)
+    ranks[tuple(points.T)] = numpy.arange(len(points), dtype=uint_type)
+    ranks.flags.writeable = False
+    return ranks
+
+
+def simplex_lattice_ranks(component: tuple[Index, ...]) -> numpy.ndarray:
+    """Tabulate the compact rank of every point of a simplex lattice.
 
     Parameters
     ----------
     component
-        Nested simplex lattice indices.
-    values
-        Scalar value for each index.
+        Nested simplex lattice indices, in loop order.
 
     Returns
     -------
-    object
-        Integer or symbolic lattice rank.
+    numpy.ndarray
+        Rectangular table of the lexicographic rank of each lattice
+        point, indexed by the lattice indices themselves. Entries
+        outside the jagged bounds are never read and are set to zero.
 
     """
-    prefix = 0
-    rank = 0
-    dimension = len(component)
-    for position, index in enumerate(component):
-        value = values[index]
-        order = dimension - position
-
-        def choose(argument):
-            product = 1
-            for offset in range(order):
-                product *= argument - offset
-            return product // factorial(order)
-
-        upper = index.extent - prefix + order - 1
-        rank += choose(upper) - choose(upper - value)
-        prefix += value
-    return rank
+    return _lattice_ranks(_jagged_layout(component))
 
 
 class IndexSum(Scalar):
