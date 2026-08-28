@@ -94,6 +94,7 @@ When writing Python code for FIAT, maintain the ecosystem's structural and styli
 * Boolean attributes must be used to record initialization intent and state instead of probing for the presence of state built by an initialization function.
 * New code must include type hints on all function and method signatures.
 * Public-facing APIs must include properly formatted `numpydoc`-style docstrings.
-* CI enforces `pydocstyle` (see the `[pydocstyle]` section of `setup.cfg` for the active ignore list)
-  in addition to `flake8`; run `pydocstyle <changed files>` locally before finishing a change, since a
-  clean `flake8` pass does not imply a clean `pydocstyle` pass.
+* Lint before finishing a change: `make srclint` runs `flake8`, `make doclint` runs `pydocstyle`
+  (see the `[flake8]` and `[pydocstyle]` sections of `setup.cfg` for the active ignore lists), and
+  `make lint` runs both. CI runs the same targets, and a clean `srclint` pass does not imply a clean
+  `doclint` pass, so run both.
