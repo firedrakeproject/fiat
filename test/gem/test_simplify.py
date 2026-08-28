@@ -522,6 +522,45 @@ def test_literal_distinguishes_dtypes():
     assert {index: "index"}.get(value) is None
 
 
+def _churned_indices(count):
+    """Create indices whose addresses disagree with their creation order.
+
+    CPython reuses freed object slots, so allocating a pool, releasing half
+    of it, and allocating again places later-created indices below
+    earlier-created ones in memory.
+    """
+    pool = [gem.Index(extent=2) for _ in range(4 * count)]
+    indices = pool[::2][:count]
+    del pool
+    indices += [gem.Index(extent=2) for _ in range(count)]
+    return indices
+
+
+def test_free_indices_ignore_allocation_addresses():
+    """Order free indices by creation, not by memory address.
+
+    Sorting by :func:`id` makes every ``free_indices`` tuple depend on
+    where the allocator happened to place each index, so compiling one form
+    changes the loop order chosen for the next one in the same process.
+    """
+    indices = _churned_indices(16)
+    assert any(a.count < b.count and id(a) > id(b)
+               for a in indices for b in indices), \
+        "precondition: allocator did not invert creation order"
+
+    by_creation = lambda ids: tuple(sorted(ids, key=lambda i: i.count))
+    assert gem.gem.unique(reversed(indices)) == by_creation(indices)
+
+    expression = gem.Indexed(gem.Variable("A", (2,) * len(indices)),
+                             tuple(indices))
+    assert expression.free_indices == by_creation(indices)
+
+    bound = tuple(indices[::2])
+    free = by_creation(set(indices) - set(bound))
+    assert gem.IndexSum(expression, bound).free_indices == free
+    assert gem.ComponentTensor(expression, bound).free_indices == free
+
+
 def test_rename_index_under_variable_index():
     """Renaming a bound index must reach the lookup of an indirect gather."""
     values = gem.Literal(numpy.array([10.0, 20.0, 30.0]))

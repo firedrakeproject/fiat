@@ -1435,10 +1435,15 @@ class OrientationVariableIndex(VariableIndex, FIATOrientation):
 def unique(indices):
     """Sorts free indices and eliminates duplicates.
 
+    Indices are ordered by creation, not by :func:`id`.  Object addresses
+    depend on what else the process has allocated, so an address ordering
+    would make every ``free_indices`` tuple, and hence the loop order
+    chosen downstream, depend on which forms were compiled beforehand.
+
     :arg indices: iterable of indices
     :returns: sorted tuple of unique free indices
     """
-    return tuple(sorted(set(indices), key=id))
+    return tuple(sorted(set(indices), key=attrgetter("count")))
 
 
 def index_sum(expression, indices):
