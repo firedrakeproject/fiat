@@ -5,6 +5,7 @@ from operator import add, methodcaller
 import FIAT
 import gem
 import numpy
+from gem.interpreter import evaluate
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
@@ -243,9 +244,20 @@ def concatenate_entity_permutations(elements):
 
 
 def is_orthogonal(A, B):
-    """Test whether two elements are orthogonal."""
+    """Test whether two elements map into orthogonal components.
+
+    .. todo::
+
+       Read the components off the products of :class:`gem.Delta` that the
+       transforms select with, rather than evaluating the contraction
+       numerically in an element constructor.
+    """
     if isinstance(A, (HCurlElement, HDivElement)) and isinstance(B, (HCurlElement, HDivElement)):
-        Amap = A.transform(gem.Literal(numpy.ones(A.wrappee.value_shape)))
-        Bmap = B.transform(gem.Literal(numpy.ones(B.wrappee.value_shape)))
-        return sum(a * b for a, b in zip(Amap, Bmap)) == gem.Literal(0.0)
+        dim, = A.value_shape
+        zeta = gem.Index(extent=dim)
+        a = A.transform(gem.Literal(numpy.ones(A.wrappee.value_shape)), zeta)
+        b = B.transform(gem.Literal(numpy.ones(B.wrappee.value_shape)), zeta)
+        contraction = gem.ComponentTensor(gem.Product(a, b), (zeta,))
+        result, = evaluate([contraction])
+        return not result.arr.any()
     return False
