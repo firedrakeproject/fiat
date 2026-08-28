@@ -310,15 +310,46 @@ def _share_linear_maps(
     return result
 
 
-def optimise_monomial_sum(monomial_sum, linear_indices):
+def optimise_monomial_sum(
+        monomial_sum, linear_indices, contraction_order=()):
     """Choose optimal common atomic subexpressions and factorise a
     :class:`MonomialSum` object to create a GEM expression.
 
     :arg monomial_sum: a :class:`MonomialSum` object
     :arg linear_indices: tuple of linear indices
+    :arg contraction_order: contraction indices, outermost first
 
     :returns: factorised GEM expression
     """
+    if contraction_order:
+        grouped = defaultdict(MonomialSum)
+        order = {}
+        remaining = frozenset(contraction_order)
+        for monomial in monomial_sum:
+            inner_indices = tuple(index for index in monomial.sum_indices
+                                  if index in remaining)
+            involved = frozenset(inner_indices)
+            inner_atomics = tuple(
+                atomic for atomic in monomial.atomics
+                if involved.intersection(atomic.free_indices))
+            outer_indices = tuple(index for index in monomial.sum_indices
+                                  if index not in remaining)
+            outer_atomics = tuple(
+                atomic for atomic in monomial.atomics
+                if atomic not in inner_atomics)
+            key = outer_indices, outer_atomics
+            order.setdefault(key, None)
+            grouped[key].add(
+                inner_indices, inner_atomics, monomial.rest)
+
+        outer_sum = MonomialSum()
+        for outer_indices, outer_atomics in order:
+            inner = optimise_monomial_sum(
+                grouped[(outer_indices, outer_atomics)],
+                linear_indices, contraction_order[1:])
+            outer_sum.add(outer_indices, outer_atomics, inner)
+        monomial_sum = outer_sum
+
     monomial_sum = _share_linear_maps(monomial_sum, linear_indices)
     groups = groupby(monomial_sum, key=lambda m: frozenset(m.sum_indices))
     new_monomials = []

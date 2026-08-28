@@ -14,7 +14,6 @@ from gem.optimise import (
     contraction,
     eliminate_deltas,
     preserve_linear_maps,
-    sum_factorise,
     unflatten_returns,
 )
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
@@ -437,23 +436,7 @@ def test_unflatten_factorises_bilinear_arguments_together():
     assert numpy.allclose(dense, expected.broadcast((i, j)))
 
 
-def test_sum_factorise_bounded_distribution():
-    indices = tuple(gem.Index(extent=2) for _ in range(6))
-    extra = gem.Index(extent=2)
-
-    def unit(index):
-        return gem.Indexed(gem.Literal(numpy.ones(2)), (index,))
-
-    factor = gem.Sum(gem.IndexSum(unit(indices[0]) * unit(extra), (extra,)),
-                     unit(indices[1]))
-    expression = sum_factorise(
-        indices, [factor, *(unit(index) for index in indices[2:])],
-        distribute=True)
-    value, = evaluate([expression])
-    assert value.arr == 192
-
-
-def test_sum_factorise_distribution():
+def test_distribute_sum_preserves_rectangular_multiplicity():
     """Preserve rectangular contraction multiplicity after distribution."""
     indices = tuple(gem.Index(extent=2) for _ in range(2))
     extra = gem.Index(extent=2)
@@ -463,7 +446,10 @@ def test_sum_factorise_distribution():
 
     factor = gem.Sum(gem.IndexSum(unit(indices[0]) * unit(extra), (extra,)),
                      unit(indices[1]))
-    expression = sum_factorise(indices, [factor], distribute=True)
+    expression = gem.IndexSum(factor, indices)
+    terms = _distribute_sum(
+        expression, predicate=lambda node: isinstance(node, gem.Sum))
+    expression = gem.Sum(*terms)
     value, = evaluate([expression])
     assert value.arr == 12
 
@@ -492,7 +478,10 @@ def test_sum_factorise_jagged_distribution():
         lambda i, j: j < 3 - i, (3, 3), dtype=int)
     factor = gem.Sum(
         unit(parent), gem.Indexed(gem.Literal(triangle), (parent, child)))
-    expression = sum_factorise((parent, child), [factor], distribute=True)
+    expression = gem.IndexSum(factor, (parent, child))
+    terms = _distribute_sum(
+        expression, predicate=lambda node: isinstance(node, gem.Sum))
+    expression = gem.Sum(*terms)
     value, = evaluate([expression])
     assert value.arr == 12
 

@@ -768,6 +768,34 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _distributed_indexsum_term(
+        term: Node, indices: tuple[Index, ...]) -> Node:
+    """Preserve a joint contraction domain after distributing one term."""
+    active = tuple(index for index in indices if index in term.free_indices)
+    missing = tuple(index for index in indices if index not in active)
+    if not missing:
+        return IndexSum(term, indices)
+
+    if any(getattr(index, "parents", ()) for index in indices):
+        points = _jagged_lattice(indices)
+        if active:
+            positions = tuple(indices.index(index) for index in active)
+            multiplicity = numpy.zeros(
+                tuple(index.extent for index in active))
+            numpy.add.at(
+                multiplicity,
+                tuple(points[:, position] for position in positions),
+                1,
+            )
+            factor = Indexed(Literal(multiplicity), active)
+        else:
+            factor = Literal(float(len(points)))
+    else:
+        factor = Literal(float(numpy.prod(
+            [index.extent for index in missing], dtype=int)))
+    return IndexSum(Product(term, factor), active)
+
+
 def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
@@ -800,9 +828,7 @@ def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
             elif isinstance(node, IndexSum):
                 body, = node.children
                 results[key] = [
-                    IndexSum(term, tuple(
-                        index for index in node.multiindex
-                        if index in term.free_indices))
+                    _distributed_indexsum_term(term, node.multiindex)
                     for term in results[id(body)]]
             else:  # Product
                 a, b = node.children
@@ -1064,8 +1090,15 @@ def contraction(expression):
         factors = [index_replacer(f, ()) for f in factors]
 
         expression = IndexSum(Product(*factors), sum_indices)
-        expression = unflatten(expression)
-        sum_indices, factors = traverse_product(expression, index_replacer=index_replacer)
+        unflattened = unflatten(expression)
+        if unflattened is expression:
+            return sum_factorise(sum_indices, factors)
+
+        root = unflattened
+        keep = repeated_contractions(unflattened)
+        sum_indices, factors = traverse_product(
+            unflattened, index_replacer=index_replacer,
+            stop_at=lambda e: e is not root and e in keep)
         sum_indices, factors = pull_back_indirect_delta(
             sum_indices, factors, index_replacer)
         sum_indices, factors = delta_elimination(
@@ -1702,8 +1735,7 @@ def _refactor_unflattened_outputs(
             index
             for monomial in monomials
             for index in monomial.sum_indices))
-        candidates.append(
-            (variable, monomial_sum, sum_indices))
+        candidates.append((variable, monomial_sum, sum_indices))
 
     if not has_nontrivial_sum:
         return None
