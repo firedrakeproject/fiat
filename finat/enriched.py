@@ -190,7 +190,18 @@ class EnrichedElement(FiniteElementBase):
         offset in the union, and are zero against every other summand's
         points.  :meth:`_dual_evaluation` contracts each summand on its own
         points instead of carrying those zeros.
+
+        Unlike :meth:`_dual_evaluation`, this has no ``coordinate_mapping`` to
+        apply a summand's own :meth:`~.FiniteElementBase.dual_transformation`
+        with, so it refuses a sum with a summand that needs one rather than
+        silently combining untransformed weights.
         """
+        if any(type(e).dual_transformation is not FiniteElementBase.dual_transformation
+               for e in self._summands):
+            raise NotImplementedError(
+                f"dual_basis not defined for {type(self).__name__} with a summand"
+                " that has its own dual_transformation; use dual_evaluation instead"
+            )
         duals = [element.dual_basis for element in self._summands]
         x = UnionPointSet([xk for _, xk in duals])
         p, = x.indices
@@ -253,10 +264,10 @@ def as_enriched(element):
     """Rewrite an element as a direct sum, bringing the sum outermost.
 
     :arg element: the :class:`~finat.finiteelementbase.FiniteElementBase` to
-                  rewrite.
+        rewrite.
     :returns: an :class:`EnrichedElement` with the same basis functions in the
-              same order as ``element``, or ``None`` if ``element`` is not a
-              direct sum.
+        same order as ``element``, or ``None`` if ``element`` is not a direct
+        sum.
     """
     return None
 
@@ -276,14 +287,25 @@ def as_enriched_discontinuous(element):
     return as_enriched(element.element)
 
 
+def distribute_over_sum(reconstruct, summands):
+    """Rebuild each summand of a direct sum, keeping its nodality.
+
+    :arg reconstruct: called on each of ``summands.elements`` to rebuild it
+        inside whatever wraps the sum.
+    :arg summands: an :class:`EnrichedElement`.
+    :returns: an :class:`EnrichedElement` of the rebuilt summands.
+    """
+    return EnrichedElement(list(map(reconstruct, summands.elements)),
+                           is_nodal_enriched=summands.is_nodal_enriched)
+
+
 @as_enriched.register(WrapperElementBase)
 def as_enriched_wrapper(element):
     """Distribute the pullback over the sum the wrapped element is."""
     summands = as_enriched(element.wrappee)
     if summands is None:
         return None
-    return EnrichedElement([type(element)(e) for e in summands.elements],
-                           is_nodal_enriched=summands.is_nodal_enriched)
+    return distribute_over_sum(type(element), summands)
 
 
 @as_enriched.register(QuadratureElement)
@@ -315,9 +337,7 @@ def as_enriched_tensor_product(element):
     summands = as_enriched(first)
     if summands is None:
         return None
-    return EnrichedElement(
-        [TensorProductElement((e, *rest)) for e in summands.elements],
-        is_nodal_enriched=summands.is_nodal_enriched)
+    return distribute_over_sum(lambda e: TensorProductElement((e, *rest)), summands)
 
 
 def tree_map(f, *args):

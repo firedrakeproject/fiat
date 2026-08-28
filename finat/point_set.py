@@ -47,6 +47,15 @@ class AbstractPointSet(abc.ABC):
         """GEM expression describing the points, with free indices
         ``self.indices`` and shape (point dimension,)."""
 
+    @cached_property
+    def point_sets(self):
+        """The point sets this point set is a union of.
+
+        A plain point set is the union of just itself; overridden by
+        :class:`UnionPointSet` for the point sets it is actually a union of.
+        """
+        return (self,)
+
 
 class PointSingleton(AbstractPointSet):
     """A point set representing a single point.
@@ -246,9 +255,7 @@ class UnionPointSet(PointSet):
     """
 
     def __init__(self, point_sets):
-        self.point_sets = tuple(chain(*(
-            ps.point_sets if isinstance(ps, UnionPointSet) else (ps,)
-            for ps in point_sets)))
+        self.point_sets = tuple(chain(*(ps.point_sets for ps in point_sets)))
         super().__init__(numpy.concatenate([ps.points
                                             for ps in self.point_sets]))
 

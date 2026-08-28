@@ -187,11 +187,10 @@ class FiniteElementBase(metaclass=ABCMeta):
         :arg order: return derivatives up to this order.
         :arg ps: the :class:`~finat.point_set.UnionPointSet` to tabulate on.
         :arg entity: the cell entity on which to tabulate.
-        :arg coordinate_mapping: a
-           :class:`~.physically_mapped.PhysicalGeometry` object that
-           provides physical geometry callbacks (may be None).
+        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
+            object that provides physical geometry callbacks (may be None).
         :returns: the tabulation on the whole of ``ps``, as
-           :meth:`basis_evaluation` returns.
+            :meth:`basis_evaluation` returns.
 
         A union of points has no structure of its own, so structured elements
         tabulate on each point set in turn and stack the tabulations here.
@@ -325,14 +324,12 @@ class FiniteElementBase(metaclass=ABCMeta):
         """Dual evaluate an element that is not a direct sum.
 
         :arg fn: Callable representing the function to dual evaluate.
-                 Callable should take in an :class:`AbstractPointSet` and
-                 return a GEM expression for evaluation of the function at
-                 those points.
-        :arg coordinate_mapping: a
-           :class:`~.physically_mapped.PhysicalGeometry` object that
-           provides physical geometry callbacks (may be None).
+            Callable should take in an :class:`AbstractPointSet` and return a
+            GEM expression for evaluation of the function at those points.
+        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`
+            object that provides physical geometry callbacks (may be None).
         :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
-           :meth:`dual_evaluation` returns.
+            :meth:`dual_evaluation` returns.
 
         :meth:`dual_evaluation` rewrites an element as a direct sum before
         calling this, so the element here has a single set of points.

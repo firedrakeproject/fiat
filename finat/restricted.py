@@ -146,9 +146,7 @@ def restrict_hdivcurl(element, domain, take_closure):
     if restricted is null_element:
         return null_element
     elif isinstance(restricted, finat.EnrichedElement):
-        return finat.EnrichedElement(
-            [type(element)(e) for e in restricted.elements],
-            is_nodal_enriched=restricted.is_nodal_enriched)
+        return finat.enriched.distribute_over_sum(type(element), restricted)
     else:
         return type(element)(restricted)
 

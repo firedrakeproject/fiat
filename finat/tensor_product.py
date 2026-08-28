@@ -12,7 +12,7 @@ import gem
 from gem.utils import cached_property
 
 from finat.finiteelementbase import FiniteElementBase
-from finat.point_set import PointSingleton, PointSet, TensorPointSet, UnionPointSet
+from finat.point_set import PointSingleton, PointSet, TensorPointSet
 
 
 class TensorProductElement(FiniteElementBase):
@@ -133,7 +133,7 @@ class TensorProductElement(FiniteElementBase):
         return result
 
     def basis_evaluation(self, order, ps, entity=None, coordinate_mapping=None):
-        if isinstance(ps, UnionPointSet):
+        if len(ps.point_sets) > 1:
             # A union of points does not factor, so tabulate on each of its
             # point sets, where the product structure survives to be sum
             # factorised.

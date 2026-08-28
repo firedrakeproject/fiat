@@ -66,7 +66,7 @@ from gem.interpreter import evaluate
 __all__ = ['flatten', 'unconcatenate']
 
 
-def find_group(expressions, free_indices):
+def find_group(expressions, splittable_indices):
     """Finds a full set of indexed Concatenate nodes with the same
     free index, if any such node exists.
 
@@ -74,10 +74,9 @@ def find_group(expressions, free_indices):
     must be removed.
 
     :arg expressions: a multi-root GEM expression DAG
-    :arg free_indices: the indices that may be split along, that is, those
-                       carried by the assignment variables.  A Concatenate
-                       indexed by anything else has nothing to be split
-                       against, and is left alone.
+    :arg splittable_indices: the indices that may be split along, that is,
+        those carried by the assignment variables.  A Concatenate indexed by
+        anything else has nothing to be split against, and is left alone.
     :returns: a list of GEM nodes, or None
     """
     # Result variables
@@ -95,14 +94,14 @@ def find_group(expressions, free_indices):
 
     while lifo:
         node = lifo.pop()
-        if not free_indices.intersection(node.free_indices):
+        if not splittable_indices.intersection(node.free_indices):
             continue
 
         if isinstance(node, Indexed):
             child, = node.children
             if isinstance(child, Concatenate):
                 i, = node.multiindex
-                if i in free_indices and (index or i) == i:
+                if i in splittable_indices and (index or i) == i:
                     index = i
                     nodes.append(node)
                     # Skip adding children
