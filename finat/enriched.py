@@ -195,7 +195,15 @@ class EnrichedElement(FiniteElementBase):
         apply a summand's own :meth:`~.FiniteElementBase.dual_transformation`
         with, so it refuses a sum with a summand that needs one rather than
         silently combining untransformed weights.
+
+        A non-nodal sum has no dual basis to give.  Its functionals are still
+        these weights, but a caller contracts them into coefficients, and that
+        is the inverse of this element's nodal matrix, not the identity.
         """
+        if not self.is_nodal_enriched:
+            raise NotImplementedError(
+                f"Dual basis not defined for non-nodal {type(self).__name__}"
+            )
         if any(type(e).dual_transformation is not FiniteElementBase.dual_transformation
                for e in self._summands):
             raise NotImplementedError(
@@ -249,6 +257,9 @@ class EnrichedElement(FiniteElementBase):
             raise NotImplementedError(
                 f"Dual evaluation not defined for non-nodal {type(self).__name__}"
             )
+        # Each summand contracts through its own dual_basis, so a non-nodal
+        # sum has to be refused here as well as in dual_basis: this path
+        # never asks self for one.
         evals = []
         for element in self.elements:
             expr, point_indices, indices = element.dual_evaluation(
