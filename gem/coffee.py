@@ -236,7 +236,7 @@ def _extract_repeated_linear_maps(
                 if len(multiplicities) == 1:
                     multiplicity, = multiplicities
                     if multiplicity > 1:
-                        atomic = make_sum(counts)
+                        atomic = make_sum(list(counts))
                         factors.append(Literal(float(multiplicity)))
             atomics.append(atomic)
         result.add(
