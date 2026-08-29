@@ -1,4 +1,4 @@
-from finat.point_set import UnknownPointSet, FacetPointSet, UnionPointSet
+from finat.point_set import UnknownPointSet, FacetPointSet
 
 import numpy
 
@@ -114,13 +114,10 @@ class QuadratureElement(FiniteElementBase):
 
     @cached_property
     def _weights(self):
-        weights = getattr(self._rule, 'weights', None)
-        if weights is None:
-            # we need the weights.
-            weights, = evaluate([self._rule.weight_expression])
-            weights = weights.arr.flatten()
-            self._rule.weights = weights
-        return weights
+        if isinstance(self._rule, QuadratureRule):
+            return self._rule.weights
+        weights, = evaluate([self._rule.weight_expression])
+        return weights.arr.flatten()
 
     @cached_property
     def fiat_equivalent(self):
@@ -152,7 +149,7 @@ class QuadratureElement(FiniteElementBase):
             raise ValueError("Derivatives are not defined on a QuadratureElement.")
 
         # A union of points has no structure of its own to tabulate on.
-        if isinstance(ps, UnionPointSet):
+        if len(ps.point_sets) > 1:
             return self._stack_tabulations(order, ps, entity, coordinate_mapping=coordinate_mapping)
 
         basis_indices = self.get_indices()
@@ -162,13 +159,13 @@ class QuadratureElement(FiniteElementBase):
             ps_indices = (entity_id, *ps_indices)
 
         rule_ps = self._rule.point_set
-        blocks = rule_ps.point_sets if isinstance(rule_ps, UnionPointSet) else (rule_ps,)
+        blocks = rule_ps.point_sets
         matches = [k for k, block in enumerate(blocks) if block.almost_equal(ps)]
         if not matches:
             raise ValueError("Mismatch of quadrature points!")
         k, = matches
 
-        if isinstance(rule_ps, UnionPointSet):
+        if len(blocks) > 1:
             # `ps` is one point set of the union: tabulate onto the rows of the
             # identity it owns, and zero onto the others.  Concatenating along
             # the basis index lets the contraction with a coefficient split.
@@ -201,22 +198,17 @@ class QuadratureElement(FiniteElementBase):
     def _summand_rules(self):
         """The rules of the summands this element is a direct sum of.
 
-        Returns
-        -------
-        tuple
-            One :class:`~finat.quadrature.QuadratureRule` for each point set of
-            a :class:`~finat.point_set.UnionPointSet` rule, in the order they
-            are stacked, or an empty tuple if the rule has a single point set.
+        :returns: one :class:`~finat.quadrature.QuadratureRule` for each
+            point set of a :class:`~finat.point_set.UnionPointSet` rule, in
+            the order they are stacked, or an empty tuple if the rule has a
+            single point set.
 
-        Notes
-        -----
-        A union of point sets is how the points of a direct sum are stacked, so
-        splitting it back up recovers a rule for each summand, each on the
-        points its own functionals evaluate on.
-
+        A union of point sets is how the points of a direct sum are stacked,
+        so splitting it back up recovers a rule for each summand, each on
+        the points its own functionals evaluate on.
         """
         rule_ps = self._rule.point_set
-        if not isinstance(rule_ps, UnionPointSet):
+        if len(rule_ps.point_sets) == 1:
             return ()
 
         rules = []

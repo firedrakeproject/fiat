@@ -81,15 +81,20 @@ def check_dual_basis(element):
     assert numpy.allclose(result.arr.reshape(n, n), numpy.eye(n))
 
 
+def restricted_lagrange_sum(cell):
+    """A direct sum of a cubic Lagrange element restricted to its interior
+    and to its facets."""
+    fe = finat.Lagrange(cell, 3)
+    return finat.EnrichedElement(
+        [finat.RestrictedElement(fe, restriction_domain=domain)
+         for domain in ("interior", "facet")], is_nodal_enriched=True)
+
+
 def test_enriched_element_dual_basis():
     # The weights of a direct sum are block diagonal: each summand's weights
     # sit at its own offset in the union of the points, and are zero against
     # every other summand's points.
-    cell = ufc_simplex(2)
-    fe = finat.Lagrange(cell, 3)
-    enriched = finat.EnrichedElement(
-        [finat.RestrictedElement(fe, restriction_domain=domain)
-         for domain in ("interior", "facet")], is_nodal_enriched=True)
+    enriched = restricted_lagrange_sum(ufc_simplex(2))
 
     assert isinstance(enriched.dual_basis[1], UnionPointSet)
     check_dual_basis(enriched)
@@ -100,10 +105,7 @@ def test_quadrature_element_on_union_of_points():
     # target's dual basis, which for a direct sum is a union.  That element
     # has to evaluate on each point set of the union, just as the sum does.
     cell = ufc_simplex(2)
-    fe = finat.Lagrange(cell, 3)
-    enriched = finat.EnrichedElement(
-        [finat.RestrictedElement(fe, restriction_domain=domain)
-         for domain in ("interior", "facet")], is_nodal_enriched=True)
+    enriched = restricted_lagrange_sum(cell)
 
     _, ps = enriched.dual_basis
     # The weights are not used, this quadrature scheme is not for integration.
@@ -114,9 +116,8 @@ def test_quadrature_element_on_union_of_points():
     vector = finat.TensorFiniteElement(element, (cell.get_spatial_dimension(),))
     for e in (element, vector):
         check_nodal(e)
-        # Each summand evaluates on its own points.  Handed the union instead,
-        # the callable tabulates into a Concatenate over the points, which is
-        # contracted away before anything downstream can split along it.
+        # Each summand evaluates on its own points, so the callable is called
+        # once per point set of the union rather than once on the union.
         seen = []
 
         def fn(point_set, e=e):
@@ -137,13 +138,24 @@ def test_hdivcurl_dual_basis(family, degree):
     check_dual_basis(element)
 
 
-def test_enriched_element_dual_evaluation():
+def test_non_nodal_enriched_element_has_no_dual_basis():
+    # MINI: the linear basis functions are not zero at the bubble's point, so
+    # the functionals of the sum are not dual to its basis.  The weights are
+    # still block diagonal, but contracting them gives the functionals, not
+    # the coefficients, so the sum must not offer them as a dual basis.
     cell = ufc_simplex(2)
-    fe = finat.Lagrange(cell, 3)
+    mini = finat.EnrichedElement([finat.Lagrange(cell, 1), finat.Bubble(cell, 3)])
 
-    fe1 = finat.RestrictedElement(fe, restriction_domain="interior")
-    fe2 = finat.RestrictedElement(fe, restriction_domain="facet")
-    enriched = finat.EnrichedElement([fe1, fe2], is_nodal_enriched=True)
+    assert not mini.is_nodal_enriched
+    with pytest.raises(NotImplementedError):
+        mini.dual_basis
+    with pytest.raises(NotImplementedError):
+        mini.dual_evaluation(lambda x: gem.Literal(1.0))
+    assert not mini.has_pointwise_dual_basis
+
+
+def test_enriched_element_dual_evaluation():
+    enriched = restricted_lagrange_sum(ufc_simplex(2))
 
     fn = lambda x: gem.Literal(1.0)
     expr, point_indices, basis_indices = enriched.dual_evaluation(fn)
@@ -273,11 +285,7 @@ def test_restricted_hdivcurl_dual_basis(family, domain):
     # Restriction selects disjoint subsets of the DoFs, so a restricted
     # H(div)/H(curl) element stays nodal even where the summands are not
     # orthogonal to each other, as several of them map to the same component.
-    if family.startswith("RTC"):
-        cell = ufl.quadrilateral
-    else:
-        cell = ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
-    element = create_element(finat.ufl.FiniteElement(family, cell, 2)[domain])
+    element = create_element(finat.ufl.FiniteElement(family, hdivcurl_cell(family), 2)[domain])
     check_nodal(element)
 
     # Each summand has a dual basis on its own points, and together they

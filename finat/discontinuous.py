@@ -75,8 +75,8 @@ class DiscontinuousElement(FiniteElementBase):
     def dual_basis(self):
         return self.element.dual_basis
 
-    def dual_evaluation(self, fn, coordinate_mapping=None):
-        return self.element.dual_evaluation(fn, coordinate_mapping)
+    def _dual_evaluation(self, fn, coordinate_mapping=None):
+        return self.element.dual_evaluation(fn, coordinate_mapping=coordinate_mapping)
 
     @property
     def mapping(self):
