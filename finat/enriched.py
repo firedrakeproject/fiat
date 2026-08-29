@@ -205,7 +205,14 @@ class EnrichedElement(FiniteElementBase):
         rather than use these weights; they are here for the callers that
         want a single weight tensor.
 
+        A non-nodal sum has no dual basis to give.  Its functionals are still
+        these weights, but a caller contracts them into coefficients, and that
+        is the inverse of this element's nodal matrix, not the identity.
         """
+        if not self.is_nodal_enriched:
+            raise NotImplementedError(
+                f"Dual basis not defined for non-nodal {type(self).__name__}"
+            )
         duals = [element.dual_basis for element in self._summands]
         x = UnionPointSet([xk for _, xk in duals])
         p, = x.indices
@@ -262,6 +269,9 @@ class EnrichedElement(FiniteElementBase):
             raise NotImplementedError(
                 f"Dual evaluation not defined for non-nodal {type(self).__name__}"
             )
+        # Each summand contracts through its own dual_basis, so a non-nodal
+        # sum has to be refused here as well as in dual_basis: this path
+        # never asks self for one.
         evals = []
         for element in self.elements:
             expr, point_indices, indices = element.dual_evaluation(

@@ -103,6 +103,22 @@ def test_hdivcurl_dual_basis(family, degree):
     check_dual_basis(element)
 
 
+def test_non_nodal_enriched_element_has_no_dual_basis():
+    # MINI: the linear basis functions are not zero at the bubble's point, so
+    # the functionals of the sum are not dual to its basis.  The weights are
+    # still block diagonal, but contracting them gives the functionals, not
+    # the coefficients, so the sum must not offer them as a dual basis.
+    cell = ufc_simplex(2)
+    mini = finat.EnrichedElement([finat.Lagrange(cell, 1), finat.Bubble(cell, 3)])
+
+    assert not mini.is_nodal_enriched
+    with pytest.raises(NotImplementedError):
+        mini.dual_basis
+    with pytest.raises(NotImplementedError):
+        mini.dual_evaluation(lambda x: gem.Literal(1.0))
+    assert not mini.has_pointwise_dual_basis
+
+
 def test_enriched_element_dual_evaluation():
     cell = ufc_simplex(2)
     fe = finat.Lagrange(cell, 3)
