@@ -95,6 +95,21 @@ class MixedSubElement(FiniteElementBase):
         core_eval = self.element.point_evaluation(order, refcoords, entity)
         return self._transform_evaluation(core_eval)
 
+    def dual_evaluation(self, fn, coordinate_mapping=None):
+        """Evaluate the dual basis against this mixed component."""
+        def component(points):
+            value = fn(points)
+            values = numpy.empty(self.element.value_shape, dtype=object)
+            for j, zeta in enumerate(numpy.ndindex(self.element.value_shape)):
+                values[zeta] = gem.Indexed(value, (self.offset + j,))
+            if self.element.value_shape:
+                return gem.ListTensor(values)
+            return values.item()
+
+        return self.element.dual_evaluation(
+            component, coordinate_mapping=coordinate_mapping
+        )
+
     @property
     def mapping(self):
         return self.element.mapping
