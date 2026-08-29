@@ -119,12 +119,6 @@ class MappedTabulation(Mapping):
         column = gem.VariableIndex(gem.Indexed(self._columns, (r, k)))
         return gem.IndexSum(gem.Product(entry, gem.Delta(column, a)), (k,))
 
-    def matrix(self) -> gem.Node:
-        """The basis transformation as a rank-2 GEM expression."""
-        r = gem.Index(extent=self._space_dim)
-        a = self._reference_index
-        return gem.ComponentTensor(self._entry(r, a), (r, a))
-
     def matmul(self, table: gem.Node) -> gem.Node:
         """Apply the basis transformation to a reference tabulation."""
         r = gem.Index(extent=self._space_dim)

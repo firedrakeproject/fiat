@@ -9,9 +9,10 @@ from numbers import Integral
 
 import numpy
 
+from gem.cost import index_space_literal
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
-                      reuse_if_untouched_arg, traversal)
+                      reuse_if_untouched_arg, traversal, traversal_children)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, IndexBase, VariableIndex, Indexed, FlexiblyIndexed,
@@ -546,8 +547,7 @@ def _sum_factorise_connected(sum_indices, groups):
     :returns: optimised GEM expression
     """
     if not groups:
-        extent = numpy.prod([index.extent for index in sum_indices], dtype=int)
-        return Literal(float(extent))
+        return index_space_literal(sum_indices)
 
     if len(groups) <= _MAX_PLANNED_FACTORS:
         return _plan_contraction(sum_indices, groups)
@@ -597,10 +597,7 @@ def sum_factorise(sum_indices, factors):
     :returns: optimised GEM expression
     """
     if len(factors) == 0:
-        # The empty product is one, so contracting it counts the tuples in the
-        # index space.
-        extent = numpy.prod([index.extent for index in sum_indices], dtype=int)
-        return Literal(float(extent))
+        return index_space_literal(sum_indices)
 
     # Form groups by free indices
     groups = groupby(factors, key=lambda f: f.free_indices)
@@ -941,24 +938,21 @@ def repeated_contractions(expression):
     return frozenset(expr for expr, count in counts.items() if count > 1)
 
 
-def _cancellable_delta(node: Node) -> bool:
-    """Is there a Delta below ``node`` cancelling one of its own indices?
+def _delta_axes(node: Node, self: Memoizer) -> frozenset:
+    """The axes compared by the Deltas below a node, including its own.
 
-    Parameters
-    ----------
-    node
-        An IndexSum.
+    Memoising this over the DAG keeps the search for a cancellable Delta
+    linear, rather than re-walking the subtree at every enclosing
+    contraction.
 
-    Returns
-    -------
-    bool
-        Whether cancelling is possible below it.
-
+    :arg node: a GEM expression
+    :arg self: memoizer visiting the DAG
+    :returns: the indices some Delta at or below ``node`` compares
     """
-    contracted = frozenset(node.multiindex)
-    return any(isinstance(child, Delta)
-               and bool({child.i, child.j} & contracted)
-               for child in traversal(node.children))
+    axes = frozenset().union(*map(self, traversal_children(node)))
+    if isinstance(node, Delta):
+        axes = axes | {node.i, node.j}
+    return axes
 
 
 def _constant_map(index: IndexBase) -> tuple | None:
@@ -989,131 +983,94 @@ def _constant_map(index: IndexBase) -> tuple | None:
     return table.array, expression.multiindex
 
 
-def _pull_back(
-        delta: Delta,
+def pull_back_indirect_delta(
         sum_indices: Iterable[Index],
         factors: Iterable[Node],
-        replacer: MemoizerArg) -> tuple | None:
-    """Contract a Delta's own axes before its column axis.
+        replacer: MemoizerArg) -> tuple:
+    """Contract an indirect Delta's own axes before its column axis.
 
     ``sum_a (sum_rk v(r,k) delta(c(r,k), a)) T(a, q)`` is cancelled by
-    substituting ``a := c(r,k)``, which makes ``T`` depend on ``r`` and ``k``
-    and so forces that contraction inside the ``q`` loop.  When ``r`` and
-    ``k`` are contracted here and ``T`` carries indices of its own, summing
-    them first is cheaper: it yields a dense vector indexed by ``a``.
+    `delta_elimination` substituting ``a := c(r,k)``, which makes ``T``
+    depend on ``r`` and ``k`` and so forces that contraction inside the ``q``
+    loop.  When ``r`` and ``k`` are contracted here and ``T`` carries indices
+    of its own, summing them first is cheaper: it yields a dense vector
+    indexed by ``a``.  Run this before `delta_elimination` to take that
+    cheaper route where it exists.
 
-    Parameters
-    ----------
-    delta
-        Candidate Delta, a factor of the product.
-    sum_indices
-        Indices contracted over the product.
-    factors
-        Product factors.
-    replacer
-        ``MemoizerArg(filtered_replace_indices)``.
-
-    Returns
-    -------
-    tuple or None
-        New ``(sum_indices, factors)``, or None when cancelling is better.
-
+    :arg sum_indices: indices contracted over the product
+    :arg factors: product factors
+    :arg replacer: ``MemoizerArg(filtered_replace_indices)``
+    :returns: new ``(sum_indices, factors)``, unchanged when no Delta is
+              worth pulling back
     """
-    column = delta.j if isinstance(delta.i, VariableIndex) else delta.i
-    variable = delta.i if isinstance(delta.i, VariableIndex) else delta.j
-    if not isinstance(column, Index) or not isinstance(variable, VariableIndex):
-        return None
-    lookup = _constant_map(variable)
-    if lookup is None:
-        return None
-    table, source_indices = lookup
-    sources = frozenset(source_indices)
-    if column not in sum_indices or not sources <= set(sum_indices):
-        return None
+    for delta in factors:
+        if not isinstance(delta, Delta):
+            continue
+        column = delta.j if isinstance(delta.i, VariableIndex) else delta.i
+        variable = delta.i if isinstance(delta.i, VariableIndex) else delta.j
+        if not isinstance(column, Index) or not isinstance(variable, VariableIndex):
+            continue
+        lookup = _constant_map(variable)
+        if lookup is None:
+            continue
+        table, source_indices = lookup
+        sources = frozenset(source_indices)
+        if column not in sum_indices or not sources <= set(sum_indices):
+            continue
 
-    others = [f for f in factors if f is not delta]
-    spanning = [f for f in others if column in f.free_indices]
-    pulled = [f for f in others if column not in f.free_indices]
-    if not spanning or not pulled:
-        return None
-    # Cancelling couples the spanning factors to the source indices.  That
-    # only costs anything when they carry indices of their own.
-    if not any(set(f.free_indices) - sources - {column} for f in spanning):
-        return None
+        others = [f for f in factors if f is not delta]
+        spanning = [f for f in others if column in f.free_indices]
+        pulled = [f for f in others if column not in f.free_indices]
+        if not spanning or not pulled:
+            continue
+        # Cancelling couples the spanning factors to the source indices.  That
+        # only costs anything when they carry indices of their own.
+        if not any(set(f.free_indices) - sources - {column} for f in spanning):
+            continue
 
-    vector = numpy.empty(column.extent, dtype=object)
-    contributions = defaultdict(list)
-    for position in numpy.ndindex(table.shape):
-        substitution = tuple(zip(source_indices, (int(p) for p in position)))
-        contributions[int(table[position])].append(substitution)
-    for value in range(column.extent):
-        terms = [make_product([replacer(f, substitution) for f in pulled])
-                 for substitution in contributions.get(value, ())]
-        # A reference basis function that no row maps onto contributes nothing.
-        vector[value] = make_sum(terms) if terms else Zero()
+        vector = numpy.empty(column.extent, dtype=object)
+        contributions = defaultdict(list)
+        for position in numpy.ndindex(table.shape):
+            substitution = tuple(zip(source_indices, (int(p) for p in position)))
+            contributions[int(table[position])].append(substitution)
+        for value in range(column.extent):
+            terms = [make_product([replacer(f, substitution) for f in pulled])
+                     for substitution in contributions.get(value, ())]
+            # A reference basis function that no row maps onto contributes
+            # nothing.
+            vector[value] = make_sum(terms) if terms else Zero()
 
-    rest = tuple(i for i in sum_indices if i not in sources)
-    return rest, [Indexed(ListTensor(vector), (column,)), *spanning]
+        rest = tuple(i for i in sum_indices if i not in sources)
+        return rest, [Indexed(ListTensor(vector), (column,)), *spanning]
 
-
-def cancel_deltas(
-        sum_indices: Iterable[Index],
-        factors: Iterable[Node],
-        replacer: MemoizerArg) -> tuple[list, list]:
-    """Cancel contracted Deltas, pulling a map back through its own axes first.
-
-    Parameters
-    ----------
-    sum_indices
-        Indices contracted over the product.
-    factors
-        Product factors.
-    replacer
-        ``MemoizerArg(filtered_replace_indices)``.
-
-    Returns
-    -------
-    tuple
-        Remaining sum indices and factors.
-
-    """
-    for delta in [f for f in factors if isinstance(f, Delta)]:
-        specialised = _pull_back(delta, sum_indices, factors, replacer)
-        if specialised is not None:
-            sum_indices, factors = specialised
-            break
-    return delta_elimination(sum_indices, factors, index_replacer=replacer)
+    return sum_indices, factors
 
 
-def eliminate_deltas(expression: Node) -> Node:
-    """Cancel contracted Deltas that ``delta_elimination`` cannot reach.
+def cancel_nested_deltas(expression: Node) -> Node:
+    """Apply `delta_elimination` at every contraction of a whole DAG.
 
-    Parameters
-    ----------
-    expression
-        Root of a scalar GEM expression.
-
-    Returns
-    -------
-    Node
-        Expression with those Deltas cancelled.
-
-    Notes
-    -----
-    ``delta_elimination`` only inspects top-level product factors, so a Delta
+    `delta_elimination` only inspects top-level product factors, so a Delta
     inside a preserved linear map is invisible to it.  Flattening the product
     tree first exposes it, and hoists the contractions it sits under so that
     substituting the Delta's variable index cannot capture them.
 
+    :arg expression: root of a scalar GEM expression
+    :returns: the expression with those Deltas cancelled
     """
     replacer = MemoizerArg(filtered_replace_indices)
+    delta_axes = Memoizer(_delta_axes)
 
     def visit(node, self):
         node = reuse_if_untouched(node, self)
-        if not isinstance(node, IndexSum) or not _cancellable_delta(node):
+        if not isinstance(node, IndexSum):
+            return node
+        if not delta_axes(node).intersection(node.multiindex):
             return node
         sum_indices, factors = traverse_product(node, index_replacer=replacer)
-        sum_indices, factors = cancel_deltas(sum_indices, factors, replacer)
+        sum_indices, factors = pull_back_indirect_delta(
+            sum_indices, factors, replacer)
+        sum_indices, factors = delta_elimination(
+            sum_indices, factors, index_replacer=replacer)
         factors = [replacer(factor, ()) for factor in factors]
         return IndexSum(make_product(factors), tuple(sum_indices))
 
@@ -1146,7 +1103,10 @@ def contraction(expression):
         sum_indices, factors = traverse_product(
             expression, index_replacer=index_replacer,
             stop_at=lambda e: e is not root and e in keep)
-        sum_indices, factors = cancel_deltas(sum_indices, factors, index_replacer)
+        sum_indices, factors = pull_back_indirect_delta(
+            sum_indices, factors, index_replacer)
+        sum_indices, factors = delta_elimination(
+            sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         return sum_factorise(sum_indices, factors)
 
