@@ -425,6 +425,12 @@ def _independent_contractions(sum_indices, groups):
     return list(subproblems.values()), rest
 
 
+# Planning a tree visits 3**factors subset pairs, while searching the
+# orderings of the contraction indices costs indices!.  Above this many
+# factors the exhaustive search over orderings is the cheaper plan.
+_MAX_PLANNED_FACTORS = 10
+
+
 def _plan_contraction(sum_indices, groups):
     """Choose a product tree for one connected contraction.
 
@@ -515,15 +521,15 @@ def _plan_contraction(sum_indices, groups):
 def _sum_factorise_connected(sum_indices, groups):
     """Sum factorise a single connected contraction.
 
-    Planning the tree costs 3**factors and searching the orderings costs
-    indices!, so take whichever the contraction is small enough for.
+    Take whichever of the two searches the contraction is small enough for;
+    see `_MAX_PLANNED_FACTORS`.
 
     :arg sum_indices: free indices for contractions, which must not split
                       into independent subproblems
     :arg groups: product factors, grouped by free indices
     :returns: optimised GEM expression
     """
-    if len(groups) <= 10:
+    if len(groups) <= _MAX_PLANNED_FACTORS:
         return _plan_contraction(sum_indices, groups)
 
     if len(sum_indices) > 6:
@@ -649,6 +655,26 @@ def make_renamer(rename_map):
     return partial(_renamer, rename_map, set())
 
 
+def _product_descent(expr):
+    """The subexpressions a product-tree walk breaks into further factors.
+
+    A contraction and a product are broken up, and so is the dividend of a
+    division, but never its divisor.  This is the one rule shared by
+    `traverse_product` and `repeated_contractions`.
+
+    :arg expr: a GEM expression
+    :returns: the subexpressions to descend into, empty when ``expr`` is
+              itself a factor
+    """
+    if isinstance(expr, (IndexSum, Product)):
+        return expr.children
+    if isinstance(expr, Division):
+        dividend, _ = expr.children
+        # A reciprocal is a factor in its own right.
+        return () if dividend == one else (dividend,)
+    return ()
+
+
 def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=None):
     """Traverses a product tree and collects factors, also descending into
     tensor contractions (IndexSum).  The numerators of divisions are
@@ -678,24 +704,20 @@ def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=N
     stack = [expression]
     while stack:
         expr = stack.pop()
-        if stop_at is not None and stop_at(expr):
+        children = () if stop_at is not None and stop_at(expr) \
+            else _product_descent(expr)
+        if not children:
             terms.append(expr)
         elif isinstance(expr, IndexSum):
             indices, applier = renamer(expr.multiindex)
             sum_indices.extend(indices)
-            stack.extend(index_replacer(applier(c), ()) for c in expr.children)
-        elif isinstance(expr, Product):
-            stack.extend(reversed(expr.children))
+            stack.extend(index_replacer(applier(c), ()) for c in children)
         elif isinstance(expr, Division):
-            # Break up products in the dividend, but not in divisor.
-            dividend, divisor = expr.children
-            if dividend == one:
-                terms.append(expr)
-            else:
-                stack.append(Division(one, divisor))
-                stack.append(dividend)
+            # The divisor is not broken up, but becomes a factor of its own.
+            stack.append(Division(one, expr.children[1]))
+            stack.extend(children)
         else:
-            terms.append(expr)
+            stack.extend(reversed(children))
 
     return sum_indices, terms
 
@@ -740,11 +762,7 @@ def repeated_contractions(expression):
         expr = stack.pop()
         if isinstance(expr, IndexSum):
             counts[expr] += 1
-            stack.extend(expr.children)
-        elif isinstance(expr, Product):
-            stack.extend(expr.children)
-        elif isinstance(expr, Division):
-            stack.append(expr.children[0])
+        stack.extend(_product_descent(expr))
     return frozenset(expr for expr, count in counts.items() if count > 1)
 
 
