@@ -8,7 +8,8 @@ from functools import singledispatch
 import itertools
 
 from gem import gem, node
-from gem.optimise import replace_delta, replace_flattened
+from gem.jagged import replace_flattened
+from gem.optimise import replace_delta
 
 __all__ = ("evaluate", )
 

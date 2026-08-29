@@ -7,7 +7,7 @@ import pprint
 
 from gem.interpreter import evaluate
 from gem.node import traversal
-from gem.optimise import contraction
+from gem.driver import contraction
 from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
 
 

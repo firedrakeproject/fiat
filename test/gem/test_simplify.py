@@ -9,16 +9,15 @@ from gem.impero_utils import (collect_temporaries, compile_gem,
                               place_declarations)
 from gem.node import traversal
 from gem.interpreter import evaluate
+from gem.driver import contraction, unflatten_returns
 from gem.optimise import (
-    _distribute_sum,
-    contraction,
-    eliminate_deltas,
+    cancel_nested_deltas,
+    distribute_sum,
     preserve_linear_maps,
-    unflatten_returns,
 )
 from gem.refactorise import (ATOMIC, COMPOUND, OTHER,
                              collect_monomials)
-from gem.gem import _jagged_lattice
+from gem.gem import jagged_lattice
 
 
 @pytest.fixture
@@ -53,7 +52,7 @@ def test_compact_simplex_lattice_product():
 
     # Ranks agree with the order in which FlattenedTensor flattens.
     ranks = gem.simplex_lattice_ranks((p, q))
-    points = _jagged_lattice((p, q))
+    points = jagged_lattice((p, q))
     assert [int(ranks[tuple(point)]) for point in points] == list(range(10))
 
 
@@ -184,7 +183,7 @@ def test_selective_distribution():
     common = gem.Sum(a, b)
     expression = gem.Product(common, gem.Sum(c, delta))
 
-    terms = _distribute_sum(
+    terms = distribute_sum(
         expression, predicate=lambda node: isinstance(node, gem.Delta))
 
     assert len(terms) == 2
@@ -269,7 +268,7 @@ def test_delta_elimination_preserves_indirect_free_index():
     expression = gem.IndexSum(
         gem.Delta(i, indirect) * gem.Indexed(values, (i,)), (i,))
 
-    result = eliminate_deltas(expression)
+    result = cancel_nested_deltas(expression)
     assert result.free_indices == (k,)
     actual, = evaluate([result])
     assert numpy.array_equal(actual.arr, values.array[entries])
@@ -468,7 +467,7 @@ def test_distribute_sum_preserves_rectangular_multiplicity():
     factor = gem.Sum(gem.IndexSum(unit(indices[0]) * unit(extra), (extra,)),
                      unit(indices[1]))
     expression = gem.IndexSum(factor, indices)
-    terms = _distribute_sum(
+    terms = distribute_sum(
         expression, predicate=lambda node: isinstance(node, gem.Sum))
     expression = gem.Sum(*terms)
     value, = evaluate([expression])
@@ -500,7 +499,7 @@ def test_sum_factorise_jagged_distribution():
     factor = gem.Sum(
         unit(parent), gem.Indexed(gem.Literal(triangle), (parent, child)))
     expression = gem.IndexSum(factor, (parent, child))
-    terms = _distribute_sum(
+    terms = distribute_sum(
         expression, predicate=lambda node: isinstance(node, gem.Sum))
     expression = gem.Sum(*terms)
     value, = evaluate([expression])

@@ -37,8 +37,7 @@ __all__ = ['Node', 'Identity', 'Literal', 'Zero', 'Failure',
            'OrientationVariableIndex',
            'index_sum', 'partial_indexed', 'reshape', 'view',
            'indices', 'as_gem', 'FlexiblyIndexed',
-           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise',
-           'compact_index_layout', 'simplex_lattice_ranks']
+           'Inverse', 'Solve', 'extract_type', 'uint_type', 'Piecewise']
 
 
 uint_type = numpy.dtype(numpy.uintc)
@@ -611,6 +610,10 @@ class Index(IndexBase):
     # Not true object count, just for naming purposes
     _count = 0
 
+    # Indices whose values reduce the iteration bound; JaggedIndex overrides
+    # this with a slot, so every index answers to `parents`.
+    parents = ()
+
     __slots__ = ('name', 'extent', 'count')
 
     def __init__(self, name=None, extent=None):
@@ -991,28 +994,31 @@ class FlattenedTensor(Node):
         assert set(multiindex) <= set(expression.free_indices)
         self.children = (expression,)
         self.multiindex = multiindex
-        self.shape = (len(_jagged_lattice(multiindex)),)
+        self.shape = (len(jagged_lattice(multiindex)),)
         self.free_indices = unique(set(expression.free_indices) - set(multiindex))
 
     def lattice_points(self) -> numpy.ndarray:
         """Return the in-bounds lattice multi-indices in flat order."""
-        return _jagged_lattice(self.multiindex)
+        return jagged_lattice(self.multiindex)
 
 
-def _jagged_layout(multiindex: tuple[Index, ...]) -> tuple:
-    """Return a structural description of a jagged iteration domain."""
+def jagged_layout(multiindex: tuple[Index, ...]) -> tuple:
+    """Return a structural description of a jagged iteration domain.
+
+    Two multiindices with the same layout enumerate the same lattice, so the
+    layout is the cache key of `lattice_points`.
+    """
     positions = {}
     layout = []
     for position, index in enumerate(multiindex):
-        parents = tuple(positions[parent]
-                        for parent in getattr(index, "parents", ()))
+        parents = tuple(positions[parent] for parent in index.parents)
         layout.append((index.extent, parents))
         positions[index] = position
     return tuple(layout)
 
 
 @lru_cache(maxsize=128)
-def _lattice_points(layout: tuple) -> numpy.ndarray:
+def lattice_points(layout: tuple) -> numpy.ndarray:
     """Enumerate one structural jagged iteration domain."""
     points = []
     for alpha in numpy.ndindex(*(extent for extent, _ in layout)):
@@ -1025,129 +1031,10 @@ def _lattice_points(layout: tuple) -> numpy.ndarray:
     return points
 
 
-def _jagged_lattice(multiindex: tuple[Index, ...]) -> numpy.ndarray:
+def jagged_lattice(multiindex: tuple[Index, ...]) -> numpy.ndarray:
     """All lattice points of ``multiindex``'s iteration domain, honouring
     `JaggedIndex` bounds, as an integer array of shape (npoint, dim)."""
-    return _lattice_points(_jagged_layout(multiindex))
-
-
-def _index_components(indices: tuple[Index, ...]) -> tuple[tuple, ...]:
-    """Partition indices into connected parent domains."""
-    index_set = frozenset(indices)
-    neighbours = {index: set() for index in indices}
-    for index in indices:
-        for parent in getattr(index, "parents", ()):
-            if parent in index_set:
-                neighbours[index].add(parent)
-                neighbours[parent].add(index)
-
-    components = []
-    unseen = set(indices)
-    for seed in indices:
-        if seed not in unseen:
-            continue
-        component = {seed}
-        pending = [seed]
-        unseen.remove(seed)
-        while pending:
-            for index in neighbours[pending.pop()] & unseen:
-                unseen.remove(index)
-                component.add(index)
-                pending.append(index)
-        components.append(tuple(index for index in indices
-                                if index in component))
-    return tuple(components)
-
-
-def _is_simplex_lattice(component: tuple[Index, ...]) -> bool:
-    """Check whether indices describe a nested simplex lattice."""
-    return all(
-        isinstance(index, JaggedIndex)
-        and index.extent == component[0].extent
-        and index.parents == component[:position]
-        for position, index in enumerate(component))
-
-
-def compact_index_layout(
-        indices: tuple[Index, ...]) -> tuple[tuple[int, ...], tuple]:
-    """Compact a product of independent simplex lattices.
-
-    Parameters
-    ----------
-    indices
-        Indices in loop order.
-
-    Returns
-    -------
-    shape
-        Compact storage shape.
-    layout
-        Scalar indices and compact simplex components.
-
-    Notes
-    -----
-    A simplex lattice is stored along one compact dimension holding just
-    its lattice points, in the same lexicographic order that
-    `FlattenedTensor` flattens a jagged tensor. Rectangular padding is
-    exponential in the lattice dimension, so it is avoided whenever the
-    lattice is smaller than the box enclosing it.
-
-    """
-    shape = []
-    layout = []
-    for component in _index_components(indices):
-        points = _compact_extent(component)
-        if points is None:
-            shape.extend(index.extent for index in component)
-            layout.extend(component)
-        else:
-            shape.append(points)
-            layout.append(component)
-    return tuple(shape), tuple(layout)
-
-
-def _compact_extent(component: tuple[Index, ...]) -> int | None:
-    """Return the compact extent of a simplex lattice, or None to pad.
-
-    A lattice that already fills its box gains nothing from compaction:
-    the rank lookup would just be the identity.
-
-    """
-    if not _is_simplex_lattice(component):
-        return None
-    points = len(_jagged_lattice(component))
-    if points >= numpy.prod([index.extent for index in component]):
-        return None
-    return points
-
-
-@lru_cache(maxsize=128)
-def _lattice_ranks(layout: tuple) -> numpy.ndarray:
-    """Rank of every point of one structural jagged iteration domain."""
-    points = _lattice_points(layout)
-    ranks = numpy.zeros(tuple(extent for extent, _ in layout), dtype=uint_type)
-    ranks[tuple(points.T)] = numpy.arange(len(points), dtype=uint_type)
-    ranks.flags.writeable = False
-    return ranks
-
-
-def simplex_lattice_ranks(component: tuple[Index, ...]) -> numpy.ndarray:
-    """Tabulate the compact rank of every point of a simplex lattice.
-
-    Parameters
-    ----------
-    component
-        Nested simplex lattice indices, in loop order.
-
-    Returns
-    -------
-    numpy.ndarray
-        Rectangular table of the lexicographic rank of each lattice
-        point, indexed by the lattice indices themselves. Entries
-        outside the jagged bounds are never read and are set to zero.
-
-    """
-    return _lattice_ranks(_jagged_layout(component))
+    return lattice_points(jagged_layout(multiindex))
 
 
 class IndexSum(Scalar):
@@ -1163,7 +1050,7 @@ class IndexSum(Scalar):
         # Unroll singleton sums
         unroll = tuple(
             index for index in multiindex
-            if index.extent <= 1 and not getattr(index, "parents", ()))
+            if index.extent <= 1 and not index.parents)
         if unroll:
             assert numpy.prod([index.extent for index in unroll]) == 1
             summand = Indexed(ComponentTensor(summand, unroll),

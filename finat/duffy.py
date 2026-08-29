@@ -44,8 +44,7 @@ class DuffyElement:
             coeffs = coeffs @ recombination
 
         coeffs = coeffs[:, expansion_set.get_duffy_permutation(degree)]
-        rows, cols = numpy.nonzero(~numpy.isclose(coeffs, 0.0))
-        if not len(rows):
+        if numpy.allclose(coeffs, 0.0):
             raise ValueError("empty Duffy coefficient matrix")
         return gem.Literal(coeffs)
 

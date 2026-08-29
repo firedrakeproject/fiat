@@ -2,6 +2,7 @@ import pytest
 import numpy
 import finat
 import gem
+import gem.driver
 from FIAT import ufc_simplex
 from gem.interpreter import evaluate
 
@@ -62,7 +63,7 @@ def coefficient_evaluation(element, ps, dofs):
     table = element.basis_evaluation(0, ps)[(0,) * dim]
     dofs = gem.Literal(dofs.reshape([index.extent for index in beta]))
     value = gem.Product(gem.Indexed(table, beta + zeta), gem.Indexed(dofs, beta))
-    return gem.ComponentTensor(gem.optimise.contraction(gem.IndexSum(value, beta)), zeta)
+    return gem.ComponentTensor(gem.driver.contraction(gem.IndexSum(value, beta)), zeta)
 
 
 def nodal_values(element, fn):

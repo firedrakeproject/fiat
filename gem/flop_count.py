@@ -31,7 +31,7 @@ def statement_for(tree, temporaries):
         _active_indices.get() | {tree.index})
     try:
         index_values = _index_values.get()
-        if getattr(tree.index, "parents", ()) and all(
+        if tree.index.parents and all(
                 parent in index_values for parent in tree.index.parents):
             extent = tree.index.iteration_extent(index_values)
         child, = tree.children
@@ -165,7 +165,7 @@ def flops_componenttensor(expr, temporaries):
         return expression_flops(body, temporaries)
     control = _control_indices.get().intersection(implicit_indices)
     if not control and not any(
-            getattr(index, "parents", ()) for index in implicit_indices):
+            index.parents for index in implicit_indices):
         extent = numpy.prod(
             [index.extent for index in implicit_indices], dtype=int)
         return extent * expression_flops(body, temporaries)
@@ -176,7 +176,7 @@ def flops_componenttensor(expr, temporaries):
         index = implicit_indices[position]
         values = _index_values.get()
         extent = index.extent
-        if getattr(index, "parents", ()):
+        if index.parents:
             extent = index.iteration_extent(values)
         total = 0
         for value in range(extent):
@@ -236,7 +236,7 @@ def _find_control_indices(tree):
     """Find loop indices controlling dependent loop bounds."""
     result = set()
     if isinstance(tree, imp.For):
-        if getattr(tree.index, "parents", ()):
+        if tree.index.parents:
             result.update(tree.index.parents)
         result.update(_find_control_indices(tree.children[0]))
     elif isinstance(tree, imp.Block):
