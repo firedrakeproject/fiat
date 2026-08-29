@@ -1,7 +1,6 @@
 """A set of routines implementing various transformations on GEM
 expressions."""
 
-import math
 from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Callable, Iterable
 from functools import singledispatch, partial
@@ -17,7 +16,6 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
-                     MathFunction, MinValue, MaxValue, Power, Inverse, Solve,
                      partial_indexed, one)
 
 
@@ -748,122 +746,7 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
-def _iteration_count(indices: Iterable[Index]) -> int:
-    """Count the points of a rectangular iteration space.
-
-    Parameters
-    ----------
-    indices
-        Indices an operation depends on.
-
-    Returns
-    -------
-    int
-        Number of executions of the operation.
-
-    """
-    return int(numpy.prod([index.extent for index in indices], dtype=int))
-
-
-def _operation_count(node: Node) -> int:
-    """Estimate the scalar operations performed by one GEM node.
-
-    Parameters
-    ----------
-    node
-        Scalar expression node.
-
-    Returns
-    -------
-    int
-        Operations over the node's complete iteration domain.
-
-    Notes
-    -----
-    Negation folds into the operation that consumes it, so a product with
-    ``-1`` costs nothing.
-
-    """
-    domain = _iteration_count(node.free_indices)
-    if isinstance(node, Product):
-        if any(isinstance(child, Literal) and not child.shape
-               and child.value == -1 for child in node.children):
-            return 0
-        return domain
-    if isinstance(node, (Sum, Division, MathFunction, MinValue, MaxValue)):
-        return domain
-    if isinstance(node, Power):
-        _, exponent = node.children
-        if isinstance(exponent, Literal) and not exponent.shape:
-            value = exponent.value
-            if value > 0 and value == math.floor(value):
-                return math.ceil(math.log2(value)) * domain
-        return 5 * domain
-    if isinstance(node, IndexSum):
-        body, = node.children
-        return _iteration_count(body.free_indices)
-    if isinstance(node, Inverse):
-        n, _ = node.shape
-        return 2 * n ** 3
-    if isinstance(node, Solve):
-        n, m = node.shape
-        return 2 * n * m + 2 * n ** 3
-    return 0
-
-
-def has_arithmetic(expressions: Iterable[Node]) -> bool:
-    """Does a GEM DAG perform any scalar arithmetic?
-
-    Parameters
-    ----------
-    expressions
-        Roots of a scalar GEM expression DAG.
-
-    Returns
-    -------
-    bool
-        Whether any node costs arithmetic to evaluate.
-
-    Notes
-    -----
-    Materialising a tabulation reference buys no arithmetic, so sharing one
-    only adds storage.
-
-    """
-    return any(map(_operation_count, traversal(tuple(expressions))))
-
-
-def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
-    """Estimate arithmetic work and contraction storage for a GEM DAG.
-
-    Each structurally shared operation counts once over the domain its free
-    indices induce.  An :class:`~gem.gem.IndexSum` contributes one
-    accumulation per point of its body domain.  Storage counts the result
-    domains of contractions, the intermediates that scheduling exposes.
-
-    Parameters
-    ----------
-    expressions
-        Roots of a scalar GEM expression DAG.
-
-    Returns
-    -------
-    tuple of int
-        Operation count, total contraction storage, largest contraction, and
-        expression-node count.  Comparing the tuples lexicographically ranks
-        arithmetic first and breaks ties by storage.
-
-    """
-    nodes = tuple(traversal(tuple(expressions)))
-    sizes = [_iteration_count(node.free_indices)
-             for node in nodes if isinstance(node, IndexSum)]
-    return (sum(map(_operation_count, nodes)),
-            sum(sizes),
-            max(sizes, default=0),
-            len(nodes))
-
-
-def _distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
+def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
     Parameters
@@ -1003,7 +886,7 @@ def preserve_linear_maps(
     if not has_linear_maps((expression,), linear_indices):
         return (expression,), ()
 
-    terms = tuple(_distribute_sum(expression, multilinear_sum))
+    terms = tuple(distribute_sum(expression, multilinear_sum))
     groups = OrderedDict()
     for term in terms:
         _, factors = traverse_product(term)

@@ -12,7 +12,8 @@ import numpy
 
 from gem.gem import ComponentTensor, Index, Indexed, IndexSum, one
 from gem.node import MemoizerArg
-from gem.optimise import (filtered_replace_indices, has_arithmetic,
+from gem.cost import has_arithmetic
+from gem.optimise import (filtered_replace_indices,
                           make_sum, make_product)
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby

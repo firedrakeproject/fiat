@@ -8,7 +8,8 @@ import gem.impero as imp
 from contextvars import ContextVar
 from functools import singledispatch
 import numpy
-import math
+
+from gem.cost import node_cost
 
 
 @singledispatch
@@ -97,41 +98,18 @@ def flops_zeroplus(expr, temporaries):
 
 
 @flops.register(gem.Product)
-def flops_product(expr, temporaries):
-    # Multiplication by -1 is not a flop.
-    a, b = expr.children
-    if isinstance(a, gem.Literal) and a.value == -1:
-        return expression_flops(b, temporaries)
-    elif isinstance(b, gem.Literal) and b.value == -1:
-        return expression_flops(a, temporaries)
-    else:
-        return 1 + sum(expression_flops(child, temporaries)
-                       for child in expr.children)
-
-
 @flops.register(gem.Sum)
 @flops.register(gem.Division)
 @flops.register(gem.Comparison)
 @flops.register(gem.MathFunction)
 @flops.register(gem.MinValue)
 @flops.register(gem.MaxValue)
-def flops_oneplus(expr, temporaries):
-    return 1 + sum(expression_flops(child, temporaries)
-                   for child in expr.children)
-
-
 @flops.register(gem.Power)
-def flops_power(expr, temporaries):
-    base, exponent = expr.children
-    base_flops = expression_flops(base, temporaries)
-    if isinstance(exponent, gem.Literal):
-        exponent = exponent.value
-        if exponent > 0 and exponent == math.floor(exponent):
-            return base_flops + int(math.ceil(math.log2(exponent)))
-        else:
-            return base_flops + 5  # heuristic
-    else:
-        return base_flops + 5   # heuristic
+def flops_arithmetic(expr, temporaries):
+    # The cost of the operation itself is shared with gem.cost, which weighs
+    # it by free indices rather than by enclosing loops.
+    return node_cost(expr) + sum(expression_flops(child, temporaries)
+                                 for child in expr.children)
 
 
 @flops.register(gem.Conditional)
@@ -156,19 +134,10 @@ def flops_indexsum(expr, temporaries):
 
 
 @flops.register(gem.Inverse)
-def flops_inverse(expr, temporaries):
-    n, _ = expr.shape
-    # 2n^3 + child flop count
-    return 2*n**3 + sum(expression_flops(child, temporaries)
-                        for child in expr.children)
-
-
 @flops.register(gem.Solve)
-def flops_solve(expr, temporaries):
-    n, m = expr.shape
-    # 2mn + inversion cost of A + children flop count
-    return 2*n*m + 2*n**3 + sum(expression_flops(child, temporaries)
-                                for child in expr.children)
+def flops_dense_linear_algebra(expr, temporaries):
+    return node_cost(expr) + sum(expression_flops(child, temporaries)
+                                 for child in expr.children)
 
 
 @flops.register(gem.ComponentTensor)

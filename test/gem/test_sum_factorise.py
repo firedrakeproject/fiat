@@ -6,7 +6,7 @@ import pytest
 
 import gem
 from gem.interpreter import evaluate
-from gem import optimise
+from gem import cost, optimise
 from gem.node import traversal
 from gem.optimise import sum_factorise
 from gem.coffee import optimise_monomial_sum
@@ -249,7 +249,7 @@ def test_has_linear_maps_detects_preservable_maps():
 
 def test_estimate_cost_counts_the_contraction():
     _, expression, _ = laplacian(ndofs=4, ndims=2)
-    flops, storage, largest, nodes = optimise.estimate_cost([expression])
+    flops, storage, largest, nodes = cost.estimate_cost([expression])
     # Two mapped gradients over (argument, k, l) and their contraction
     # over k, all counted over their own domains.
     assert flops > 0
