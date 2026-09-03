@@ -6,15 +6,19 @@ from FIAT.functional import PointEvaluation
 from FIAT.reference_element import make_lattice, ufc_simplex
 
 
-@pytest.fixture
-def cell():
-    return ufc_simplex(2)
+@pytest.fixture(params=(numpy.float64, numpy.float32),
+                ids=("float64", "float32"))
+def cell(request):
+    return ufc_simplex(2, dtype=request.param)
 
 
 @pytest.mark.parametrize("el", (PS6, PS12))
 def test_powell_sabin_constant(cell, el):
     # Test that bfs associated with point evaluation sum up to 1
     fe = el(cell)
+    assert (numpy.asarray(fe.get_reference_complex().vertices).dtype
+            == numpy.asarray(cell.vertices).dtype)
+    assert fe.get_coeffs().dtype == numpy.float64
 
     pts = make_lattice(cell.get_vertices(), 3)
     tab = fe.tabulate(2, pts)

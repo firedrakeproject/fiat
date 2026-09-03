@@ -88,7 +88,10 @@ class SplitSimplicialComplex(SimplicialComplex):
     :arg vertices: The vertices of the simplicial complex.
     :arg topology: The topology of the simplicial complex.
     """
-    def __init__(self, parent, vertices, topology):
+    def __init__(
+            self, parent: SimplicialComplex, vertices: tuple, topology: dict,
+            split_parent: SimplicialComplex | None = None) -> None:
+        self._split_parent = parent if split_parent is None else split_parent
         self._parent_complex = parent
         while parent.get_parent():
             parent = parent.get_parent()
@@ -199,6 +202,22 @@ class SplitSimplicialComplex(SimplicialComplex):
     def get_parent_complex(self):
         return self._parent_complex
 
+    def reconstruct(
+            self, ref_el: SimplicialComplex) -> "SplitSimplicialComplex":
+        """Reconstruct this split on another reference complex.
+
+        Parameters
+        ----------
+        ref_el : SimplicialComplex
+            The reference complex to split.
+
+        Returns
+        -------
+        SplitSimplicialComplex
+            The reconstructed split.
+        """
+        return type(self)(ref_el)
+
 
 class IsoSplit(SplitSimplicialComplex):
     """Splits simplex into the simplicial complex obtained by
@@ -236,6 +255,21 @@ class IsoSplit(SplitSimplicialComplex):
 
         new_topology = make_topology(sd, len(new_verts), edges)
         super().__init__(ref_el, tuple(new_verts), new_topology)
+
+    def reconstruct(self, ref_el: SimplicialComplex) -> "IsoSplit":
+        """Reconstruct this split on another reference complex.
+
+        Parameters
+        ----------
+        ref_el : SimplicialComplex
+            The reference complex to split.
+
+        Returns
+        -------
+        IsoSplit
+            The reconstructed split.
+        """
+        return type(self)(ref_el, degree=self.degree, variant=self.variant)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent complex
@@ -288,7 +322,25 @@ class PowellSabinSplit(SplitSimplicialComplex):
         new_topology[sd] = dict(enumerate(simplices))
 
         parent = ref_el if dimension == sd else PowellSabinSplit(ref_el, dimension=dimension+1)
-        super().__init__(parent, tuple(new_verts), new_topology)
+        super().__init__(parent, tuple(new_verts), new_topology,
+                         split_parent=ref_el)
+
+    def reconstruct(self, ref_el: SimplicialComplex) -> "PowellSabinSplit":
+        """Reconstruct this split on another reference complex.
+
+        Parameters
+        ----------
+        ref_el : SimplicialComplex
+            The reference complex to split.
+
+        Returns
+        -------
+        PowellSabinSplit
+            The reconstructed split.
+        """
+        if type(self) is PowellSabinSplit:
+            return type(self)(ref_el, dimension=self.split_dimension)
+        return super().reconstruct(ref_el)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent complex
@@ -345,15 +397,16 @@ class PowellSabin12Split(SplitSimplicialComplex):
         assert ref_el.get_shape() == TRIANGLE
         verts = ref_el.get_vertices()
         new_verts = list(verts)
+        dtype = numpy.asarray(verts).dtype
         new_verts.extend(
             map(tuple, bary_to_xy(verts,
-                [(1/3, 1/3, 1/3),
-                 (1/2, 1/2, 0),
-                 (1/2, 0, 1/2),
-                 (0, 1/2, 1/2),
-                 (1/2, 1/4, 1/4),
-                 (1/4, 1/2, 1/4),
-                 (1/4, 1/4, 1/2)])))
+                numpy.asarray([(1/3, 1/3, 1/3),
+                               (1/2, 1/2, 0),
+                               (1/2, 0, 1/2),
+                               (0, 1/2, 1/2),
+                               (1/2, 1/4, 1/4),
+                               (1/4, 1/2, 1/4),
+                               (1/4, 1/4, 1/2)], dtype=dtype))))
 
         edges = [(0, 4), (0, 7), (0, 5),
                  (1, 4), (1, 8), (1, 6),
@@ -363,7 +416,8 @@ class PowellSabin12Split(SplitSimplicialComplex):
 
         parent = PowellSabinSplit(ref_el)
         new_topology = make_topology(2, len(new_verts), edges)
-        super().__init__(parent, tuple(new_verts), new_topology)
+        super().__init__(parent, tuple(new_verts), new_topology,
+                         split_parent=ref_el)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -377,6 +431,31 @@ class PowellSabin12Split(SplitSimplicialComplex):
             return self.construct_subelement(0)
         else:
             raise ValueError("Illegal dimension")
+
+
+def _reconstruct_split_complex_fp64(
+        ref_el: SimplicialComplex) -> SimplicialComplex:
+    """Reconstruct a split complex from float64 root geometry.
+
+    Parameters
+    ----------
+    ref_el : SimplicialComplex
+        The reference complex to reconstruct.
+
+    Returns
+    -------
+    SimplicialComplex
+        The reconstructed reference complex.
+    """
+    if not isinstance(ref_el, SplitSimplicialComplex):
+        ref_el_fp64 = copy.copy(ref_el)
+        ref_el_fp64.vertices = reference_element.cast_vertices(
+            ref_el.vertices, numpy.float64)
+        ref_el_fp64._split_cache = {}
+        return ref_el_fp64
+
+    parent_fp64 = _reconstruct_split_complex_fp64(ref_el._split_parent)
+    return ref_el.reconstruct(parent_fp64)
 
 
 class MacroQuadratureRule(QuadratureRule):
@@ -451,6 +530,18 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         if not isinstance(order, (int, dict)):
             raise TypeError(f"'order' must be either an int or dict, not {type(order).__name__}")
 
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
+        dtype = numpy.asarray(ref_el.get_vertices()).dtype
+        if dtype == numpy.dtype(numpy.float32):
+            ref_el_fp64 = _reconstruct_split_complex_fp64(ref_el)
+            poly_set_fp64 = CkPolynomialSet(
+                ref_el_fp64, degree, order=copy.deepcopy(order),
+                vorder=vorder, shape=shape, **kwargs)
+            coeffs = poly_set_fp64.get_coeffs()
+            super().__init__(
+                ref_el, degree, degree, expansion_set, coeffs)
+            return
+
         sd = ref_el.get_spatial_dimension()
         if isinstance(order, int):
             order = {sd-1: dict.fromkeys(ref_el.get_interior_facets(sd-1), order)}
@@ -462,7 +553,6 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         if not all(k in {0, sd-1} for k in order):
             raise NotImplementedError("Only face or vertex constraints have been implemented.")
 
-        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         k = 1 if expansion_set.continuity == "C0" else 0
 
         # Impose C^forder continuity across interior facets
