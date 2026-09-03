@@ -485,20 +485,31 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         # Impose C^vorder super-smoothness at interior vertices
         # C^forder automatically gives C^{forder+dim-1} at the interior vertex
         verts = numpy.asarray(ref_el.get_vertices())
+        has_vertex_constraints = False
         for vorder in set(order[0].values()):
             vids = [i for i in order[0] if order[0][i] == vorder]
             facets = chain.from_iterable(ref_el.connectivity[(0, sd-1)][v] for v in vids)
             forder = min(order[sd-1][f] for f in facets)
             sorder = forder + sd - 1
             if vorder > sorder:
+                has_vertex_constraints = True
                 jumps = expansion_set.tabulate_jumps(degree, verts[vids], order=vorder)
                 rows.extend(numpy.vstack(jumps[r].T) for r in range(sorder+1, vorder+1))
 
         if len(rows) > 0:
             for row in rows:
                 row *= 1 / max(numpy.max(abs(row)), 1)
-            dual_mat = numpy.vstack(rows)
-            coeffs = polynomial_set.spanning_basis(dual_mat, nullspace=True)
+            if has_vertex_constraints:
+                # Project each constraint block onto the current nullspace so
+                # high-order vertex constraints are not buried in one large SVD.
+                coeffs = numpy.eye(expansion_set.get_num_members(degree))
+                for row in rows:
+                    restricted_row = numpy.dot(row, coeffs.T)
+                    nsp = polynomial_set.spanning_basis(restricted_row, nullspace=True, rtol=1e-12)
+                    coeffs = numpy.dot(nsp, coeffs)
+            else:
+                dual_mat = numpy.vstack(rows)
+                coeffs = polynomial_set.spanning_basis(dual_mat, nullspace=True)
         else:
             coeffs = numpy.eye(expansion_set.get_num_members(degree))
 

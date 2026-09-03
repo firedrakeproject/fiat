@@ -14,7 +14,7 @@
 from itertools import chain
 
 from ufl.cell import TensorProductCell, as_cell
-from finat.ufl.finiteelementbase import FiniteElementBase
+from finat.ufl.finiteelementbase import FiniteElementBase, shifted_sub_degrees
 from ufl.sobolevspace import DirectionalSobolevSpace
 
 
@@ -110,7 +110,16 @@ class TensorProductElement(FiniteElementBase):
     def reconstruct(self, **kwargs):
         """Doc."""
         cell = kwargs.pop("cell", self.cell)
-        return TensorProductElement(*[e.reconstruct(**kwargs) for e in self.factor_elements], cell=cell)
+        degree = kwargs.pop('degree', None)
+        if degree is None:
+            degrees = [None] * len(self.factor_elements)
+        elif isinstance(degree, (list, tuple)):
+            degrees = degree
+        else:
+            degrees = shifted_sub_degrees(self.factor_elements, degree)
+        return TensorProductElement(
+            *(e.reconstruct(degree=d, **kwargs) for d, e in zip(degrees, self.factor_elements)),
+            cell=cell)
 
     def variant(self):
         """Doc."""
@@ -132,10 +141,10 @@ class TensorProductElement(FiniteElementBase):
 
     @property
     def embedded_superdegree(self):
-        """Doc."""
-        return sum(self.degree())
+        """The degree of the smallest Lagrange space that holds this element."""
+        return max(e.embedded_superdegree for e in self.factor_elements)
 
     @property
     def embedded_subdegree(self):
-        """Doc."""
-        return min(self.degree())
+        """The degree of the largest Lagrange space that is a subspace of this element."""
+        return min(e.embedded_subdegree for e in self.factor_elements)
