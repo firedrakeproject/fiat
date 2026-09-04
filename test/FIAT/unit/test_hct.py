@@ -10,8 +10,7 @@ from FIAT.macro import CkPolynomialSet
 @pytest.fixture(params=(numpy.float64, numpy.float32), ids=("float64", "float32"))
 def cell(request):
     K = ufc_simplex(2, dtype=request.param)
-    K.vertices = tuple(map(tuple, numpy.asarray(
-        ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84)), dtype=request.param)))
+    K.vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
     return K
 
 

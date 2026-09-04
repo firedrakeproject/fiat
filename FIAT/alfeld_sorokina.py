@@ -6,13 +6,10 @@
 #
 # Written by Pablo D. Brubeck (brubeck@protonmail.com), 2024
 
-import copy
-
 from FIAT import finite_element, dual_set, polynomial_set
 from FIAT.functional import ComponentPointEvaluation, PointDivergence
 from FIAT.quadrature_schemes import create_quadrature
 from FIAT.macro import CkPolynomialSet, AlfeldSplit
-from FIAT.reference_element import cast_vertices
 
 import numpy
 
@@ -27,34 +24,25 @@ def AlfeldSorokinaSpace(ref_el, degree):
     num_members = C0.get_num_members()
     coeffs = C0.get_coeffs()
 
-    interior_facets = ref_complex.get_interior_facets(sd-1)
-    if len(interior_facets) > 0:
-        # Redo this in double precision, on a copy of the actual geometry.
-        ref_el_fp64 = copy.copy(ref_el)
-        ref_el_fp64.vertices = cast_vertices(ref_el.vertices, float)
-        ref_el_fp64._split_cache = {}
-        ref_complex_fp64 = AlfeldSplit(ref_el_fp64)
-        C0_fp64 = CkPolynomialSet(ref_complex_fp64, degree, order=0, shape=(sd,), variant="bubble")
-        expansion_set_fp64 = C0_fp64.get_expansion_set()
+    facet_el = ref_complex.construct_subelement(sd-1)
+    phi = polynomial_set.ONPolynomialSet(facet_el, 0 if sd == 1 else degree-1)
+    Q = create_quadrature(facet_el, 2 * phi.degree)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
+    weights = numpy.multiply(phi_at_qpts, qwts)
 
-        facet_el_fp64 = ref_complex_fp64.construct_subelement(sd-1)
-        phi_fp64 = polynomial_set.ONPolynomialSet(facet_el_fp64, 0 if sd == 1 else degree-1)
-        Q_fp64 = create_quadrature(facet_el_fp64, 2 * phi_fp64.degree)
-        qpts_fp64, qwts_fp64 = Q_fp64.get_points(), Q_fp64.get_weights()
-        phi_at_qpts_fp64 = phi_fp64.tabulate(qpts_fp64)[(0,) * (sd-1)]
-        weights_fp64 = numpy.multiply(phi_at_qpts_fp64, qwts_fp64)
+    rows = []
+    for facet in ref_complex.get_interior_facets(sd-1):
+        n = ref_complex.compute_normal(facet)
+        jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=1)
+        div_jump = n[:, None, None] * jumps[1][None, ...]
+        r = numpy.tensordot(div_jump, weights, axes=(-1, -1))
+        rows.append(r.reshape(num_members, -1).T)
 
-        rows_fp64 = []
-        for facet in ref_complex_fp64.get_interior_facets(sd-1):
-            n_fp64 = ref_complex_fp64.compute_normal(facet)
-            jumps_fp64 = expansion_set_fp64.tabulate_normal_jumps(degree, qpts_fp64, facet, order=1)
-            div_jump_fp64 = n_fp64[:, None, None] * jumps_fp64[1][None, ...]
-            r_fp64 = numpy.tensordot(div_jump_fp64, weights_fp64, axes=(-1, -1))
-            rows_fp64.append(r_fp64.reshape(num_members, -1).T)
-
-        dual_mat = numpy.vstack(rows_fp64)
+    if len(rows) > 0:
+        dual_mat = numpy.vstack(rows)
         nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
-        coeffs = numpy.tensordot(nsp.astype(coeffs.dtype), coeffs, axes=(-1, 0))
+        coeffs = numpy.tensordot(nsp, coeffs, axes=(-1, 0))
     return polynomial_set.PolynomialSet(ref_complex, degree, degree, expansion_set, coeffs)
 
 

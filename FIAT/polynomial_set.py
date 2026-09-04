@@ -17,7 +17,6 @@
 
 import numpy
 
-from FIAT.precision import calibrate_tolerance
 from itertools import chain
 from FIAT import expansions
 
@@ -159,11 +158,9 @@ def form_matrix_product(mats, alpha):
     return result
 
 
-def spanning_basis(A, nullspace=False, rtol=None):
+def spanning_basis(A, nullspace=False, rtol=1e-10):
     """Construct a basis that spans the rows of A via SVD.
     """
-    if rtol is None:
-        rtol = calibrate_tolerance(1e-10, A.dtype)
     Aflat = A.reshape(A.shape[0], -1)
     u, sig, vt = numpy.linalg.svd(Aflat, full_matrices=True)
     atol = rtol * (sig[0] + 1)

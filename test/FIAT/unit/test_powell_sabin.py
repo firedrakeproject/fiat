@@ -16,8 +16,8 @@ def cell(request):
 def test_powell_sabin_constant(cell, el):
     # Test that bfs associated with point evaluation sum up to 1
     fe = el(cell)
-    assert (numpy.asarray(fe.get_reference_complex().vertices).dtype
-            == numpy.asarray(cell.vertices).dtype)
+    assert numpy.asarray(fe.get_reference_complex().vertices).dtype == numpy.float64
+    assert fe.get_reference_complex().target_dtype == cell.target_dtype
     assert fe.get_coeffs().dtype == numpy.float64
 
     pts = make_lattice(cell.get_vertices(), 3)

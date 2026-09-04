@@ -168,15 +168,17 @@ def test_cache_hit_vector(ufl_vector_element):
 
 
 def test_dtype_reaches_reference_cell(ufl_element):
-    """dtype passed to create_element must reach the constructed element's
-    reference cell, not silently fall back to FIAT's float64 default."""
+    """Check that target dtype is independent of construction dtype."""
     default = create_element(ufl_element)
     single = create_element(ufl_element, dtype=numpy.float32)
     double = create_element(ufl_element, dtype=numpy.float64)
 
     assert numpy.array(default.cell.vertices).dtype == numpy.float64
-    assert numpy.array(single.cell.vertices).dtype == numpy.float32
+    assert numpy.array(single.cell.vertices).dtype == numpy.float64
     assert numpy.array(double.cell.vertices).dtype == numpy.float64
+    assert default.cell.target_dtype == numpy.float64
+    assert single.cell.target_dtype == numpy.float32
+    assert double.cell.target_dtype == numpy.float64
 
 
 def test_dtype_cache_distinguishes(ufl_element):

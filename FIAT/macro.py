@@ -1,4 +1,3 @@
-import copy
 from itertools import chain, combinations
 
 import numpy
@@ -88,10 +87,7 @@ class SplitSimplicialComplex(SimplicialComplex):
     :arg vertices: The vertices of the simplicial complex.
     :arg topology: The topology of the simplicial complex.
     """
-    def __init__(
-            self, parent: SimplicialComplex, vertices: tuple, topology: dict,
-            split_parent: SimplicialComplex | None = None) -> None:
-        self._split_parent = parent if split_parent is None else split_parent
+    def __init__(self, parent, vertices, topology):
         self._parent_complex = parent
         while parent.get_parent():
             parent = parent.get_parent()
@@ -155,6 +151,7 @@ class SplitSimplicialComplex(SimplicialComplex):
         self._interior_facets = interior_facets
 
         super().__init__(parent.shape, vertices, topology)
+        self.target_dtype = parent.target_dtype
 
     def get_child_to_parent(self):
         """Maps split complex facet tuple to its parent entity tuple."""
@@ -202,22 +199,6 @@ class SplitSimplicialComplex(SimplicialComplex):
     def get_parent_complex(self):
         return self._parent_complex
 
-    def reconstruct(
-            self, ref_el: SimplicialComplex) -> "SplitSimplicialComplex":
-        """Reconstruct this split on another reference complex.
-
-        Parameters
-        ----------
-        ref_el : SimplicialComplex
-            The reference complex to split.
-
-        Returns
-        -------
-        SplitSimplicialComplex
-            The reconstructed split.
-        """
-        return type(self)(ref_el)
-
 
 class IsoSplit(SplitSimplicialComplex):
     """Splits simplex into the simplicial complex obtained by
@@ -255,21 +236,6 @@ class IsoSplit(SplitSimplicialComplex):
 
         new_topology = make_topology(sd, len(new_verts), edges)
         super().__init__(ref_el, tuple(new_verts), new_topology)
-
-    def reconstruct(self, ref_el: SimplicialComplex) -> "IsoSplit":
-        """Reconstruct this split on another reference complex.
-
-        Parameters
-        ----------
-        ref_el : SimplicialComplex
-            The reference complex to split.
-
-        Returns
-        -------
-        IsoSplit
-            The reconstructed split.
-        """
-        return type(self)(ref_el, degree=self.degree, variant=self.variant)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent complex
@@ -322,25 +288,7 @@ class PowellSabinSplit(SplitSimplicialComplex):
         new_topology[sd] = dict(enumerate(simplices))
 
         parent = ref_el if dimension == sd else PowellSabinSplit(ref_el, dimension=dimension+1)
-        super().__init__(parent, tuple(new_verts), new_topology,
-                         split_parent=ref_el)
-
-    def reconstruct(self, ref_el: SimplicialComplex) -> "PowellSabinSplit":
-        """Reconstruct this split on another reference complex.
-
-        Parameters
-        ----------
-        ref_el : SimplicialComplex
-            The reference complex to split.
-
-        Returns
-        -------
-        PowellSabinSplit
-            The reconstructed split.
-        """
-        if type(self) is PowellSabinSplit:
-            return type(self)(ref_el, dimension=self.split_dimension)
-        return super().reconstruct(ref_el)
+        super().__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent complex
@@ -397,16 +345,15 @@ class PowellSabin12Split(SplitSimplicialComplex):
         assert ref_el.get_shape() == TRIANGLE
         verts = ref_el.get_vertices()
         new_verts = list(verts)
-        dtype = numpy.asarray(verts).dtype
         new_verts.extend(
             map(tuple, bary_to_xy(verts,
-                numpy.asarray([(1/3, 1/3, 1/3),
-                               (1/2, 1/2, 0),
-                               (1/2, 0, 1/2),
-                               (0, 1/2, 1/2),
-                               (1/2, 1/4, 1/4),
-                               (1/4, 1/2, 1/4),
-                               (1/4, 1/4, 1/2)], dtype=dtype))))
+                [(1/3, 1/3, 1/3),
+                 (1/2, 1/2, 0),
+                 (1/2, 0, 1/2),
+                 (0, 1/2, 1/2),
+                 (1/2, 1/4, 1/4),
+                 (1/4, 1/2, 1/4),
+                 (1/4, 1/4, 1/2)])))
 
         edges = [(0, 4), (0, 7), (0, 5),
                  (1, 4), (1, 8), (1, 6),
@@ -416,8 +363,7 @@ class PowellSabin12Split(SplitSimplicialComplex):
 
         parent = PowellSabinSplit(ref_el)
         new_topology = make_topology(2, len(new_verts), edges)
-        super().__init__(parent, tuple(new_verts), new_topology,
-                         split_parent=ref_el)
+        super().__init__(parent, tuple(new_verts), new_topology)
 
     def construct_subcomplex(self, dimension):
         """Constructs the reference subcomplex of the parent cell subentity
@@ -431,31 +377,6 @@ class PowellSabin12Split(SplitSimplicialComplex):
             return self.construct_subelement(0)
         else:
             raise ValueError("Illegal dimension")
-
-
-def _reconstruct_split_complex_fp64(
-        ref_el: SimplicialComplex) -> SimplicialComplex:
-    """Reconstruct a split complex from float64 root geometry.
-
-    Parameters
-    ----------
-    ref_el : SimplicialComplex
-        The reference complex to reconstruct.
-
-    Returns
-    -------
-    SimplicialComplex
-        The reconstructed reference complex.
-    """
-    if not isinstance(ref_el, SplitSimplicialComplex):
-        ref_el_fp64 = copy.copy(ref_el)
-        ref_el_fp64.vertices = reference_element.cast_vertices(
-            ref_el.vertices, numpy.float64)
-        ref_el_fp64._split_cache = {}
-        return ref_el_fp64
-
-    parent_fp64 = _reconstruct_split_complex_fp64(ref_el._split_parent)
-    return ref_el.reconstruct(parent_fp64)
 
 
 class MacroQuadratureRule(QuadratureRule):
@@ -530,18 +451,6 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         if not isinstance(order, (int, dict)):
             raise TypeError(f"'order' must be either an int or dict, not {type(order).__name__}")
 
-        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
-        dtype = numpy.asarray(ref_el.get_vertices()).dtype
-        if dtype == numpy.dtype(numpy.float32):
-            ref_el_fp64 = _reconstruct_split_complex_fp64(ref_el)
-            poly_set_fp64 = CkPolynomialSet(
-                ref_el_fp64, degree, order=copy.deepcopy(order),
-                vorder=vorder, shape=shape, **kwargs)
-            coeffs = poly_set_fp64.get_coeffs()
-            super().__init__(
-                ref_el, degree, degree, expansion_set, coeffs)
-            return
-
         sd = ref_el.get_spatial_dimension()
         if isinstance(order, int):
             order = {sd-1: dict.fromkeys(ref_el.get_interior_facets(sd-1), order)}
@@ -553,6 +462,7 @@ class CkPolynomialSet(polynomial_set.PolynomialSet):
         if not all(k in {0, sd-1} for k in order):
             raise NotImplementedError("Only face or vertex constraints have been implemented.")
 
+        expansion_set = expansions.ExpansionSet(ref_el, **kwargs)
         k = 1 if expansion_set.continuity == "C0" else 0
 
         # Impose C^forder continuity across interior facets
@@ -630,37 +540,29 @@ def hdiv_conforming_coefficients(U, order=0):
     k = 1 if expansion_set.continuity == "C0" else 0
 
     sd = ref_el.get_spatial_dimension()
+    facet_el = ref_el.construct_subelement(sd-1)
+
     phi_deg = 0 if sd == 1 else degree - k
+    phi = polynomial_set.ONPolynomialSet(facet_el, phi_deg, shape=shape[1:])
+    Q = create_quadrature(facet_el, 2 * phi_deg)
+    qpts, qwts = Q.get_points(), Q.get_weights()
+    phi_at_qpts = phi.tabulate(qpts)[(0,) * (sd-1)]
+    weights = numpy.multiply(phi_at_qpts, qwts)
+    ax = tuple(range(1, weights.ndim))
 
-    interior_facets = ref_el.get_interior_facets(sd-1)
-    if len(interior_facets) > 0:
-        # Redo this in double precision, on a copy of the actual geometry.
-        parent_fp64 = copy.copy(ref_el.get_parent())
-        parent_fp64.vertices = reference_element.cast_vertices(parent_fp64.vertices, float)
-        parent_fp64._split_cache = {}
-        ref_complex_fp64 = type(ref_el)(parent_fp64)
-        expansion_set_fp64 = expansions.ExpansionSet(ref_complex_fp64, scale=expansion_set.scale, variant=expansion_set.variant)
-        facet_el_fp64 = ref_complex_fp64.construct_subelement(sd-1)
-        phi_fp64 = polynomial_set.ONPolynomialSet(facet_el_fp64, phi_deg, shape=shape[1:])
-        Q_fp64 = create_quadrature(facet_el_fp64, 2 * phi_deg)
-        qpts_fp64, qwts_fp64 = Q_fp64.get_points(), Q_fp64.get_weights()
-        phi_at_qpts_fp64 = phi_fp64.tabulate(qpts_fp64)[(0,) * (sd-1)]
-        weights_fp64 = numpy.multiply(phi_at_qpts_fp64, qwts_fp64)
-        ax = tuple(range(1, weights_fp64.ndim))
-        coeffs_fp64 = coeffs.astype(numpy.float64)
+    rows = []
+    for facet in ref_el.get_interior_facets(sd-1):
+        normal = ref_el.compute_scaled_normal(facet)
+        ncoeffs = numpy.tensordot(coeffs, normal, axes=(len(shape), 0))
+        jumps = expansion_set.tabulate_normal_jumps(degree, qpts, facet, order=order)
+        for r in range(k, order+1):
+            njump = numpy.dot(ncoeffs, jumps[r])
+            rows.append(numpy.tensordot(weights, njump, axes=(ax, ax)))
 
-        rows_fp64 = []
-        for facet in ref_complex_fp64.get_interior_facets(sd-1):
-            normal_fp64 = ref_complex_fp64.compute_scaled_normal(facet)
-            ncoeffs_fp64 = numpy.tensordot(coeffs_fp64, normal_fp64, axes=(len(shape), 0))
-            jumps_fp64 = expansion_set_fp64.tabulate_normal_jumps(degree, qpts_fp64, facet, order=order)
-            for r in range(k, order+1):
-                njump_fp64 = numpy.dot(ncoeffs_fp64, jumps_fp64[r])
-                rows_fp64.append(numpy.tensordot(weights_fp64, njump_fp64, axes=(ax, ax)))
-
-        dual_mat = numpy.vstack(rows_fp64)
+    if len(rows) > 0:
+        dual_mat = numpy.vstack(rows)
         nsp = polynomial_set.spanning_basis(dual_mat, nullspace=True)
-        coeffs = numpy.tensordot(nsp.astype(coeffs.dtype), coeffs, axes=(1, 0))
+        coeffs = numpy.tensordot(nsp, coeffs, axes=(1, 0))
     return coeffs
 
 
