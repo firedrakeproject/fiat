@@ -46,7 +46,9 @@ def test_dtype_propagates_into_symbolic_tabulation():
     fe64 = macro_element(dtype=numpy.float64)
     fe32 = macro_element(dtype=numpy.float32)
     assert numpy.array(fe64.ref_complex.vertices).dtype == numpy.float64
-    assert numpy.array(fe32.ref_complex.vertices).dtype == numpy.float32
+    assert numpy.array(fe32.ref_complex.vertices).dtype == numpy.float64
+    assert fe64.ref_complex.target_dtype == numpy.float64
+    assert fe32.ref_complex.target_dtype == numpy.float32
     x0 = gem.Variable("x0", ())
 
     tab64 = fe64.tabulate(0, (x0,))[(0,)][0]
