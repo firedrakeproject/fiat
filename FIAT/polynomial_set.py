@@ -16,6 +16,7 @@
 # an entire set of polynomials)
 
 import numpy
+
 from itertools import chain
 from FIAT import expansions
 

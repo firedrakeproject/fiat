@@ -1,3 +1,4 @@
+import numpy
 import pytest
 
 import ufl
@@ -164,6 +165,30 @@ def test_cache_hit_vector(ufl_vector_element):
     B = create_element(ufl_vector_element)
 
     assert A is B
+
+
+def test_dtype_reaches_reference_cell(ufl_element):
+    """Check that target dtype is independent of construction dtype."""
+    default = create_element(ufl_element)
+    single = create_element(ufl_element, dtype=numpy.float32)
+    double = create_element(ufl_element, dtype=numpy.float64)
+
+    assert numpy.array(default.cell.vertices).dtype == numpy.float64
+    assert numpy.array(single.cell.vertices).dtype == numpy.float64
+    assert numpy.array(double.cell.vertices).dtype == numpy.float64
+    assert default.cell.target_dtype == numpy.float64
+    assert single.cell.target_dtype == numpy.float32
+    assert double.cell.target_dtype == numpy.float64
+
+
+def test_dtype_cache_distinguishes(ufl_element):
+    """Different dtypes for the same UFL element must not share a cache entry."""
+    single_a = create_element(ufl_element, dtype=numpy.float32)
+    single_b = create_element(ufl_element, dtype=numpy.float32)
+    double = create_element(ufl_element, dtype=numpy.float64)
+
+    assert single_a is single_b
+    assert single_a is not double
 
 
 if __name__ == "__main__":

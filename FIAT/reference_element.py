@@ -143,6 +143,7 @@ class Cell:
         comprising the facet."""
         self.shape = shape
         self.vertices = vertices
+        self.target_dtype = numpy.asarray(vertices).dtype
         self.topology = topology
 
         # Given the topology, work out for each entity in the cell,
@@ -409,7 +410,8 @@ class SimplicialComplex(Cell):
         if cell is None:
             cell = next(k for k, facets in enumerate(self.connectivity[(sd, sd-1)])
                         if facet_i in facets)
-        verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]))
+        # Always compute in double precision for a robust SVD below.
+        verts = numpy.asarray(self.get_vertices_of_subcomplex(t[sd][cell]), dtype=float)
         # Interval case
         if self.get_shape() == LINE:
             v_i = t[1][cell].index(t[0][facet_i][0])
@@ -429,7 +431,7 @@ class SimplicialComplex(Cell):
             self.get_vertices_of_subcomplex(t[sd-1][facet_i])
 
         # now I find everything normal to the facet.
-        vcf = numpy.asarray(vert_coords_of_facet)
+        vcf = numpy.asarray(vert_coords_of_facet, dtype=float)
         facet_span = vcf[1:, :] - vcf[:1, :]
         (_, sf, vft) = numpy.linalg.svd(facet_span)
 
@@ -1658,9 +1660,7 @@ def ufc_hypercube(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
     the UFC reference hypercube of that dimension.
 
-    :arg dtype: optional numpy dtype to cast the vertex coordinates to.
-        Defaults to the plain Python `float` used by the hardcoded
-        vertex coordinates.
+    :arg dtype: optional working dtype for tabulation.
     """
     if spatial_dim == 0:
         cell = Point()
@@ -1673,7 +1673,7 @@ def ufc_hypercube(spatial_dim, dtype=None):
     else:
         raise RuntimeError(f"Can't create UFC hypercube of dimension {spatial_dim}.")
     if dtype is not None:
-        cell.vertices = cast_vertices(cell.vertices, dtype)
+        cell.target_dtype = numpy.dtype(dtype)
     return cell
 
 
@@ -1696,9 +1696,7 @@ def ufc_simplex(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
     the UFC reference simplex of that dimension.
 
-    :arg dtype: optional numpy dtype to cast the vertex coordinates to.
-        Defaults to the plain Python `float` used by the hardcoded
-        vertex coordinates.
+    :arg dtype: optional working dtype for tabulation.
     """
     if spatial_dim == 0:
         cell = Point()
@@ -1711,20 +1709,22 @@ def ufc_simplex(spatial_dim, dtype=None):
     else:
         raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
     if dtype is not None:
-        cell.vertices = cast_vertices(cell.vertices, dtype)
+        cell.target_dtype = numpy.dtype(dtype)
     return cell
 
 
 def symmetric_simplex(spatial_dim, dtype=None):
     A = numpy.array([[2, 1, 1],
                      [0, numpy.sqrt(3), numpy.sqrt(3)/3],
-                     [0, 0, numpy.sqrt(6)*(2/3)]], dtype=dtype)
+                     [0, 0, numpy.sqrt(6)*(2/3)]], dtype=float)
     A = A[:spatial_dim, :][:, :spatial_dim]
     b = A.sum(axis=1) * (-1 / (1 + spatial_dim))
     Ref1 = ufc_simplex(spatial_dim, dtype=dtype)
     v = numpy.dot(Ref1.get_vertices(), A.T) + b[None, :]
     vertices = tuple(map(tuple, v))
-    return SymmetricSimplex(Ref1.get_shape(), vertices, Ref1.get_topology())
+    cell = SymmetricSimplex(Ref1.get_shape(), vertices, Ref1.get_topology())
+    cell.target_dtype = numpy.dtype(float if dtype is None else dtype)
+    return cell
 
 
 def ufc_cell(cell, dtype=None):
@@ -1738,7 +1738,9 @@ def ufc_cell(cell, dtype=None):
 
     if " * " in celltype:
         # Tensor product cell
-        return TensorProductCell(*(ufc_cell(c, dtype=dtype) for c in celltype.split(" * ")))
+        ref_el = TensorProductCell(*(ufc_cell(c, dtype=dtype) for c in celltype.split(" * ")))
+        ref_el.target_dtype = numpy.dtype(float if dtype is None else dtype)
+        return ref_el
     elif celltype == "quadrilateral":
         return ufc_hypercube(2, dtype=dtype)
     elif celltype == "hexahedron":

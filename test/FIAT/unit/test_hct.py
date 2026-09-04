@@ -7,9 +7,9 @@ from FIAT.functional import PointEvaluation
 from FIAT.macro import CkPolynomialSet
 
 
-@pytest.fixture
-def cell():
-    K = ufc_simplex(2)
+@pytest.fixture(params=(numpy.float64, numpy.float32), ids=("float64", "float32"))
+def cell(request):
+    K = ufc_simplex(2, dtype=request.param)
     K.vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
     return K
 
@@ -76,7 +76,9 @@ def test_full_polynomials(cell, reduced):
     assert span_greater_equal(tab, C1_tab)
 
 
+@pytest.mark.parametrize("dtype", (numpy.float64, numpy.float32),
+                         ids=("float64", "float32"))
 @pytest.mark.parametrize("degree, space_dimension", [(13, 127), (14, 144)])
-def test_hct_high_order_degree(degree: int, space_dimension: int) -> None:
-    fe = HCT(ufc_simplex(2), degree)
+def test_hct_high_order_degree(dtype, degree: int, space_dimension: int) -> None:
+    fe = HCT(ufc_simplex(2, dtype=dtype), degree)
     assert fe.space_dimension() == space_dimension
