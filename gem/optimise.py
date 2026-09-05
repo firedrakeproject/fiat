@@ -2,6 +2,7 @@
 expressions."""
 
 from collections import Counter, OrderedDict, defaultdict
+from collections.abc import Callable, Iterable
 from functools import singledispatch, partial
 from itertools import combinations, permutations, zip_longest
 from numbers import Integral
@@ -743,6 +744,159 @@ def traverse_sum(expression, stop_at=None):
         else:
             result.append(expr)
     return result
+
+
+def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
+    """Distribute selected sums through products and contractions.
+
+    Parameters
+    ----------
+    expr
+        GEM expression to distribute.
+    predicate
+        Predicate selecting the operations to distribute.
+
+    Returns
+    -------
+    list of Node
+        Additive terms after distribution.
+
+    Notes
+    -----
+    Memoization uses object identity.  Structurally equal GEM nodes can have
+    deep expression trees, while distribution only needs to reuse actual DAG
+    nodes.
+
+    """
+    results = {}
+    active = {}
+    stack = [(expr, False)]
+    while stack:
+        node, expanded = stack.pop()
+        key = id(node)
+        if key in results:
+            continue
+        if not expanded:
+            stack.append((node, True))
+            stack.extend((c, False) for c in node.children)
+            continue
+        active[key] = predicate(node) or any(
+            active[id(child)] for child in node.children)
+        if active[key] and isinstance(node, (Sum, IndexSum, Product)):
+            if isinstance(node, Sum):
+                results[key] = [
+                    term
+                    for child in node.children
+                    for term in results[id(child)]]
+            elif isinstance(node, IndexSum):
+                body, = node.children
+                results[key] = [
+                    IndexSum(term, tuple(
+                        index for index in node.multiindex
+                        if index in term.free_indices))
+                    for term in results[id(body)]]
+            else:  # Product
+                a, b = node.children
+                ta, tb = results[id(a)], results[id(b)]
+                results[key] = [node] if len(ta) == 1 and len(tb) == 1 \
+                    else [Product(x, y) for x in ta for y in tb]
+        else:
+            results[key] = [node]
+    return results[id(expr)]
+
+
+def _is_linear_map(node: Node, linear_indices: frozenset) -> bool:
+    """Is a node a linear map into one multilinear axis?
+
+    Parameters
+    ----------
+    node
+        GEM expression node.
+    linear_indices
+        Free indices identifying the multilinear axes.
+
+    Returns
+    -------
+    bool
+        Whether the node is a sum over exactly one such axis.
+
+    """
+    return (isinstance(node, Sum)
+            and len(linear_indices.intersection(node.free_indices)) == 1)
+
+
+def has_linear_maps(
+        expressions: Iterable[Node],
+        linear_indices: Iterable[Index]) -> bool:
+    """Does a GEM DAG contain a finite element linear map?
+
+    Parameters
+    ----------
+    expressions
+        Roots of a multilinear GEM expression DAG.
+    linear_indices
+        Free indices identifying the multilinear axes.
+
+    Returns
+    -------
+    bool
+        Whether preserving one-axis sums can change the factorisation.
+
+    Notes
+    -----
+    Answering this costs one traversal, where building the preserved
+    factorisation to compare it costs a whole pass of monomial collection.
+
+    """
+    linear_indices = frozenset(linear_indices)
+    return any(_is_linear_map(node, linear_indices)
+               for node in traversal(tuple(expressions)))
+
+
+def preserve_linear_maps(
+        expression: Node,
+        linear_indices: Iterable[Index]) -> tuple[
+            tuple[Node, ...], tuple[Node, ...]]:
+    """Expose multilinear terms and retain each one-axis linear map.
+
+    A sum that depends on one linear index represents a linear map into an
+    argument tabulation. A sum that depends on several linear indices
+    separates multilinear form terms. This function distributes the latter
+    sums and returns the former sums as factors.
+
+    Parameters
+    ----------
+    expression
+        Multilinear GEM expression.
+    linear_indices
+        Free indices identifying the linear axes.
+
+    Returns
+    -------
+    tuple
+        Additive terms and the linear-map factors that they contain.
+
+    """
+    linear_indices = frozenset(linear_indices)
+
+    def multilinear_sum(node: Node) -> bool:
+        return isinstance(node, Sum) and len(
+            linear_indices.intersection(node.free_indices)) > 1
+
+    if not has_linear_maps((expression,), linear_indices):
+        return (expression,), ()
+
+    terms = tuple(distribute_sum(expression, multilinear_sum))
+    groups = OrderedDict()
+    for term in terms:
+        _, factors = traverse_product(term)
+        for factor in factors:
+            if _is_linear_map(factor, linear_indices):
+                groups.setdefault(factor)
+
+    if not groups:
+        return (expression,), ()
+    return terms, tuple(groups)
 
 
 def repeated_contractions(expression):
