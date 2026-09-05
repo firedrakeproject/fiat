@@ -4,7 +4,7 @@ expressions."""
 from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Callable, Iterable
 from functools import singledispatch, partial
-from itertools import combinations, permutations, zip_longest
+from itertools import combinations, permutations
 from numbers import Integral
 
 import numpy
@@ -17,7 +17,7 @@ from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, IndexBase, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
-                     partial_indexed, one)
+                     jagged_lattice, partial_indexed, one)
 
 
 @singledispatch
@@ -767,6 +767,33 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
+def _distributed_indexsum_term(
+        term: Node, indices: tuple[Index, ...]) -> Node:
+    """Preserve a joint contraction domain after distributing one term."""
+    active = tuple(index for index in indices if index in term.free_indices)
+    missing = tuple(index for index in indices if index not in active)
+    if not missing:
+        return IndexSum(term, indices)
+
+    if any(index.parents for index in indices):
+        points = jagged_lattice(indices)
+        if active:
+            positions = tuple(indices.index(index) for index in active)
+            multiplicity = numpy.zeros(
+                tuple(index.extent for index in active))
+            numpy.add.at(
+                multiplicity,
+                tuple(points[:, position] for position in positions),
+                1,
+            )
+            factor = Indexed(Literal(multiplicity), active)
+        else:
+            factor = Literal(float(len(points)))
+    else:
+        factor = index_space_literal(missing)
+    return IndexSum(Product(term, factor), active)
+
+
 def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
@@ -799,9 +826,7 @@ def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
             elif isinstance(node, IndexSum):
                 body, = node.children
                 results[key] = [
-                    IndexSum(term, tuple(
-                        index for index in node.multiindex
-                        if index in term.free_indices))
+                    _distributed_indexsum_term(term, node.multiindex)
                     for term in results[id(body)]]
             else:  # Product
                 a, b = node.children
@@ -1028,66 +1053,6 @@ def cancel_nested_deltas(expression: Node) -> Node:
         return IndexSum(make_product(factors), tuple(sum_indices))
 
     return Memoizer(visit)(expression)
-
-
-def contraction(expression):
-    """Optimise the contractions of the tensor product at the root of
-    the expression, including:
-
-    - IndexSum-Delta cancellation
-    - Sum factorisation
-
-    This routine was designed with finite element coefficient
-    evaluation in mind.
-    """
-
-    # Common memoizer to remove ComponentTensors
-    index_replacer = MemoizerArg(filtered_replace_indices)
-
-    # Eliminate annoying ComponentTensors
-    expression = index_replacer(expression, ())
-
-    # Flatten product tree, eliminate deltas, sum factorise
-    def rebuild(expression):
-        root = expression
-        # The contraction at the root is always broken up, as that is the
-        # one being optimised
-        keep = repeated_contractions(expression)
-        sum_indices, factors = traverse_product(
-            expression, index_replacer=index_replacer,
-            stop_at=lambda e: e is not root and e in keep)
-        sum_indices, factors = pull_back_indirect_delta(
-            sum_indices, factors, index_replacer)
-        sum_indices, factors = delta_elimination(
-            sum_indices, factors, index_replacer=index_replacer)
-        factors = [index_replacer(f, ()) for f in factors]
-        return sum_factorise(sum_indices, factors)
-
-    # Sometimes the value shape is composed as a ListTensor, which
-    # could get in the way of decomposing factors.  In particular,
-    # this is the case for H(div) and H(curl) conforming tensor
-    # product elements.  So if ListTensors are used, they are pulled
-    # out to be outermost, so we can straightforwardly factorise each
-    # of its entries.
-    lt_fis = OrderedDict()  # ListTensor free indices
-    for node in traversal((expression,)):
-        if isinstance(node, Indexed):
-            child, = node.children
-            if isinstance(child, ListTensor):
-                lt_fis.update(zip_longest(node.multiindex, ()))
-    lt_fis = tuple(index for index in lt_fis if index in expression.free_indices)
-
-    if lt_fis:
-        # Rebuild each split component
-        tensor = ComponentTensor(expression, lt_fis)
-        entries = [Indexed(tensor, zeta) for zeta in numpy.ndindex(tensor.shape)]
-        entries = [index_replacer(e, ()) for e in entries]
-        return Indexed(ListTensor(
-            numpy.array(list(map(rebuild, entries))).reshape(tensor.shape)
-        ), lt_fis)
-    else:
-        # Rebuild whole expression at once
-        return rebuild(expression)
 
 
 @singledispatch
