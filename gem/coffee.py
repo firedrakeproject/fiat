@@ -4,17 +4,17 @@ algorithm operating on a GEM representation.
 This file is NOT for code generation as a COFFEE AST.
 """
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from itertools import chain, repeat
 import logging
 
 import numpy
 
-from gem.gem import ComponentTensor, Index, Indexed, IndexSum, one
+from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Literal, Node, one
 from gem.node import MemoizerArg
 from gem.cost import has_arithmetic
 from gem.optimise import (filtered_replace_indices,
-                          make_sum, make_product)
+                          make_sum, make_product, traverse_sum)
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
 
@@ -201,33 +201,70 @@ def factorise_atomics(monomials, optimal_atomics, linear_indices):
     return new_monomials
 
 
+def _additive_map_key(
+        expression: Node) -> frozenset[tuple[Node, int]]:
+    """Represent an additive linear map independently of term order."""
+    return frozenset(Counter(traverse_sum(expression)).items())
+
+
+def _extract_repeated_linear_maps(
+        monomial_sum: MonomialSum,
+        linear_indices: tuple[Index, ...]) -> MonomialSum:
+    """Move uniform multiplicities from linear maps into scalar factors.
+
+    A repeated additive map is a scalar multiple of the map formed from its
+    distinct summands.  Keeping that scalar in the monomial remainder leaves
+    the atomic factor as the finite element map that should be materialised.
+
+    :arg monomial_sum: sum-of-products representation of a multilinear
+                       expression
+    :arg linear_indices: free indices identifying argument axes
+    :returns: representation with primitive linear maps and scalar
+              multiplicities
+    """
+    linear_set = frozenset(linear_indices)
+    result = MonomialSum()
+    for monomial in monomial_sum:
+        atomics = []
+        factors = []
+        for atomic in monomial.atomics:
+            involved = linear_set.intersection(atomic.free_indices)
+            if len(involved) == 1:
+                summands = traverse_sum(atomic)
+                counts = Counter(summands)
+                multiplicities = set(counts.values())
+                if len(multiplicities) == 1:
+                    multiplicity, = multiplicities
+                    if multiplicity > 1:
+                        atomic = make_sum(list(counts))
+                        factors.append(Literal(float(multiplicity)))
+            atomics.append(atomic)
+        result.add(
+            monomial.sum_indices,
+            atomics,
+            make_product((*factors, monomial.rest)),
+        )
+    return result
+
+
 def _share_linear_maps(
         monomial_sum: MonomialSum,
         linear_indices: tuple[Index, ...]) -> MonomialSum:
     """Share isomorphic maps of distinct multilinear axes.
 
-    Parameters
-    ----------
-    monomial_sum
-        Sum-of-products representation of a multilinear expression.
-    linear_indices
-        Free indices identifying argument axes.
-
-    Returns
-    -------
-    MonomialSum
-        Representation whose repeated linear maps access one tensor.
-
-    Notes
-    -----
     Test and trial axes use distinct indices even when they apply the same
-    finite element map.  Renaming each axis to a canonical index exposes
-    that isomorphism without inspecting the element family.  Materialising
-    the canonical map is generalised code motion: the basis transformation
-    is evaluated once and both axes index its result.
+    finite element map.  Renaming each axis to a canonical index exposes that
+    isomorphism without inspecting the element family.  Materialising the
+    canonical map is generalised code motion: the basis transformation is
+    evaluated once and both axes index its result.
 
+    :arg monomial_sum: sum-of-products representation of a multilinear
+                       expression
+    :arg linear_indices: free indices identifying argument axes
+    :returns: representation whose repeated linear maps access one tensor
     """
     linear_indices = tuple(linear_indices)
+    monomial_sum = _extract_repeated_linear_maps(monomial_sum, linear_indices)
     linear_set = frozenset(linear_indices)
     canonical = {
         index.extent: Index(extent=index.extent)
@@ -235,6 +272,7 @@ def _share_linear_maps(
     }
     replacer = MemoizerArg(filtered_replace_indices)
     groups = defaultdict(list)
+    representatives = {}
     for monomial in monomial_sum:
         for atomic in monomial.atomics:
             involved = linear_set.intersection(atomic.free_indices)
@@ -242,10 +280,13 @@ def _share_linear_maps(
                 continue
             index, = involved
             normal = replacer(atomic, ((index, canonical[index.extent]),))
-            groups[normal].append((atomic, index))
+            key = _additive_map_key(normal)
+            groups[key].append((atomic, index))
+            representatives.setdefault(key, normal)
 
     replacements = {}
-    for normal, occurrences in groups.items():
+    for key, occurrences in groups.items():
+        normal = representatives[key]
         indices = {index for _, index in occurrences}
         if len(indices) < 2 or not has_arithmetic((normal,)):
             continue

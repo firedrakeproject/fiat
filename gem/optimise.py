@@ -9,7 +9,7 @@ from numbers import Integral
 
 import numpy
 
-from gem.cost import index_space_literal
+from gem.cost import estimate_cost, index_space_literal, iteration_count
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
                       reuse_if_untouched_arg, traversal, traversal_children)
@@ -487,9 +487,12 @@ def _plan_contraction(sum_indices, groups):
         reducible[subset] = frozenset(index for index in sum_indices
                                       if not incidence[index] & ~subset)
 
+    # Rank of each contraction index in the caller's ordering, to break ties.
+    position = {index: n for n, index in enumerate(sum_indices)}
+
     def order(indices):
         """Sum out the widest index first, breaking ties reproducibly."""
-        return tuple(sorted(indices, key=lambda i: (-extents[i], i.count)))
+        return tuple(sorted(indices, key=lambda i: (-extents[i], position[i])))
 
     def reduce_indices(expression, free, indices):
         """Sum out indices, largest extent first, costing each reduction."""
@@ -767,24 +770,11 @@ def traverse_sum(expression, stop_at=None):
 def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
-    Parameters
-    ----------
-    expr
-        GEM expression to distribute.
-    predicate
-        Predicate selecting the operations to distribute.
+    Memoisation is by object identity, which reuses each node of the DAG once.
 
-    Returns
-    -------
-    list of Node
-        Additive terms after distribution.
-
-    Notes
-    -----
-    Memoization uses object identity.  Structurally equal GEM nodes can have
-    deep expression trees, while distribution only needs to reuse actual DAG
-    nodes.
-
+    :arg expr: GEM expression to distribute
+    :arg predicate: predicate selecting the operations to distribute
+    :returns: the additive terms after distribution
     """
     results = {}
     active = {}
@@ -826,18 +816,9 @@ def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
 def _is_linear_map(node: Node, linear_indices: frozenset) -> bool:
     """Is a node a linear map into one multilinear axis?
 
-    Parameters
-    ----------
-    node
-        GEM expression node.
-    linear_indices
-        Free indices identifying the multilinear axes.
-
-    Returns
-    -------
-    bool
-        Whether the node is a sum over exactly one such axis.
-
+    :arg node: GEM expression node
+    :arg linear_indices: free indices identifying the multilinear axes
+    :returns: whether the node is a sum over exactly one such axis
     """
     return (isinstance(node, Sum)
             and len(linear_indices.intersection(node.free_indices)) == 1)
@@ -848,23 +829,12 @@ def has_linear_maps(
         linear_indices: Iterable[Index]) -> bool:
     """Does a GEM DAG contain a finite element linear map?
 
-    Parameters
-    ----------
-    expressions
-        Roots of a multilinear GEM expression DAG.
-    linear_indices
-        Free indices identifying the multilinear axes.
+    One traversal answers this, so a caller can gate a second factorisation
+    on it.
 
-    Returns
-    -------
-    bool
-        Whether preserving one-axis sums can change the factorisation.
-
-    Notes
-    -----
-    Answering this costs one traversal, where building the preserved
-    factorisation to compare it costs a whole pass of monomial collection.
-
+    :arg expressions: roots of a multilinear GEM expression DAG
+    :arg linear_indices: free indices identifying the multilinear axes
+    :returns: whether preserving one-axis sums can change the factorisation
     """
     linear_indices = frozenset(linear_indices)
     return any(_is_linear_map(node, linear_indices)
@@ -878,22 +848,13 @@ def preserve_linear_maps(
     """Expose multilinear terms and retain each one-axis linear map.
 
     A sum that depends on one linear index represents a linear map into an
-    argument tabulation. A sum that depends on several linear indices
-    separates multilinear form terms. This function distributes the latter
+    argument tabulation.  A sum that depends on several linear indices
+    separates multilinear form terms.  This function distributes the latter
     sums and returns the former sums as factors.
 
-    Parameters
-    ----------
-    expression
-        Multilinear GEM expression.
-    linear_indices
-        Free indices identifying the linear axes.
-
-    Returns
-    -------
-    tuple
-        Additive terms and the linear-map factors that they contain.
-
+    :arg expression: multilinear GEM expression
+    :arg linear_indices: free indices identifying the linear axes
+    :returns: the additive terms, and the linear-map factors they contain
     """
     linear_indices = frozenset(linear_indices)
 
@@ -958,17 +919,9 @@ def _delta_axes(node: Node, self: Memoizer) -> frozenset:
 def _constant_map(index: IndexBase) -> tuple | None:
     """The literal table behind a VariableIndex, and the indices addressing it.
 
-    Parameters
-    ----------
-    index
-        Index to inspect.
-
-    Returns
-    -------
-    tuple or None
-        ``(array, indices)`` when the index is a lookup into a Literal with a
-        plain multiindex, otherwise None.
-
+    :arg index: index to inspect
+    :returns: ``(array, indices)`` when the index is a lookup into a
+              :class:`~.Literal` with a plain multiindex, otherwise ``None``
     """
     if not isinstance(index, VariableIndex):
         return None
@@ -1232,3 +1185,143 @@ def aggressive_unroll(expression):
     expression, = unroll_indexsum((expression,), predicate=lambda index: True)
     expression, = remove_componenttensors((expression,))
     return expression
+
+
+def factorise_scalar_sums(expression: Node) -> Node:
+    """Factor common products from scalar sums when this lowers GEM cost.
+
+    Scalar geometry and basis-transformation expressions are simplified below
+    the indexed contraction structure.  Contractions are indivisible factors:
+    their bound indices cannot move through an enclosing sum.  Sums carrying
+    free indices are left to the contraction planner, whose cost model
+    includes their iteration domains.
+
+    :arg expression: root of a GEM expression
+    :returns: the expression with profitable common product factors extracted
+    """
+    def choose(node):
+        if node.free_indices:
+            return node
+        summands = traverse_sum(node)
+        if len(summands) < 2:
+            return node
+
+        factorisations = []
+        for summand in summands:
+            _, factors = traverse_product(
+                summand,
+                stop_at=lambda factor: isinstance(factor, IndexSum),
+            )
+            factorisations.append(factors)
+
+        common = Counter(factorisations[0])
+        for factors in factorisations[1:]:
+            common &= Counter(factors)
+        if not common:
+            return node
+
+        common_factors = list(common.elements())
+        remainders = []
+        for factors in factorisations:
+            remaining_common = common.copy()
+            remaining = []
+            for factor in factors:
+                if remaining_common[factor]:
+                    remaining_common[factor] -= 1
+                else:
+                    remaining.append(factor)
+            remainders.append(make_product(remaining))
+
+        candidate = make_product(
+            (*common_factors, make_sum(remainders)))
+        if candidate.free_indices != node.free_indices:
+            return node
+        if estimate_cost((candidate,)) < estimate_cost((node,)):
+            return candidate
+        return node
+
+    def visit(node, self):
+        node = reuse_if_untouched(node, self)
+        if isinstance(node, Sum):
+            node = choose(node)
+        return node
+
+    return Memoizer(visit)(expression)
+
+
+def _indirect_gathers(expression: Node) -> OrderedDict:
+    """Find the maps that an expression reads tables through.
+
+    :arg expression: the root of a scalar GEM expression
+    :returns: an ordered mapping from each :class:`~.VariableIndex` that
+              indexes a table to the number of rows it selects from
+    """
+    gathers = OrderedDict()
+    for node in traversal((expression,)):
+        if isinstance(node, Indexed):
+            aggregate, = node.children
+            for index, extent in zip(node.multiindex, aggregate.shape):
+                if isinstance(index, VariableIndex) and index.expression.free_indices:
+                    gathers.setdefault(index, extent)
+    return gathers
+
+
+def tabulate_indirect_contractions(expression: Node) -> Node:
+    """Evaluate a contraction one time for each row of its table.
+
+    An expression can read a table through a map.  Each argument of the map
+    selects one row, and two arguments can select the same row.  A
+    contraction that reads the table through the map thus repeats work.
+
+    This function evaluates the contraction for each row, then reads those
+    results through the map.  The rewrite is correct only if the map does not
+    change with the contracted indices, and no other part of the contraction
+    uses the argument.  It is faster only if the map has more arguments than
+    the table has rows.
+
+    :arg expression: the root of a scalar GEM expression
+    :returns: the expression with each such contraction evaluated one time
+              for each row
+    """
+    gathers = _indirect_gathers(expression)
+    if not gathers:
+        return expression
+
+    def rename(node, self, substitution):
+        target, replacement = substitution
+        if isinstance(node, Indexed):
+            aggregate, = node.children
+            multiindex = tuple(replacement if index == target else index
+                               for index in node.multiindex)
+            return Indexed(self(aggregate, substitution), multiindex)
+        return reuse_if_untouched_arg(node, self, substitution)
+
+    def hoist(node):
+        body, = node.children
+        free = frozenset(body.free_indices)
+        contracted = frozenset(node.multiindex)
+
+        candidates = []
+        for gather, nrows in gathers.items():
+            arguments = frozenset(gather.expression.free_indices)
+            if arguments <= free and arguments.isdisjoint(contracted):
+                saving = iteration_count(arguments) - nrows
+                if saving > 0:
+                    candidates.append((saving, gather, arguments, nrows))
+
+        for _, gather, arguments, nrows in sorted(candidates, key=lambda c: -c[0]):
+            row = Index(extent=nrows)
+            per_row = MemoizerArg(rename)(body, (gather, row))
+            # The body must reach the arguments only through this gather.
+            if arguments.isdisjoint(per_row.free_indices):
+                table = ComponentTensor(IndexSum(per_row, node.multiindex), (row,))
+                return Indexed(table, (gather,))
+        return node
+
+    def visit(node, self):
+        node = reuse_if_untouched(node, self)
+        if isinstance(node, IndexSum):
+            node = hoist(node)
+        return node
+
+    return Memoizer(visit)(expression)
