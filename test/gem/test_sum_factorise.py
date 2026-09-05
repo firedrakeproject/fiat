@@ -255,3 +255,20 @@ def test_estimate_cost_counts_the_contraction():
     assert flops > 0
     assert storage >= largest > 0
     assert nodes > 0
+
+
+def test_empty_product_contraction_counts_index_tuples() -> None:
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    expression = sum_factorise((i, j), ())
+    result, = evaluate([expression])
+    assert result.arr == 6
+
+
+def test_contraction_counts_index_absent_from_factors() -> None:
+    i, j = gem.Index(extent=2), gem.Index(extent=3)
+    factor = gem.Indexed(gem.Literal(numpy.arange(3.0)), (j,))
+
+    expression = sum_factorise((i, j), (factor,))
+    result, = evaluate([expression])
+
+    assert result.arr == 2 * numpy.arange(3.0).sum()

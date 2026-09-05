@@ -1,10 +1,15 @@
 from abc import ABCMeta, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
+from functools import cached_property
 
 import gem
 import numpy
 
 from finat.citations import cite
+
+
+zero = gem.Zero()
+one = gem.Literal(1.0)
 
 
 class NeedsCoordinateMappingElement(metaclass=ABCMeta):
@@ -16,44 +21,118 @@ class NeedsCoordinateMappingElement(metaclass=ABCMeta):
 
 
 class MappedTabulation(Mapping):
-    """A lazy tabulation dict that applies the basis transformation only
-    on the requested derivatives.
+    """Apply a sparse basis transformation to reference tabulations.
 
-    :arg M: a gem.ListTensor with the basis transformation matrix.
-    :arg ref_tabulation: a dict of tabulations on the reference cell.
-    :kwarg indices: an optional list of restriction indices on the basis functions.
+    Parameters
+    ----------
+    M : gem.ListTensor
+        Basis-transformation matrix.
+    ref_tabulation : Mapping
+        Reference tabulations indexed by derivative order.
+    indices : iterable of int, optional
+        Rows retained by an element restriction.
+
+    Notes
+    -----
+    In order to generate good loopy kernels, rows are padded so that they have
+    the same number of entries.  Constant tables select the reference column
+    and one of the distinct symbolic coefficients.  Interning coefficients
+    preserves their sharing without materialising a symbolic matrix entry by
+    entry.
+
     """
-    def __init__(self, M, ref_tabulation, indices=None):
-        self.M = M
+
+    def __init__(
+            self, M: gem.ListTensor, ref_tabulation: Mapping,
+            indices: Iterable[int] | None = None) -> None:
         self.ref_tabulation = ref_tabulation
         if indices is None:
-            indices = list(range(M.shape[0]))
-        self.indices = indices
-        # we expect M to be sparse with O(1) nonzeros per row
-        # for each row, get the column index of each nonzero entry
-        csr = [[j for j in range(M.shape[1]) if not isinstance(M.array[i, j], gem.Zero)]
-               for i in indices]
-        self.csr = csr
+            indices = range(M.shape[0])
+        self.indices = tuple(indices)
+        self._space_dim = len(self.indices)
+        self._value_dim = M.shape[1]
+
+        nonzero_rows = []
+        for source_row in self.indices:
+            row = []
+            for column in range(M.shape[1]):
+                value = M.array[source_row, column]
+                if not isinstance(value, gem.Zero):
+                    row.append((column, value))
+            nonzero_rows.append(row)
+        width = max((len(row) for row in nonzero_rows), default=0)
+        nrows = len(self.indices)
+        columns = numpy.zeros((nrows, width), dtype=gem.uint_type)
+        data = numpy.full((nrows, width), zero, dtype=object)
+        for index, row in enumerate(nonzero_rows):
+            columns[index, :len(row)] = tuple(column for column, _ in row)
+            data[index, :len(row)] = tuple(gem.as_gem(value) for _, value in row)
+        self._width = width
+        self._columns = gem.Literal(columns, dtype=gem.uint_type)
+        values = []
+        value_numbers = {}
+        value_indices = numpy.empty(data.shape, dtype=gem.uint_type)
+        for multiindex, value in numpy.ndenumerate(data):
+            try:
+                number = value_numbers[value]
+            except KeyError:
+                number = len(values)
+                value_numbers[value] = number
+                values.append(value)
+            value_indices[multiindex] = number
+        self._value_indices = gem.Literal(value_indices, dtype=gem.uint_type)
+        self._values = gem.ListTensor(values)
         self._tabulation_cache = {}
 
-    def matvec(self, table):
-        # basis recombination using hand-rolled sparse-dense matrix multiplication
-        ii = gem.indices(len(table.shape)-1)
-        phi = [gem.Indexed(table, (j, *ii)) for j in range(self.M.shape[1])]
-        # the sum approach is faster than calling numpy.dot or gem.IndexSum
-        exprs = [gem.ComponentTensor(gem.Sum(*(self.M.array[i, j] * phi[j] for j in js)), ii)
-                 for i, js in zip(self.indices, self.csr)]
+    @cached_property
+    def _reference_index(self) -> gem.Index:
+        """Contraction over the reference basis, shared by all tabulations."""
+        return gem.Index(extent=self._value_dim)
 
-        result = gem.ListTensor(exprs)
-        result, = gem.optimise.unroll_indexsum((result,), lambda index: True)
-        # result = gem.optimise.aggressive_unroll(self.M @ table)
-        return result
+    @cached_property
+    def _row_index(self) -> gem.Index:
+        """Contraction over a padded row, shared by all tabulations."""
+        return gem.Index(extent=self._width)
+
+    def _entry(self, r: gem.Index, a: gem.Index) -> gem.Node:
+        """Entry ``M[r, a]`` of the basis transformation.
+
+        Parameters
+        ----------
+        r
+            Index over the rows retained by the element.
+        a
+            Index over the reference basis.
+
+        Returns
+        -------
+        gem.Node
+            A sum over the padded row of an interned entry against a Delta
+            selecting its column, so that contracting either axis of ``M``
+            is ordinary GEM algebra.
+
+        """
+        k = self._row_index
+        entry = gem.Indexed(
+            self._values,
+            (gem.VariableIndex(gem.Indexed(self._value_indices, (r, k))),))
+        column = gem.VariableIndex(gem.Indexed(self._columns, (r, k)))
+        return gem.IndexSum(gem.Product(entry, gem.Delta(column, a)), (k,))
+
+    def matmul(self, table: gem.Node) -> gem.Node:
+        """Apply the basis transformation to a reference tabulation."""
+        r = gem.Index(extent=self._space_dim)
+        a = self._reference_index
+        tail = gem.indices(len(table.shape) - 1)
+        mapped = gem.IndexSum(
+            gem.Product(self._entry(r, a), gem.Indexed(table, (a, *tail))), (a,))
+        return gem.ComponentTensor(mapped, (r, *tail))
 
     def __getitem__(self, alpha):
         try:
             return self._tabulation_cache[alpha]
         except KeyError:
-            result = self.matvec(self.ref_tabulation[alpha])
+            result = self.matmul(self.ref_tabulation[alpha])
             return self._tabulation_cache.setdefault(alpha, result)
 
     def __iter__(self):
@@ -193,10 +272,6 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :returns: a GEM expression for the physical vertices, shape
                 (gdim, )."""
-
-
-zero = gem.Zero()
-one = gem.Literal(1.0)
 
 
 def identity(*shape):
