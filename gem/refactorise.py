@@ -6,10 +6,11 @@ from functools import singledispatch
 from itertools import product
 from sys import intern
 
-from gem.node import Memoizer, traversal
+from gem.node import Memoizer, MemoizerArg, traversal
 from gem.gem import (Node, Conditional, Zero, Product, Sum, Indexed,
                      ListTensor, one, MathFunction)
-from gem.optimise import (remove_componenttensors, sum_factorise,
+from gem.optimise import (delta_elimination, filtered_replace_indices,
+                          remove_componenttensors, sum_factorise,
                           traverse_product, traverse_sum, unroll_indexsum,
                           make_rename_map, make_renamer)
 
@@ -189,9 +190,20 @@ def _collect_monomials(expression, self):
         all_indices = common_indices + s_
         atomics = common_atomics + tuple(map(applier, a))
 
+        others, rest_factors = traverse_product(
+            Product(*common_others, applier(r)),
+            index_replacer=self.index_replacer)
+        all_indices, factors = delta_elimination(
+            all_indices + tuple(others), list(atomics) + rest_factors,
+            index_replacer=self.index_replacer)
+        factors = [self.index_replacer(f, ()) for f in factors]
+        atomic_factors = factors[:len(atomics)]
+        rest_factors = factors[len(atomics):]
+        atomics = tuple(f for f in atomic_factors if f != one)
+
         # All free indices that appear in atomic terms
-        atomic_indices = set().union(*[atomic.free_indices
-                                       for atomic in atomics])
+        atomic_indices = {index for atomic in atomics
+                          for index in atomic.free_indices}
 
         # Sum indices that appear in atomic terms
         # (will go to the result :py:class:`Monomial`)
@@ -205,7 +217,7 @@ def _collect_monomials(expression, self):
 
         # Not really sum factorisation, but rather just an optimised
         # way of building a product.
-        rest = sum_factorise(rest_indices, common_others + [applier(r)])
+        rest = sum_factorise(rest_indices, rest_factors)
 
         result.add(sum_indices, atomics, rest)
     return result
@@ -301,4 +313,5 @@ def collect_monomials(expressions, classifier):
     mapper = Memoizer(_collect_monomials)
     mapper.classifier = classifier
     mapper.rename_map = make_rename_map()
+    mapper.index_replacer = MemoizerArg(filtered_replace_indices)
     return list(map(mapper, expressions))
