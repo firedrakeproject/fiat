@@ -190,23 +190,21 @@ def _collect_monomials(expression, self):
         all_indices = common_indices + s_
         atomics = common_atomics + tuple(map(applier, a))
 
-        # A Product folds to Zero as soon as one of its factors is Zero,
-        # taking the free indices of the others with it.  Such a monomial is
-        # zero, and has no contraction left to plan.
+        # Replace indices
         product = Product(*common_others, applier(r))
         is_zero = isinstance(product, Zero)
+        if is_zero:
+            rest_factors = []
+        else:
+            _, rest_factors = traverse_product(product,
+                                               stop_at=lambda expr: isinstance(expr, IndexSum),
+                                               index_replacer=self.index_replacer)
 
-        # Flatten the product tree, which hides Deltas from delta_elimination,
-        # but stop at the contractions it already contains: contracting them
-        # again here would merge independent ones through the quadrature
-        # indices they share.
-        _, rest_factors = ((), []) if is_zero else traverse_product(
-            product, stop_at=lambda expr: isinstance(expr, IndexSum),
-            index_replacer=self.index_replacer)
-        all_indices, factors = delta_elimination(
-            all_indices, list(atomics) + rest_factors,
-            index_replacer=self.index_replacer)
-        factors = [self.index_replacer(f, ()) for f in factors]
+        # Apply delta elimination
+        factors = list(atomics) + rest_factors
+        all_indices, factors = delta_elimination(all_indices, factors,
+                                                 index_replacer=self.index_replacer)
+
         atomic_factors = factors[:len(atomics)]
         rest_factors = factors[len(atomics):]
         atomics = tuple(f for f in atomic_factors if f != one)
