@@ -556,7 +556,7 @@ def make_renamer(rename_map):
     return partial(_renamer, rename_map, set())
 
 
-def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=None):
+def traverse_product(expression, stop_at=None, renamer=None, index_replacer=None):
     """Traverses a product tree and collects factors, also descending into
     tensor contractions (IndexSum).  The numerators of divisions are
     also broken up, but not the denominators.
@@ -566,16 +566,18 @@ def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=N
                   and returns true for some subexpression, that
                   subexpression is not broken into further factors
                   even if it is a product-like expression.
-    :arg rename_map: an rename map for consistent index renaming
+    :arg renamer: Optional renamer from :py:func:`make_renamer`.  Pass one
+                  that has already seen the indices bound outside
+                  ``expression``, so that the contracted indices hoisted
+                  out of it stay distinct from those.
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
 
     :returns: (sum_indices, terms)
               - sum_indices: list of indices to sum over
               - terms: list of product terms
     """
-    if rename_map is None:
-        rename_map = make_rename_map()
-    renamer = make_renamer(rename_map)
+    if renamer is None:
+        renamer = make_renamer(make_rename_map())
     if index_replacer is None:
         index_replacer = MemoizerArg(filtered_replace_indices)
 

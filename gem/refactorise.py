@@ -190,9 +190,13 @@ def _collect_monomials(expression, self):
         all_indices = common_indices + s_
         atomics = common_atomics + tuple(map(applier, a))
 
-        others, rest_factors = traverse_product(
-            Product(*common_others, applier(r)),
-            index_replacer=self.index_replacer)
+        # A Product folds to Zero as soon as one of its factors is Zero,
+        # taking the free indices of the others with it.  Such a monomial is
+        # zero, and has no contraction left to plan.
+        product = Product(*common_others, applier(r))
+        is_zero = isinstance(product, Zero)
+        others, rest_factors = ((), []) if is_zero else traverse_product(
+            product, renamer=renamer, index_replacer=self.index_replacer)
         all_indices, factors = delta_elimination(
             all_indices + tuple(others), list(atomics) + rest_factors,
             index_replacer=self.index_replacer)
@@ -217,7 +221,7 @@ def _collect_monomials(expression, self):
 
         # Not really sum factorisation, but rather just an optimised
         # way of building a product.
-        rest = sum_factorise(rest_indices, rest_factors)
+        rest = product if is_zero else sum_factorise(rest_indices, rest_factors)
 
         result.add(sum_indices, atomics, rest)
     return result
