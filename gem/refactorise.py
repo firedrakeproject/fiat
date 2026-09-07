@@ -7,8 +7,8 @@ from itertools import product
 from sys import intern
 
 from gem.node import Memoizer, MemoizerArg, traversal
-from gem.gem import (Node, Conditional, Zero, Product, Sum, Indexed,
-                     ListTensor, one, MathFunction)
+from gem.gem import (Node, Conditional, IndexSum, Zero, Product, Sum,
+                     Indexed, ListTensor, one, MathFunction)
 from gem.optimise import (delta_elimination, filtered_replace_indices,
                           remove_componenttensors, sum_factorise,
                           traverse_product, traverse_sum, unroll_indexsum,
@@ -190,11 +190,21 @@ def _collect_monomials(expression, self):
         all_indices = common_indices + s_
         atomics = common_atomics + tuple(map(applier, a))
 
-        others, rest_factors = traverse_product(
-            Product(*common_others, applier(r)),
+        # A Product folds to Zero as soon as one of its factors is Zero,
+        # taking the free indices of the others with it.  Such a monomial is
+        # zero, and has no contraction left to plan.
+        product = Product(*common_others, applier(r))
+        is_zero = isinstance(product, Zero)
+
+        # Flatten the product tree, which hides Deltas from delta_elimination,
+        # but stop at the contractions it already contains: contracting them
+        # again here would merge independent ones through the quadrature
+        # indices they share.
+        _, rest_factors = ((), []) if is_zero else traverse_product(
+            product, stop_at=lambda expr: isinstance(expr, IndexSum),
             index_replacer=self.index_replacer)
         all_indices, factors = delta_elimination(
-            all_indices + tuple(others), list(atomics) + rest_factors,
+            all_indices, list(atomics) + rest_factors,
             index_replacer=self.index_replacer)
         factors = [self.index_replacer(f, ()) for f in factors]
         atomic_factors = factors[:len(atomics)]
@@ -217,7 +227,7 @@ def _collect_monomials(expression, self):
 
         # Not really sum factorisation, but rather just an optimised
         # way of building a product.
-        rest = sum_factorise(rest_indices, rest_factors)
+        rest = product if is_zero else sum_factorise(rest_indices, rest_factors)
 
         result.add(sum_indices, atomics, rest)
     return result
