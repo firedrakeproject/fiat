@@ -153,6 +153,7 @@ def _cancel_deltas(sum_indices, atomics, rest_factors, index_replacer):
     if len(cancelled) == len(sum_indices):
         return sum_indices, atomics, rest_factors
 
+    factors = [index_replacer(f, ()) for f in factors]
     atomic_factors = factors[:len(atomics)]
     return (cancelled,
             tuple(f for f in atomic_factors if f != one),
