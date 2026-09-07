@@ -17,7 +17,7 @@ def MixedElement(elements):
     offsets = [int(offset) for offset in numpy.cumsum([0] + sizes)]
     total_size = offsets.pop()
     return EnrichedElement([MixedSubElement(element, total_size, offset)
-                            for offset, element in zip(offsets, elements)])
+                            for offset, element in zip(offsets, elements)], is_nodal_enriched=True)
 
 
 class MixedSubElement(FiniteElementBase):
