@@ -130,6 +130,35 @@ class FactorisationError(Exception):
     pass
 
 
+def _cancel_deltas(sum_indices, atomics, rest_factors, index_replacer):
+    """IndexSum-Delta cancellation for a monomial under construction.
+
+    ``rest_factors`` are flattened first, which exposes the Deltas that
+    expansion has buried inside a product.  Contractions are left unbroken, as
+    their indices are bound and ``sum_indices`` does not cover them.
+
+    :arg sum_indices: indices contracted by the monomial
+    :arg atomics: the monomial's factors classified as ``ATOMIC``
+    :arg rest_factors: the monomial's other factors
+    :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
+
+    :returns: rebound (sum_indices, atomics, rest_factors), or the arguments
+              as they came if no Delta cancels.
+    """
+    _, flat_factors = traverse_product(
+        Product(*rest_factors), stop_at=lambda expr: isinstance(expr, IndexSum))
+    cancelled, factors = delta_elimination(sum_indices,
+                                           list(atomics) + flat_factors,
+                                           index_replacer=index_replacer)
+    if len(cancelled) == len(sum_indices):
+        return sum_indices, atomics, rest_factors
+
+    atomic_factors = factors[:len(atomics)]
+    return (cancelled,
+            tuple(f for f in atomic_factors if f != one),
+            factors[len(atomics):])
+
+
 @singledispatch
 def _collect_monomials(expression, self):
     """Refactorises an expression into a sum-of-products form, using
@@ -190,42 +219,31 @@ def _collect_monomials(expression, self):
         all_indices = common_indices + s_
         atomics = common_atomics + tuple(map(applier, a))
 
-        # Replace indices
-        product = Product(*common_others, applier(r))
-        is_zero = isinstance(product, Zero)
-        if is_zero:
-            rest_factors = []
-        else:
-            _, rest_factors = traverse_product(product,
-                                               stop_at=lambda expr: isinstance(expr, IndexSum),
-                                               index_replacer=self.index_replacer)
-
-        # Apply delta elimination
-        factors = list(atomics) + rest_factors
-        all_indices, factors = delta_elimination(all_indices, factors,
-                                                 index_replacer=self.index_replacer)
-
-        atomic_factors = factors[:len(atomics)]
-        rest_factors = factors[len(atomics):]
-        atomics = tuple(f for f in atomic_factors if f != one)
+        rest_factors = common_others + [applier(r)]
+        all_indices, atomics, rest_factors = _cancel_deltas(
+            all_indices, atomics, rest_factors, self.index_replacer)
 
         # All free indices that appear in atomic terms
         atomic_indices = {index for atomic in atomics
                           for index in atomic.free_indices}
+
+        # All free indices that appear in the other terms
+        other_indices = {index for factor in rest_factors
+                         for index in factor.free_indices}
 
         # Sum indices that appear in atomic terms
         # (will go to the result :py:class:`Monomial`)
         sum_indices = tuple(index for index in all_indices
                             if index in atomic_indices)
 
-        # Sum indices that do not appear in atomic terms
+        # Sum indices that appear in the other terms alone
         # (can factorise them over atomic terms immediately)
         rest_indices = tuple(index for index in all_indices
-                             if index not in atomic_indices)
+                             if index in other_indices - atomic_indices)
 
         # Not really sum factorisation, but rather just an optimised
         # way of building a product.
-        rest = product if is_zero else sum_factorise(rest_indices, rest_factors)
+        rest = sum_factorise(rest_indices, rest_factors)
 
         result.add(sum_indices, atomics, rest)
     return result
