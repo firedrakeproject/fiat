@@ -100,3 +100,41 @@ def test_flatten_indexsum(A):
     result = gem.IndexSum(gem.IndexSum(Aij, (i,)), (j,))
     expected = gem.IndexSum(Aij, (i, j))
     assert result == expected
+
+
+def test_rename_index_under_variable_index():
+    """Renaming a bound index must reach the lookup of an indirect gather."""
+    values = gem.Literal(numpy.array([10.0, 20.0, 30.0]))
+    lookup = gem.Literal(numpy.array([2, 0, 1], dtype=gem.uint_type),
+                         dtype=gem.uint_type)
+
+    k, kp = gem.indices(2)
+    gather = gem.Indexed(
+        values, (gem.VariableIndex(gem.Indexed(lookup, (k,))),))
+    assert k in gather.free_indices
+
+    # This is how make_renamer separates two sums that bind the same index.
+    renamed = gem.Indexed(gem.ComponentTensor(gather, (k,)), (kp,))
+    assert renamed.free_indices == (kp,)
+
+
+def test_product_of_sums_over_one_index():
+    """Two sums that bind the same index expand to a double sum, not one."""
+    from gem.interpreter import evaluate
+    from gem.optimise import make_rename_map, make_renamer
+
+    values = gem.Literal(numpy.array([1.0, 2.0, 3.0]))
+    lookup = gem.Literal(numpy.array([2, 0, 1], dtype=gem.uint_type),
+                         dtype=gem.uint_type)
+    k, = gem.indices(1)
+    gather = gem.Indexed(
+        values, (gem.VariableIndex(gem.Indexed(lookup, (k,))),))
+
+    renamer = make_renamer(make_rename_map())
+    (k0,), first = renamer((k,))
+    (k1,), second = renamer((k,))
+    assert k0 != k1
+
+    square = gem.IndexSum(gem.Product(first(gather), second(gather)), (k0, k1))
+    result, = evaluate([square])
+    assert numpy.isclose(result.arr, (1.0 + 2.0 + 3.0) ** 2)
