@@ -67,13 +67,22 @@ def shared_index_contraction(nindices, nfactors, extent=2):
     return indices, factors
 
 
-def test_too_many_indices_in_one_contraction():
+def test_greedy_contraction():
     # A connected contraction of more factors than the planner takes falls
-    # back on searching the orderings, which is still bounded.
+    # back on searching the orderings, and one of more indices than that
+    # search can afford is ordered greedily rather than refused.
+    numpy.random.seed(0)
     indices, factors = shared_index_contraction(7, 11)
 
-    with pytest.raises(NotImplementedError):
-        sum_factorise(indices, factors)
+    expression = sum_factorise(indices, factors)
+    assert expression.free_indices == ()
+
+    letters = {index: chr(ord("a") + n) for n, index in enumerate(indices)}
+    spec = ",".join("".join(letters[i] for i in f.multiindex) for f in factors)
+    expected = numpy.einsum(spec + "->", *[f.children[0].array for f in factors])
+
+    result, = evaluate([expression])
+    assert numpy.allclose(result.arr, expected)
 
 
 def test_more_factors_than_indices():
