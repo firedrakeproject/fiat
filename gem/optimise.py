@@ -325,12 +325,15 @@ def select_expression(expressions, index):
     return ComponentTensor(selected, alpha)
 
 
-def delta_elimination(sum_indices, factors, index_replacer=None):
+def delta_elimination(sum_indices, factors, index_replacer=None, indirect_only=False):
     """IndexSum-Delta cancellation.
 
     :arg sum_indices: free indices for contractions
     :arg factors: product factors
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
+    :kwarg indirect_only: only cancel a Delta that compares a
+                          :class:`~.VariableIndex`, leaving one between two
+                          plain indices to a later pass
 
     :returns: optimised (sum_indices, factors)
     """
@@ -347,9 +350,15 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         else:
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
 
-    delta_queue = [(f, index)
-                   for f in factors if isinstance(f, Delta)
-                   for index in (f.i, f.j) if index in sum_indices]
+    def cancellable(factors):
+        return [(f, index)
+                for f in factors if isinstance(f, Delta)
+                if not indirect_only
+                or isinstance(f.i, VariableIndex) or isinstance(f.j, VariableIndex)
+                for index in (f.i, f.j)
+                if index in sum_indices]
+
+    delta_queue = cancellable(factors)
     while delta_queue:
         delta, from_ = delta_queue[0]
         to_, = list({delta.i, delta.j} - {from_})
@@ -358,9 +367,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
 
         factors = [substitute(f, from_, to_) for f in factors]
 
-        delta_queue = [(f, index)
-                       for f in factors if isinstance(f, Delta)
-                       for index in (f.i, f.j) if index in sum_indices]
+        delta_queue = cancellable(factors)
 
     return sum_indices, factors
 
@@ -938,19 +945,21 @@ def repeated_contractions(expression):
     return frozenset(expr for expr, count in counts.items() if count > 1)
 
 
-def _delta_axes(node: Node, self: Memoizer) -> frozenset:
-    """The axes compared by the Deltas below a node, including its own.
+def _indirect_delta_axes(node: Node, self: Memoizer) -> frozenset:
+    """The axes compared by the indirect Deltas below a node, including its own.
 
-    Memoising this over the DAG keeps the search for a cancellable Delta
-    linear, rather than re-walking the subtree at every enclosing
-    contraction.
+    An indirect Delta compares a :class:`~.VariableIndex`, and is the only
+    kind `cancel_nested_deltas` cancels.  Memoising this over the DAG keeps
+    the search for one linear, rather than re-walking the subtree at every
+    enclosing contraction.
 
     :arg node: a GEM expression
     :arg self: memoizer visiting the DAG
-    :returns: the indices some Delta at or below ``node`` compares
+    :returns: the indices some indirect Delta at or below ``node`` compares
     """
     axes = frozenset().union(*map(self, traversal_children(node)))
-    if isinstance(node, Delta):
+    if isinstance(node, Delta) and any(isinstance(i, VariableIndex)
+                                       for i in (node.i, node.j)):
         axes = axes | {node.i, node.j}
     return axes
 
@@ -1047,18 +1056,23 @@ def pull_back_indirect_delta(
 
 
 def cancel_nested_deltas(expression: Node) -> Node:
-    """Apply `delta_elimination` at every contraction of a whole DAG.
+    """Cancel the indirect Deltas at every contraction of a whole DAG.
 
     `delta_elimination` only inspects top-level product factors, so a Delta
     inside a preserved linear map is invisible to it.  Flattening the product
     tree first exposes it, and hoists the contractions it sits under so that
     substituting the Delta's variable index cannot capture them.
 
+    A Delta comparing a :class:`~.VariableIndex` is the only kind handled
+    here.  It is the only kind that has to be: nothing downstream can lower
+    one.  A Delta between two plain indices is left to monomial collection,
+    which cancels it knowing what the substitution costs there.
+
     :arg expression: root of a scalar GEM expression
     :returns: the expression with those Deltas cancelled
     """
     replacer = MemoizerArg(filtered_replace_indices)
-    delta_axes = Memoizer(_delta_axes)
+    delta_axes = Memoizer(_indirect_delta_axes)
 
     def visit(node, self):
         node = reuse_if_untouched(node, self)
@@ -1067,12 +1081,17 @@ def cancel_nested_deltas(expression: Node) -> Node:
         if not delta_axes(node).intersection(node.multiindex):
             return node
         sum_indices, factors = traverse_product(node, index_replacer=replacer)
-        sum_indices, factors = pull_back_indirect_delta(
+        cancelled, new_factors = pull_back_indirect_delta(
             sum_indices, factors, replacer)
-        sum_indices, factors = delta_elimination(
-            sum_indices, factors, index_replacer=replacer)
-        factors = [replacer(factor, ()) for factor in factors]
-        return IndexSum(make_product(factors), tuple(sum_indices))
+        cancelled, new_factors = delta_elimination(
+            cancelled, new_factors, index_replacer=replacer, indirect_only=True)
+        if tuple(cancelled) == tuple(sum_indices) and tuple(new_factors) == tuple(factors):
+            # Nothing cancelled, so rebuilding would only flatten the
+            # contractions this node nests into a single product, and sum
+            # factorisation needs them nested.
+            return node
+        factors = [replacer(factor, ()) for factor in new_factors]
+        return IndexSum(make_product(factors), tuple(cancelled))
 
     return Memoizer(visit)(expression)
 
