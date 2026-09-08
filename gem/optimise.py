@@ -1039,9 +1039,9 @@ def cancel_nested_deltas(expression: Node) -> Node:
         cancelled, new_factors = delta_elimination(
             cancelled, new_factors, index_replacer=replacer, indirect_only=True)
         if tuple(cancelled) == tuple(sum_indices) and tuple(new_factors) == tuple(factors):
-            # The Delta below this node cancelled at an inner contraction, so
-            # leave the ones this node nests as they are rather than
-            # flattening them into a single product.
+            # Nothing cancelled, so rebuilding would only flatten the
+            # contractions this node nests into a single product, and sum
+            # factorisation needs them nested.
             return node
         factors = [replacer(factor, ()) for factor in new_factors]
         return IndexSum(make_product(factors), tuple(cancelled))
