@@ -325,12 +325,15 @@ def select_expression(expressions, index):
     return ComponentTensor(selected, alpha)
 
 
-def delta_elimination(sum_indices, factors, index_replacer=None):
+def delta_elimination(sum_indices, factors, index_replacer=None, protected=frozenset()):
     """IndexSum-Delta cancellation.
 
     :arg sum_indices: free indices for contractions
     :arg factors: product factors
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
+    :kwarg protected: indices that must not be substituted into the other
+                      factors, so that a Delta which carries one of them
+                      survives as a factor of its own
 
     :returns: optimised (sum_indices, factors)
     """
@@ -347,9 +350,14 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
         else:
             return Indexed(ComponentTensor(expression, (from_,)), (to_,))
 
-    delta_queue = [(f, index)
-                   for f in factors if isinstance(f, Delta)
-                   for index in (f.i, f.j) if index in sum_indices]
+    def cancellable(factors):
+        return [(f, index)
+                for f in factors if isinstance(f, Delta)
+                for index in (f.i, f.j)
+                if index in sum_indices
+                and not {f.i, f.j}.difference({index}) <= protected]
+
+    delta_queue = cancellable(factors)
     while delta_queue:
         delta, from_ = delta_queue[0]
         to_, = list({delta.i, delta.j} - {from_})
@@ -358,9 +366,7 @@ def delta_elimination(sum_indices, factors, index_replacer=None):
 
         factors = [substitute(f, from_, to_) for f in factors]
 
-        delta_queue = [(f, index)
-                       for f in factors if isinstance(f, Delta)
-                       for index in (f.i, f.j) if index in sum_indices]
+        delta_queue = cancellable(factors)
 
     return sum_indices, factors
 
@@ -999,7 +1005,7 @@ def pull_back_indirect_delta(
     return sum_indices, factors
 
 
-def cancel_nested_deltas(expression: Node) -> Node:
+def cancel_nested_deltas(expression: Node, protected=frozenset()) -> Node:
     """Apply `delta_elimination` at every contraction of a whole DAG.
 
     `delta_elimination` only inspects top-level product factors, so a Delta
@@ -1008,6 +1014,7 @@ def cancel_nested_deltas(expression: Node) -> Node:
     substituting the Delta's variable index cannot capture them.
 
     :arg expression: root of a scalar GEM expression
+    :kwarg protected: indices a Delta may keep rather than substitute away
     :returns: the expression with those Deltas cancelled
     """
     replacer = MemoizerArg(filtered_replace_indices)
@@ -1020,12 +1027,16 @@ def cancel_nested_deltas(expression: Node) -> Node:
         if not delta_axes(node).intersection(node.multiindex):
             return node
         sum_indices, factors = traverse_product(node, index_replacer=replacer)
-        sum_indices, factors = pull_back_indirect_delta(
+        cancelled, new_factors = pull_back_indirect_delta(
             sum_indices, factors, replacer)
-        sum_indices, factors = delta_elimination(
-            sum_indices, factors, index_replacer=replacer)
-        factors = [replacer(factor, ()) for factor in factors]
-        return IndexSum(make_product(factors), tuple(sum_indices))
+        cancelled, new_factors = delta_elimination(
+            cancelled, new_factors, index_replacer=replacer, protected=protected)
+        if tuple(cancelled) == tuple(sum_indices) and tuple(new_factors) == tuple(factors):
+            # Nothing cancelled here, so leave the contractions this node nests
+            # as they are rather than flattening them into one product.
+            return node
+        factors = [replacer(factor, ()) for factor in new_factors]
+        return IndexSum(make_product(factors), tuple(cancelled))
 
     return Memoizer(visit)(expression)
 
