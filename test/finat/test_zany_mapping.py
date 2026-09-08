@@ -1,11 +1,49 @@
 import FIAT
 import finat
+import gem
 import numpy as np
 import pytest
 import pprint
 
 from gem.interpreter import evaluate
-from finat.physically_mapped import PhysicallyMappedElement
+from gem.node import traversal
+from gem.optimise import contraction
+from finat.physically_mapped import MappedTabulation, PhysicallyMappedElement
+
+
+def test_sparse_mapped_tabulation():
+    """Apply a sparse basis map at the cost of its nonzeros."""
+    coefficient = gem.Variable("coefficient", ())
+    matrix = gem.ListTensor(np.asarray([
+        [gem.Literal(1.0), gem.Zero(), coefficient],
+        [gem.Zero(), gem.Literal(1.0), gem.Zero()],
+    ], dtype=object))
+    table_values = np.arange(1.0, 7.0).reshape(3, 2)
+    table = gem.Literal(table_values)
+
+    mapped_tabulation = MappedTabulation(matrix, {None: table})
+    # Equal symbolic entries share one coefficient slot, so the sparse map
+    # indexes a vector rather than materialising a symbolic matrix.
+    assert mapped_tabulation._values.shape == (3,)
+
+    i, j = gem.indices(2)
+    mapped = contraction(gem.Indexed(mapped_tabulation[None], (i, j)))
+
+    # The three unit entries cost no multiplication, and the one remaining
+    # nonzero costs exactly one. Nothing is selected by a branch.
+    products = [node for node in traversal((mapped,))
+                if isinstance(node, gem.Product)]
+    assert len(products) == 1
+    assert not any(isinstance(node, gem.Conditional)
+                   for node in traversal((mapped,)))
+
+    actual, = evaluate(
+        [gem.ComponentTensor(mapped, (i, j))],
+        {coefficient: np.asarray(2.0)},
+    )
+    expected = np.asarray([[1.0, 0.0, 2.0], [0.0, 1.0, 0.0]]) \
+        @ table_values
+    assert np.array_equal(actual.arr, expected)
 
 
 def make_unisolvent_points(element, interior=False):
