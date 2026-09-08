@@ -12,7 +12,8 @@ import numpy
 
 from gem.gem import ComponentTensor, Index, Indexed, IndexSum, Literal, Node, one
 from gem.node import MemoizerArg
-from gem.optimise import (filtered_replace_indices, has_arithmetic,
+from gem.cost import has_arithmetic
+from gem.optimise import (filtered_replace_indices,
                           make_sum, make_product, traverse_sum)
 from gem.refactorise import Monomial, MonomialSum
 from gem.utils import groupby
@@ -235,7 +236,7 @@ def _extract_repeated_linear_maps(
                 if len(multiplicities) == 1:
                     multiplicity, = multiplicities
                     if multiplicity > 1:
-                        atomic = make_sum(counts)
+                        atomic = make_sum(list(counts))
                         factors.append(Literal(float(multiplicity)))
             atomics.append(atomic)
         result.add(

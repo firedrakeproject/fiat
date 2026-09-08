@@ -1,7 +1,6 @@
 """A set of routines implementing various transformations on GEM
 expressions."""
 
-import math
 from collections import Counter, OrderedDict, defaultdict
 from collections.abc import Callable, Iterable
 from functools import singledispatch, partial
@@ -10,14 +9,14 @@ from numbers import Integral
 
 import numpy
 
+from gem.cost import estimate_cost, index_space_literal, iteration_count
 from gem.utils import groupby
 from gem.node import (Memoizer, MemoizerArg, reuse_if_untouched,
-                      reuse_if_untouched_arg, traversal)
+                      reuse_if_untouched_arg, traversal, traversal_children)
 from gem.gem import (Node, Failure, Identity, Constant, Literal, Zero,
                      Product, Sum, Comparison, Conditional, Division,
                      Index, IndexBase, VariableIndex, Indexed, FlexiblyIndexed,
                      IndexSum, ComponentTensor, ListTensor, Delta,
-                     MathFunction, MinValue, MaxValue, Power, Inverse, Solve,
                      partial_indexed, one)
 
 
@@ -443,6 +442,12 @@ def _independent_contractions(sum_indices, groups):
     return list(subproblems.values()), rest
 
 
+# Planning a tree visits 3**factors subset pairs, while searching the
+# orderings of the contraction indices costs indices!.  Above this many
+# factors the exhaustive search over orderings is the cheaper plan.
+_MAX_PLANNED_FACTORS = 10
+
+
 def _plan_contraction(sum_indices, groups):
     """Choose a product tree for one connected contraction.
 
@@ -536,8 +541,8 @@ def _plan_contraction(sum_indices, groups):
 def _sum_factorise_connected(sum_indices, groups):
     """Sum factorise a single connected contraction.
 
-    Planning the tree costs 3**factors and searching the orderings costs
-    indices!, so take whichever the contraction is small enough for.
+    Take whichever of the two searches the contraction is small enough for;
+    see `_MAX_PLANNED_FACTORS`.
 
     :arg sum_indices: free indices for contractions, which must not split
                       into independent subproblems
@@ -545,10 +550,9 @@ def _sum_factorise_connected(sum_indices, groups):
     :returns: optimised GEM expression
     """
     if not groups:
-        extent = numpy.prod([index.extent for index in sum_indices], dtype=int)
-        return Literal(float(extent))
+        return index_space_literal(sum_indices)
 
-    if len(groups) <= 10:
+    if len(groups) <= _MAX_PLANNED_FACTORS:
         return _plan_contraction(sum_indices, groups)
 
     if len(sum_indices) > 6:
@@ -596,10 +600,7 @@ def sum_factorise(sum_indices, factors):
     :returns: optimised GEM expression
     """
     if len(factors) == 0:
-        # The empty product is one, so contracting it counts the tuples in the
-        # index space.
-        extent = numpy.prod([index.extent for index in sum_indices], dtype=int)
-        return Literal(float(extent))
+        return index_space_literal(sum_indices)
 
     # Form groups by free indices
     groups = groupby(factors, key=lambda f: f.free_indices)
@@ -676,6 +677,26 @@ def make_renamer(rename_map):
     return partial(_renamer, rename_map, set())
 
 
+def _product_descent(expr):
+    """The subexpressions a product-tree walk breaks into further factors.
+
+    A contraction and a product are broken up, and so is the dividend of a
+    division, but never its divisor.  This is the one rule shared by
+    `traverse_product` and `repeated_contractions`.
+
+    :arg expr: a GEM expression
+    :returns: the subexpressions to descend into, empty when ``expr`` is
+              itself a factor
+    """
+    if isinstance(expr, (IndexSum, Product)):
+        return expr.children
+    if isinstance(expr, Division):
+        dividend, _ = expr.children
+        # A reciprocal is a factor in its own right.
+        return () if dividend == one else (dividend,)
+    return ()
+
+
 def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=None):
     """Traverses a product tree and collects factors, also descending into
     tensor contractions (IndexSum).  The numerators of divisions are
@@ -705,24 +726,20 @@ def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=N
     stack = [expression]
     while stack:
         expr = stack.pop()
-        if stop_at is not None and stop_at(expr):
+        children = () if stop_at is not None and stop_at(expr) \
+            else _product_descent(expr)
+        if not children:
             terms.append(expr)
         elif isinstance(expr, IndexSum):
             indices, applier = renamer(expr.multiindex)
             sum_indices.extend(indices)
-            stack.extend(index_replacer(applier(c), ()) for c in expr.children)
-        elif isinstance(expr, Product):
-            stack.extend(reversed(expr.children))
+            stack.extend(index_replacer(applier(c), ()) for c in children)
         elif isinstance(expr, Division):
-            # Break up products in the dividend, but not in divisor.
-            dividend, divisor = expr.children
-            if dividend == one:
-                terms.append(expr)
-            else:
-                stack.append(Division(one, divisor))
-                stack.append(dividend)
+            # The divisor is not broken up, but becomes a factor of its own.
+            stack.append(Division(one, expr.children[1]))
+            stack.extend(children)
         else:
-            terms.append(expr)
+            stack.extend(reversed(children))
 
     return sum_indices, terms
 
@@ -750,87 +767,7 @@ def traverse_sum(expression, stop_at=None):
     return result
 
 
-def _iteration_count(indices: Iterable[Index]) -> int:
-    """Count the points of a rectangular iteration space.
-
-    :arg indices: indices an operation depends on
-    :returns: the number of executions of the operation
-    """
-    return int(numpy.prod([index.extent for index in indices], dtype=int))
-
-
-def _operation_count(node: Node) -> int:
-    """Estimate the scalar operations performed by one GEM node.
-
-    Negation folds into the operation that consumes it, so a product with
-    ``-1`` costs nothing.
-
-    :arg node: scalar expression node
-    :returns: operations over the node's complete iteration domain
-    """
-    domain = _iteration_count(node.free_indices)
-    if isinstance(node, Product):
-        if any(isinstance(child, Literal) and not child.shape
-               and child.value == -1 for child in node.children):
-            return 0
-        return domain
-    if isinstance(node, (Sum, Division, MathFunction, MinValue, MaxValue)):
-        return domain
-    if isinstance(node, Power):
-        _, exponent = node.children
-        if isinstance(exponent, Literal) and not exponent.shape:
-            value = exponent.value
-            if value > 0 and value == math.floor(value):
-                return math.ceil(math.log2(value)) * domain
-        return 5 * domain
-    if isinstance(node, IndexSum):
-        body, = node.children
-        return _iteration_count(body.free_indices)
-    if isinstance(node, Inverse):
-        n, _ = node.shape
-        return 2 * n ** 3
-    if isinstance(node, Solve):
-        n, m = node.shape
-        return 2 * n * m + 2 * n ** 3
-    return 0
-
-
-def has_arithmetic(expressions: Iterable[Node]) -> bool:
-    """Does a GEM DAG perform any scalar arithmetic?
-
-    Materialising a tabulation reference buys no arithmetic, so sharing one
-    only adds storage.
-
-    :arg expressions: roots of a scalar GEM expression DAG
-    :returns: whether any node costs arithmetic to evaluate
-    """
-    return any(map(_operation_count, traversal(tuple(expressions))))
-
-
-def estimate_cost(expressions: Iterable[Node]) -> tuple[int, int, int, int]:
-    """Estimate arithmetic work and contraction storage for a GEM DAG.
-
-    Each structurally shared operation counts once over the domain its free
-    indices induce.  An :class:`~gem.gem.IndexSum` contributes one
-    accumulation per point of its body domain.  Storage counts the result
-    domains of contractions, the intermediates that scheduling exposes.
-
-    :arg expressions: roots of a scalar GEM expression DAG
-    :returns: operation count, total contraction storage, largest
-              contraction, and expression-node count.  Comparing the tuples
-              lexicographically ranks arithmetic first and breaks ties by
-              storage.
-    """
-    nodes = tuple(traversal(tuple(expressions)))
-    sizes = [_iteration_count(node.free_indices)
-             for node in nodes if isinstance(node, IndexSum)]
-    return (sum(map(_operation_count, nodes)),
-            sum(sizes),
-            max(sizes, default=0),
-            len(nodes))
-
-
-def _distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
+def distribute_sum(expr: Node, predicate: Callable[[Node], bool]) -> list[Node]:
     """Distribute selected sums through products and contractions.
 
     Memoisation is by object identity, which reuses each node of the DAG once.
@@ -928,7 +865,7 @@ def preserve_linear_maps(
     if not has_linear_maps((expression,), linear_indices):
         return (expression,), ()
 
-    terms = tuple(_distribute_sum(expression, multilinear_sum))
+    terms = tuple(distribute_sum(expression, multilinear_sum))
     groups = OrderedDict()
     for term in terms:
         _, factors = traverse_product(term)
@@ -958,24 +895,25 @@ def repeated_contractions(expression):
         expr = stack.pop()
         if isinstance(expr, IndexSum):
             counts[expr] += 1
-            stack.extend(expr.children)
-        elif isinstance(expr, Product):
-            stack.extend(expr.children)
-        elif isinstance(expr, Division):
-            stack.append(expr.children[0])
+        stack.extend(_product_descent(expr))
     return frozenset(expr for expr, count in counts.items() if count > 1)
 
 
-def _cancellable_delta(node: Node) -> bool:
-    """Is there a Delta below ``node`` cancelling one of its own indices?
+def _delta_axes(node: Node, self: Memoizer) -> frozenset:
+    """The axes compared by the Deltas below a node, including its own.
 
-    :arg node: an :class:`~.IndexSum`
-    :returns: whether cancelling is possible below it
+    Memoising this over the DAG keeps the search for a cancellable Delta
+    linear, rather than re-walking the subtree at every enclosing
+    contraction.
+
+    :arg node: a GEM expression
+    :arg self: memoizer visiting the DAG
+    :returns: the indices some Delta at or below ``node`` compares
     """
-    contracted = frozenset(node.multiindex)
-    return any(isinstance(child, Delta)
-               and bool({child.i, child.j} & contracted)
-               for child in traversal(node.children))
+    axes = frozenset().union(*map(self, traversal_children(node)))
+    if isinstance(node, Delta):
+        axes = axes | {node.i, node.j}
+    return axes
 
 
 def _constant_map(index: IndexBase) -> tuple | None:
@@ -998,86 +936,73 @@ def _constant_map(index: IndexBase) -> tuple | None:
     return table.array, expression.multiindex
 
 
-def _pull_back(
-        delta: Delta,
+def pull_back_indirect_delta(
         sum_indices: Iterable[Index],
         factors: Iterable[Node],
-        replacer: MemoizerArg) -> tuple | None:
-    """Contract a Delta's own axes before its column axis.
+        replacer: MemoizerArg) -> tuple:
+    """Contract an indirect Delta's own axes before its column axis.
 
     ``sum_a (sum_rk v(r,k) delta(c(r,k), a)) T(a, q)`` is cancelled by
-    substituting ``a := c(r,k)``, which makes ``T`` depend on ``r`` and ``k``
-    and so forces that contraction inside the ``q`` loop.  When ``r`` and
-    ``k`` are contracted here and ``T`` carries indices of its own, summing
-    them first is cheaper: it yields a dense vector indexed by ``a``.
-
-    :arg delta: candidate Delta, a factor of the product
-    :arg sum_indices: indices contracted over the product
-    :arg factors: product factors
-    :arg replacer: ``MemoizerArg(filtered_replace_indices)``
-    :returns: new ``(sum_indices, factors)``, or ``None`` when cancelling is
-              better
-    """
-    column = delta.j if isinstance(delta.i, VariableIndex) else delta.i
-    variable = delta.i if isinstance(delta.i, VariableIndex) else delta.j
-    if not isinstance(column, Index) or not isinstance(variable, VariableIndex):
-        return None
-    lookup = _constant_map(variable)
-    if lookup is None:
-        return None
-    table, source_indices = lookup
-    sources = frozenset(source_indices)
-    if column not in sum_indices or not sources <= set(sum_indices):
-        return None
-
-    others = [f for f in factors if f is not delta]
-    spanning = [f for f in others if column in f.free_indices]
-    pulled = [f for f in others if column not in f.free_indices]
-    if not spanning or not pulled:
-        return None
-    # Cancelling couples the spanning factors to the source indices.  That
-    # only costs anything when they carry indices of their own.
-    if not any(set(f.free_indices) - sources - {column} for f in spanning):
-        return None
-
-    vector = numpy.empty(column.extent, dtype=object)
-    contributions = defaultdict(list)
-    for position in numpy.ndindex(table.shape):
-        substitution = tuple(zip(source_indices, (int(p) for p in position)))
-        contributions[int(table[position])].append(substitution)
-    for value in range(column.extent):
-        terms = [make_product([replacer(f, substitution) for f in pulled])
-                 for substitution in contributions.get(value, ())]
-        # A reference basis function that no row maps onto contributes nothing.
-        vector[value] = make_sum(terms) if terms else Zero()
-
-    rest = tuple(i for i in sum_indices if i not in sources)
-    return rest, [Indexed(ListTensor(vector), (column,)), *spanning]
-
-
-def cancel_deltas(
-        sum_indices: Iterable[Index],
-        factors: Iterable[Node],
-        replacer: MemoizerArg) -> tuple[list, list]:
-    """Cancel contracted Deltas, pulling a map back through its own axes first.
+    `delta_elimination` substituting ``a := c(r,k)``, which makes ``T``
+    depend on ``r`` and ``k`` and so forces that contraction inside the ``q``
+    loop.  When ``r`` and ``k`` are contracted here and ``T`` carries indices
+    of its own, summing them first is cheaper: it yields a dense vector
+    indexed by ``a``.  Run this before `delta_elimination` to take that
+    cheaper route where it exists.
 
     :arg sum_indices: indices contracted over the product
     :arg factors: product factors
     :arg replacer: ``MemoizerArg(filtered_replace_indices)``
-    :returns: the remaining sum indices and factors
+    :returns: new ``(sum_indices, factors)``, unchanged when no Delta is
+              worth pulling back
     """
-    for delta in [f for f in factors if isinstance(f, Delta)]:
-        specialised = _pull_back(delta, sum_indices, factors, replacer)
-        if specialised is not None:
-            sum_indices, factors = specialised
-            break
-    return delta_elimination(sum_indices, factors, index_replacer=replacer)
+    for delta in factors:
+        if not isinstance(delta, Delta):
+            continue
+        column = delta.j if isinstance(delta.i, VariableIndex) else delta.i
+        variable = delta.i if isinstance(delta.i, VariableIndex) else delta.j
+        if not isinstance(column, Index) or not isinstance(variable, VariableIndex):
+            continue
+        lookup = _constant_map(variable)
+        if lookup is None:
+            continue
+        table, source_indices = lookup
+        sources = frozenset(source_indices)
+        if column not in sum_indices or not sources <= set(sum_indices):
+            continue
+
+        others = [f for f in factors if f is not delta]
+        spanning = [f for f in others if column in f.free_indices]
+        pulled = [f for f in others if column not in f.free_indices]
+        if not spanning or not pulled:
+            continue
+        # Cancelling couples the spanning factors to the source indices.  That
+        # only costs anything when they carry indices of their own.
+        if not any(set(f.free_indices) - sources - {column} for f in spanning):
+            continue
+
+        vector = numpy.empty(column.extent, dtype=object)
+        contributions = defaultdict(list)
+        for position in numpy.ndindex(table.shape):
+            substitution = tuple(zip(source_indices, (int(p) for p in position)))
+            contributions[int(table[position])].append(substitution)
+        for value in range(column.extent):
+            terms = [make_product([replacer(f, substitution) for f in pulled])
+                     for substitution in contributions.get(value, ())]
+            # A reference basis function that no row maps onto contributes
+            # nothing.
+            vector[value] = make_sum(terms) if terms else Zero()
+
+        rest = tuple(i for i in sum_indices if i not in sources)
+        return rest, [Indexed(ListTensor(vector), (column,)), *spanning]
+
+    return sum_indices, factors
 
 
-def eliminate_deltas(expression: Node) -> Node:
-    """Cancel contracted Deltas that ``delta_elimination`` cannot reach.
+def cancel_nested_deltas(expression: Node) -> Node:
+    """Apply `delta_elimination` at every contraction of a whole DAG.
 
-    ``delta_elimination`` only inspects top-level product factors, so a Delta
+    `delta_elimination` only inspects top-level product factors, so a Delta
     inside a preserved linear map is invisible to it.  Flattening the product
     tree first exposes it, and hoists the contractions it sits under so that
     substituting the Delta's variable index cannot capture them.
@@ -1086,13 +1011,19 @@ def eliminate_deltas(expression: Node) -> Node:
     :returns: the expression with those Deltas cancelled
     """
     replacer = MemoizerArg(filtered_replace_indices)
+    delta_axes = Memoizer(_delta_axes)
 
     def visit(node, self):
         node = reuse_if_untouched(node, self)
-        if not isinstance(node, IndexSum) or not _cancellable_delta(node):
+        if not isinstance(node, IndexSum):
+            return node
+        if not delta_axes(node).intersection(node.multiindex):
             return node
         sum_indices, factors = traverse_product(node, index_replacer=replacer)
-        sum_indices, factors = cancel_deltas(sum_indices, factors, replacer)
+        sum_indices, factors = pull_back_indirect_delta(
+            sum_indices, factors, replacer)
+        sum_indices, factors = delta_elimination(
+            sum_indices, factors, index_replacer=replacer)
         factors = [replacer(factor, ()) for factor in factors]
         return IndexSum(make_product(factors), tuple(sum_indices))
 
@@ -1125,7 +1056,10 @@ def contraction(expression):
         sum_indices, factors = traverse_product(
             expression, index_replacer=index_replacer,
             stop_at=lambda e: e is not root and e in keep)
-        sum_indices, factors = cancel_deltas(sum_indices, factors, index_replacer)
+        sum_indices, factors = pull_back_indirect_delta(
+            sum_indices, factors, index_replacer)
+        sum_indices, factors = delta_elimination(
+            sum_indices, factors, index_replacer=index_replacer)
         factors = [index_replacer(f, ()) for f in factors]
         return sum_factorise(sum_indices, factors)
 
@@ -1371,7 +1305,7 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
         for gather, nrows in gathers.items():
             arguments = frozenset(gather.expression.free_indices)
             if arguments <= free and arguments.isdisjoint(contracted):
-                saving = _iteration_count(arguments) - nrows
+                saving = iteration_count(arguments) - nrows
                 if saving > 0:
                     candidates.append((saving, gather, arguments, nrows))
 
