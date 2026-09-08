@@ -1295,8 +1295,8 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     This function evaluates the contraction for each row, then reads those
     results through the map.  The rewrite is correct only if the map does not
     change with the contracted indices, and no other part of the contraction
-    uses the argument.  It is faster only if the map has more arguments than
-    the table has rows.
+    uses the argument.  It is faster only when the gathers that share a
+    tabulation have more arguments between them than the table has rows.
 
     :arg expression: the root of a scalar GEM expression
     :returns: the expression with each such contraction evaluated one time
@@ -1305,6 +1305,12 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     gathers = _indirect_gathers(expression)
     if not gathers:
         return expression
+
+    # Gathers that select the same rows with the same arguments read one
+    # tabulation, so they pay for it once between them.
+    readers = Counter((frozenset(gather.expression.free_indices), nrows)
+                      for gather, nrows in gathers.items())
+    row_indices = {}
 
     def rename(node, self, substitution):
         target, replacement = substitution
@@ -1324,12 +1330,15 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
         for gather, nrows in gathers.items():
             arguments = frozenset(gather.expression.free_indices)
             if arguments <= free and arguments.isdisjoint(contracted):
-                saving = iteration_count(arguments) - nrows
+                sharing = readers[(arguments, nrows)]
+                saving = sharing * iteration_count(arguments) - nrows
                 if saving > 0:
                     candidates.append((saving, gather, arguments, nrows))
 
         for _, gather, arguments, nrows in sorted(candidates, key=lambda c: -c[0]):
-            row = Index(extent=nrows)
+            # One index per table, so that gathers sharing a tabulation build
+            # the same node and evaluate it one time.
+            row = row_indices.setdefault((arguments, nrows), Index(extent=nrows))
             per_row = MemoizerArg(rename)(body, (gather, row))
             # The body must reach the arguments only through this gather.
             if arguments.isdisjoint(per_row.free_indices):

@@ -352,3 +352,41 @@ def test_contraction_plan_follows_the_callers_index_order() -> None:
                 if isinstance(node, gem.IndexSum)]
 
     assert plan(False) == plan(True) == [("q", "r")]
+
+
+def test_gathers_sharing_a_table_tabulate_it_once() -> None:
+    """Several gathers of one table share a single tabulation.
+
+    A padded basis transformation reads one reference tabulation through a
+    map per padded column.  Each gather alone selects as many rows as it has
+    arguments, so on its own it saves nothing; together they repeat one
+    contraction once per column.
+    """
+    nrows, npoints, nwidth = 4, 3, 3
+    j = gem.Index(extent=nrows)
+    q = gem.Index(extent=npoints)
+    table = gem.Literal(numpy.arange(nrows * npoints, dtype=float)
+                        .reshape(nrows, npoints))
+    weights = gem.Literal(numpy.arange(1.0, npoints + 1))
+    columns = [gem.Literal(numpy.roll(numpy.arange(nrows), k),
+                           dtype=gem.uint_type)
+               for k in range(nwidth)]
+    terms = [gem.IndexSum(
+        gem.Product(
+            gem.Indexed(table,
+                        (gem.VariableIndex(gem.Indexed(column, (j,))), q)),
+            gem.Indexed(weights, (q,))), (q,))
+        for column in columns]
+    expression = optimise.make_sum(terms)
+
+    tabulated = optimise.tabulate_indirect_contractions(expression)
+
+    tensors = {node for node in traversal((tabulated,))
+               if isinstance(node, gem.ComponentTensor)}
+    assert len(tensors) == 1
+
+    contracted = table.array @ weights.array
+    expected = sum(contracted[numpy.roll(numpy.arange(nrows), k)]
+                   for k in range(nwidth))
+    result, = evaluate([gem.ComponentTensor(tabulated, (j,))])
+    assert numpy.allclose(result.arr, expected)
