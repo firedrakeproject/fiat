@@ -505,8 +505,64 @@
     <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">subproblems</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="n">rest</span>
 
 
+<span class="k">def</span><span class="w"> </span><span class="nf">_contract</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">sum_index</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Sum one index out of a list of product terms.</span>
+
+<span class="sd">    :arg terms: list of product terms</span>
+<span class="sd">    :arg sum_index: the index to contract</span>
+<span class="sd">    :returns: (terms after the contraction, its flop count)</span>
+<span class="sd">    """</span>
+    <span class="c1"># Select terms that need to be part of the contraction</span>
+    <span class="n">contract</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">terms</span> <span class="k">if</span> <span class="n">sum_index</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">free_indices</span><span class="p">]</span>
+    <span class="n">deferred</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">terms</span> <span class="k">if</span> <span class="n">sum_index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">free_indices</span><span class="p">]</span>
+
+    <span class="c1"># Optimise associativity</span>
+    <span class="n">product</span><span class="p">,</span> <span class="n">flops</span> <span class="o">=</span> <span class="n">associate</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">contract</span><span class="p">)</span>
+    <span class="n">term</span> <span class="o">=</span> <span class="n">IndexSum</span><span class="p">(</span><span class="n">product</span><span class="p">,</span> <span class="p">(</span><span class="n">sum_index</span><span class="p">,))</span>
+    <span class="n">flops</span> <span class="o">+=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">i</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">product</span><span class="o">.</span><span class="n">free_indices</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+
+    <span class="c1"># Replace the contracted terms with the result of the contraction.</span>
+    <span class="k">return</span> <span class="n">deferred</span> <span class="o">+</span> <span class="p">[</span><span class="n">term</span><span class="p">],</span> <span class="n">flops</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_contract_in_order</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">groups</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Contract indices in the given order.</span>
+
+<span class="sd">    :returns: (GEM expression, its flop count)</span>
+<span class="sd">    """</span>
+    <span class="n">terms</span> <span class="o">=</span> <span class="n">groups</span><span class="p">[:]</span>
+    <span class="n">flops</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">sum_index</span> <span class="ow">in</span> <span class="n">sum_indices</span><span class="p">:</span>
+        <span class="n">terms</span><span class="p">,</span> <span class="n">flops_</span> <span class="o">=</span> <span class="n">_contract</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">sum_index</span><span class="p">)</span>
+        <span class="n">flops</span> <span class="o">+=</span> <span class="n">flops_</span>
+
+    <span class="c1"># If some contraction indices were independent, then we may still</span>
+    <span class="c1"># have several terms at this point.</span>
+    <span class="n">expression</span><span class="p">,</span> <span class="n">flops_</span> <span class="o">=</span> <span class="n">associate</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">terms</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">expression</span><span class="p">,</span> <span class="n">flops</span> <span class="o">+</span> <span class="n">flops_</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_contract_greedily</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">groups</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Contract indices cheapest first.</span>
+
+<span class="sd">    :returns: (GEM expression, its flop count)</span>
+<span class="sd">    """</span>
+    <span class="n">remaining</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span>
+    <span class="n">ordering</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">terms</span> <span class="o">=</span> <span class="n">groups</span><span class="p">[:]</span>
+    <span class="k">while</span> <span class="n">remaining</span><span class="p">:</span>
+        <span class="n">sum_index</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">remaining</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">index</span><span class="p">:</span> <span class="n">_contract</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">index</span><span class="p">)[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="n">remaining</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">sum_index</span><span class="p">)</span>
+        <span class="n">ordering</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sum_index</span><span class="p">)</span>
+        <span class="n">terms</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_contract</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">sum_index</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_contract_in_order</span><span class="p">(</span><span class="n">ordering</span><span class="p">,</span> <span class="n">groups</span><span class="p">)</span>
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">_sum_factorise_connected</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">groups</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">"""Sum factorise a single connected contraction by exhaustive search.</span>
+<span class="w">    </span><span class="sd">"""Sum factorise a single connected contraction.</span>
+
+<span class="sd">    Contraction orderings are searched exhaustively while that is</span>
+<span class="sd">    affordable, and chosen greedily when it is not.</span>
 
 <span class="sd">    :arg sum_indices: free indices for contractions, which must not split</span>
 <span class="sd">                      into independent subproblems</span>
@@ -514,35 +570,16 @@
 <span class="sd">    :returns: optimised GEM expression</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">6</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Too many indices for sum factorisation!"</span><span class="p">)</span>
+        <span class="c1"># Exhaustive search costs a factorial in the number of indices.</span>
+        <span class="n">expression</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_contract_greedily</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">,</span> <span class="n">groups</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">expression</span>
 
     <span class="n">expression</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">best_flops</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">inf</span>
 
     <span class="c1"># Consider all orderings of contraction indices</span>
     <span class="k">for</span> <span class="n">ordering</span> <span class="ow">in</span> <span class="n">permutations</span><span class="p">(</span><span class="n">sum_indices</span><span class="p">):</span>
-        <span class="n">terms</span> <span class="o">=</span> <span class="n">groups</span><span class="p">[:]</span>
-        <span class="n">flops</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="c1"># Apply contraction index by index</span>
-        <span class="k">for</span> <span class="n">sum_index</span> <span class="ow">in</span> <span class="n">ordering</span><span class="p">:</span>
-            <span class="c1"># Select terms that need to be part of the contraction</span>
-            <span class="n">contract</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">terms</span> <span class="k">if</span> <span class="n">sum_index</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">free_indices</span><span class="p">]</span>
-            <span class="n">deferred</span> <span class="o">=</span> <span class="p">[</span><span class="n">t</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">terms</span> <span class="k">if</span> <span class="n">sum_index</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">free_indices</span><span class="p">]</span>
-
-            <span class="c1"># Optimise associativity</span>
-            <span class="n">product</span><span class="p">,</span> <span class="n">flops_</span> <span class="o">=</span> <span class="n">associate</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">contract</span><span class="p">)</span>
-            <span class="n">term</span> <span class="o">=</span> <span class="n">IndexSum</span><span class="p">(</span><span class="n">product</span><span class="p">,</span> <span class="p">(</span><span class="n">sum_index</span><span class="p">,))</span>
-            <span class="n">flops</span> <span class="o">+=</span> <span class="n">flops_</span> <span class="o">+</span> <span class="n">numpy</span><span class="o">.</span><span class="n">prod</span><span class="p">([</span><span class="n">i</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">product</span><span class="o">.</span><span class="n">free_indices</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
-
-            <span class="c1"># Replace the contracted terms with the result of the</span>
-            <span class="c1"># contraction.</span>
-            <span class="n">terms</span> <span class="o">=</span> <span class="n">deferred</span> <span class="o">+</span> <span class="p">[</span><span class="n">term</span><span class="p">]</span>
-
-        <span class="c1"># If some contraction indices were independent, then we may</span>
-        <span class="c1"># still have several terms at this point.</span>
-        <span class="n">expr</span><span class="p">,</span> <span class="n">flops_</span> <span class="o">=</span> <span class="n">associate</span><span class="p">(</span><span class="n">Product</span><span class="p">,</span> <span class="n">terms</span><span class="p">)</span>
-        <span class="n">flops</span> <span class="o">+=</span> <span class="n">flops_</span>
-
+        <span class="n">expr</span><span class="p">,</span> <span class="n">flops</span> <span class="o">=</span> <span class="n">_contract_in_order</span><span class="p">(</span><span class="n">ordering</span><span class="p">,</span> <span class="n">groups</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">flops</span> <span class="o">&lt;</span> <span class="n">best_flops</span><span class="p">:</span>
             <span class="n">expression</span> <span class="o">=</span> <span class="n">expr</span>
             <span class="n">best_flops</span> <span class="o">=</span> <span class="n">flops</span>
