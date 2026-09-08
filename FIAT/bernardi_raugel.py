@@ -74,15 +74,26 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             # Face moments of tangential components against dual bubbles
             ref_facet = ref_complex.construct_subcomplex(sd-1)
             ref_area = ref_facet.volume()
-
             # Quadrature and weight function for tangential constraints
             codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
-            Qt_ref, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
-            ft_at_qpts = phis[-1]
             if codim == 0:
-                scale = (-1)**(sd-1) * 0.5 * ref_area
+                Qt_ref = parse_quadrature_scheme(ref_facet, 2*degree, quad_scheme=None)
+                Pk = polynomial_set.ONPolynomialSet(ref_facet, degree, scale="orthonormal")
+                coeffs = polynomial_set.project(ref_facet.compute_bubble, Pk, Qt_ref)
+                coeffs[..., :expansions.polynomial_dimension(ref_facet, degree-1)] = 0
+                Pt = polynomial_set.PolynomialSet(ref_facet, degree, degree,
+                                                  Pk.get_expansion_set(),
+                                                  coeffs)
+                ft_at_qpts = Pt.tabulate(Qt_ref.get_points())[(0,)*(sd-1)][-1]
+                bf_at_qpts = ref_facet.compute_bubble(Qt_ref.get_points())
+                bf_wts = numpy.multiply(bf_at_qpts, Qt_ref.get_weights())
+                scale = numpy.sum(bf_wts) / numpy.dot(ft_at_qpts, bf_wts)
+                scale /= ref_area
             else:
+                Qt_ref, phis = make_dual_bubbles(ref_facet, degree, codim=codim, scale=1)
+                ft_at_qpts = phis[-1]
                 scale = ref_area / numpy.dot(ft_at_qpts, Qt_ref.get_weights())
+
             ft_at_qpts *= scale
             if codim != 0:
                 ft_at_qpts -= numpy.dot(ft_at_qpts, Qt_ref.get_weights()) / ref_area
