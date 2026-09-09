@@ -425,8 +425,64 @@ def _independent_contractions(sum_indices, groups):
     return list(subproblems.values()), rest
 
 
+def _contract(terms, sum_index):
+    """Sum one index out of a list of product terms.
+
+    :arg terms: list of product terms
+    :arg sum_index: the index to contract
+    :returns: (terms after the contraction, its flop count)
+    """
+    # Select terms that need to be part of the contraction
+    contract = [t for t in terms if sum_index in t.free_indices]
+    deferred = [t for t in terms if sum_index not in t.free_indices]
+
+    # Optimise associativity
+    product, flops = associate(Product, contract)
+    term = IndexSum(product, (sum_index,))
+    flops += numpy.prod([i.extent for i in product.free_indices], dtype=int)
+
+    # Replace the contracted terms with the result of the contraction.
+    return deferred + [term], flops
+
+
+def _contract_in_order(sum_indices, groups):
+    """Contract indices in the given order.
+
+    :returns: (GEM expression, its flop count)
+    """
+    terms = groups[:]
+    flops = 0
+    for sum_index in sum_indices:
+        terms, flops_ = _contract(terms, sum_index)
+        flops += flops_
+
+    # If some contraction indices were independent, then we may still
+    # have several terms at this point.
+    expression, flops_ = associate(Product, terms)
+    return expression, flops + flops_
+
+
+def _contract_greedily(sum_indices, groups):
+    """Contract indices cheapest first.
+
+    :returns: (GEM expression, its flop count)
+    """
+    remaining = list(sum_indices)
+    ordering = []
+    terms = groups[:]
+    while remaining:
+        sum_index = min(remaining, key=lambda index: _contract(terms, index)[1])
+        remaining.remove(sum_index)
+        ordering.append(sum_index)
+        terms, _ = _contract(terms, sum_index)
+    return _contract_in_order(ordering, groups)
+
+
 def _sum_factorise_connected(sum_indices, groups):
-    """Sum factorise a single connected contraction by exhaustive search.
+    """Sum factorise a single connected contraction.
+
+    Contraction orderings are searched exhaustively while that is
+    affordable, and chosen greedily when it is not.
 
     :arg sum_indices: free indices for contractions, which must not split
                       into independent subproblems
@@ -434,35 +490,16 @@ def _sum_factorise_connected(sum_indices, groups):
     :returns: optimised GEM expression
     """
     if len(sum_indices) > 6:
-        raise NotImplementedError("Too many indices for sum factorisation!")
+        # Exhaustive search costs a factorial in the number of indices.
+        expression, _ = _contract_greedily(sum_indices, groups)
+        return expression
 
     expression = None
     best_flops = numpy.inf
 
     # Consider all orderings of contraction indices
     for ordering in permutations(sum_indices):
-        terms = groups[:]
-        flops = 0
-        # Apply contraction index by index
-        for sum_index in ordering:
-            # Select terms that need to be part of the contraction
-            contract = [t for t in terms if sum_index in t.free_indices]
-            deferred = [t for t in terms if sum_index not in t.free_indices]
-
-            # Optimise associativity
-            product, flops_ = associate(Product, contract)
-            term = IndexSum(product, (sum_index,))
-            flops += flops_ + numpy.prod([i.extent for i in product.free_indices], dtype=int)
-
-            # Replace the contracted terms with the result of the
-            # contraction.
-            terms = deferred + [term]
-
-        # If some contraction indices were independent, then we may
-        # still have several terms at this point.
-        expr, flops_ = associate(Product, terms)
-        flops += flops_
-
+        expr, flops = _contract_in_order(ordering, groups)
         if flops < best_flops:
             expression = expr
             best_flops = flops
@@ -556,7 +593,7 @@ def make_renamer(rename_map):
     return partial(_renamer, rename_map, set())
 
 
-def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=None):
+def traverse_product(expression, stop_at=None, renamer=None, index_replacer=None):
     """Traverses a product tree and collects factors, also descending into
     tensor contractions (IndexSum).  The numerators of divisions are
     also broken up, but not the denominators.
@@ -566,16 +603,18 @@ def traverse_product(expression, stop_at=None, rename_map=None, index_replacer=N
                   and returns true for some subexpression, that
                   subexpression is not broken into further factors
                   even if it is a product-like expression.
-    :arg rename_map: an rename map for consistent index renaming
+    :arg renamer: Optional renamer from :py:func:`make_renamer`.  Pass one
+                  that has already seen the indices bound outside
+                  ``expression``, so that the contracted indices hoisted
+                  out of it stay distinct from those.
     :kwarg index_replacer: MemoizerArg(filtered_replace_indices)
 
     :returns: (sum_indices, terms)
               - sum_indices: list of indices to sum over
               - terms: list of product terms
     """
-    if rename_map is None:
-        rename_map = make_rename_map()
-    renamer = make_renamer(rename_map)
+    if renamer is None:
+        renamer = make_renamer(make_rename_map())
     if index_replacer is None:
         index_replacer = MemoizerArg(filtered_replace_indices)
 
