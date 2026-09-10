@@ -306,3 +306,27 @@ def test_restricted_hdivcurl_dual_basis(family, domain):
         assert set(Q.free_indices) <= set(x.indices)
     assert len(element.dual_basis[1].points) \
         == sum(len(e.dual_basis[1].points) for e in elements)
+
+
+def test_mixed_subelement_dual_evaluation():
+    # A mixed element is the direct sum of its components, so each component
+    # dual evaluates against its own slice of the flattened value vector.
+    cell = ufc_simplex(2)
+    scalar = finat.Lagrange(cell, 1)
+    vector = finat.TensorFiniteElement(scalar, (2,))
+    mixed = finat.MixedElement([scalar, vector])
+    vector_component = mixed.elements[1]
+
+    def fn(points):
+        coordinates = points.expression
+        return gem.ListTensor([
+            gem.Literal(0.0),
+            gem.Indexed(coordinates, (0,)),
+            gem.Indexed(coordinates, (1,)),
+        ])
+
+    expression, point_indices, basis_indices = vector_component.dual_evaluation(fn)
+    result, = evaluate([gem.ComponentTensor(gem.IndexSum(expression, point_indices),
+                                            basis_indices)])
+
+    assert numpy.allclose(result.arr, cell.vertices)
