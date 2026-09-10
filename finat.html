@@ -1346,35 +1346,22 @@ Can be different than self.cell in the case of macro elements.</p>
 <p>In the tensor case this is a tuple.</p>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="finat.enriched.EnrichedElement.dual_evaluation">
-<span class="sig-name descname"><span class="pre">dual_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">argument</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#EnrichedElement.dual_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.EnrichedElement.dual_evaluation" title="Link to this definition">¶</a></dt>
-<dd><p>Get a GEM expression for performing the dual basis evaluation at
-the nodes of the reference element. Currently only works for flat
-elements: tensor elements are implemented in
-<code class="xref py py-class docutils literal notranslate"><span class="pre">TensorFiniteElement</span></code>.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>fn</strong> – Callable representing the function to dual evaluate.
-Callable should take in an <code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractPointSet</span></code> and
-return a GEM expression for evaluation of the function at
-those points.</p></li>
-<li><p><strong>coordinate_mapping</strong> – a
-<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
-provides physical geometry callbacks (may be None).</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(evaluation,</span> <span class="pre">point_indices,</span> <span class="pre">basis_indices)</span></code> where
-<code class="docutils literal notranslate"><span class="pre">evaluation</span></code> is summed over the value shape but still has
-<code class="docutils literal notranslate"><span class="pre">point_indices</span></code> free, leaving the caller to choose how to
-contract over the points. The given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are
-those needed to form a return expression for the code which
-is compiled from <code class="docutils literal notranslate"><span class="pre">evaluation</span></code> (alongside any argument
-multiindices already encoded within <code class="docutils literal notranslate"><span class="pre">fn</span></code>)</p>
-</dd>
-</dl>
+<dl class="py property">
+<dt class="sig sig-object py" id="finat.enriched.EnrichedElement.dual_basis">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">dual_basis</span></span><a class="headerlink" href="#finat.enriched.EnrichedElement.dual_basis" title="Link to this definition">¶</a></dt>
+<dd><p>The weights of the dual basis, on the union of the summands’ points.</p>
+<p>A summand’s functionals evaluate only on that summand’s points, so the
+weights are block diagonal: each summand’s weights sit at its own
+offset in the union, and are zero against every other summand’s
+points.  <code class="xref py py-meth docutils literal notranslate"><span class="pre">_dual_evaluation()</span></code> contracts each summand on its own
+points instead of carrying those zeros.</p>
+<p>Unlike <code class="xref py py-meth docutils literal notranslate"><span class="pre">_dual_evaluation()</span></code>, this has no <code class="docutils literal notranslate"><span class="pre">coordinate_mapping</span></code> to
+apply a summand’s own <a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.dual_transformation" title="finat.finiteelementbase.FiniteElementBase.dual_transformation"><code class="xref py py-meth docutils literal notranslate"><span class="pre">dual_transformation()</span></code></a>
+with, so it refuses a sum with a summand that needs one rather than
+silently combining untransformed weights.</p>
+<p>A non-nodal sum has no dual basis to give.  Its functionals are still
+these weights, but a caller contracts them into coefficients, and that
+is the inverse of this element’s nodal matrix, not the identity.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1458,6 +1445,72 @@ free indices are arbitrary.</p></li>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.as_enriched">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.enriched.EnrichedElement" title="finat.enriched.EnrichedElement"><span class="pre">EnrichedElement</span></a></span></em><span class="sig-paren">)</span></dt>
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.cube.FlattenedDimensions" title="finat.cube.FlattenedDimensions"><span class="pre">FlattenedDimensions</span></a></span></em><span class="sig-paren">)</span></dt>
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.discontinuous.DiscontinuousElement" title="finat.discontinuous.DiscontinuousElement"><span class="pre">DiscontinuousElement</span></a></span></em><span class="sig-paren">)</span></dt>
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.hdivcurl.WrapperElementBase" title="finat.hdivcurl.WrapperElementBase"><span class="pre">WrapperElementBase</span></a></span></em><span class="sig-paren">)</span></dt>
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.quadrature_element.QuadratureElement" title="finat.quadrature_element.QuadratureElement"><span class="pre">QuadratureElement</span></a></span></em><span class="sig-paren">)</span></dt>
+<dt class="sig sig-object py">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.tensor_product.TensorProductElement" title="finat.tensor_product.TensorProductElement"><span class="pre">TensorProductElement</span></a></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Rewrite an element as a direct sum, bringing the sum outermost.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>element</strong> – the <a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase" title="finat.finiteelementbase.FiniteElementBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">FiniteElementBase</span></code></a> to
+rewrite.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>an <a class="reference internal" href="#finat.enriched.EnrichedElement" title="finat.enriched.EnrichedElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnrichedElement</span></code></a> with the same basis functions in the
+same order as <code class="docutils literal notranslate"><span class="pre">element</span></code>, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if <code class="docutils literal notranslate"><span class="pre">element</span></code> is not a direct
+sum.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.as_enriched_discontinuous">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_discontinuous</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_discontinuous"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_discontinuous" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.as_enriched_enriched">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_enriched</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_enriched"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_enriched" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.as_enriched_flattened">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_flattened</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_flattened"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_flattened" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.as_enriched_quadrature_element">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_quadrature_element</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_quadrature_element"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_quadrature_element" title="Link to this definition">¶</a></dt>
+<dd><p>Rewrite a rule on a union of point sets as a sum of one rule each.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.as_enriched_tensor_product">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_tensor_product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_tensor_product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_tensor_product" title="Link to this definition">¶</a></dt>
+<dd><p>Distribute the product over the sum its first factor is.</p>
+<p>The summands of a sum in the first factor own a contiguous range of the
+flat basis index, so they stack in the order the product already numbers
+them.  A sum in any later factor would interleave with the factors before
+it, and stacking would renumber the degrees of freedom.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.as_enriched_wrapper">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">as_enriched_wrapper</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#as_enriched_wrapper"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.as_enriched_wrapper" title="Link to this definition">¶</a></dt>
+<dd><p>Distribute the pullback over the sum the wrapped element is.</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="finat.enriched.concatenate_entity_dofs">
 <span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">concatenate_entity_dofs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ref_el</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">elements</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#concatenate_entity_dofs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.concatenate_entity_dofs" title="Link to this definition">¶</a></dt>
 <dd><p>Combine the entity DoFs from a list of elements into a combined
@@ -1495,9 +1548,27 @@ composed of elements.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="finat.enriched.distribute_over_sum">
+<span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">distribute_over_sum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reconstruct</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">summands</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#distribute_over_sum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.distribute_over_sum" title="Link to this definition">¶</a></dt>
+<dd><p>Rebuild each summand of a direct sum, keeping its nodality.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reconstruct</strong> – called on each of <code class="docutils literal notranslate"><span class="pre">summands.elements</span></code> to rebuild it
+inside whatever wraps the sum.</p></li>
+<li><p><strong>summands</strong> – an <a class="reference internal" href="#finat.enriched.EnrichedElement" title="finat.enriched.EnrichedElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnrichedElement</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>an <a class="reference internal" href="#finat.enriched.EnrichedElement" title="finat.enriched.EnrichedElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnrichedElement</span></code></a> of the rebuilt summands.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="finat.enriched.is_orthogonal">
 <span class="sig-prename descclassname"><span class="pre">finat.enriched.</span></span><span class="sig-name descname"><span class="pre">is_orthogonal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">A</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">B</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/enriched.html#is_orthogonal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.enriched.is_orthogonal" title="Link to this definition">¶</a></dt>
-<dd><p>Test whether two elements are orthogonal.</p>
+<dd><p>Test whether two elements map into orthogonal components.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -2303,6 +2374,26 @@ provides physical geometry callbacks (may be None).</p></li>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="finat.finiteelementbase.broadcast_tensor">
+<span class="sig-prename descclassname"><span class="pre">finat.finiteelementbase.</span></span><span class="sig-name descname"><span class="pre">broadcast_tensor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiindex</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#broadcast_tensor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.broadcast_tensor" title="Link to this definition">¶</a></dt>
+<dd><p>Reshape a tensor expression, broadcasting over the indices it lacks.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>expression</strong> – an indexed tensor.</p></li>
+<li><p><strong>multiindex</strong> – the indices to turn into a shape.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">expression</span></code> as a tensor of the extents of <code class="docutils literal notranslate"><span class="pre">multiindex</span></code>.</p>
+</dd>
+</dl>
+<p><code class="xref py py-class docutils literal notranslate"><span class="pre">gem.ComponentTensor</span></code> requires every index to be free in the
+expression, which a cellwise constant, say, does not satisfy.  Multiply
+by ones to broadcast over the missing indices.</p>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="finat.finiteelementbase.entity_support_dofs">
 <span class="sig-prename descclassname"><span class="pre">finat.finiteelementbase.</span></span><span class="sig-name descname"><span class="pre">entity_support_dofs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">elem</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entity_dim</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/finiteelementbase.html#entity_support_dofs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.finiteelementbase.entity_support_dofs" title="Link to this definition">¶</a></dt>
 <dd><p>Return the map of entity id to the degrees of freedom for which
@@ -2634,7 +2725,8 @@ provides physical geometry callbacks (may be None).</p></li>
 <span class="sig-name descname"><span class="pre">transform</span></span><a class="headerlink" href="#finat.hdivcurl.WrapperElementBase.transform" title="Link to this definition">¶</a></dt>
 <dd><p>A transformation applied on the scalar/vector values of the
 wrapped element to produce an H(div) or H(curl) conforming
-element.</p>
+element.  Takes the wrapped value and the value index of the
+result, and returns the component that index selects.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -2651,6 +2743,26 @@ functions are mapped to produce an H(div) or H(curl)
 conforming element.</p>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="finat.hdivcurl.select_component">
+<span class="sig-prename descclassname"><span class="pre">finat.hdivcurl.</span></span><span class="sig-name descname"><span class="pre">select_component</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">zeta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">components</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/hdivcurl.html#select_component"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.hdivcurl.select_component" title="Link to this definition">¶</a></dt>
+<dd><p>Select one component of a vector with the vector’s value index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>zeta</strong> – the value index of the vector</p></li>
+<li><p><strong>components</strong> – the scalar components of the vector, in order</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the component that <code class="docutils literal notranslate"><span class="pre">zeta</span></code> selects</p>
+</dd>
+</dl>
+<p>Selecting with a <code class="xref py py-class docutils literal notranslate"><span class="pre">gem.Delta</span></code> keeps the components apart, so that
+contracting two of these over <code class="docutils literal notranslate"><span class="pre">zeta</span></code> cancels the components that do not
+coincide.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -3260,6 +3372,14 @@ point set.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="finat.point_set.AbstractPointSet.point_sets">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">point_sets</span></span><a class="headerlink" href="#finat.point_set.AbstractPointSet.point_sets" title="Link to this definition">¶</a></dt>
+<dd><p>The point sets this point set is a union of.</p>
+<p>A plain point set is the union of just itself; overridden by
+<a class="reference internal" href="#finat.point_set.UnionPointSet" title="finat.point_set.UnionPointSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnionPointSet</span></code></a> for the point sets it is actually a union of.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="finat.point_set.AbstractPointSet.points">
 <span class="property"><span class="k"><span class="pre">abstract</span></span><span class="w"> </span><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">points</span></span><a class="headerlink" href="#finat.point_set.AbstractPointSet.points" title="Link to this definition">¶</a></dt>
 <dd><p>A flattened numpy array of points or <a class="reference internal" href="#finat.point_set.UnknownPointsArray" title="finat.point_set.UnknownPointsArray"><code class="xref py py-class docutils literal notranslate"><span class="pre">UnknownPointsArray</span></code></a>
@@ -3434,6 +3554,23 @@ point set.</p>
 object with shape (# of points, point dimension).</p>
 </dd></dl>
 
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="finat.point_set.UnionPointSet">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">finat.point_set.</span></span><span class="sig-name descname"><span class="pre">UnionPointSet</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">point_sets</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/point_set.html#UnionPointSet"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.point_set.UnionPointSet" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#finat.point_set.PointSet" title="finat.point_set.PointSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">PointSet</span></code></a></p>
+<p>All of the points of several point sets, along a single point index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>point_sets</strong> – the point sets to take the union of, in the order they
+occupy the point index.  A union of unions is flattened.</p>
+</dd>
+</dl>
+<p>These are the points of a dual basis that evaluates summand by summand,
+named so that a function space can be built on them.  The point sets are
+kept because an element that needs their structure to tabulate – a tensor
+product, which cannot factor the union – tabulates on each in turn.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -3916,9 +4053,7 @@ freedom for the finite element.</p>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.enriched.EnrichedElement" title="finat.enriched.EnrichedElement"><span class="pre">EnrichedElement</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
 <dt class="sig sig-object py">
-<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.hdivcurl.HCurlElement" title="finat.hdivcurl.HCurlElement"><span class="pre">HCurlElement</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
-<dt class="sig sig-object py">
-<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.hdivcurl.HDivElement" title="finat.hdivcurl.HDivElement"><span class="pre">HDivElement</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
+<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.hdivcurl.WrapperElementBase" title="finat.hdivcurl.WrapperElementBase"><span class="pre">WrapperElementBase</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
 <dt class="sig sig-object py">
 <span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#finat.mixed.MixedSubElement" title="finat.mixed.MixedSubElement"><span class="pre">MixedSubElement</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span></dt>
 <dt class="sig sig-object py">
@@ -3971,14 +4106,13 @@ element.</p></li>
 <dd></dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="finat.restricted.restrict_hcurl">
-<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict_hcurl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#restrict_hcurl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.restrict_hcurl" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="finat.restricted.restrict_hdiv">
-<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict_hdiv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#restrict_hdiv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.restrict_hdiv" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
+<dt class="sig sig-object py" id="finat.restricted.restrict_hdivcurl">
+<span class="sig-prename descclassname"><span class="pre">finat.restricted.</span></span><span class="sig-name descname"><span class="pre">restrict_hdivcurl</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">element</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">take_closure</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/restricted.html#restrict_hdivcurl"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.restricted.restrict_hdivcurl" title="Link to this definition">¶</a></dt>
+<dd><p>Restrict an element that wraps another with a pullback.</p>
+<p>The pullback acts on each subelement separately, so it preserves
+whichever subelements the restriction selects, and with them the
+nodality of the restricted element.</p>
+</dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="finat.restricted.restrict_hdivtrace">
@@ -4813,37 +4947,6 @@ currently have a FInAT dual basis.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation">
-<span class="sig-name descname"><span class="pre">dual_evaluation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinate_mapping</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensorfiniteelement.html#TensorFiniteElement.dual_evaluation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation" title="Link to this definition">¶</a></dt>
-<dd><p>Get a GEM expression for performing the dual basis evaluation at
-the nodes of the reference element. Currently only works for flat
-elements: tensor elements are implemented in
-<a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement" title="finat.tensorfiniteelement.TensorFiniteElement"><code class="xref py py-class docutils literal notranslate"><span class="pre">TensorFiniteElement</span></code></a>.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>fn</strong> – Callable representing the function to dual evaluate.
-Callable should take in an <code class="xref py py-class docutils literal notranslate"><span class="pre">AbstractPointSet</span></code> and
-return a GEM expression for evaluation of the function at
-those points.</p></li>
-<li><p><strong>coordinate_mapping</strong> – a
-<a class="reference internal" href="#finat.physically_mapped.PhysicalGeometry" title="finat.physically_mapped.PhysicalGeometry"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhysicalGeometry</span></code></a> object that
-provides physical geometry callbacks (may be None).</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A tuple <code class="docutils literal notranslate"><span class="pre">(evaluation,</span> <span class="pre">point_indices,</span> <span class="pre">basis_indices)</span></code> where
-<code class="docutils literal notranslate"><span class="pre">evaluation</span></code> is summed over the value shape but still has
-<code class="docutils literal notranslate"><span class="pre">point_indices</span></code> free, leaving the caller to choose how to
-contract over the points. The given <code class="docutils literal notranslate"><span class="pre">basis_indices</span></code> are
-those needed to form a return expression for the code which
-is compiled from <code class="docutils literal notranslate"><span class="pre">evaluation</span></code> (alongside any argument
-multiindices already encoded within <code class="docutils literal notranslate"><span class="pre">fn</span></code>)</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method">
 <dt class="sig sig-object py" id="finat.tensorfiniteelement.TensorFiniteElement.entity_dofs">
 <span class="sig-name descname"><span class="pre">entity_dofs</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/finat/tensorfiniteelement.html#TensorFiniteElement.entity_dofs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#finat.tensorfiniteelement.TensorFiniteElement.entity_dofs" title="Link to this definition">¶</a></dt>
 <dd><p>Return the map of topological entities to degrees of
@@ -5151,7 +5254,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.cell"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.cell</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.complex"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.complex</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.degree"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.degree</span></code></a></li>
-<li><a class="reference internal" href="#finat.enriched.EnrichedElement.dual_evaluation"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.dual_evaluation()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.EnrichedElement.dual_basis"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.dual_basis</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.entity_dofs"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.entity_dofs()</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.entity_permutations"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.entity_permutations</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.fiat_equivalent"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.fiat_equivalent</span></code></a></li>
@@ -5164,8 +5267,16 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.enriched.EnrichedElement.value_shape"><code class="docutils literal notranslate"><span class="pre">EnrichedElement.value_shape</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#finat.enriched.as_enriched"><code class="docutils literal notranslate"><span class="pre">as_enriched()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.as_enriched_discontinuous"><code class="docutils literal notranslate"><span class="pre">as_enriched_discontinuous()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.as_enriched_enriched"><code class="docutils literal notranslate"><span class="pre">as_enriched_enriched()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.as_enriched_flattened"><code class="docutils literal notranslate"><span class="pre">as_enriched_flattened()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.as_enriched_quadrature_element"><code class="docutils literal notranslate"><span class="pre">as_enriched_quadrature_element()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.as_enriched_tensor_product"><code class="docutils literal notranslate"><span class="pre">as_enriched_tensor_product()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.as_enriched_wrapper"><code class="docutils literal notranslate"><span class="pre">as_enriched_wrapper()</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.concatenate_entity_dofs"><code class="docutils literal notranslate"><span class="pre">concatenate_entity_dofs()</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.concatenate_entity_permutations"><code class="docutils literal notranslate"><span class="pre">concatenate_entity_permutations()</span></code></a></li>
+<li><a class="reference internal" href="#finat.enriched.distribute_over_sum"><code class="docutils literal notranslate"><span class="pre">distribute_over_sum()</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.is_orthogonal"><code class="docutils literal notranslate"><span class="pre">is_orthogonal()</span></code></a></li>
 <li><a class="reference internal" href="#finat.enriched.tree_map"><code class="docutils literal notranslate"><span class="pre">tree_map()</span></code></a></li>
 </ul>
@@ -5270,6 +5381,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.finiteelementbase.FiniteElementBase.value_shape"><code class="docutils literal notranslate"><span class="pre">FiniteElementBase.value_shape</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#finat.finiteelementbase.broadcast_tensor"><code class="docutils literal notranslate"><span class="pre">broadcast_tensor()</span></code></a></li>
 <li><a class="reference internal" href="#finat.finiteelementbase.entity_support_dofs"><code class="docutils literal notranslate"><span class="pre">entity_support_dofs()</span></code></a></li>
 </ul>
 </li>
@@ -5324,6 +5436,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.hdivcurl.WrapperElementBase.wrappee"><code class="docutils literal notranslate"><span class="pre">WrapperElementBase.wrappee</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#finat.hdivcurl.select_component"><code class="docutils literal notranslate"><span class="pre">select_component()</span></code></a></li>
 <li><a class="reference internal" href="#finat.hdivcurl.select_hcurl_transformer"><code class="docutils literal notranslate"><span class="pre">select_hcurl_transformer()</span></code></a></li>
 <li><a class="reference internal" href="#finat.hdivcurl.select_hdiv_transformer"><code class="docutils literal notranslate"><span class="pre">select_hdiv_transformer()</span></code></a></li>
 </ul>
@@ -5441,6 +5554,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.point_set.AbstractPointSet.dimension"><code class="docutils literal notranslate"><span class="pre">AbstractPointSet.dimension</span></code></a></li>
 <li><a class="reference internal" href="#finat.point_set.AbstractPointSet.expression"><code class="docutils literal notranslate"><span class="pre">AbstractPointSet.expression</span></code></a></li>
 <li><a class="reference internal" href="#finat.point_set.AbstractPointSet.indices"><code class="docutils literal notranslate"><span class="pre">AbstractPointSet.indices</span></code></a></li>
+<li><a class="reference internal" href="#finat.point_set.AbstractPointSet.point_sets"><code class="docutils literal notranslate"><span class="pre">AbstractPointSet.point_sets</span></code></a></li>
 <li><a class="reference internal" href="#finat.point_set.AbstractPointSet.points"><code class="docutils literal notranslate"><span class="pre">AbstractPointSet.points</span></code></a></li>
 </ul>
 </li>
@@ -5475,6 +5589,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.point_set.TensorPointSet.points"><code class="docutils literal notranslate"><span class="pre">TensorPointSet.points</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#finat.point_set.UnionPointSet"><code class="docutils literal notranslate"><span class="pre">UnionPointSet</span></code></a></li>
 <li><a class="reference internal" href="#finat.point_set.UnknownPointSet"><code class="docutils literal notranslate"><span class="pre">UnknownPointSet</span></code></a><ul>
 <li><a class="reference internal" href="#finat.point_set.UnknownPointSet.expression"><code class="docutils literal notranslate"><span class="pre">UnknownPointSet.expression</span></code></a></li>
 <li><a class="reference internal" href="#finat.point_set.UnknownPointSet.indices"><code class="docutils literal notranslate"><span class="pre">UnknownPointSet.indices</span></code></a></li>
@@ -5551,8 +5666,7 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.restricted.restrict_enriched"><code class="docutils literal notranslate"><span class="pre">restrict_enriched()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_fiat"><code class="docutils literal notranslate"><span class="pre">restrict_fiat()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_flattened_dimensions"><code class="docutils literal notranslate"><span class="pre">restrict_flattened_dimensions()</span></code></a></li>
-<li><a class="reference internal" href="#finat.restricted.restrict_hcurl"><code class="docutils literal notranslate"><span class="pre">restrict_hcurl()</span></code></a></li>
-<li><a class="reference internal" href="#finat.restricted.restrict_hdiv"><code class="docutils literal notranslate"><span class="pre">restrict_hdiv()</span></code></a></li>
+<li><a class="reference internal" href="#finat.restricted.restrict_hdivcurl"><code class="docutils literal notranslate"><span class="pre">restrict_hdivcurl()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_hdivtrace"><code class="docutils literal notranslate"><span class="pre">restrict_hdivtrace()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_mixed"><code class="docutils literal notranslate"><span class="pre">restrict_mixed()</span></code></a></li>
 <li><a class="reference internal" href="#finat.restricted.restrict_tfe"><code class="docutils literal notranslate"><span class="pre">restrict_tfe()</span></code></a></li>
@@ -5658,7 +5772,6 @@ freedom for the finite element.</p>
 <li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.complex"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.complex</span></code></a></li>
 <li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.degree"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.degree</span></code></a></li>
 <li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.dual_basis"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.dual_basis</span></code></a></li>
-<li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.dual_evaluation()</span></code></a></li>
 <li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.entity_dofs"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.entity_dofs()</span></code></a></li>
 <li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.formdegree"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.formdegree</span></code></a></li>
 <li><a class="reference internal" href="#finat.tensorfiniteelement.TensorFiniteElement.index_shape"><code class="docutils literal notranslate"><span class="pre">TensorFiniteElement.index_shape</span></code></a></li>

@@ -36,7 +36,9 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.hdivcurl</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.hdivcurl</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hdiv</span><span class="p">,</span> <span class="n">Hcurl</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">reduce</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.hdivcurl</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hdiv</span><span class="p">,</span> <span class="n">Hcurl</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">FIAT.reference_element</span><span class="w"> </span><span class="kn">import</span> <span class="n">LINE</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">gem</span>
@@ -60,7 +62,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">transform</span> <span class="o">=</span> <span class="n">transform</span>
 <span class="w">        </span><span class="sd">"""A transformation applied on the scalar/vector values of the</span>
 <span class="sd">        wrapped element to produce an H(div) or H(curl) conforming</span>
-<span class="sd">        element."""</span>
+<span class="sd">        element.  Takes the wrapped value and the value index of the</span>
+<span class="sd">        result, and returns the component that index selects."""</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">cell</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -113,11 +116,11 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_transform_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">core_eval</span><span class="p">):</span>
         <span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
         <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
+        <span class="n">z</span><span class="p">,</span> <span class="o">=</span> <span class="n">zeta</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">promote</span><span class="p">(</span><span class="n">table</span><span class="p">):</span>
             <span class="n">v</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">partial_indexed</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">beta</span><span class="p">)</span>
-            <span class="n">u</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">v</span><span class="p">))</span>
-            <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">zeta</span><span class="p">),</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">z</span><span class="p">),</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">promote</span><span class="p">(</span><span class="n">table</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">alpha</span><span class="p">,</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">core_eval</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
@@ -141,13 +144,14 @@
         <span class="n">Q</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wrappee</span><span class="o">.</span><span class="n">dual_basis</span>
         <span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
         <span class="n">zeta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
+        <span class="n">z</span><span class="p">,</span> <span class="o">=</span> <span class="n">zeta</span>
         <span class="c1"># Index out the basis indices from wrapee's Q, to get</span>
         <span class="c1"># something of wrappee.value_shape, then promote to new shape</span>
         <span class="c1"># with the same transform as done for basis evaluation</span>
-        <span class="n">Q</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ListTensor</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">partial_indexed</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">beta</span><span class="p">)))</span>
+        <span class="n">Q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">partial_indexed</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">beta</span><span class="p">),</span> <span class="n">z</span><span class="p">)</span>
         <span class="c1"># Finally wrap up Q in shape again (now with some extra</span>
         <span class="c1"># value_shape indices)</span>
-        <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">Q</span><span class="p">[</span><span class="n">zeta</span><span class="p">],</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">),</span> <span class="n">x</span></div>
+        <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">beta</span> <span class="o">+</span> <span class="n">zeta</span><span class="p">),</span> <span class="n">x</span></div>
 
 
 
@@ -213,6 +217,24 @@
 
 
 
+<div class="viewcode-block" id="select_component">
+<a class="viewcode-back" href="../../finat.html#finat.hdivcurl.select_component">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="n">components</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Select one component of a vector with the vector's value index.</span>
+
+<span class="sd">    :arg zeta: the value index of the vector</span>
+<span class="sd">    :arg components: the scalar components of the vector, in order</span>
+<span class="sd">    :returns: the component that ``zeta`` selects</span>
+
+<span class="sd">    Selecting with a :class:`gem.Delta` keeps the components apart, so that</span>
+<span class="sd">    contracting two of these over ``zeta`` cancels the components that do not</span>
+<span class="sd">    coincide.</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Sum</span><span class="p">,</span> <span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="n">i</span><span class="p">),</span> <span class="n">v</span><span class="p">)</span>
+                            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">components</span><span class="p">)))</span></div>
+
+
+
 <div class="viewcode-block" id="select_hdiv_transformer">
 <a class="viewcode-back" href="../../finat.html#finat.hdivcurl.select_hdiv_transformer">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">select_hdiv_transformer</span><span class="p">(</span><span class="n">element</span><span class="p">):</span>
@@ -228,27 +250,27 @@
     <span class="k">if</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
         <span class="c1"># Make the scalar value the leftward-pointing normal on the</span>
         <span class="c1"># y-aligned edges.</span>
-        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">v</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">v</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()])</span>
     <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
         <span class="c1"># Make the scalar value the upward-pointing normal on the</span>
         <span class="c1"># x-aligned edges.</span>
-        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">v</span><span class="p">]</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">v</span><span class="p">])</span>
     <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
         <span class="c1"># Same for 3D, so z-plane.</span>
-        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">v</span><span class="p">]</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">(),</span> <span class="n">v</span><span class="p">])</span>
     <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">"contravariant piola"</span><span class="p">:</span>
             <span class="c1"># Pad the 2-vector normal on the "base" cell into a</span>
             <span class="c1"># 3-vector, maintaining direction.</span>
-            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
-                              <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
-                              <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
+                                                           <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
+                                                           <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()])</span>
         <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">"covariant piola"</span><span class="p">:</span>
             <span class="c1"># Rotate the 2-vector tangential component on the "base"</span>
             <span class="c1"># cell 90 degrees anticlockwise into a 3-vector and pad.</span>
-            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
-                              <span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,))),</span>
-                              <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
+                                                           <span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,))),</span>
+                                                           <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()])</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"Unexpected original mapping!"</span>
     <span class="k">else</span><span class="p">:</span>
@@ -272,25 +294,25 @@
         <span class="k">if</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
             <span class="c1"># Can only be 2D.  Make the scalar value the</span>
             <span class="c1"># rightward-pointing tangential on the x-aligned edges.</span>
-            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">v</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">v</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()])</span>
         <span class="k">elif</span> <span class="n">ks</span> <span class="o">==</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span>
             <span class="c1"># Can be any spatial dimension.  Make the scalar value the</span>
             <span class="c1"># upward-pointing tangential.</span>
-            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span> <span class="o">*</span> <span class="p">(</span><span class="n">dim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">v</span><span class="p">]</span>
+            <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span> <span class="o">*</span> <span class="p">(</span><span class="n">dim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">assert</span> <span class="kc">False</span>
     <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">"covariant piola"</span><span class="p">:</span>
         <span class="c1"># Second factor must be continuous interval.  Just padding.</span>
-        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
-                          <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
-                          <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
+                                                       <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,)),</span>
+                                                       <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()])</span>
     <span class="k">elif</span> <span class="n">element</span><span class="o">.</span><span class="n">mapping</span> <span class="o">==</span> <span class="s2">"contravariant piola"</span><span class="p">:</span>
         <span class="c1"># Second factor must be continuous interval.  Rotate the</span>
         <span class="c1"># 2-vector tangential component on the "base" cell 90 degrees</span>
         <span class="c1"># clockwise into a 3-vector and pad.</span>
-        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">:</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,))),</span>
-                          <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
-                          <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()]</span>
+        <span class="k">return</span> <span class="k">lambda</span> <span class="n">v</span><span class="p">,</span> <span class="n">zeta</span><span class="p">:</span> <span class="n">select_component</span><span class="p">(</span><span class="n">zeta</span><span class="p">,</span> <span class="p">[</span><span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,))),</span>
+                                                       <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,)),</span>
+                                                       <span class="n">gem</span><span class="o">.</span><span class="n">Zero</span><span class="p">()])</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">assert</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"Unexpected original mapping!"</span></div>
 

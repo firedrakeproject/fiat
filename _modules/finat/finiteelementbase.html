@@ -47,6 +47,27 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">finat.quadrature</span><span class="w"> </span><span class="kn">import</span> <span class="n">make_quadrature</span>
 
 
+<div class="viewcode-block" id="broadcast_tensor">
+<a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.broadcast_tensor">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">broadcast_tensor</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">multiindex</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Reshape a tensor expression, broadcasting over the indices it lacks.</span>
+
+<span class="sd">    :arg expression: an indexed tensor.</span>
+<span class="sd">    :arg multiindex: the indices to turn into a shape.</span>
+<span class="sd">    :returns: ``expression`` as a tensor of the extents of ``multiindex``.</span>
+
+<span class="sd">    :class:`gem.ComponentTensor` requires every index to be free in the</span>
+<span class="sd">    expression, which a cellwise constant, say, does not satisfy.  Multiply</span>
+<span class="sd">    by ones to broadcast over the missing indices.</span>
+<span class="sd">    """</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">multiindex</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">expression</span><span class="o">.</span><span class="n">free_indices</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="n">ones</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Literal</span><span class="p">(</span><span class="n">numpy</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">i</span><span class="o">.</span><span class="n">extent</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">missing</span><span class="p">)))</span>
+        <span class="n">expression</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">ones</span><span class="p">,</span> <span class="n">missing</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">multiindex</span><span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="FiniteElementBase">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FiniteElementBase</span><span class="p">(</span><span class="n">metaclass</span><span class="o">=</span><span class="n">ABCMeta</span><span class="p">):</span>
@@ -227,6 +248,38 @@
 <span class="sd">        '''</span></div>
 
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_stack_tabulations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Tabulate on each point set of a union, stacking on the point index.</span>
+
+<span class="sd">        :arg order: return derivatives up to this order.</span>
+<span class="sd">        :arg ps: the :class:`~finat.point_set.UnionPointSet` to tabulate on.</span>
+<span class="sd">        :arg entity: the cell entity on which to tabulate.</span>
+<span class="sd">        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`</span>
+<span class="sd">            object that provides physical geometry callbacks (may be None).</span>
+<span class="sd">        :returns: the tabulation on the whole of ``ps``, as</span>
+<span class="sd">            :meth:`basis_evaluation` returns.</span>
+
+<span class="sd">        A union of points has no structure of its own, so structured elements</span>
+<span class="sd">        tabulate on each point set in turn and stack the tabulations here.</span>
+<span class="sd">        """</span>
+        <span class="n">tables</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">basis_evaluation</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">sub</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span>
+                                        <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+                  <span class="k">for</span> <span class="n">sub</span> <span class="ow">in</span> <span class="n">ps</span><span class="o">.</span><span class="n">point_sets</span><span class="p">]</span>
+        <span class="n">keys</span><span class="p">,</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">frozenset</span><span class="p">,</span> <span class="n">tables</span><span class="p">))</span>
+        <span class="n">p</span><span class="p">,</span> <span class="o">=</span> <span class="n">ps</span><span class="o">.</span><span class="n">indices</span>
+        <span class="n">multiindex</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_indices</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()))</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">concatenate</span><span class="p">(</span><span class="n">alpha</span><span class="p">):</span>
+            <span class="c1"># The point indices are free in each table, so promote them to a</span>
+            <span class="c1"># shape before concatenating the tables along it.</span>
+            <span class="n">pieces</span> <span class="o">=</span> <span class="p">[</span><span class="n">broadcast_tensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">table</span><span class="p">[</span><span class="n">alpha</span><span class="p">],</span> <span class="n">multiindex</span><span class="p">),</span>
+                                       <span class="n">sub</span><span class="o">.</span><span class="n">indices</span><span class="p">)</span>
+                      <span class="k">for</span> <span class="n">table</span><span class="p">,</span> <span class="n">sub</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">tables</span><span class="p">,</span> <span class="n">ps</span><span class="o">.</span><span class="n">point_sets</span><span class="p">)]</span>
+            <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span>
+                <span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Concatenate</span><span class="p">(</span><span class="o">*</span><span class="n">pieces</span><span class="p">),</span> <span class="p">(</span><span class="n">p</span><span class="p">,)),</span> <span class="n">multiindex</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">{</span><span class="n">alpha</span><span class="p">:</span> <span class="n">concatenate</span><span class="p">(</span><span class="n">alpha</span><span class="p">)</span> <span class="k">for</span> <span class="n">alpha</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">}</span>
+
 <div class="viewcode-block" id="FiniteElementBase.point_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.point_evaluation">[docs]</a>
     <span class="nd">@abstractmethod</span>
@@ -331,6 +384,29 @@
 <span class="sd">                  is compiled from ``evaluation`` (alongside any argument</span>
 <span class="sd">                  multiindices already encoded within ``fn``)</span>
 <span class="sd">        '''</span>
+        <span class="c1"># Only a direct sum can dual evaluate each summand on its own points,</span>
+        <span class="c1"># so bring the sum outermost first.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">finat.enriched</span><span class="w"> </span><span class="kn">import</span> <span class="n">as_enriched</span>  <span class="c1"># Avoid circular import</span>
+        <span class="n">summands</span> <span class="o">=</span> <span class="n">as_enriched</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">summands</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">summands</span> <span class="ow">is</span> <span class="ow">not</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">summands</span><span class="o">.</span><span class="n">dual_evaluation</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dual_evaluation</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Dual evaluate an element that is not a direct sum.</span>
+
+<span class="sd">        :arg fn: Callable representing the function to dual evaluate.</span>
+<span class="sd">            Callable should take in an :class:`AbstractPointSet` and return a</span>
+<span class="sd">            GEM expression for evaluation of the function at those points.</span>
+<span class="sd">        :arg coordinate_mapping: a :class:`~.physically_mapped.PhysicalGeometry`</span>
+<span class="sd">            object that provides physical geometry callbacks (may be None).</span>
+<span class="sd">        :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as</span>
+<span class="sd">            :meth:`dual_evaluation` returns.</span>
+
+<span class="sd">        :meth:`dual_evaluation` rewrites an element as a direct sum before</span>
+<span class="sd">        calling this, so the element here has a single set of points.</span>
+<span class="sd">        """</span>
         <span class="n">Q</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
         <span class="n">Q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_transformation</span><span class="p">(</span><span class="n">Q</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
 
@@ -343,8 +419,7 @@
         <span class="n">Qi</span> <span class="o">=</span> <span class="n">Q</span><span class="p">[</span><span class="n">basis_indices</span> <span class="o">+</span> <span class="n">shape_indices</span><span class="p">]</span>
         <span class="n">expri</span> <span class="o">=</span> <span class="n">expr</span><span class="p">[</span><span class="n">shape_indices</span><span class="p">]</span>
         <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">Qi</span> <span class="o">*</span> <span class="n">expri</span><span class="p">,</span> <span class="n">shape_indices</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span><span class="p">,</span> <span class="n">basis_indices</span></div>
-
+        <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span><span class="p">,</span> <span class="n">basis_indices</span>
 
 <div class="viewcode-block" id="FiniteElementBase.dual_transformation">
 <a class="viewcode-back" href="../../finat.html#finat.finiteelementbase.FiniteElementBase.dual_transformation">[docs]</a>

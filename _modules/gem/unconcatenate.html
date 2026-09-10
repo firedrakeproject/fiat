@@ -104,7 +104,7 @@
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s1">'flatten'</span><span class="p">,</span> <span class="s1">'unconcatenate'</span><span class="p">]</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">find_group</span><span class="p">(</span><span class="n">expressions</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">find_group</span><span class="p">(</span><span class="n">expressions</span><span class="p">,</span> <span class="n">splittable_indices</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Finds a full set of indexed Concatenate nodes with the same</span>
 <span class="sd">    free index, if any such node exists.</span>
 
@@ -112,10 +112,11 @@
 <span class="sd">    must be removed.</span>
 
 <span class="sd">    :arg expressions: a multi-root GEM expression DAG</span>
+<span class="sd">    :arg splittable_indices: the indices that may be split along, that is,</span>
+<span class="sd">        those carried by the assignment variables.  A Concatenate indexed by</span>
+<span class="sd">        anything else has nothing to be split against, and is left alone.</span>
 <span class="sd">    :returns: a list of GEM nodes, or None</span>
 <span class="sd">    """</span>
-    <span class="n">free_indices</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">free_indices</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">expressions</span><span class="p">]))</span>
-
     <span class="c1"># Result variables</span>
     <span class="n">index</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="n">nodes</span> <span class="o">=</span> <span class="p">[]</span>
@@ -131,15 +132,14 @@
 
     <span class="k">while</span> <span class="n">lifo</span><span class="p">:</span>
         <span class="n">node</span> <span class="o">=</span> <span class="n">lifo</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">free_indices</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">free_indices</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">splittable_indices</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">free_indices</span><span class="p">):</span>
             <span class="k">continue</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">node</span><span class="p">,</span> <span class="n">Indexed</span><span class="p">):</span>
             <span class="n">child</span><span class="p">,</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">children</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">child</span><span class="p">,</span> <span class="n">Concatenate</span><span class="p">):</span>
                 <span class="n">i</span><span class="p">,</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">multiindex</span>
-                <span class="k">assert</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">free_indices</span>
-                <span class="k">if</span> <span class="p">(</span><span class="n">index</span> <span class="ow">or</span> <span class="n">i</span><span class="p">)</span> <span class="o">==</span> <span class="n">i</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">splittable_indices</span> <span class="ow">and</span> <span class="p">(</span><span class="n">index</span> <span class="ow">or</span> <span class="n">i</span><span class="p">)</span> <span class="o">==</span> <span class="n">i</span><span class="p">:</span>
                     <span class="n">index</span> <span class="o">=</span> <span class="n">i</span>
                     <span class="n">nodes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
                     <span class="c1"># Skip adding children</span>
@@ -216,7 +216,9 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">_unconcatenate</span><span class="p">(</span><span class="n">cache</span><span class="p">,</span> <span class="n">pairs</span><span class="p">):</span>
     <span class="c1"># Tail-call recursive core of unconcatenate.</span>
     <span class="c1"># Assumes that input has already been sanitised.</span>
-    <span class="n">concat_group</span> <span class="o">=</span> <span class="n">find_group</span><span class="p">([</span><span class="n">e</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">])</span>
+    <span class="c1"># Only an index carried by an assignment variable can be split against it.</span>
+    <span class="n">splittable</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">v</span><span class="o">.</span><span class="n">free_indices</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">]))</span>
+    <span class="n">concat_group</span> <span class="o">=</span> <span class="n">find_group</span><span class="p">([</span><span class="n">e</span> <span class="k">for</span> <span class="n">v</span><span class="p">,</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">pairs</span><span class="p">],</span> <span class="n">splittable</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">concat_group</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">pairs</span>
 

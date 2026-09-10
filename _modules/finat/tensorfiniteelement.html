@@ -222,32 +222,48 @@
         <span class="n">tQ</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">Qi</span><span class="o">*</span><span class="n">deltas</span><span class="p">,</span> <span class="n">index_ordering</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">tQ</span><span class="p">,</span> <span class="n">points</span>
 
-<div class="viewcode-block" id="TensorFiniteElement.dual_evaluation">
-<a class="viewcode-back" href="../../finat.html#finat.tensorfiniteelement.TensorFiniteElement.dual_evaluation">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-        <span class="n">tQ</span><span class="p">,</span> <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dual_basis</span>
-        <span class="n">tQ</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_base_element</span><span class="o">.</span><span class="n">dual_transformation</span><span class="p">(</span><span class="n">tQ</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_dual_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Dual evaluate the base element on one tensor component at a time.</span>
 
-        <span class="n">expr</span> <span class="o">=</span> <span class="n">fn</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="c1"># NOTE: any shape indices in the expression are because the</span>
-        <span class="c1"># expression is tensor valued.</span>
-        <span class="k">assert</span> <span class="n">expr</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span>
+<span class="sd">        :arg fn: Callable representing the function to dual evaluate.</span>
+<span class="sd">                 Callable should take in an :class:`AbstractPointSet` and</span>
+<span class="sd">                 return a GEM expression for evaluation of the function at</span>
+<span class="sd">                 those points.</span>
+<span class="sd">        :arg coordinate_mapping: a</span>
+<span class="sd">           :class:`~.physically_mapped.PhysicalGeometry` object that</span>
+<span class="sd">           provides physical geometry callbacks (may be None).</span>
+<span class="sd">        :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as</span>
+<span class="sd">           :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`</span>
+<span class="sd">           returns.</span>
 
-        <span class="n">scalar_i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_element</span><span class="o">.</span><span class="n">get_indices</span><span class="p">()</span>
-        <span class="n">scalar_vi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_element</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
+<span class="sd">        The tensor wrapper couples a basis function to a value component</span>
+<span class="sd">        through an identity, so the components share the base element's dual</span>
+<span class="sd">        basis and the base element keeps whatever structure it dual evaluates</span>
+<span class="sd">        with -- a direct sum among it.</span>
+<span class="sd">        """</span>
+        <span class="n">base</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">base_element</span>
+        <span class="n">base_vi</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">get_value_indices</span><span class="p">()</span>
         <span class="n">tensor_i</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">component</span><span class="p">(</span><span class="n">ps</span><span class="p">):</span>
+            <span class="n">expr</span> <span class="o">=</span> <span class="n">fn</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+            <span class="k">assert</span> <span class="n">expr</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">value_shape</span>
+            <span class="k">return</span> <span class="n">gem</span><span class="o">.</span><span class="n">ComponentTensor</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Indexed</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="n">tensor_i</span> <span class="o">+</span> <span class="n">base_vi</span><span class="p">),</span> <span class="n">base_vi</span><span class="p">)</span>
+
+        <span class="n">evaluation</span><span class="p">,</span> <span class="n">point_indices</span><span class="p">,</span> <span class="n">scalar_i</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">dual_evaluation</span><span class="p">(</span>
+            <span class="n">component</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+        <span class="c1"># Couple the component the base element saw to the basis function that</span>
+        <span class="c1"># carries it.  Contracting the pair keeps the component index out of</span>
+        <span class="c1"># the basis indices, where a free index into a ListTensor would defeat</span>
+        <span class="c1"># argument factorisation.</span>
         <span class="n">tensor_vi</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Index</span><span class="p">(</span><span class="n">extent</span><span class="o">=</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shape</span><span class="p">)</span>
-
+        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span>
+            <span class="n">gem</span><span class="o">.</span><span class="n">Product</span><span class="p">(</span><span class="n">gem</span><span class="o">.</span><span class="n">Delta</span><span class="p">(</span><span class="n">tensor_i</span><span class="p">,</span> <span class="n">tensor_vi</span><span class="p">),</span> <span class="n">evaluation</span><span class="p">),</span> <span class="n">tensor_i</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transpose</span><span class="p">:</span>
-            <span class="n">index_ordering</span> <span class="o">=</span> <span class="n">tensor_i</span> <span class="o">+</span> <span class="n">scalar_i</span> <span class="o">+</span> <span class="n">tensor_vi</span> <span class="o">+</span> <span class="n">scalar_vi</span>
+            <span class="n">basis_indices</span> <span class="o">=</span> <span class="n">tensor_vi</span> <span class="o">+</span> <span class="n">scalar_i</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">index_ordering</span> <span class="o">=</span> <span class="n">scalar_i</span> <span class="o">+</span> <span class="n">tensor_i</span> <span class="o">+</span> <span class="n">tensor_vi</span> <span class="o">+</span> <span class="n">scalar_vi</span>
-
-        <span class="n">tQi</span> <span class="o">=</span> <span class="n">tQ</span><span class="p">[</span><span class="n">index_ordering</span><span class="p">]</span>
-        <span class="n">expri</span> <span class="o">=</span> <span class="n">expr</span><span class="p">[</span><span class="n">tensor_i</span> <span class="o">+</span> <span class="n">scalar_vi</span><span class="p">]</span>
-        <span class="n">evaluation</span> <span class="o">=</span> <span class="n">gem</span><span class="o">.</span><span class="n">IndexSum</span><span class="p">(</span><span class="n">tQi</span> <span class="o">*</span> <span class="n">expri</span><span class="p">,</span> <span class="n">scalar_vi</span> <span class="o">+</span> <span class="n">tensor_i</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">x</span><span class="o">.</span><span class="n">indices</span><span class="p">,</span> <span class="n">scalar_i</span> <span class="o">+</span> <span class="n">tensor_vi</span></div>
-
+            <span class="n">basis_indices</span> <span class="o">=</span> <span class="n">scalar_i</span> <span class="o">+</span> <span class="n">tensor_vi</span>
+        <span class="k">return</span> <span class="n">evaluation</span><span class="p">,</span> <span class="n">point_indices</span><span class="p">,</span> <span class="n">basis_indices</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">mapping</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>

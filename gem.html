@@ -1875,7 +1875,7 @@ Semantically equivalent to</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="gem.optimise.traverse_product">
-<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">traverse_product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rename_map</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_replacer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#traverse_product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.traverse_product" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">gem.optimise.</span></span><span class="sig-name descname"><span class="pre">traverse_product</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">expression</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop_at</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">renamer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_replacer</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/gem/optimise.html#traverse_product"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#gem.optimise.traverse_product" title="Link to this definition">¶</a></dt>
 <dd><p>Traverses a product tree and collects factors, also descending into
 tensor contractions (IndexSum).  The numerators of divisions are
 also broken up, but not the denominators.</p>
@@ -1887,7 +1887,10 @@ also broken up, but not the denominators.</p>
 and returns true for some subexpression, that
 subexpression is not broken into further factors
 even if it is a product-like expression.</p></li>
-<li><p><strong>rename_map</strong> – an rename map for consistent index renaming</p></li>
+<li><p><strong>renamer</strong> – Optional renamer from <a class="reference internal" href="#gem.optimise.make_renamer" title="gem.optimise.make_renamer"><code class="xref py py-func docutils literal notranslate"><span class="pre">make_renamer()</span></code></a>.  Pass one
+that has already seen the indices bound outside
+<code class="docutils literal notranslate"><span class="pre">expression</span></code>, so that the contracted indices hoisted
+out of it stay distinct from those.</p></li>
 <li><p><strong>index_replacer</strong> – MemoizerArg(filtered_replace_indices)</p></li>
 </ul>
 </dd>

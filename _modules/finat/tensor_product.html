@@ -181,6 +181,13 @@
 <div class="viewcode-block" id="TensorProductElement.basis_evaluation">
 <a class="viewcode-back" href="../../finat.html#finat.tensor_product.TensorProductElement.basis_evaluation">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">basis_evaluation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">coordinate_mapping</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ps</span><span class="o">.</span><span class="n">point_sets</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># A union of points does not factor, so tabulate on each of its</span>
+            <span class="c1"># point sets, where the product structure survives to be sum</span>
+            <span class="c1"># factorised.</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack_tabulations</span><span class="p">(</span><span class="n">order</span><span class="p">,</span> <span class="n">ps</span><span class="p">,</span> <span class="n">entity</span><span class="p">,</span>
+                                           <span class="n">coordinate_mapping</span><span class="o">=</span><span class="n">coordinate_mapping</span><span class="p">)</span>
+
         <span class="n">entities</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_factor_entity</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span>
         <span class="n">entity_dim</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">entities</span><span class="p">)</span>
 

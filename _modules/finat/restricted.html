@@ -36,7 +36,7 @@
           <div class="body" role="main">
             
   <h1>Source code for finat.restricted</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">singledispatch</span>
+<span></span><span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">partial</span><span class="p">,</span> <span class="n">singledispatch</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">FIAT</span>
@@ -184,7 +184,10 @@
     <span class="k">elif</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">finat</span><span class="o">.</span><span class="n">mixed</span><span class="o">.</span><span class="n">MixedSubElement</span><span class="p">)</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">elements</span><span class="p">):</span>
         <span class="n">elements</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">restrict</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="p">)</span>
                          <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">element</span><span class="o">.</span><span class="n">elements</span><span class="p">)</span>
-        <span class="n">reconstruct</span> <span class="o">=</span> <span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span>
+        <span class="c1"># Restriction selects disjoint subsets of the DoFs, so the restricted</span>
+        <span class="c1"># subelements are nodal whenever the original ones are.</span>
+        <span class="n">reconstruct</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">,</span>
+                              <span class="n">is_nodal_enriched</span><span class="o">=</span><span class="n">element</span><span class="o">.</span><span class="n">is_nodal_enriched</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Not expecting enriched with mixture of MixedSubElement and others"</span><span class="p">)</span>
 
@@ -196,35 +199,23 @@
 
 
 
-<div class="viewcode-block" id="restrict_hcurl">
-<a class="viewcode-back" href="../../finat.html#finat.restricted.restrict_hcurl">[docs]</a>
-<span class="nd">@restrict</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">HCurlElement</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">restrict_hcurl</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="p">):</span>
+<div class="viewcode-block" id="restrict_hdivcurl">
+<a class="viewcode-back" href="../../finat.html#finat.restricted.restrict_hdivcurl">[docs]</a>
+<span class="nd">@restrict</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">hdivcurl</span><span class="o">.</span><span class="n">WrapperElementBase</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">restrict_hdivcurl</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Restrict an element that wraps another with a pullback.</span>
+
+<span class="sd">    The pullback acts on each subelement separately, so it preserves</span>
+<span class="sd">    whichever subelements the restriction selects, and with them the</span>
+<span class="sd">    nodality of the restricted element.</span>
+<span class="sd">    """</span>
     <span class="n">restricted</span> <span class="o">=</span> <span class="n">restrict</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">wrappee</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">restricted</span> <span class="ow">is</span> <span class="n">null_element</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">null_element</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">restricted</span><span class="p">,</span> <span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">enriched</span><span class="o">.</span><span class="n">distribute_over_sum</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">element</span><span class="p">),</span> <span class="n">restricted</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">restricted</span><span class="p">,</span> <span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">HCurlElement</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
-                                         <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">restricted</span><span class="o">.</span><span class="n">elements</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">HCurlElement</span><span class="p">(</span><span class="n">restricted</span><span class="p">)</span></div>
-
-
-
-<div class="viewcode-block" id="restrict_hdiv">
-<a class="viewcode-back" href="../../finat.html#finat.restricted.restrict_hdiv">[docs]</a>
-<span class="nd">@restrict</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">HDivElement</span><span class="p">)</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">restrict_hdiv</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="p">):</span>
-    <span class="n">restricted</span> <span class="o">=</span> <span class="n">restrict</span><span class="p">(</span><span class="n">element</span><span class="o">.</span><span class="n">wrappee</span><span class="p">,</span> <span class="n">domain</span><span class="p">,</span> <span class="n">take_closure</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">restricted</span> <span class="ow">is</span> <span class="n">null_element</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">null_element</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">restricted</span><span class="p">,</span> <span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">EnrichedElement</span><span class="p">(</span><span class="n">finat</span><span class="o">.</span><span class="n">HDivElement</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
-                                         <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">restricted</span><span class="o">.</span><span class="n">elements</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">finat</span><span class="o">.</span><span class="n">HDivElement</span><span class="p">(</span><span class="n">restricted</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="n">element</span><span class="p">)(</span><span class="n">restricted</span><span class="p">)</span></div>
 
 
 
