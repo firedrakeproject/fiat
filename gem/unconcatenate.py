@@ -66,7 +66,7 @@ from gem.interpreter import evaluate
 __all__ = ['flatten', 'unconcatenate']
 
 
-def find_group(expressions):
+def find_group(expressions, splittable_indices):
     """Finds a full set of indexed Concatenate nodes with the same
     free index, if any such node exists.
 
@@ -74,10 +74,11 @@ def find_group(expressions):
     must be removed.
 
     :arg expressions: a multi-root GEM expression DAG
+    :arg splittable_indices: the indices that may be split along, that is,
+        those carried by the assignment variables.  A Concatenate indexed by
+        anything else has nothing to be split against, and is left alone.
     :returns: a list of GEM nodes, or None
     """
-    free_indices = set().union(chain(*[e.free_indices for e in expressions]))
-
     # Result variables
     index = None
     nodes = []
@@ -93,15 +94,14 @@ def find_group(expressions):
 
     while lifo:
         node = lifo.pop()
-        if not free_indices.intersection(node.free_indices):
+        if not splittable_indices.intersection(node.free_indices):
             continue
 
         if isinstance(node, Indexed):
             child, = node.children
             if isinstance(child, Concatenate):
                 i, = node.multiindex
-                assert i in free_indices
-                if (index or i) == i:
+                if i in splittable_indices and (index or i) == i:
                     index = i
                     nodes.append(node)
                     # Skip adding children
@@ -178,7 +178,9 @@ def replace_node(expression, mapping, cut=None):
 def _unconcatenate(cache, pairs):
     # Tail-call recursive core of unconcatenate.
     # Assumes that input has already been sanitised.
-    concat_group = find_group([e for v, e in pairs])
+    # Only an index carried by an assignment variable can be split against it.
+    splittable = set().union(chain(*[v.free_indices for v, e in pairs]))
+    concat_group = find_group([e for v, e in pairs], splittable)
     if concat_group is None:
         return pairs
 
