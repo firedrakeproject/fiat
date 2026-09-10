@@ -12,6 +12,7 @@ from finat.point_set import UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
 from gem.interpreter import evaluate
+from gem.unconcatenate import unconcatenate
 from FIAT import ufc_simplex
 
 
@@ -50,11 +51,28 @@ def check_nodal(element):
         table = element.basis_evaluation(0, ps)[(0,) * dim]
         return gem.ComponentTensor(gem.Indexed(table, j + zeta), zeta)
 
-    expr, point_indices, indices = element.dual_evaluation(tabulate)
-    if point_indices:
-        expr = gem.IndexSum(expr, point_indices)
-    result, = evaluate([gem.ComponentTensor(expr, indices + j)])
+    expr, _, indices = element.dual_evaluation(tabulate)
     n = element.space_dimension()
+    strides = tuple(
+        numpy.prod(tuple(index.extent for index in indices[offset + 1:]), dtype=int)
+        for offset in range(len(indices))
+    )
+    variable = gem.FlexiblyIndexed(
+        gem.Variable("A", (n,)), ((0, tuple(zip(indices, strides))),)
+    )
+    blocks = []
+    for variable, evaluation in unconcatenate([(variable, expr)]):
+        point_indices = tuple(
+            index for index in evaluation.free_indices
+            if index not in variable.free_indices and index not in j
+        )
+        blocks.append(gem.ComponentTensor(
+            gem.IndexSum(evaluation, point_indices),
+            variable.index_ordering(),
+        ))
+    i = gem.Index(extent=n)
+    evaluation = gem.Indexed(gem.Concatenate(*blocks), (i,))
+    result, = evaluate([gem.ComponentTensor(evaluation, (i,) + j)])
     assert numpy.allclose(result.arr.reshape(n, n), numpy.eye(n))
 
 

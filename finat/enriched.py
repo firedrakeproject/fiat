@@ -245,29 +245,31 @@ class EnrichedElement(FiniteElementBase):
            provides physical geometry callbacks (may be None).
         :returns: an ``(evaluation, point_indices, basis_indices)`` triple, as
            :meth:`~finat.finiteelementbase.FiniteElementBase.dual_evaluation`
-           returns.  The points are contracted here, so ``point_indices`` is
-           empty.
+           returns.  The summand point indices remain free, so the caller can
+           choose how to contract each direct-sum component.
 
-        The summands do not share their points, so each one contracts on its
-        own, and the results stack along the basis index.  Concatenating over
-        a free index is what :func:`~gem.unconcatenate.unconcatenate` splits
-        downstream; a concatenation over the contracted points could not be.
+        The summands do not share their points, so their evaluations stack
+        along the basis index while retaining their own point indices.
+        Concatenating over a free basis index is what
+        :func:`~gem.unconcatenate.unconcatenate` splits downstream.
         """
         if not self.is_nodal_enriched:
             raise NotImplementedError(
                 f"Dual evaluation not defined for non-nodal {type(self).__name__}"
             )
-        # Each summand contracts through its own dual_basis, so a non-nodal
-        # sum has to be refused here as well as in dual_basis: this path
-        # never asks self for one.
+        # Each summand uses its own dual_basis, so a non-nodal sum has to be
+        # refused here as well as in dual_basis: this path never asks self
+        # for one.
         evals = []
+        point_indices = []
         for element in self.elements:
-            expr, point_indices, indices = element.dual_evaluation(
+            expr, element_points, indices = element.dual_evaluation(
                 fn, coordinate_mapping=coordinate_mapping)
-            evals.append(broadcast_tensor(gem.IndexSum(expr, point_indices), indices))
+            evals.append(broadcast_tensor(expr, indices))
+            point_indices.extend(element_points)
 
         beta = self.get_indices()
-        return gem.Indexed(gem.Concatenate(*evals), beta), (), beta
+        return gem.Indexed(gem.Concatenate(*evals), beta), tuple(dict.fromkeys(point_indices)), beta
 
 
 @singledispatch
