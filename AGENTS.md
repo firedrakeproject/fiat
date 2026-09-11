@@ -9,7 +9,11 @@ This document outlines the guidelines and architectural context for AI agents as
 When assisting with contributions to FIAT and the Firedrake project, AI agents and their human counterparts must adhere to the following strict policies:
 
 * The use of AI tools must be explicitly declared alongside the specific tool used.
+* A human developer must lead the Pull Request.
+* The human contributor must understand every change made to the codebase.
 * Reviewer questions must be answered directly by the human, rather than acting as a relay to the AI.
+* Any generated code must be executed locally to verify that it functions correctly.
+* AI tools must not be used to resolve issues that are labeled as 'good first issue'.
 
 ---
 
@@ -121,7 +125,7 @@ mathematical patterns rather than starting from ad hoc special cases:
   properties, not when one or two test cases happen to pass.
 
 
-## Pattern Matching and Mathematical Reasoning
+## Transformation-automation lessons
 
 This section used to be a rough draft of aspirations. It is now grounded in the concrete
 experience of automating the Kirby (2017) / Aznaran-Kirby-Farrell (2022) / Brubeck & Kirby
