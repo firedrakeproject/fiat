@@ -86,6 +86,9 @@ class ArnoldWinther(PhysicallyMappedElement, FiatElement):
         cite("Arnold2002")
         super().__init__(FIAT.ArnoldWinther(cell, degree))
 
+    def dof_scale(self, node, dim, havg):
+        return havg**-2 if dim == 0 else None
+
     def _basis_transformation(self, coordinate_mapping):
         # The extra 6 dofs removed here correspond to the constraints
         numbf = self._element.space_dimension()

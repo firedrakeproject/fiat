@@ -197,6 +197,23 @@ def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
 
 
+@pytest.mark.parametrize("element", [finat.ArnoldWinther, finat.HuZhang])
+def test_vertex_value_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, element):
+    """Vertex values of stress elements use the conditioning scale ``h**-2``."""
+    scaled = scaled_ref_to_phys[2][-1]
+    unit = type(ref_to_phys[2])(scaled.ref_cell, scaled.phys_cell)
+    finat_element = element(scaled.ref_cell)
+
+    Ms = evaluate([finat_element.basis_transformation(scaled)])[0].arr
+    Mu = evaluate([finat_element.basis_transformation(unit)])[0].arr
+
+    h = scaled.cell_size()[0]
+    assert not np.isclose(h, 1)
+    expected = Mu.copy()
+    expected[:9] *= h**-2
+    assert np.allclose(Ms, expected)
+
+
 @pytest.mark.parametrize("dimension, element, degree", [
     (3, finat.MardalTaiWinther, 2),
     (3, finat.GuzmanNeilanFirstKindH1, 2),

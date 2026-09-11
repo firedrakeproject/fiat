@@ -13,6 +13,9 @@ class HuZhang(PhysicallyMappedElement, FiatElement):
         self.variant = variant
         super().__init__(FIAT.HuZhang(cell, degree, variant=variant, quad_scheme=quad_scheme))
 
+    def dof_scale(self, node, dim, havg):
+        return havg**-2 if dim == 0 else None
+
     def _basis_transformation(self, coordinate_mapping):
         ndofs = self.space_dimension()
         V = identity(ndofs)
