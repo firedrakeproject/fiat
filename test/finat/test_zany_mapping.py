@@ -9,6 +9,23 @@ from gem.interpreter import evaluate
 from finat.physically_mapped import PhysicallyMappedElement
 
 
+@pytest.fixture(params=["positive", "negative"])
+def phys_el(request):
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
+    K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
+    K[3].vertices = ((0, 0, 0),
+                     (1., 0.1, -0.37),
+                     (0.01, 0.987, -.23),
+                     (-0.1, -0.2, 1.38))
+    if request.param == "negative":
+        # swap two vertices to reverse the orientation
+        for dim in K:
+            v = list(K[dim].vertices)
+            v[1], v[2] = v[2], v[1]
+            K[dim].vertices = tuple(v)
+    return K
+
+
 def make_unisolvent_points(element, interior=False):
     degree = element.degree()
     ref_complex = element.get_reference_complex()
@@ -117,6 +134,7 @@ def test_C1_triangle(ref_to_phys, element):
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
+                         finat.Hermite,
                          finat.Walkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):

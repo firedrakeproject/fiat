@@ -112,9 +112,16 @@ class MardalTaiWintherDual(dual_set.DualSet):
 
         # Interior nodes: moments against Nedelec(order-1)
         if order > 1:
-            Q = parse_quadrature_scheme(ref_el, degree+order-1, quad_scheme)
-            Ned = Nedelec(ref_el, order-1)
-            phis = Ned.tabulate(0, Q.get_points())[(0,) * sd]
+            cell = ref_el.construct_subelement(sd)
+            Q_ref = parse_quadrature_scheme(cell, degree+order-1, quad_scheme)
+            Ned = Nedelec(cell, order-1)
+            Ned_at_qpts = Ned.tabulate(0, Q_ref.get_points())[(0,) * sd]
+            Q = FacetQuadratureRule(ref_el, sd, 0, Q_ref)
+            J = Q.jacobian()
+            # The quadrature carries |det J|, so the orientation of the cell
+            # makes the moments invariant under the contravariant Piola map
+            Jinv = numpy.sign(numpy.linalg.det(J)) * numpy.linalg.inv(J)
+            phis = numpy.tensordot(Jinv.T, Ned_at_qpts, (1, 1)).transpose((1, 0, 2))
             cur = len(nodes)
             nodes.extend(FrobeniusIntegralMoment(ref_el, Q, phi) for phi in phis)
             entity_ids[sd][0] = list(range(cur, len(nodes)))

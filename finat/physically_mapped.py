@@ -1,38 +1,10 @@
 r"""Physically mapped elements and the automatic basis transformation.
 
-The transformation matrix of a physically mapped element is obtained by
-duality (Kirby 2017, Brubeck & Kirby 2025).  With :math:`\hat\psi_j` the
-reference nodal basis, :math:`F` the cell map and :math:`n_i` the
-physical node,
-
-.. math:: B_{ij} = n_i(\hat\psi_j \circ F^{-1}), \qquad V = B^{-1},
-
-and the physical basis functions are :math:`M F^*(\hat\Psi)` with
-:math:`M = V^T`.  This is a second Vandermonde inversion on top of
-FIAT's: FIAT expresses the reference nodal basis in the expansion set
-of the polynomial space (:class:`ReferenceNodalBasis`), and FInAT
-expresses the physical nodal basis in the pulled-back reference nodal
-basis (:class:`PhysicalVandermonde`).
-
-A physical node is its reference node with the directions of its
-coefficient tensor replaced (:class:`PhysicalNode`): FIAT builds the
-physical dual set with the same points and weights as on the reference
-cell, and only the directions change.  Point data keeps its Cartesian
-directions, facet nodes are framed on the physical facet
-(:class:`FlagFrame`), and interior moments are push-forward invariant.
-Pulling the physical directions back to the reference cell, index by
-index of the coefficient tensor (:class:`DirectionPullback`), turns the
-physical node into a functional on reference functions, whose values on
-the reference nodal basis are numeric tabulations contracted with
-matrices polynomial in the Jacobian, up to a scalar denominator.
-
-:math:`B` is block lower triangular in the entity order, because a node
-on an entity only couples to the dofs of that entity and of its
-closure, and it is inverted by block back-substitution over the
-entities, one small symbolic solve per entity.  Rows of invariant nodes
-are rows of the identity and are never assembled.  The dual evaluation
-needs no inversion: the physical nodes of a function are :math:`B`
-applied to the reference nodes of its pullback.
+The physical basis functions are :math:`M F^*(\hat\Psi)`, with
+:math:`M = V^T`, :math:`V = B^{-1}`, and :math:`B_{ij} = n_i(\hat\psi_j
+\circ F^{-1})` the Vandermonde matrix of the physical nodes :math:`n_i`
+on the pulled-back reference nodal basis :math:`\hat\psi_j` (Kirby 2017,
+Brubeck & Kirby 2025).
 """
 
 from abc import ABCMeta, abstractmethod
@@ -176,16 +148,15 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
         :arg coordinate_mapping: Object providing the physical geometry
             as GEM expressions.
-        :returns: The :class:`PhysicalVandermonde`.
+        :returns: The :class:`PhysicalVandermondeMatrix`.
         """
-        basis = ReferenceNodalBasis(self._element)
-        sd = basis.ref_el.get_spatial_dimension()
-        bary, = basis.ref_el.make_points(sd, 0, sd + 1)
+        ref_el = self._element.get_reference_element()
+        sd = ref_el.get_spatial_dimension()
+        bary, = ref_el.make_points(sd, 0, sd + 1)
         jacobian = Jacobian(coordinate_mapping.jacobian_at(bary))
-        nodes = self.physical_nodes(basis, jacobian)
-        return PhysicalVandermonde(basis, nodes, self.tol)
+        return PhysicalVandermondeMatrix(self._element, self.physical_nodes(jacobian), self.tol)
 
-    def physical_nodes(self, basis, jacobian):
+    def physical_nodes(self, jacobian):
         """The physical degrees of freedom.
 
         Constraint functionals of an extended element that cannot be
@@ -193,26 +164,27 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         counterparts are the push-forwards of the reference ones (Kirby
         2017, section 5), with identity rows.
 
-        :arg basis: The :class:`ReferenceNodalBasis`.
         :arg jacobian: The :class:`Jacobian`.
         :returns: A list with a :class:`PhysicalNode` per dof, or None
             for a dof keeping an identity row.
         """
-        fiat_element = basis.fiat_element
+        fiat_element = self._element
+        ref_el = fiat_element.get_reference_element()
         fiat_nodes = fiat_element.dual_basis()
         mappings = fiat_element.mapping()
         ndof = self.space_dimension()
         nodes = [None] * len(fiat_nodes)
-        for dim in basis.entity_dofs:
-            for entity, dofs in basis.entity_dofs[dim].items():
+        for dim, entities in fiat_element.entity_dofs().items():
+            for entity, dofs in entities.items():
                 for i in dofs:
                     try:
-                        node = ReferenceNode.from_fiat(fiat_nodes[i], mappings[i], (dim, entity), basis.ref_el)
+                        functional = FunctionalData.from_fiat(fiat_nodes[i], mappings[i])
                     except NotImplementedError:
                         if i < ndof:
                             raise
                         continue
-                    nodes[i] = physical_node(node, basis.ref_el, jacobian, avg=self.avg)
+                    nodes[i] = physical_node(fiat_nodes[i], functional, ref_el, (dim, entity),
+                                             jacobian, avg=self.avg)
         return nodes
 
     def dof_scales(self, coordinate_mapping):
@@ -500,72 +472,30 @@ class Jacobian:
         self.K = self.adjJ.T
 
 
-class ReferenceNodalBasis:
-    """The nodal basis of a FIAT element on the reference cell.
+def arrange_tabulation(tabulation, columns, functional):
+    """Arranges a FIAT tabulation with the axes of a coefficient tensor.
 
-    :arg fiat_element: The FIAT element.
+    :arg tabulation: A FIAT tabulation dict, of sufficient derivative order.
+    :arg columns: A dict mapping each point to its column in the tabulation.
+    :arg functional: The :class:`~finat.functional.FunctionalData`.
+    :returns: An array of shape ``(nbf, *shape, len(points))`` with one
+        axis per axis of the coefficient tensor: the value components,
+        then the derivatives, then the divergence (an axis of length one).
     """
-    def __init__(self, fiat_element):
-        self.fiat_element = fiat_element
-        self.ref_el = fiat_element.get_reference_element()
-        # FIAT may list a dof on more than one entity (e.g. the edge
-        # moments of Arnold-Winther reappear in its interior list); the
-        # lowest-dimensional entity owns the dof.
-        seen = set()
-        self.entity_dofs = {}
-        for dim, entities in sorted(fiat_element.entity_dofs().items()):
-            self.entity_dofs[dim] = {}
-            for entity, dofs in sorted(entities.items()):
-                dofs = [i for i in dofs if i not in seen]
-                seen.update(dofs)
-                self.entity_dofs[dim][entity] = dofs
-        self._tabulations = {}
-
-    def closure_dofs(self, dim, entity):
-        """The dofs on the sub-entities of an entity.
-
-        :arg dim: The dimension of the entity.
-        :arg entity: The entity number.
-        :returns: The indices of the dofs owned by entities of lower
-            dimension in the closure of the entity.
-        """
-        top = self.ref_el.get_topology()
-        verts = set(top[dim][entity])
-        return [i for d in self.entity_dofs if d < dim
-                for e in self.entity_dofs[d] if set(top[d][e]) <= verts
-                for i in self.entity_dofs[d][e]]
-
-    def tabulate(self, mappings, points):
-        """Tabulates the nodal basis with the axes of a coefficient tensor.
-
-        :arg mappings: The index mappings of a
-            :class:`~finat.functional.FunctionalData`.
-        :arg points: The points, a tuple of tuples.
-        :returns: An array of shape ``(nbf, *shape, len(points))`` with
-            one axis per index of the coefficient tensor: the value
-            components, then the derivatives, then the divergence (an
-            axis of length one).
-        """
-        key = (mappings, points)
-        try:
-            return self._tabulations[key]
-        except KeyError:
-            pass
-        sd = self.ref_el.get_spatial_dimension()
-        order = sum(mapping in (DERIVATIVE, DIVERGENCE) for mapping in mappings)
-        tab = self.fiat_element.tabulate(order, points)
-        values = tab[(0,) * sd]
-        T = numpy.zeros(values.shape[:-1] + (sd,) * order + values.shape[-1:])
-        prefix = (slice(None),) * (values.ndim - 1)
-        for index in numpy.ndindex((sd,) * order):
-            alpha = [0] * sd
-            for k in index:
-                alpha[k] += 1
-            T[prefix + index] = tab[tuple(alpha)]
-        if DIVERGENCE in mappings:
-            # contract the last value axis with the derivative axis
-            T = numpy.trace(T, axis1=values.ndim - 2, axis2=-2)[..., None, :]
-        return self._tabulations.setdefault(key, T)
+    sd = len(next(iter(tabulation)))
+    cols = [columns[pt] for pt in functional.points]
+    values = tabulation[(0,) * sd][..., cols]
+    T = numpy.zeros(values.shape[:-1] + (sd,) * functional.order + values.shape[-1:])
+    prefix = (slice(None),) * (values.ndim - 1)
+    for index in numpy.ndindex((sd,) * functional.order):
+        alpha = [0] * sd
+        for k in index:
+            alpha[k] += 1
+        T[prefix + index] = tabulation[tuple(alpha)][..., cols]
+    if DIVERGENCE in functional.mappings:
+        # contract the last value axis with the derivative axis
+        T = numpy.trace(T, axis1=values.ndim - 2, axis2=-2)[..., None, :]
+    return T
 
 
 def support_entity(ref_el, points, tol=1e-12):
@@ -585,35 +515,8 @@ def support_entity(ref_el, points, tol=1e-12):
                 return dim, entity
 
 
-class ReferenceNode:
-    """A reference degree of freedom and its place on the cell.
-
-    :arg functional: The :class:`~finat.functional.FunctionalData`.
-    :arg owner: The ``(dim, entity)`` FIAT lists the dof under.
-    :arg support: The ``(dim, entity)`` of the smallest entity whose
-        closure contains the points of the functional.
-    """
-    def __init__(self, functional, owner, support):
-        self.functional = functional
-        self.owner = owner
-        self.support = support
-
-    @classmethod
-    def from_fiat(cls, node, mapping, owner, ref_el):
-        """Parses a FIAT functional.
-
-        :arg node: The FIAT :class:`~FIAT.functional.Functional`.
-        :arg mapping: The FIAT mapping of the basis functions.
-        :arg owner: The ``(dim, entity)`` FIAT lists the dof under.
-        :arg ref_el: The reference cell.
-        :returns: The :class:`ReferenceNode`.
-        """
-        functional = FunctionalData.from_fiat(node, mapping)
-        return cls(functional, owner, support_entity(ref_el, functional.points))
-
-
-def physical_convention(node, sd):
-    """The convention by which FIAT builds the physical counterpart of a node.
+def get_transformation_type(node, dim):
+    """How FIAT builds the physical counterpart of a node.
 
     Instantiated on a physical cell, FIAT dual sets follow one of three
     conventions, which cannot be read off the reference functional
@@ -635,42 +538,34 @@ def physical_convention(node, sd):
     the C0 data of vector-valued H1 elements (the edge midpoint values
     of Alfeld-Sorokina).
 
-    :arg node: The :class:`ReferenceNode`.
-    :arg sd: The spatial dimension.
+    :arg node: The FIAT :class:`~FIAT.functional.Functional`.
+    :arg dim: The dimension of the entity FIAT lists the node under.
     :returns: One of ``"cartesian"``, ``"frame"`` or ``"invariant"``.
     """
-    dim = node.owner[0]
-    functional = node.functional
-    single = len(functional.points) == 1
-    if functional.order == 0 and functional.rank == 0:
+    sd = node.ref_el.get_spatial_dimension()
+    order = node.max_deriv_order
+    rank = len(node.target_shape)
+    single = len(node.deriv_dict or node.pt_dict) == 1
+    if order == 0 and rank == 0:
         return "invariant"
-    if dim == sd - 1 and not (single and functional.order == 0 and functional.rank == 1):
+    if dim == sd - 1 and not (single and order == 0 and rank == 1):
         return "frame"
-    if dim == sd and not single and functional.order == 0:
+    if dim == sd and not single and order == 0:
         return "invariant"
     return "cartesian"
 
 
 class DirectionPullback:
-    r"""The pullback of the physical directions of one index of a node.
+    r"""The pullback to the reference cell of one axis of a physical node.
 
-    A physical node has coefficient tensors :math:`\Phi\hat{W}`, the
-    reference ones with the directions of one index replaced by their
-    physical counterparts, and the pullback of the basis functions acts
-    on the same index with a matrix :math:`A`: :math:`J^{-T}` for a
-    derivative or covariant component (the chain rule), :math:`J/\det J`
-    for a contravariant component, :math:`1/\det J` for a divergence,
-    and the identity for an affine component.  Applying the physical
-    node to pulled-back basis functions is therefore the same as
-    applying, to reference functions, the reference node with that
-    index of its coefficients contracted with :math:`G = A^T\Phi`,
-    which pulls the physical directions back to the reference cell.
-    It is stored as :math:`G = P + \sum_t g_t C_t / d`, where :math:`P`
-    is the numeric projector onto the reference directions whose
-    physical counterparts pull back to themselves, the :math:`g_t` are
-    GEM scalars polynomial in :math:`J`, and the :math:`C_t` are
-    numeric matrices aligned with the frame of the node, so that the
-    cancellations of the theory happen numerically.
+    A physical node differs from its reference node only in the
+    directions along each axis of its coefficient tensor, e.g. the
+    physical facet normal replaces the reference one, and the pullback
+    of the basis functions acts on the same axis by the chain rule or a
+    Piola map.  Together they contract that axis with the matrix
+    :math:`G = P + \sum_t g_t C_t / d`, where the numeric projector
+    :math:`P` keeps the directions that pull back to themselves, and the
+    :math:`C_t` are numeric matrices with GEM coefficients :math:`g_t`.
 
     :arg invariant: The projector :math:`P`, a numeric square array.
     :arg terms: A list of pairs ``(g, C)``.
@@ -690,23 +585,28 @@ class DirectionPullback:
 
 
 def identity_pullback(extent):
-    """The pullback of an index whose physical directions pull back to themselves."""
+    """The pullback of an axis whose physical directions pull back to themselves."""
     return DirectionPullback(numpy.eye(extent), [], one)
 
 
 def cartesian_pullback(mapping, jacobian):
-    """The pullback of an index keeping its Cartesian directions.
+    """The pullback of an axis keeping its Cartesian directions.
 
-    :arg mapping: The mapping of the index.
+    :arg mapping: The mapping of the axis.
     :arg jacobian: The :class:`Jacobian`.
     :returns: The :class:`DirectionPullback`.
     """
     sd = jacobian.J.shape[0]
     if mapping == "affine":
         return identity_pullback(sd)
-    if mapping == DIVERGENCE:
+    elif mapping == DIVERGENCE:
         return DirectionPullback(numpy.zeros((1, 1)), [(one, numpy.ones((1, 1)))], jacobian.detJ)
-    Q = jacobian.J.T if mapping == "contravariant piola" else jacobian.adjJ
+    elif mapping == "contravariant piola":
+        Q = jacobian.J.T
+    elif mapping in {"covariant piola", DERIVATIVE}:
+        Q = jacobian.adjJ
+    else:
+        raise NotImplementedError(f"No pullback for an axis with {mapping} mapping.")
     terms = []
     for a, b in numpy.ndindex(sd, sd):
         E = numpy.zeros((sd, sd))
@@ -715,28 +615,18 @@ def cartesian_pullback(mapping, jacobian):
     return DirectionPullback(numpy.zeros((sd, sd)), terms, jacobian.detJ)
 
 
-class FlagFrame:
-    r"""The physical directions of a node framed on a facet.
+class PhysicalEntityFrame:
+    r"""The physical directions of a node on a facet.
 
-    The frame is attached to the flag of entities support :math:`\subseteq`
-    facet :math:`\subset` cell.  Tangents of the support entity map by
-    :math:`J`, and each unit normal of the flag (the facet normal within
-    the cell, and the normal to the support within the facet when the
-    support is an edge of a face) maps to the physical unit normal,
-    which FIAT computes from the mapped tangents by the same
-    cross-product formulas as on the reference cell, so no orientation
-    logic is needed.  With :math:`K = \operatorname{adj}(J)^T` the
-    facet normal is :math:`\nu = K\hat{n}/|K\hat{n}|`, and the normal
-    to an edge within a face is :math:`\nu_e = Jw/|Jw|` with
-    :math:`w = ((J^TJ)\hat{t})\times\hat{n}`, by the identity
-    :math:`Ja\times Kb = J((J^TJ)a\times b)`.  The pulled-back normals
-    are expanded in the orthonormal reference frame of the flag, so
-    that every term of a pullback pairs a symbolic coefficient with a
-    reference direction along which the tabulation is nodal.
+    Tangents of the support entity of the node pull back to themselves.
+    Each unit normal, to the facet and to an edge within a face, pulls
+    back to a GEM vector expanded in an orthonormal reference frame, so
+    that the tabulation is only ever contracted with numeric directions.
 
     :arg ref_el: The reference cell.
     :arg facet: The facet number.
-    :arg support: The ``(dim, entity)`` supporting the node.
+    :arg support: The ``(dim, entity)`` of the smallest entity whose
+        closure contains the points of the node.
     :arg jacobian: The :class:`Jacobian`.
     """
     def __init__(self, ref_el, facet, support, jacobian):
@@ -751,34 +641,40 @@ class FlagFrame:
         n = ref_el.compute_normal(facet)
         n = n / numpy.linalg.norm(n)
         Kn = K @ n
-        # unit normals of the flag as (nhat, u, d, frame), with
-        # J^{-1} nu = u / d expanded in the reference directions frame
+        # unit normals as (nhat, u, d, frame), with J^{-1} nu = u / d
+        # expanded in the reference directions frame
         self.normals = []
         if support[0] == sd - 2 >= 1:
             t = ref_el.compute_edge_tangent(support[1])
             m = numpy.cross(t, n)
             m = m / numpy.linalg.norm(m)
             self.tangents = [t / numpy.linalg.norm(t)]
+            # the normal to the edge within the face is Jw/|Jw| with
+            # w = (J^T J t) x n, since Ja x Kb = J((J^T J)a x b)
             w = numpy.cross(J.T @ (J @ t), n)
             Jw = J @ w
             self.normals.append((m, w, (Jw @ Jw)**0.5, self.tangents + [m]))
         else:
             self.tangents = self.facet_tangents
         frame = self.tangents + [m for m, *_ in self.normals] + [n]
+        # the facet normal is Kn/|Kn|, and J^{-1} = adj(J) / detJ
         self.normals.append((n, adjJ @ Kn, detJ * (Kn @ Kn)**0.5, frame))
 
     def pullback(self, mapping):
-        """The :class:`DirectionPullback` of an index of a node in this frame."""
-        if mapping == "contravariant piola":
-            return self.contravariant_pullback()
+        """The :class:`DirectionPullback` of an axis with the given mapping."""
         if mapping == "affine":
             return identity_pullback(self.ref_el.get_spatial_dimension())
-        if mapping == DIVERGENCE:
+        elif mapping == "contravariant piola":
+            return self.contravariant_pullback()
+        elif mapping in {"covariant piola", DERIVATIVE}:
+            return self.covariant_pullback()
+        elif mapping == DIVERGENCE:
             return cartesian_pullback(mapping, self.jacobian)
-        return self.derivative_pullback()
+        else:
+            raise NotImplementedError(f"No pullback for an axis with {mapping} mapping.")
 
-    def derivative_pullback(self):
-        r"""The pullback of a derivative or covariant component index.
+    def covariant_pullback(self):
+        r"""The pullback of a derivative or covariant component axis.
 
         Tangents are invariant and each unit normal :math:`\hat{n}_k`
         maps to :math:`J^{-1}\nu_k = u_k/d_k`.
@@ -794,7 +690,7 @@ class FlagFrame:
         return DirectionPullback(P, terms, reduce(mul, dens))
 
     def contravariant_pullback(self):
-        r"""The pullback of a contravariant component index.
+        r"""The pullback of a contravariant component axis.
 
         The scaled normal :math:`\hat\nu` is invariant, since
         :math:`K\hat\nu` is the physical scaled normal, while a
@@ -829,12 +725,12 @@ class FlagFrame:
 class PhysicalNode:
     """A physical degree of freedom: a reference node with its directions replaced.
 
-    :arg node: The :class:`ReferenceNode`.
-    :arg pullbacks: A :class:`DirectionPullback` per index of the coefficient tensor.
+    :arg functional: The :class:`~finat.functional.FunctionalData` of the reference node.
+    :arg pullbacks: A :class:`DirectionPullback` per axis of the coefficient tensor.
     :arg scale: An optional GEM scalar multiplying the coefficients.
     """
-    def __init__(self, node, pullbacks, scale=None):
-        self.node = node
+    def __init__(self, functional, pullbacks, scale=None):
+        self.functional = functional
         self.pullbacks = tuple(pullbacks)
         self.scale = scale
 
@@ -843,7 +739,7 @@ class PhysicalNode:
 
         :arg tol: Relative tolerance on the coefficients.
         """
-        W = self.node.functional.coefficients
+        W = self.functional.coefficients
         for k, pullback in enumerate(self.pullbacks):
             P = pullback.invariant
             R = numpy.tensordot(W, numpy.eye(P.shape[0]) - P, axes=(1 + k, 1))
@@ -851,7 +747,7 @@ class PhysicalNode:
                 return False
         return True
 
-    def evaluate(self, basis, tol):
+    def action(self, tabulation, tol):
         """The values of the physical node on the pulled-back nodal basis.
 
         The row is a sum over products of one term per pullback.  The
@@ -861,19 +757,19 @@ class PhysicalNode:
         decided numerically in the frame of the node and never by
         inspecting a GEM expression.
 
-        :arg basis: The :class:`ReferenceNodalBasis`.
+        :arg tabulation: The reference nodal basis at the points of the
+            node, as returned by :func:`arrange_tabulation`.
         :arg tol: Relative tolerance below which numeric entries of the
             tabulation are dropped.
         :returns: The pair ``(numerator, denominator)`` of an object
             array of GEM scalars and a GEM scalar, the row of the
             physical Vandermonde matrix being their ratio.
         """
-        functional = self.node.functional
-        T = basis.tabulate(functional.mappings, functional.points)
-        nbf = T.shape[0]
+        functional = self.functional
+        nbf = tabulation.shape[0]
         # N[I', I, j] pairs the reference coefficients with indices I'
         # against the tabulated basis with indices I
-        N = numpy.tensordot(functional.coefficients, T, axes=(0, -1))
+        N = numpy.tensordot(functional.coefficients, tabulation, axes=(0, -1))
         size = prod(functional.coefficients.shape[1:])
         N = N.reshape(size, nbf, size).transpose(0, 2, 1).reshape(size * size, nbf)
         scale = tol * numpy.abs(N).max()
@@ -890,11 +786,13 @@ class PhysicalNode:
         return numerator, denominator
 
 
-def physical_node(node, ref_el, jacobian, avg=True):
+def physical_node(node, functional, ref_el, entity, jacobian, avg=True):
     """Builds the physical counterpart of a reference node.
 
-    :arg node: The :class:`ReferenceNode`.
+    :arg node: The FIAT :class:`~FIAT.functional.Functional`.
+    :arg functional: The :class:`~finat.functional.FunctionalData` of the node.
     :arg ref_el: The reference cell.
+    :arg entity: The ``(dim, entity)`` FIAT lists the node under.
     :arg jacobian: The :class:`Jacobian`.
     :arg avg: Whether physical facet moments are integral averages, as
         the reference nodes are; if not, they carry the physical facet
@@ -902,22 +800,22 @@ def physical_node(node, ref_el, jacobian, avg=True):
     :returns: The :class:`PhysicalNode`.
     """
     sd = ref_el.get_spatial_dimension()
-    functional = node.functional
-    convention = physical_convention(node, sd)
+    transformation = get_transformation_type(node, entity[0])
     scale = None
-    if convention == "invariant":
+    if transformation == "invariant":
         pullbacks = [identity_pullback(sd) for mapping in functional.mappings]
-    elif convention == "cartesian":
+    elif transformation == "cartesian":
         pullbacks = [cartesian_pullback(mapping, jacobian) for mapping in functional.mappings]
     else:
-        frame = FlagFrame(ref_el, node.owner[1], node.support, jacobian)
+        support = support_entity(ref_el, functional.points)
+        frame = PhysicalEntityFrame(ref_el, entity[1], support, jacobian)
         pullbacks = [frame.pullback(mapping) for mapping in functional.mappings]
         if not avg and len(functional.points) > 1:
             scale = frame.measure()
-    return PhysicalNode(node, pullbacks, scale)
+    return PhysicalNode(functional, pullbacks, scale)
 
 
-class PhysicalVandermonde:
+class PhysicalVandermondeMatrix:
     r"""The generalized Vandermonde matrix of the physical nodes.
 
     :math:`B_{ij} = n_i(\hat\psi_j\circ F^{-1})` pairs the physical
@@ -928,13 +826,13 @@ class PhysicalVandermonde:
     makes the element conforming), so :math:`B` is block lower
     triangular in the entity order.
 
-    :arg basis: The :class:`ReferenceNodalBasis`.
+    :arg fiat_element: The FIAT element.
     :arg nodes: A :class:`PhysicalNode` per dof, or None for a dof
         whose physical node is the push-forward of the reference one.
     :arg tol: Relative tolerance below which numeric couplings are dropped.
     """
-    def __init__(self, basis, nodes, tol):
-        self.basis = basis
+    def __init__(self, fiat_element, nodes, tol):
+        self.fiat_element = fiat_element
         self.nodes = nodes
         self.tol = tol
 
@@ -947,17 +845,28 @@ class PhysicalVandermonde:
         :returns: A dict mapping the dof to its ``(numerator, denominator)``
             pair of an object array of GEM scalars and a GEM scalar.
         """
-        basis = self.basis
-        nbf = basis.fiat_element.space_dimension()
+        fiat_element = self.fiat_element
+        nbf = fiat_element.space_dimension()
+        nodes = {i: node for i, node in enumerate(self.nodes)
+                 if node is not None and not node.is_invariant(self.tol)}
+        if not nodes:
+            return {}
+        # tabulate once at the points of all the nodes, as DualSet.to_riesz does
+        points = sorted({pt for node in nodes.values() for pt in node.functional.points})
+        order = max(node.functional.order for node in nodes.values())
+        tabulation = fiat_element.tabulate(order, points)
+        columns = {pt: q for q, pt in enumerate(points)}
+
+        closure_dofs = fiat_element.entity_closure_dofs()
         rows = {}
-        for dim in basis.entity_dofs:
-            for entity, block in basis.entity_dofs[dim].items():
-                allowed = set(block) | set(basis.closure_dofs(dim, entity))
-                for i in block:
-                    node = self.nodes[i]
-                    if node is None or node.is_invariant(self.tol):
+        for dim, entities in fiat_element.entity_dofs().items():
+            for entity, dofs in entities.items():
+                allowed = set(closure_dofs[dim][entity])
+                for i in dofs:
+                    if i not in nodes:
                         continue
-                    numerator, denominator = node.evaluate(basis, self.tol)
+                    T = arrange_tabulation(tabulation, columns, nodes[i].functional)
+                    numerator, denominator = nodes[i].action(T, self.tol)
                     outside = [j for j in range(nbf) if j not in allowed
                                and not isinstance(numerator[j], gem.Zero)]
                     if outside:
@@ -972,8 +881,7 @@ class PhysicalVandermonde:
 
         :returns: :math:`B` as an object array of GEM scalars.
         """
-        nbf = self.basis.fiat_element.space_dimension()
-        B = identity(nbf)
+        B = identity(self.fiat_element.space_dimension())
         for i, (numerator, denominator) in self.rows().items():
             B[i] = numerator / denominator
         return B
@@ -993,16 +901,18 @@ class PhysicalVandermonde:
 
         :returns: :math:`V` as an object array of GEM scalars.
         """
-        basis = self.basis
-        nbf = basis.fiat_element.space_dimension()
+        fiat_element = self.fiat_element
+        nbf = fiat_element.space_dimension()
+        entity_dofs = fiat_element.entity_dofs()
+        closure_dofs = fiat_element.entity_closure_dofs()
         rows = self.rows()
         V = identity(nbf)
         cache = {}
-        for dim in basis.entity_dofs:
-            for entity, block in basis.entity_dofs[dim].items():
+        for dim in sorted(entity_dofs):
+            for entity, block in entity_dofs[dim].items():
                 if not any(i in rows for i in block):
                     continue
-                closure = basis.closure_dofs(dim, entity)
+                closure = [j for j in closure_dofs[dim][entity] if j not in block]
                 # B_ee V_e = D_e - B_ec V_c, with B = diag(1/D) numerators
                 n = len(block)
                 Bee = numpy.full((n, n), zero, dtype=object)

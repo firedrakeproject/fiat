@@ -1003,3 +1003,35 @@ assembly convention.  All four are in `finat/functional.py` and
   through `dual_basis`/`dual_transformation`/`basis_evaluation` on the Piola zoo; elements
   with `deriv_dict` nodes (Morley, Alfeld-Sorokina, Guzman-Neilan H1div) have no FInAT dual
   basis and are excluded.
+* **Review round (evening of 2026-09-11, PR #259 comments).**  `ReferenceNodalBasis` and
+  `ReferenceNode` are gone.  The owning entity and the closure come from FIAT's own
+  `entity_dofs()`/`entity_closure_dofs()` (the dedup that `ReferenceNodalBasis` did was
+  hiding a FIAT bug: `ArnoldWintherDual` reused a stale `cur` and listed the dofs of edge 2
+  again under the interior, fixed in `FIAT/arnold_winther.py`).  The support entity is a
+  plain function of the points (`support_entity`), needed only for the 3D face-owned dofs
+  supported on an edge.  The reference nodal basis is tabulated once at the union of the
+  points of all transformed nodes, as `DualSet.to_riesz` does, and `arrange_tabulation`
+  lays it out with the axes of each coefficient tensor; no tabulation cache.
+  `get_transformation_type(node, dim)` (formerly `physical_convention`) reads the FIAT
+  functional itself (`ref_el`, `max_deriv_order`, `target_shape`); it agreed with the old
+  classification on all 4627 nodes of the FInAT suite.  Renames: `split_axis_mappings`,
+  `PhysicalEntityFrame` (was `FlagFrame`), `covariant_pullback`, `PhysicalNode.action`,
+  `PhysicalVandermondeMatrix`; "index" of a coefficient tensor is now "axis" throughout.
+  `FunctionalData` is no longer exported from `finat` and is purely numeric.  Merging the
+  tabulation changes round-off (BLAS sums the merged point set in a different order), so
+  the GEM is not bit-identical to 021ca3dc: literals move in the last digit and an entry
+  that happened to be exactly 1.0 may now be 0.9999999999999999 (or vice versa), which
+  changes node counts by a few either way (Bell 685 -> 668).  Values agree to <= 1.4e-15
+  relative at a random Jacobian on 12 zoo elements.
+  Also removed from the PR: the `AGENTS.md` changes (root restored to main,
+  `finat/`/`gem/AGENTS.md` deleted), `rck_remarks_for_claude.md`, and the numeric prototype
+  `test/finat/test_claude_zany_piola.py` (its elements are all checked against ground truth
+  by `test_zany_mapping.py`, 3D Hermite added there).  `test_zany_mapping.py` now runs on a
+  positively and a negatively oriented physical cell.  The reflected cell exposed a FIAT
+  bug, present on main 851843f7: the interior moments of BDM and MTW against Nedelec test
+  functions mapped by J^{-T} were off by sign(det J) from the push-forward of the reference
+  ones (the quadrature carries |det J|, the contravariant Piola map det J).  Both duals now
+  scale the test functions by sign(det J), per subcell for macro BDM (the reference Alfeld
+  and Iso splits have reflected subcells, so reference macro-BDM interior basis functions
+  change sign there), and MTW maps a reference Nedelec element like BDM does.
+  NedelecSecondKind already had it right: its RT test functions are mapped by J/|det J|.

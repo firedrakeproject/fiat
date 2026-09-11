@@ -1,42 +1,29 @@
 r"""Degrees of freedom as coefficient tensors.
 
-Every FIAT functional built from point and derivative dictionaries has
-the form
-
-.. math:: \ell(f) = \sum_q \langle W_q, \nabla^m f(x_q) \rangle,
-
-with reference points :math:`x_q` and coefficient tensors :math:`W_q`
-carrying one index for each value component of :math:`f` and one for
-each derivative.  :class:`FunctionalData` stores exactly this, together
-with the mapping of each index, which says how that index transforms
-under the pullback of the basis functions: a component index carries
-the Piola mapping of the element, a derivative index the chain rule,
-and a divergence index (a contravariant component contracted with a
-derivative) the scalar :math:`1/\det J`.  Point evaluations, integral
-moments, normal derivatives, divergences and tensor divergences are
-all instances of the same data, so the transformation theory of
-:mod:`finat.physically_mapped` never dispatches on FIAT functional
-types.
+A FIAT functional built from point and derivative dictionaries is
+:math:`\ell(f) = \sum_q \langle W_q, \nabla^m f(x_q) \rangle`, with one
+axis of :math:`W_q` per value component and one per derivative.
 """
 
 from itertools import permutations
 
 import numpy
 
-#: The mapping of a derivative index of the coefficient tensor.
+#: The mapping of a derivative axis of the coefficient tensor.
 DERIVATIVE = "derivative"
 
-#: The mapping of a divergence index of the coefficient tensor.
+#: The mapping of a divergence axis of the coefficient tensor.
 DIVERGENCE = "divergence"
 
 
-def component_mappings(mapping, rank):
-    """The mapping of each component index of a functional.
+def split_axis_mappings(mapping, rank):
+    """Splits a FIAT mapping into the mapping of each component axis.
 
     :arg mapping: The FIAT mapping of the basis functions the functional
         acts on, e.g. ``"affine"`` or ``"double contravariant piola"``.
-    :arg rank: The number of component indices of the functional.
-    :returns: A tuple with the Piola mapping of each component index.
+    :arg rank: The number of component axes of the functional.
+    :returns: A tuple with the mapping of each component axis, e.g.
+        ``("contravariant piola", "contravariant piola")``.
     """
     words = mapping.split()
     if words == ["affine"]:
@@ -51,16 +38,15 @@ def component_mappings(mapping, rank):
 
 
 class FunctionalData:
-    """A degree of freedom as a coefficient tensor at each point.
+    """A reference degree of freedom as a numeric coefficient tensor at each point.
 
     :arg points: The points, a tuple of reference coordinates.
-    :arg coefficients: An array of shape ``(len(points), sd, ..., sd)``
-        with one trailing axis per index of the coefficient tensor, the
-        component indices first.  The axis of a divergence index has
-        length one.
-    :arg mappings: The mapping of each index: a Piola mapping for a
-        component index, :data:`DERIVATIVE` for a derivative index, or
-        :data:`DIVERGENCE` for the last index.
+    :arg coefficients: A numeric array of shape ``(len(points), sd, ...,
+        sd)`` with one trailing axis per component and per derivative,
+        the components first.  A divergence axis has length one.
+    :arg mappings: The mapping of each axis: a FIAT mapping for a
+        component axis, :data:`DERIVATIVE` for a derivative axis, or
+        :data:`DIVERGENCE` for the last axis.
     """
     def __init__(self, points, coefficients, mappings):
         self.points = tuple(map(tuple, points))
@@ -69,7 +55,7 @@ class FunctionalData:
 
     @property
     def rank(self):
-        """The number of component indices."""
+        """The number of component axes."""
         return sum(mapping not in (DERIVATIVE, DIVERGENCE) for mapping in self.mappings)
 
     @property
@@ -85,8 +71,8 @@ class FunctionalData:
         the symmetric derivative tensor with that multi-index, so that the
         full contraction with the derivative tensor of :math:`f`
         reproduces the multi-index pairing.  A first derivative whose
-        coefficients contract the last component index with the
-        derivative index is stored with a divergence index instead.
+        coefficients contract the last component axis with the
+        derivative axis is stored with a divergence axis instead.
 
         :arg node: The FIAT :class:`~FIAT.functional.Functional`.
         :arg mapping: The FIAT mapping of the basis functions.
@@ -109,7 +95,7 @@ class FunctionalData:
             raise NotImplementedError(f"{type(node).__name__} mixes derivative orders or ranks.")
         order, = orders
         rank, = ranks
-        mappings = component_mappings(mapping, rank) + (DERIVATIVE,) * order
+        mappings = split_axis_mappings(mapping, rank) + (DERIVATIVE,) * order
 
         points = tuple(entries)
         coefficients = numpy.zeros((len(points),) + (sd,) * (rank + order))
@@ -119,6 +105,9 @@ class FunctionalData:
                 for index in indices:
                     coefficients[(q, *comp, *index)] += w / len(indices)
 
+        # A divergence has W[q, ..., i, k] = c[q, ...] delta_ik on the last
+        # component axis i and the derivative axis k: detect it by comparing
+        # W with its trace times the identity, and keep c on one axis.
         if order == 1 and rank > 0 and mappings[rank - 1] == "contravariant piola":
             trace = numpy.trace(coefficients, axis1=-2, axis2=-1) / sd
             if numpy.allclose(coefficients, trace[..., None, None] * numpy.eye(sd),
@@ -126,28 +115,3 @@ class FunctionalData:
                 coefficients = trace[..., None]
                 mappings = mappings[:rank - 1] + (DIVERGENCE,)
         return cls(points, coefficients, mappings)
-
-    def contract(self, A, index):
-        """Contract one index of the coefficients with a matrix.
-
-        :arg A: The matrix, numeric or an object array of GEM scalars.
-        :arg index: The position of the index in the coefficient tensor.
-        :returns: The :class:`FunctionalData` with ``W'[q, ..., i, ...]
-            = sum_k A[i, k] W[q, ..., k, ...]``.
-        """
-        coefficients = numpy.tensordot(self.coefficients, A, axes=(1 + index, 1))
-        coefficients = numpy.moveaxis(coefficients, -1, 1 + index)
-        return type(self)(self.points, coefficients, self.mappings)
-
-    def evaluate(self, tabulation):
-        """Apply the functional to tabulated basis functions.
-
-        :arg tabulation: The tabulation of the basis functions at
-            ``points``, shape ``(nbf, sd, ..., sd, len(points))`` with
-            the axes of the coefficient tensor, as returned by
-            :meth:`finat.physically_mapped.ReferenceNodalBasis.tabulate`.
-        :returns: The vector of values on the basis, shape ``(nbf,)``.
-        """
-        n = len(self.mappings)
-        return numpy.tensordot(tabulation, self.coefficients,
-                               axes=(tuple(range(1, n + 2)), tuple(range(1, n + 1)) + (0,)))
