@@ -100,3 +100,30 @@ def test_flatten_indexsum(A):
     result = gem.IndexSum(gem.IndexSum(Aij, (i,)), (j,))
     expected = gem.IndexSum(Aij, (i, j))
     assert result == expected
+
+
+@pytest.mark.parametrize("shape", [(), (3,), (7, 2), (2, 3, 4)])
+def test_constant_fold_zero_table(shape):
+    """A Literal of any shape that holds only zeros folds to a Zero."""
+    zeros = gem.Literal(numpy.zeros(shape))
+    folded, = gem.optimise.constant_fold_zero([zeros])
+    assert isinstance(folded, gem.Zero)
+    assert folded.shape == shape
+
+
+def test_constant_fold_zero_keeps_nonzero_table():
+    """A Literal that holds a nonzero entry stays a Literal."""
+    array = numpy.zeros((7, 2))
+    array[3, 1] = 1.0
+    literal = gem.Literal(array)
+    folded, = gem.optimise.constant_fold_zero([literal])
+    assert folded == literal
+
+
+def test_constant_fold_zero_removes_product():
+    """Folding a zero table removes the expression that it multiplies."""
+    i, j = gem.indices(2)
+    zeros = gem.Indexed(gem.Literal(numpy.zeros((7, 2))), (i, j))
+    other = gem.Indexed(gem.Variable("v", (7, 2)), (i, j))
+    folded, = gem.optimise.constant_fold_zero([gem.Product(zeros, other)])
+    assert isinstance(folded, gem.Zero)
