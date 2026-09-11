@@ -139,7 +139,7 @@ class Argyris(PhysicallyMappedElement, ScalarFiatElement):
         self.avg = avg
         super().__init__(fiat_element)
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         sd = self.cell.get_spatial_dimension()
         top = self.cell.get_topology()
 

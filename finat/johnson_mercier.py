@@ -13,7 +13,7 @@ class JohnsonMercier(PhysicallyMappedElement, FiatElement):  # symmetric matrix 
         self._indices = slice(None, None)
         super().__init__(FIAT.JohnsonMercier(cell, degree, variant=variant, quad_scheme=quad_scheme))
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         numbf = self._element.space_dimension()
         ndof = self.space_dimension()
 

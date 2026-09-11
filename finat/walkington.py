@@ -24,7 +24,7 @@ class Walkington(PhysicallyMappedElement, ScalarFiatElement):
             reduced_dofs[sd-1][entity] = reduced_dofs[sd-1][entity][:1]
         self._entity_dofs = reduced_dofs
 
-    def basis_transformation(self, coordinate_mapping):
+    def _basis_transformation(self, coordinate_mapping):
         # Jacobian at barycenter
         sd = self.cell.get_spatial_dimension()
         top = self.cell.get_topology()

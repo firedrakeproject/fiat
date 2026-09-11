@@ -1,11 +1,29 @@
 import FIAT
 import finat
+import gem
 import numpy as np
 import pytest
 import pprint
 
 from gem.interpreter import evaluate
 from finat.physically_mapped import PhysicallyMappedElement
+
+
+@pytest.fixture(params=["positive", "negative"])
+def phys_el(request):
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
+    K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
+    K[3].vertices = ((0, 0, 0),
+                     (1., 0.1, -0.37),
+                     (0.01, 0.987, -.23),
+                     (-0.1, -0.2, 1.38))
+    if request.param == "negative":
+        # swap two vertices to reverse the orientation
+        for dim in K:
+            v = list(K[dim].vertices)
+            v[1], v[2] = v[2], v[1]
+            K[dim].vertices = tuple(v)
+    return K
 
 
 def make_unisolvent_points(element, interior=False):
@@ -116,6 +134,7 @@ def test_C1_triangle(ref_to_phys, element):
 
 @pytest.mark.parametrize("element", [
                          finat.Morley,
+                         finat.Hermite,
                          finat.Walkington,
                          ])
 def test_C1_tetrahedron(ref_to_phys, element):
@@ -178,6 +197,23 @@ def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
 
 
+@pytest.mark.parametrize("element", [finat.ArnoldWinther, finat.HuZhang])
+def test_vertex_value_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, element):
+    """Vertex values of stress elements use the conditioning scale ``h**-2``."""
+    scaled = scaled_ref_to_phys[2][-1]
+    unit = type(ref_to_phys[2])(scaled.ref_cell, scaled.phys_cell)
+    finat_element = element(scaled.ref_cell)
+
+    Ms = evaluate([finat_element.basis_transformation(scaled)])[0].arr
+    Mu = evaluate([finat_element.basis_transformation(unit)])[0].arr
+
+    h = scaled.cell_size()[0]
+    assert not np.isclose(h, 1)
+    expected = Mu.copy()
+    expected[:9] *= h**-2
+    assert np.allclose(Ms, expected)
+
+
 @pytest.mark.parametrize("dimension, element, degree", [
     (3, finat.MardalTaiWinther, 2),
     (3, finat.GuzmanNeilanFirstKindH1, 2),
@@ -211,3 +247,33 @@ def test_affine(ref_to_phys, element, degree, variant, dimension):
 @pytest.mark.parametrize("variant", [None, "iso"])
 def test_macro_piola(ref_to_phys, element, degree, variant, dimension):
     check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)
+
+
+def check_dual_evaluation(element, ref_to_phys, *args, **kwargs):
+    """The physical nodes are dual to the physical basis functions."""
+    finat_element = element(ref_to_phys.ref_cell, *args, **kwargs)
+    sd = ref_to_phys.ref_cell.get_spatial_dimension()
+    Q, x = finat_element.dual_basis
+    Q = finat_element.dual_transformation(Q, coordinate_mapping=ref_to_phys)
+    phi = finat_element.basis_evaluation(0, x, coordinate_mapping=ref_to_phys)[(0,)*sd]
+
+    i, j = gem.indices(2)
+    shape_indices = gem.indices(len(phi.shape) - 1)
+    expr = gem.IndexSum(Q[(i, *shape_indices)] * phi[(j, *shape_indices)],
+                        (*x.indices, *shape_indices))
+    result = evaluate([gem.ComponentTensor(expr, (i, j))])[0].arr
+    assert np.allclose(result, np.eye(finat_element.space_dimension()))
+
+
+# FInAT has no dual basis for elements with derivative nodes
+dual_basis_elements = [e for e in zany_piola_elements[3]
+                       if e not in (finat.AlfeldSorokina, finat.GuzmanNeilanH1div)]
+
+
+@pytest.mark.parametrize("dimension, element", [
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in dual_basis_elements),
+    *((3, e) for e in dual_basis_elements),
+])
+def test_dual_evaluation(ref_to_phys, element, dimension):
+    check_dual_evaluation(element, ref_to_phys[dimension])

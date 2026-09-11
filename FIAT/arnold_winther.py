@@ -101,6 +101,7 @@ class ArnoldWintherDual(dual_set.DualSet):
             entity_ids[1][entity].extend(range(cur, len(nodes)))
 
         # internal dofs: moments of unique components against P_{k-3}
+        cur = len(nodes)
         n = list(map(ref_el.compute_scaled_normal, sorted(top[sd-1])))
         Q = create_quadrature(ref_el, 2*(degree-1))
         P = polynomial_set.ONPolynomialSet(ref_el, degree-3, scale="L2 piola")
