@@ -8,15 +8,15 @@ where :math:`\hat\psi_j` is the reference nodal basis, :math:`F` the cell
 map, and :math:`n_i` the physical node.  Two ingredients make the rows of
 :math:`B` computable without any frame algebra:
 
-* **Physical nodes by per-slot maps.**  The physical node shares the
+* **Physical nodes by per-mapping maps.**  The physical node shares the
   points and weights of its reference partner; only the directional data
-  changes, one tensor slot at a time.  A derivative slot of a facet node
+  changes, one tensor mapping at a time.  A derivative mapping of a facet node
   maps its unit-normal component to the unit physical normal
   :math:`K\hat{n}/|K\hat{n}|` (:math:`K = \operatorname{adj}(J)^T` the
   cofactor matrix, which maps normals to normals) and its tangential
   complement by :math:`J` (mapped tangents); away from facets derivative
-  slots are Cartesian and keep their reference directions.  A
-  contravariant value slot of a facet moment maps its scaled-normal
+  mappings are Cartesian and keep their reference directions.  A
+  contravariant value mapping of a facet moment maps its scaled-normal
   component by :math:`K` (the cofactor lemma :math:`K\hat\nu^s = \nu^s`
   is exact) and its tangential complement by :math:`J`.  Cartesian point
   data keeps its weights, interior moments are invariant by convention
@@ -24,11 +24,11 @@ map, and :math:`n_i` the physical node.  Two ingredients make the rows of
   contract to :math:`\det J` times the identity.
 
 * **The adjoint acts on the tabulation.**  The push-forward of a
-  reference node contracts each derivative slot of its direction with
+  reference node contracts each derivative mapping of its direction with
   :math:`J` (:math:`d = J^{\otimes m}\hat{d}`); dually, instead of
-  transforming directions, each derivative slot of the *numeric*
+  transforming directions, each derivative mapping of the *numeric*
   reference tabulation is contracted with :math:`J^{-T}` (the physical
-  derivatives of :math:`\hat\psi_j\circ F^{-1}`) and each value slot
+  derivatives of :math:`\hat\psi_j\circ F^{-1}`) and each value mapping
   with :math:`J/\det J` (its physical Piola values), once per node
   group.  A row of :math:`B` is then the plain numeric pairing of the
   physical node data with the transformed tabulation; push-forward
@@ -58,86 +58,81 @@ automated transformations: it shares no code path with
 derivation.
 """
 
-from math import factorial, prod
-
 import numpy as np
 import pytest
 
 import finat
-from FIAT.polynomial_set import mis
 from FIAT.reference_element import make_affine_mapping, ufc_simplex
-from finat.functional import PhysicallyMappedFunctional
+from finat.functional import DERIVATIVE, DIVERGENCE, FunctionalData
 from gem.interpreter import evaluate
 
 from .conftest import MyMapping
 
 
-def contract_slot(T, A, axis):
-    """Contract one tensor slot with a matrix.
+def contract(T, A, axis):
+    """Contract one tensor mapping with a matrix.
 
     :arg T: The tensor.
     :arg A: The matrix.
-    :arg axis: The slot of ``T`` to contract.
+    :arg axis: The mapping of ``T`` to contract.
     :returns: The tensor with ``T'[..., i, ...] = sum_k A[i, k] T[..., k, ...]``.
     """
     return np.moveaxis(np.tensordot(T, A, axes=(axis, 1)), -1, axis)
 
 
-def tensorize_direction(direction, sd, order):
-    """Distribute multi-index direction coefficients over a symmetric tensor.
-
-    :arg direction: Direction coefficients in the multi-index basis.
-    :arg sd: The spatial dimension.
-    :arg order: The derivative order.
-    :returns: The symmetric direction tensor, normalized so that the full
-        contraction with an index-wise derivative tabulation reproduces
-        the multi-index pairing.
-    """
-    alphas = sorted(mis(sd, order), reverse=True)
-    lookup = {alpha: k for k, alpha in enumerate(alphas)}
-    D = np.zeros((sd,) * order)
-    for index in np.ndindex(D.shape):
-        alpha = [0] * sd
-        for k in index:
-            alpha[k] += 1
-        scale = prod(map(factorial, alpha)) / factorial(order)
-        D[index] = direction[lookup[tuple(alpha)]] * scale
-    return D
-
-
-def derivative_tabulation(fiat_element, order, points, weights):
-    """Weighted symmetric-tensor derivative tabulation of the nodal basis.
+def tabulate(fiat_element, mappings, points):
+    """Tabulate the nodal basis as tensors with one axis per mapping.
 
     :arg fiat_element: The FIAT element.
-    :arg order: The derivative order.
-    :arg points: The quadrature points.
-    :arg weights: The quadrature weights.
-    :returns: The tensor ``T[j, i1, ..., im] = sum_q w_q
-        (d^m psi_j / dx_i1 ... dx_im)(x_q)``.
+    :arg mappings: The mapping kinds of a :class:`FunctionalData`.
+    :arg points: The points.
+    :returns: An array of shape ``(nbf, *shape, len(points))``: the value
+        components, then the derivatives, then the divergence (an axis
+        of length one).
     """
     sd = fiat_element.get_reference_element().get_spatial_dimension()
+    order = sum(mapping in (DERIVATIVE, DIVERGENCE) for mapping in mappings)
     tab = fiat_element.tabulate(order, points)
-    nbf = tab[(0,) * sd].shape[0]
-    T = np.zeros((nbf,) + (sd,) * order)
+    values = tab[(0,) * sd]
+    T = np.zeros(values.shape[:-1] + (sd,) * order + values.shape[-1:])
+    prefix = (slice(None),) * (values.ndim - 1)
     for index in np.ndindex((sd,) * order):
         alpha = [0] * sd
         for k in index:
             alpha[k] += 1
-        T[(slice(None), *index)] = tab[tuple(alpha)] @ weights
+        T[prefix + index] = tab[tuple(alpha)]
+    if DIVERGENCE in mappings:
+        T = np.trace(T, axis1=values.ndim - 2, axis2=-2)[..., None, :]
     return T
 
 
-def facet_slot_map(ref_el, entity, J, derivative):
-    r"""Per-slot physical direction map of a facet node.
+def pullback_map(mapping, J):
+    """The matrix by which the pullback of a basis function acts on one mapping.
 
-    A derivative slot maps its component along the FIAT normal
+    :arg mapping: The mapping kind.
+    :arg J: The (numeric) cell Jacobian.
+    :returns: The matrix.
+    """
+    if mapping == "contravariant piola":
+        return J / np.linalg.det(J)
+    if mapping == DIVERGENCE:
+        return np.ones((1, 1)) / np.linalg.det(J)
+    if mapping == "affine":
+        return np.eye(J.shape[0])
+    return np.linalg.inv(J).T
+
+
+def facet_direction_map(ref_el, entity, J, mapping):
+    r"""Per-mapping physical direction map of a facet node.
+
+    A derivative mapping maps its component along the FIAT normal
     :math:`\hat{n}` to the FIAT physical normal -- the norm-preserving
     rescaling of the cofactor image :math:`K\hat{n}` (:math:`K =
     \operatorname{adj}(J)^T` maps normals to normals, and the norm of
     the FIAT normal depends only on the reference cell) -- and its
     tangential complement by :math:`J` (mapped tangents).
 
-    A contravariant value slot maps its component along the scaled
+    A contravariant value mapping maps its component along the scaled
     normal :math:`\hat\nu^s` by :math:`K` (the cofactor lemma
     :math:`K\hat\nu^s = \nu^s` is exact), and its tangential complement
     to the cofactor image projected onto the physical facet, scaled by
@@ -148,14 +143,17 @@ def facet_slot_map(ref_el, entity, J, derivative):
     :arg ref_el: The reference cell.
     :arg entity: The facet number.
     :arg J: The (numeric) cell Jacobian.
-    :arg derivative: If True, use the derivative-slot convention;
-        if False, the contravariant value-slot convention.
-    :returns: The map as an ``(sd, sd)`` array acting on one slot.
+    :arg mapping: The mapping kind.
+    :returns: The map as an ``(sd, sd)`` array acting on one mapping.
     """
     sd = ref_el.get_spatial_dimension()
     detJ = np.linalg.det(J)
     K = detJ * np.linalg.inv(J).T
-    if derivative:
+    if mapping == DIVERGENCE:
+        return np.ones((1, 1))
+    if mapping == "affine":
+        return np.eye(sd)
+    if mapping != "contravariant piola":
         n = ref_el.compute_normal(entity)
         Kn = K @ n
         Kn = Kn * (np.linalg.norm(n) / np.linalg.norm(Kn))
@@ -169,81 +167,17 @@ def facet_slot_map(ref_el, entity, J, derivative):
     return np.outer(Kn, n) / (n @ n) + s * (Q @ K @ (np.eye(sd) - P))
 
 
-def scalar_derivative_row(fiat_element, ell, Phi, J):
-    r"""B row of a scalar derivative node.
-
-    The physical direction is the per-slot map :math:`\Phi^{\otimes m}`
-    of the reference direction; the derivative slots of the tabulation
-    carry the adjoint of the push-forward, :math:`J^{-T}` per slot.
-
-    :arg fiat_element: The FIAT element.
-    :arg ell: The parsed reference node.
-    :arg Phi: The per-slot physical direction map.
-    :arg J: The (numeric) cell Jacobian.
-    :returns: The vector of values of the physical node on the
-        pushed-forward nodal basis.
-    """
-    sd = J.shape[0]
-    T = derivative_tabulation(fiat_element, ell.order, ell.points, ell.weights)
-    A = np.linalg.inv(J).T
-    D = tensorize_direction(ell.direction, sd, ell.order)
-    for slot in range(ell.order):
-        T = contract_slot(T, A, 1 + slot)
-        D = contract_slot(D, Phi, slot)
-    return np.tensordot(T, D, axes=(tuple(range(1, ell.order + 1)),
-                                    tuple(range(ell.order))))
-
-
-def piola_value_row(fiat_element, ell, Phi, J):
-    r"""B row of a contravariant value node.
-
-    The value slots of the tabulation carry the physical Piola values,
-    :math:`J/\det J` per slot; the weights are mapped per slot by
-    ``Phi`` (facet moments) or kept Cartesian (point data).
-
-    :arg fiat_element: The FIAT element.
-    :arg ell: The parsed reference node.
-    :arg Phi: The per-slot physical weight map, or None for Cartesian
-        point data.
-    :arg J: The (numeric) cell Jacobian.
-    :returns: The vector of values of the physical node on the
-        pushed-forward nodal basis.
-    """
-    sd = J.shape[0]
-    r = ell.rank
-    npts = len(ell.points)
-    Theta = J / np.linalg.det(J)
-    T = fiat_element.tabulate(0, ell.points)[(0,) * sd]
-    T = T.reshape(T.shape[0], *(sd,) * r, npts)
-    W = ell.weights.reshape(npts, *(sd,) * r)
-    for slot in range(r):
-        T = contract_slot(T, Theta, 1 + slot)
-        if Phi is not None:
-            W = contract_slot(W, Phi, 1 + slot)
-    return np.tensordot(T, W, axes=((*range(1, r + 1), r + 1),
-                                    (*range(1, r + 1), 0)))
-
-
-def evaluate_divergence(ell, fiat_element):
-    """Apply a divergence functional to the nodal basis of a FIAT element.
-
-    :arg ell: A divergence :class:`PhysicallyMappedFunctional`.
-    :arg fiat_element: The FIAT element providing the nodal basis.
-    :returns: The vector of values of the functional on the nodal basis.
-    """
-    sd = fiat_element.get_reference_element().get_spatial_dimension()
-    tab = fiat_element.tabulate(1, ell.points)
-    alphas = [tuple(int(k == c) for k in range(sd)) for c in range(sd)]
-    div = sum(tab[alphas[c]].reshape(tab[alphas[c]].shape[0], sd, -1)[:, c, :]
-              for c in range(sd))
-    return div @ ell.weights
-
-
 def physical_node_row(fiat_element, ell, dim, entity, J, avg):
     """B row of one parseable node, or None if push-forward invariant.
 
+    The physical node keeps the points and coefficients of the reference
+    node with each mapping mapped by the FIAT convention for its entity:
+    point data keeps Cartesian directions, facet nodes are framed on the
+    physical facet, and interior moments are invariant.  The mappings of
+    the tabulation carry the pullback of the basis functions.
+
     :arg fiat_element: The FIAT element.
-    :arg ell: The parsed reference node.
+    :arg ell: The :class:`FunctionalData` of the reference node.
     :arg dim: The dimension of the entity the node sits on.
     :arg entity: The entity number.
     :arg J: The (numeric) cell Jacobian.
@@ -255,20 +189,20 @@ def physical_node_row(fiat_element, ell, dim, entity, J, avg):
     """
     ref_el = fiat_element.get_reference_element()
     sd = ref_el.get_spatial_dimension()
-    if ell.divergence:
-        return evaluate_divergence(ell, fiat_element) / np.linalg.det(J)
-    if ell.rank:
-        point_data = len(ell.points) == 1 and (ell.rank == 1 or dim != sd - 1)
-        if dim == sd and not point_data:
-            return None
-        Phi = (facet_slot_map(ref_el, entity, J, derivative=False)
-               if dim == sd - 1 and not point_data else None)
-        return piola_value_row(fiat_element, ell, Phi, J)
-    if ell.order == 0:
+    single = len(ell.points) == 1
+    if ell.order == 0 and ell.rank == 0:
         return None
-    Phi = (facet_slot_map(ref_el, entity, J, derivative=True)
-           if dim == sd - 1 else np.eye(sd))
-    row = scalar_derivative_row(fiat_element, ell, Phi, J)
+    if dim == sd - 1 and not (single and ell.order == 0 and ell.rank == 1):
+        maps = [facet_direction_map(ref_el, entity, J, mapping) for mapping in ell.mappings]
+    elif dim == sd and not single and ell.order == 0:
+        return None
+    else:
+        maps = [np.eye(1 if mapping == DIVERGENCE else sd) for mapping in ell.mappings]
+    T = tabulate(fiat_element, ell.mappings, ell.points)
+    for k, mapping in enumerate(ell.mappings):
+        ell = ell.contract(maps[k], k)
+        T = contract(T, pullback_map(mapping, J), 1 + k)
+    row = ell.evaluate(T)
     if not avg and len(ell.points) > 1 and dim == sd - 1:
         # The reference weights are measure-intrinsic (integral averages),
         # so a plain physical integral carries the physical facet measure.
@@ -325,6 +259,7 @@ def composition_transformation(fiat_element, J, ndof=None, avg=True, tol=2e-10):
         the trailing constraint columns.
     """
     nodes = fiat_element.dual_basis()
+    mappings = fiat_element.mapping()
     entity_ids = fiat_element.entity_dofs()
     nbf = len(nodes)
     if ndof is None:
@@ -344,7 +279,7 @@ def composition_transformation(fiat_element, J, ndof=None, avg=True, tol=2e-10):
             rows = []
             for i in block:
                 try:
-                    ell = PhysicallyMappedFunctional.from_fiat(nodes[i])
+                    ell = FunctionalData.from_fiat(nodes[i], mappings[i])
                 except NotImplementedError:
                     if i < ndof:
                         raise

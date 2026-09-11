@@ -942,3 +942,64 @@ t_i\partial t_j` face moments) is referenced by nothing else — the engine
 never needs a nodal completion, its residual elimination happens through
 the Vandermonde recursion.  Deleting both is a candidate cleanup once the
 hand codes are retired wholesale.
+
+---
+
+## Stage 7 (2026-09-11): structural redesign after the Codex review
+
+The review (`ZANY_AUTO_REVIEW.md`) asked for the two Vandermonde inversions to be
+explicit, for structural reasoning instead of Jacobian sampling and SCC inference,
+for the flag cascade to become a typed node representation, and for the identity
+assembly convention.  All four are in `finat/functional.py` and
+`finat/physically_mapped.py`; `finat/zany.py` (dead since Stage 5) is deleted.
+
+* **Data model.**  `FunctionalData(points, coefficients, mappings)`: the coefficient
+  tensor :math:`W_q` has one axis per index, and `mappings` records how each index
+  transforms, reusing FIAT's own `mapping()` strings for component indices plus
+  `"derivative"` (chain rule) and `"divergence"` (a contravariant component contracted
+  with a derivative; its axis has length one and its pullback is the scalar
+  :math:`1/\det J`).  `from_fiat` reads the tensors off `pt_dict`/`deriv_dict` exactly:
+  no SVD, no order/rank/direction/divergence flags.  `PointDivergence` and
+  `IntegralMomentOfTensorDivergence` parse, so the Arnold-Winther constraint rows are
+  now assembled rather than left as identity (same :math:`V[:, :\nu]`, as the span
+  argument predicts).
+* **Engine.**  `ReferenceNodalBasis` (FIAT's inversion, tabulated with the axes of a
+  coefficient tensor) -> `ReferenceNode` (functional, owner, support) -> `physical_convention`
+  (the single place where FIAT's physical dual-set conventions live: Cartesian point
+  data, framed facet nodes, invariant interior moments) -> `DirectionPullback` per index
+  -> `PhysicalNode` -> `PhysicalVandermonde.inverse` (block back-substitution over the
+  entities in increasing dimension, closure taken from the cell topology, starting from
+  the identity and replacing only the rows of entities with a non-invariant node).  The
+  support law is asserted: a row with a nonzero outside its block and closure raises.
+* **The lesson that cost the most time.**  Attaching a symbolic coefficient to each
+  Cartesian entry of the pullback matrix breaks the support law, because the
+  cancellations of the theory are *analytic identities in J* that GEM cannot see: the
+  tangential projector summed over components, the in-face edge normal lying in the face
+  plane (w = ((J^T J) t) x n is orthogonal to n symbolically), and the divergence identity
+  J^T adj(J)^T = det J I.  The cure is representational: a pullback is
+  :math:`G = P + \sum_t g_t C_t/d` with numeric matrices :math:`C_t` expressed in the
+  flag's orthonormal reference frame (support tangents, in-face normal, facet normal), and
+  each term is contracted with the tabulation numerically before its GEM coefficient
+  multiplies the result.  The divergence identity is not of this form, hence the
+  divergence index mapping.
+* **Tolerance.**  The drop tolerance on the reference tabulation is 1e-10 (the former
+  sampling tolerance): Walkington's extended element leaks ~1e-12 round-off into
+  out-of-closure columns.
+* **Verification.**  Full FInAT suite 480 passed / 8 skipped; lint targets clean.  A/B
+  against the previous engine with an opaque `gem.Variable` Jacobian on 20 zoo cases:
+  identical sparsity pattern of M everywhere, GEM node count never larger and often much
+  smaller (JM 3D 2341 -> 407, MTW 3D 637 -> 294, HuZhang 442 -> 343); values agree to
+  1.6e-14 on the fixture cells.  The hand-coded `_basis_transformation` methods are kept
+  for now at the user's request.
+* **Dual evaluation (later on 2026-09-11).**  `dual_transformation` no longer inverts
+  :math:`M^T` symbolically: the physical nodes of :math:`f` are :math:`n_i(f) = \sum_j
+  B_{ij}\hat n_j(F^*f)`, so the dual weights are transformed by the physical Vandermonde
+  matrix itself, `PhysicalVandermonde.matrix()`, with rows divided by the conditioning
+  scaling (`dof_scales`) and restricted to the exposed dofs.  `basis_transformation` and
+  `dual_transformation` share `physical_vandermonde()` (basis, Jacobian, physical nodes),
+  and `PhysicalVandermonde.rows()` is the one place the rows are assembled and the support
+  law checked.  The free function `inverse` (connected components + adjugate) is gone.
+  `test_zany_mapping.py::test_dual_evaluation` checks :math:`n_i(\psi_j) = \delta_{ij}`
+  through `dual_basis`/`dual_transformation`/`basis_evaluation` on the Piola zoo; elements
+  with `deriv_dict` nodes (Morley, Alfeld-Sorokina, Guzman-Neilan H1div) have no FInAT dual
+  basis and are excluded.

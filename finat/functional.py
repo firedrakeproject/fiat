@@ -1,276 +1,153 @@
-r"""Symbolic representation of degrees of freedom.
+r"""Degrees of freedom as coefficient tensors.
 
-A :class:`PhysicallyMappedFunctional` represents a degree of freedom in the form
+Every FIAT functional built from point and derivative dictionaries has
+the form
 
-.. math:: \\ell(f) = \\sum_q w_q \\langle D, \\nabla^m f(x_q) \\rangle,
+.. math:: \ell(f) = \sum_q \langle W_q, \nabla^m f(x_q) \rangle,
 
-where the points :math:`x_q` and quadrature/moment weights :math:`w_q`
-are numeric, and the direction tensor :math:`D` (of rank equal to the
-derivative order :math:`m`) may be numeric, for functionals defined on
-the reference cell, or a GEM expression, for functionals carrying
-physical geometry.
-
-This representation is the foundation for automating the transformation
-theory of Kirby (2017): degrees of freedom of any FIAT element are
-converted to this common form directly from their point and derivative
-dictionaries, with the derivative direction recovered numerically, so
-that no dispatch over FIAT functional types is required.
-
-The physical counterpart of a reference functional is assumed to share
-its points and weights: integral moments must be measure-intrinsic
-(e.g. integral averages), following the reference node convention of
-Brubeck & Kirby (2025).
+with reference points :math:`x_q` and coefficient tensors :math:`W_q`
+carrying one index for each value component of :math:`f` and one for
+each derivative.  :class:`FunctionalData` stores exactly this, together
+with the mapping of each index, which says how that index transforms
+under the pullback of the basis functions: a component index carries
+the Piola mapping of the element, a derivative index the chain rule,
+and a divergence index (a contravariant component contracted with a
+derivative) the scalar :math:`1/\det J`.  Point evaluations, integral
+moments, normal derivatives, divergences and tensor divergences are
+all instances of the same data, so the transformation theory of
+:mod:`finat.physically_mapped` never dispatches on FIAT functional
+types.
 """
 
-from functools import reduce
-from math import factorial, prod
-from operator import mul
+from itertools import permutations
 
 import numpy
 
-from FIAT.finite_element import FiniteElement
-from FIAT.polynomial_set import mis
-from FIAT.functional import Functional as FIATFunctional
-from gem import Node, Zero
+#: The mapping of a derivative index of the coefficient tensor.
+DERIVATIVE = "derivative"
+
+#: The mapping of a divergence index of the coefficient tensor.
+DIVERGENCE = "divergence"
 
 
-def multiindices(sd: int, order: int) -> list:
-    """Multi-indices of a given order, with axis ordering for order 1."""
-    return sorted(mis(sd, order), reverse=True)
+def component_mappings(mapping, rank):
+    """The mapping of each component index of a functional.
 
-
-class PhysicallyMappedFunctional:
-    """Symbolic degree of freedom with a single derivative direction.
-
-    Parameters
-    ----------
-    points :
-        Tuple of reference-cell points.
-    weights :
-        Numeric weight for each point.
-    order :
-        The derivative order :math:`m`.
-    direction :
-        For ``order > 0``, the direction tensor of rank ``order``,
-        either numeric or a GEM expression; ``None`` for ``order == 0``.
-    divergence :
-        Whether this is a divergence functional: the trace, at each
-        point, of the tensor pairing an order-1 derivative multi-index
-        with a rank-1 value component.  Unlike an ordinary derivative,
-        this does not have a single ``direction``, since the trace
-        pattern spans the full derivative and value index ranges; it is
-        recovered and handled as its own case because it commutes with
-        the (contravariant) Piola pullback up to the Jacobian
-        determinant, independently of the entity it sits on.
-    mapping :
-        The FIAT mapping string of the basis functions this functional
-        is dual to (``"affine"``, ``"contravariant piola"``, ...): the
-        type tag of the value slots, deciding which matrix each value
-        slot of the weight tensor is contracted with under push-forward,
-        exactly as the derivative slots of ``direction`` are contracted
-        with the Jacobian.
-
+    :arg mapping: The FIAT mapping of the basis functions the functional
+        acts on, e.g. ``"affine"`` or ``"double contravariant piola"``.
+    :arg rank: The number of component indices of the functional.
+    :returns: A tuple with the Piola mapping of each component index.
     """
+    words = mapping.split()
+    if words == ["affine"]:
+        return (mapping,) * rank
+    if words[0] == "double":
+        kinds = (f"{words[1]} piola",) * 2
+    else:
+        kinds = tuple(f"{word} piola" for word in words[:-1])
+    if len(kinds) != rank:
+        raise ValueError(f"A {mapping} functional must have rank {len(kinds)}, not {rank}.")
+    return kinds
 
-    def __init__(self, points: tuple, weights: numpy.ndarray,
-                 order: int = 0, direction=None, rank: int = 0,
-                 divergence: bool = False, mapping: str = "affine"):
-        self.points = points
-        self.weights = weights
-        self.order = order
-        self.direction = direction
-        self.rank = rank
-        self.divergence = divergence
-        self.mapping = mapping
+
+class FunctionalData:
+    """A degree of freedom as a coefficient tensor at each point.
+
+    :arg points: The points, a tuple of reference coordinates.
+    :arg coefficients: An array of shape ``(len(points), sd, ..., sd)``
+        with one trailing axis per index of the coefficient tensor, the
+        component indices first.  The axis of a divergence index has
+        length one.
+    :arg mappings: The mapping of each index: a Piola mapping for a
+        component index, :data:`DERIVATIVE` for a derivative index, or
+        :data:`DIVERGENCE` for the last index.
+    """
+    def __init__(self, points, coefficients, mappings):
+        self.points = tuple(map(tuple, points))
+        self.coefficients = numpy.asarray(coefficients)
+        self.mappings = tuple(mappings)
+
+    @property
+    def rank(self):
+        """The number of component indices."""
+        return sum(mapping not in (DERIVATIVE, DIVERGENCE) for mapping in self.mappings)
+
+    @property
+    def order(self):
+        """The number of derivatives taken."""
+        return sum(mapping in (DERIVATIVE, DIVERGENCE) for mapping in self.mappings)
 
     @classmethod
-    def from_fiat(cls, node: FIATFunctional, tol: float = 1e-12,
-                  mapping: str = "affine") -> "PhysicallyMappedFunctional":
-        """Construct a symbolic PhysicallyMappedFunctional from a FIAT functional.
+    def from_fiat(cls, node, mapping="affine", tol=1e-12):
+        """Read the coefficient tensors off a FIAT functional.
 
-        The construction only inspects the point and derivative
-        dictionaries: the derivative order and the (common) direction of
-        differentiation are recovered numerically by factorizing the
-        matrix of derivative weights.
+        A derivative multi-index is spread evenly over the positions of
+        the symmetric derivative tensor with that multi-index, so that the
+        full contraction with the derivative tensor of :math:`f`
+        reproduces the multi-index pairing.  A first derivative whose
+        coefficients contract the last component index with the
+        derivative index is stored with a divergence index instead.
 
-        Parameters
-        ----------
-        node :
-            The FIAT functional.
-        tol :
-            Relative tolerance for the rank-one factorization of the
-            derivative weights.
-        mapping :
-            The FIAT mapping string of the basis functions this
-            functional is dual to.
-
-        Returns
-        -------
-        PhysicallyMappedFunctional
-            The symbolic representation of the FIAT functional.
-
+        :arg node: The FIAT :class:`~FIAT.functional.Functional`.
+        :arg mapping: The FIAT mapping of the basis functions.
+        :arg tol: Relative tolerance for recognizing a divergence.
+        :returns: The :class:`FunctionalData`.
         """
         if node.pt_dict and node.deriv_dict:
-            raise NotImplementedError(
-                f"{type(node).__name__} mixes value and derivative weights.")
-
-        if not node.deriv_dict:
-            points = tuple(node.pt_dict)
-            comps = {comp for pt in points for w, comp in node.pt_dict[pt]}
-            rank = len(max(comps))
-            if rank == 0:
-                weights = numpy.asarray([w for pt in points
-                                         for w, comp in node.pt_dict[pt]])
-                return cls(points, weights, mapping=mapping)
-            # value weight profile: one row of component weights per point
-            sd = node.ref_el.get_spatial_dimension()
-            weights = numpy.zeros((len(points), sd**rank))
-            shape = (sd,) * rank
-            for q, pt in enumerate(points):
-                for w, comp in node.pt_dict[pt]:
-                    weights[q, numpy.ravel_multi_index(comp, shape)] += w
-            return cls(points, weights, rank=rank, mapping=mapping)
-
+            raise NotImplementedError(f"{type(node).__name__} mixes values and derivatives.")
         sd = node.ref_el.get_spatial_dimension()
-        order = node.max_deriv_order
-        alphas = multiindices(sd, order)
-        lookup = {alpha: k for k, alpha in enumerate(alphas)}
+        if node.deriv_dict:
+            entries = {pt: [(w, tuple(alpha), tuple(comp)) for w, alpha, comp in wac]
+                       for pt, wac in node.deriv_dict.items()}
+        else:
+            alpha = (0,) * sd
+            entries = {pt: [(w, alpha, tuple(comp)) for w, comp in wc]
+                       for pt, wc in node.pt_dict.items()}
+        orders = {sum(alpha) for wac in entries.values() for _, alpha, _ in wac}
+        ranks = {len(comp) for wac in entries.values() for _, _, comp in wac}
+        if len(orders) > 1 or len(ranks) > 1:
+            raise NotImplementedError(f"{type(node).__name__} mixes derivative orders or ranks.")
+        order, = orders
+        rank, = ranks
+        mappings = component_mappings(mapping, rank) + (DERIVATIVE,) * order
 
-        points = tuple(node.deriv_dict)
-        has_comp = any(comp != tuple() for pt in points
-                       for w, alpha, comp in node.deriv_dict[pt])
-        if has_comp:
-            # A divergence: at each point, the weights pairing an
-            # order-1 derivative multi-index with a rank-1 value
-            # component must form a scalar multiple of the trace.
-            if order != 1:
-                raise NotImplementedError(
-                    f"{type(node).__name__} has vector components.")
-            weights = numpy.zeros(len(points))
-            for q, pt in enumerate(points):
-                Wq = numpy.zeros((sd, sd))
-                for w, alpha, comp in node.deriv_dict[pt]:
-                    if len(comp) != 1:
-                        raise NotImplementedError(
-                            f"{type(node).__name__} has vector components.")
-                    Wq[lookup[tuple(alpha)], comp[0]] += w
-                if not numpy.allclose(Wq, Wq[0, 0] * numpy.eye(sd), atol=tol):
-                    raise NotImplementedError(
-                        f"{type(node).__name__} is not a divergence functional.")
-                weights[q] = Wq[0, 0]
-            return cls(points, weights, order=order, divergence=True,
-                       mapping=mapping)
-
-        W = numpy.zeros((len(points), len(alphas)))
+        points = tuple(entries)
+        coefficients = numpy.zeros((len(points),) + (sd,) * (rank + order))
         for q, pt in enumerate(points):
-            for w, alpha, comp in node.deriv_dict[pt]:
-                W[q, lookup[tuple(alpha)]] += w
+            for w, alpha, comp in entries[pt]:
+                indices = set(permutations(sum(([k] * a for k, a in enumerate(alpha)), [])))
+                for index in indices:
+                    coefficients[(q, *comp, *index)] += w / len(indices)
 
-        # Factor the weights as a common direction times scalar weights
-        u, s, vt = numpy.linalg.svd(W)
-        if any(s[1:] > tol * s[0]):
-            raise NotImplementedError(
-                f"{type(node).__name__} has no common derivative direction.")
-        direction = vt[0]
-        weights = u[:, 0] * s[0]
-        return cls(points, weights, order=order, direction=direction,
-                   mapping=mapping)
+        if order == 1 and rank > 0 and mappings[rank - 1] == "contravariant piola":
+            trace = numpy.trace(coefficients, axis1=-2, axis2=-1) / sd
+            if numpy.allclose(coefficients, trace[..., None, None] * numpy.eye(sd),
+                              atol=tol * numpy.abs(coefficients).max()):
+                coefficients = trace[..., None]
+                mappings = mappings[:rank - 1] + (DIVERGENCE,)
+        return cls(points, coefficients, mappings)
 
-    def with_direction(self, direction) -> "PhysicallyMappedFunctional":
-        """Return the same functional with another direction tensor."""
-        return type(self)(self.points, self.weights,
-                          order=self.order, direction=direction,
-                          mapping=self.mapping)
+    def contract(self, A, index):
+        """Contract one index of the coefficients with a matrix.
 
-    def pullback(self, A) -> "PhysicallyMappedFunctional":
-        r"""Contract each derivative slot of the direction with a matrix.
-
-        By the chain rule, reference derivatives of a pullback are
-        physical derivatives contracted with the Jacobian, so viewing
-        this reference functional as acting on physical functions
-        amounts to contracting each slot of the direction tensor with
-        the cell Jacobian; more general per-slot matrices arise when
-        the direction is instead mapped through a physical frame.
-
-        Parameters
-        ----------
-        A :
-            The per-slot matrix: a GEM expression of shape ``(sd, sd)``,
-            or an ``(sd, sd)`` array with numeric or GEM scalar entries.
-
-        Returns
-        -------
-        PhysicallyMappedFunctional
-            The functional with direction :math:`A \\otimes \\dots
-            \\otimes A : D`, collapsed back onto multi-index
-            coefficients.
-
+        :arg A: The matrix, numeric or an object array of GEM scalars.
+        :arg index: The position of the index in the coefficient tensor.
+        :returns: The :class:`FunctionalData` with ``W'[q, ..., i, ...]
+            = sum_k A[i, k] W[q, ..., k, ...]``.
         """
-        if self.order == 0:
-            return self
-        if isinstance(A, Node):
-            sd = A.shape[0]
-            A = numpy.array([[A[i, k] for k in range(sd)] for i in range(sd)],
-                            dtype=object)
-        A = numpy.asarray(A)
-        sd = A.shape[0]
-        symbolic = A.dtype == object
-        alphas = multiindices(sd, self.order)
-        lookup = {alpha: k for k, alpha in enumerate(alphas)}
+        coefficients = numpy.tensordot(self.coefficients, A, axes=(1 + index, 1))
+        coefficients = numpy.moveaxis(coefficients, -1, 1 + index)
+        return type(self)(self.points, coefficients, self.mappings)
 
-        direction = numpy.full(len(alphas), Zero() if symbolic else 0.0,
-                               dtype=object if symbolic else float)
-        shape = (sd,) * self.order
-        for index in numpy.ndindex(shape):
-            # Distribute the multi-index coefficients over a symmetric tensor
-            alpha = _index_alpha(index, sd)
-            scale = prod(map(factorial, alpha)) / factorial(self.order)
-            d = self.direction[lookup[alpha]] * scale
-            if not isinstance(d, Node) and d == 0:
-                continue
-            # Contract each slot with A, collapsing onto multi-indices
-            for target in numpy.ndindex(shape):
-                term = reduce(mul, (A[target[k], index[k]]
-                                    for k in range(self.order)), d)
-                m = lookup[_index_alpha(target, sd)]
-                direction[m] = direction[m] + term
-        return self.with_direction(direction)
+    def evaluate(self, tabulation):
+        """Apply the functional to tabulated basis functions.
 
-    def evaluate(self, fiat_element: FiniteElement) -> numpy.ndarray:
-        r"""Apply this functional to the nodal basis of a FIAT element.
-
-        This is the generalized Vandermonde computation: the restriction
-        of a functional :math:`\\ell` to the polynomial space satisfies
-        :math:`\\pi \\ell = \\sum_j \\ell(\\psi_j)\\, \\pi n_j`.  Only
-        valid for functionals with numeric direction.
-
-        Parameters
-        ----------
-        fiat_element :
-            The FIAT element providing the nodal basis.
-
-        Returns
-        -------
-        numpy.ndarray
-            The vector of values of this functional on the nodal basis.
-
+        :arg tabulation: The tabulation of the basis functions at
+            ``points``, shape ``(nbf, sd, ..., sd, len(points))`` with
+            the axes of the coefficient tensor, as returned by
+            :meth:`finat.physically_mapped.ReferenceNodalBasis.tabulate`.
+        :returns: The vector of values on the basis, shape ``(nbf,)``.
         """
-        sd = fiat_element.get_reference_element().get_spatial_dimension()
-        tab = fiat_element.tabulate(self.order, self.points)
-        if self.rank > 0:
-            T = tab[(0,) * sd]
-            T = T.reshape(T.shape[0], -1, len(self.points))
-            return numpy.einsum("jcq,qc->j", T, self.weights)
-        if self.order == 0:
-            return tab[(0,) * sd] @ self.weights
-        alphas = multiindices(sd, self.order)
-        return self.direction @ numpy.array([tab[alpha] @ self.weights
-                                             for alpha in alphas])
-
-
-def _index_alpha(index: tuple, sd: int) -> tuple:
-    """Convert a tensor index into a derivative multi-index."""
-    alpha = [0] * sd
-    for k in index:
-        alpha[k] += 1
-    return tuple(alpha)
+        n = len(self.mappings)
+        return numpy.tensordot(tabulation, self.coefficients,
+                               axes=(tuple(range(1, n + 2)), tuple(range(1, n + 1)) + (0,)))

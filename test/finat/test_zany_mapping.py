@@ -1,5 +1,6 @@
 import FIAT
 import finat
+import gem
 import numpy as np
 import pytest
 import pprint
@@ -211,3 +212,33 @@ def test_affine(ref_to_phys, element, degree, variant, dimension):
 @pytest.mark.parametrize("variant", [None, "iso"])
 def test_macro_piola(ref_to_phys, element, degree, variant, dimension):
     check_zany_mapping(element, ref_to_phys[dimension], degree, variant=variant)
+
+
+def check_dual_evaluation(element, ref_to_phys, *args, **kwargs):
+    """The physical nodes are dual to the physical basis functions."""
+    finat_element = element(ref_to_phys.ref_cell, *args, **kwargs)
+    sd = ref_to_phys.ref_cell.get_spatial_dimension()
+    Q, x = finat_element.dual_basis
+    Q = finat_element.dual_transformation(Q, coordinate_mapping=ref_to_phys)
+    phi = finat_element.basis_evaluation(0, x, coordinate_mapping=ref_to_phys)[(0,)*sd]
+
+    i, j = gem.indices(2)
+    shape_indices = gem.indices(len(phi.shape) - 1)
+    expr = gem.IndexSum(Q[(i, *shape_indices)] * phi[(j, *shape_indices)],
+                        (*x.indices, *shape_indices))
+    result = evaluate([gem.ComponentTensor(expr, (i, j))])[0].arr
+    assert np.allclose(result, np.eye(finat_element.space_dimension()))
+
+
+# FInAT has no dual basis for elements with derivative nodes
+dual_basis_elements = [e for e in zany_piola_elements[3]
+                       if e not in (finat.AlfeldSorokina, finat.GuzmanNeilanH1div)]
+
+
+@pytest.mark.parametrize("dimension, element", [
+    *((2, e) for e in zany_piola_elements[2]),
+    *((2, e) for e in dual_basis_elements),
+    *((3, e) for e in dual_basis_elements),
+])
+def test_dual_evaluation(ref_to_phys, element, dimension):
+    check_dual_evaluation(element, ref_to_phys[dimension])

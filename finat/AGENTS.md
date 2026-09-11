@@ -41,28 +41,31 @@
 
 ## Mathematical structures to recognize in FIAT/FInAT
 
-* **A degree of freedom is fully described by five numbers, not by its FIAT class.** Every
-  functional FIAT builds from `pt_dict`/`deriv_dict` reduces to (points, weights, derivative
-  order $m$, a direction tensor of rank $m$, a value rank for vector/tensor-valued dofs).
+* **A degree of freedom is a coefficient tensor at each point, not a FIAT class.** Every
+  functional FIAT builds from `pt_dict`/`deriv_dict` is $\ell(f) = \sum_q \langle W_q,
+  \nabla^m f(x_q)\rangle$ with one index of $W_q$ per value component and one per derivative.
   `IntegralMomentOfNormalDerivative`, `PointNormalDerivative`, `TensorBidirectionalIntegralMoment`,
-  etc. are just different ways of *constructing* the same five numbers. Recognizing this
-  collapses "N functional types to support" into "one shape to recover numerically"
-  (`finat.PhysicallyMappedFunctional.from_fiat`, `finat/functional.py`).
-* **Pullback is always "contract each tensor slot of the direction with a fixed matrix."**
-  Order-0 (values) are invariant (zero slots to contract). Order-$m$ derivatives contract $m$
-  slots with the Jacobian $J$ (the chain rule). Rank-$r$ Piola values contract $r$ slots with
-  the cofactor matrix $K = \operatorname{adj}(J)^T$. This is *the same operation* with a
-  different matrix, which is why the scalar and Piola code in `finat/zany.py` are mirror images
-  of each other (`_scalar_point_rows` / `_piola_point_rows`, `_scalar_facet_rows` /
-  `_piola_facet_rows`) rather than unrelated implementations.
+  `PointDivergence`, etc. are just different ways of *constructing* the same tensors
+  (`finat.FunctionalData.from_fiat`, `finat/functional.py`); each index carries its *mapping*,
+  the FIAT Piola mapping for a component, the chain rule for a derivative, $1/\det J$ for a
+  divergence.
+* **Pullback is always "contract each index of the coefficient tensor with a fixed matrix."**
+  A derivative index contracts with $J^{-T}$ (the chain rule), a contravariant component with
+  $J/\det J$, a divergence with the scalar $1/\det J$. This is *the same operation* with a
+  different matrix per index, which is why one engine (`finat/physically_mapped.py`) transforms
+  scalar and Piola elements alike: `DirectionPullback` pulls the physical directions of one
+  index back to the reference cell, and `PhysicalNode` is the reference node with those pullbacks.
 * **Frame decomposition is the one computational primitive underlying every non-affine
   element.** Facet dofs (Morley/Argyris/Bell normal derivatives; MTW/JM/GN normal-tangential
-  moments) and vertex-jet completions (Hermite/Argyris/Bell gradients and Hessians) are all
-  solved the *same* way: split a direction/profile into an invariant part and a part that needs
-  completing, express the pulled-back quantity in the frame built from the mapped generators of
-  that split (`FacetFrame`, or the direction-basis inverse in `_scalar_point_rows`), and solve
-  symbolically via `adjugate`/`determinant`. Once this pattern is visible, "add a new element"
-  stops being "derive new math" and becomes "which invariant subspace, which frame."
+  moments) are framed on the flag support $\subseteq$ facet $\subset$ cell (`FlagFrame`): the
+  tangents of the support entity pull back to themselves, and each unit normal of the flag pulls
+  back to a symbolic vector that is *expanded in the reference frame*, so that every symbolic
+  coefficient multiplies a reference direction along which the tabulation is nodal. That
+  expansion is what makes the cancellations of the theory (the tangential residual couples only
+  to closure dofs; the in-face normal of an edge lies in the face plane) happen numerically,
+  entry by entry, with no symbolic simplification required. Vertex jets (Hermite/Argyris/Bell)
+  and vector point values need no frame: their Cartesian indices contract with $J^{-1}$ or
+  $J^T/\det J$ directly.
 * **Constrained/extended elements are the same construction as a restriction.** Bell and
   Guzman-Neilan are both "take the extended FIAT element with its constraint functionals as
   extra dofs, transform the whole thing, then keep only the first $\nu$ columns." This is
@@ -90,12 +93,12 @@
   in-plane directions" in 3D), check whether its transformation law is contragredient before
   assuming it matches the direct frame.**
 * **Numerically recovered invariants (SVD, pinv) are only defined up to a group action, and
-  formulas built from them must be invariant under that action.** `from_fiat`'s SVD recovers a
-  direction/weight pair $(\hat n, w)$ up to a joint sign flip ($\hat n \to -\hat n$, $w \to
-  -w$ leaves the functional unchanged). A formula like $r_k = a x_k + (1-c)\beta_k$ that
-  implicitly assumes a particular sign will be wrong on exactly the subset of entities where
-  SVD happened to pick the other sign — a bug that looks like it "mostly works" and is
-  otherwise very hard to localize. The fix, $r_k = x_k - c\beta_k$, is invariant under the
-  joint flip. **Always test the full topology of a non-degenerate, non-symmetric physical
-  cell** (see `test/finat/conftest.py::MyMapping`'s deliberately irregular vertex coordinates) —
-  a symmetric test cell can accidentally hide a sign bug that only shows up on a generic mesh.
+  formulas built from them must be invariant under that action.** An earlier `from_fiat`
+  recovered a direction/weight pair $(\hat n, w)$ by SVD, i.e. up to a joint sign flip, and a
+  downstream formula that implicitly assumed one sign was wrong on exactly the entities where
+  the SVD picked the other — a bug that looked like it "mostly worked" and was very hard to
+  localize. The coefficient tensors of `FunctionalData` are now read off the FIAT dictionaries
+  exactly, with no factorization, so no such ambiguity exists. **Always test the full topology
+  of a non-degenerate, non-symmetric physical cell** (see `test/finat/conftest.py::MyMapping`'s
+  deliberately irregular vertex coordinates) — a symmetric test cell can accidentally hide a
+  sign bug that only shows up on a generic mesh.

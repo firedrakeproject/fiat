@@ -129,7 +129,7 @@ mathematical patterns rather than starting from ad hoc special cases:
 
 This section used to be a rough draft of aspirations. It is now grounded in the concrete
 experience of automating the Kirby (2017) / Aznaran-Kirby-Farrell (2022) / Brubeck & Kirby
-(2025) transformation theory (`finat/zany.py`, `finat/functional.py`) for Morley, Hermite,
+(2025) transformation theory (`finat/physically_mapped.py`, `finat/functional.py`) for Morley, Hermite,
 Argyris, Bell, Mardal-Tai-Winther, Johnson-Mercier, and Guzman-Neilan. The lessons below are
 about *how to design and debug this kind of code*, not just about this one project.
 

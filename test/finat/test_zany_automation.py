@@ -4,32 +4,31 @@ import numpy as np
 import pytest
 
 from gem.interpreter import evaluate
-from finat.functional import PhysicallyMappedFunctional
-from finat.fiat_elements import FiatElement
-from finat.zany import PiolaPhysicallyMappedElement, ScalarPhysicallyMappedElement
+from finat.functional import DERIVATIVE, FunctionalData
 
 
 @pytest.mark.parametrize("dimension", [2, 3])
 def test_functional_from_fiat(dimension):
-    """The symbolic PhysicallyMappedFunctional recovers order, weights and
-    direction numerically from the FIAT functional dictionaries."""
+    """The coefficient tensors of the Morley nodes are recovered from the
+    FIAT functional dictionaries."""
     cell = FIAT.ufc_simplex(dimension)
     element = FIAT.Morley(cell)
     entity_ids = element.entity_dofs()
     nodes = element.dual_basis()
 
     for i in entity_ids[dimension - 2][0]:
-        ell = PhysicallyMappedFunctional.from_fiat(nodes[i])
-        assert ell.order == 0
-        assert ell.direction is None
+        ell = FunctionalData.from_fiat(nodes[i])
+        assert ell.mappings == ()
+        assert ell.coefficients.shape == (len(ell.points),)
 
     for entity in entity_ids[dimension - 1]:
         for i in entity_ids[dimension - 1][entity]:
-            ell = PhysicallyMappedFunctional.from_fiat(nodes[i])
-            assert ell.order == 1
+            ell = FunctionalData.from_fiat(nodes[i])
+            assert ell.mappings == (DERIVATIVE,)
             normal = cell.compute_normal(entity)
-            cosine = ell.direction @ normal
-            assert np.isclose(abs(cosine), np.linalg.norm(normal))
+            direction = ell.coefficients.sum(axis=0)
+            cosine = direction @ normal
+            assert np.isclose(abs(cosine), np.linalg.norm(direction) * np.linalg.norm(normal))
 
 
 auto_elements = [finat.Morley, finat.Hermite]
@@ -53,27 +52,3 @@ def test_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, element, dimensio
     orders = [node.max_deriv_order for node in finat_element._element.dual_basis()]
     expected = Mu * np.asarray([h**-order for order in orders])[:, None]
     assert np.allclose(Ms, expected)
-
-
-def test_unsupported_mapping_scalar(ref_to_phys):
-    """A ScalarPhysicallyMappedElement rejects a non-affine FIAT element."""
-    mapping = ref_to_phys[2]
-
-    class BogusScalar(ScalarPhysicallyMappedElement, FiatElement):
-        pass
-
-    element = BogusScalar(FIAT.Nedelec(mapping.ref_cell, 1))
-    with pytest.raises(NotImplementedError):
-        element.basis_transformation(mapping)
-
-
-def test_unsupported_mapping_piola(ref_to_phys):
-    """A PiolaPhysicallyMappedElement rejects a covariant FIAT element."""
-    mapping = ref_to_phys[2]
-
-    class BogusPiola(PiolaPhysicallyMappedElement, FiatElement):
-        pass
-
-    element = BogusPiola(FIAT.Nedelec(mapping.ref_cell, 1))
-    with pytest.raises(NotImplementedError):
-        element.basis_transformation(mapping)
