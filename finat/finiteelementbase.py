@@ -291,6 +291,28 @@ class FiniteElementBase(metaclass=ABCMeta):
             f"Dual basis not defined for element {type(self).__name__}"
         )
 
+    @cached_property
+    def summands(self):
+        """The direct summands whose bases stack into this element's basis.
+
+        A direct sum blocks its tabulation and its dual basis along these
+        summands alike.  A contraction of the one against the other therefore
+        splits into a sum over them.
+
+        Returns
+        -------
+        tuple
+            The elements, on this element's own cell and in basis order, whose
+            tabulations concatenate into this element's tabulation and whose
+            dual bases stack into its dual basis.  An element that is not a
+            direct sum is its own only summand.
+        """
+        from finat.enriched import as_enriched  # Avoid circular import
+        summands = as_enriched(self)
+        if summands is None:
+            return (self,)
+        return summands.summands
+
     def dual_evaluation(self, fn, coordinate_mapping=None):
         '''Get a GEM expression for performing the dual basis evaluation at
         the nodes of the reference element. Currently only works for flat
