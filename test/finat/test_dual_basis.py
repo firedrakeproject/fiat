@@ -81,10 +81,8 @@ def check_dual_basis(element):
     Q, x = element.dual_basis
     assert Q.shape == element.index_shape + element.value_shape
     assert set(Q.free_indices) == set(x.indices)
-    summands = as_enriched(element)
-    if summands is not None:
-        assert len(x.points) == sum(len(e.dual_basis[1].points)
-                                    for e in summands._summands)
+    assert len(x.points) == sum(len(e.dual_basis[1].points)
+                                for e in element.summands)
 
     i = element.get_indices()
     j = element.get_indices()
