@@ -50,7 +50,7 @@ from FIAT.arnold_winther import ArnoldWinther, ArnoldWintherNC  # noqa: F401
 from FIAT.hu_zhang import HuZhang                               # noqa: F401
 from FIAT.bernardi_raugel import BernardiRaugel                 # noqa: F401
 from FIAT.argyris import Argyris                                # noqa: F401
-from FIAT.hermite import CubicHermite                           # noqa: F401
+from FIAT.hermite import Hermite                                # noqa: F401
 from FIAT.morley import Morley                                  # noqa: F401
 from FIAT.hct import HsiehCloughTocher                          # noqa: F401
 from FIAT.c2_elements import AlfeldC2, BrambleZlamalC2          # noqa: F401
@@ -353,9 +353,9 @@ elements = [
     "Argyris(T, 6, 'integral')",
     "WuXuH3NC(T, 4)",
     "WuXuRobustH3NC(T, 7)",
-    "CubicHermite(I)",
-    "CubicHermite(T)",
-    "CubicHermite(S)",
+    "Hermite(I)",
+    "Hermite(T)",
+    "Hermite(S)",
     "Morley(T)",
     "Morley(S)",
     "BernardiRaugel(T)",
