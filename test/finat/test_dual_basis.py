@@ -117,11 +117,13 @@ def test_enriched_element_dual_basis():
 
 
 def test_mixed_enriched_element_dual_evaluation() -> None:
-    """A mixed element must dual-evaluate an enriched component correctly."""
-    cell = ufc_simplex(2)
+    """Dual-evaluate a mixed NCE x Q element on an extruded cell."""
+    cell = ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
+    nce = create_element(finat.ufl.FiniteElement("NCE", cell, 1))
+    q = create_element(finat.ufl.FiniteElement("Q", cell, 1))
     mixed = finat.MixedElement([
-        restricted_lagrange_sum(cell),
-        finat.Lagrange(cell, 1),
+        nce,
+        q,
     ])
 
     check_nodal(mixed)
