@@ -8,7 +8,7 @@ import ufl
 import finat.ufl
 from finat.element_factory import create_element
 from finat.enriched import as_enriched
-from finat.point_set import UnionPointSet
+from finat.point_set import AbstractPointSet, UnionPointSet
 from finat.quadrature import QuadratureRule
 from finat.quadrature_element import QuadratureElement
 from gem.interpreter import evaluate
@@ -123,6 +123,19 @@ def test_mixed_enriched_element_dual_evaluation() -> None:
     q = create_element(finat.ufl.FiniteElement("Q", cell, 1))
     mixed = finat.MixedElement([nce, q])
 
+    basis_indices = mixed.get_indices()
+    value_indices = mixed.get_value_indices()
+    dimension = mixed.cell.get_spatial_dimension()
+
+    def tabulate(points: AbstractPointSet) -> gem.Node:
+        table = mixed.basis_evaluation(0, points)[(0,) * dimension]
+        return gem.ComponentTensor(
+            gem.Indexed(table, basis_indices + value_indices),
+            value_indices,
+        )
+
+    _, point_indices, _ = mixed.dual_evaluation(tabulate)
+    assert point_indices
     check_nodal(mixed)
 
 
