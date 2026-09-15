@@ -354,6 +354,7 @@ elements = [
     "WuXuH3NC(T, 4)",
     "WuXuRobustH3NC(T, 7)",
     "Hermite(I)",
+    "Hermite(I, 4)",
     "Hermite(T)",
     "Hermite(S)",
     "Morley(T)",

@@ -9,10 +9,11 @@ from FIAT import finite_element, polynomial_set, dual_set, functional
 
 
 class HermiteDualSet(dual_set.DualSet):
-    """The dual basis for Hermite elements.  This class works for
-    simplices of any dimension.  Nodes are the first order jet at
-    vertices, point evaluations inside the edge in 1D, and point
-    evaluation at barycenters of 2D entities."""
+    """The Hermite dual set is defined in 1D for any degree, with degrees of
+    freedom given by the first-order jet at the vertices and point
+    evaluations at interior points of the interval.  In higher dimensions,
+    it is defined only for degree 3, with the first-order jet at the vertices
+    and point evaluations at the barycenters of the 2D entities."""
 
     def __init__(self, ref_el, degree, variant=None):
         # make nodes by getting points
