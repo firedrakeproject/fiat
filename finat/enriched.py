@@ -167,13 +167,17 @@ class EnrichedElement(FiniteElementBase):
 
     @cached_property
     def summands(self):
-        """The summands that are not themselves direct sums, in basis order.
+        """Return the leaves of the direct-sum decomposition.
 
-        An element is brought out as a direct sum one level at a time.  A summand
-        of :attr:`elements` may therefore be a direct sum in turn, and these are
-        the elements that remain once every level is brought out.  They are the
-        elements that evaluate their dual basis on their own points, and whose
-        points make up the union that :attr:`dual_basis` works against.
+        For ``E = E_1 ⊕ ... ⊕ E_n``, return ``(E_1, ..., E_n)``.  For an
+        element that is not a direct sum, return ``(E,)``.  The summands are
+        in basis order.  Their tabulations and dual bases form the
+        corresponding blocks of ``E``.
+
+        Returns
+        -------
+        tuple
+            The direct-sum leaves on this element's cell.
         """
         return tuple(chain.from_iterable(element.summands
                                          for element in self.elements))
@@ -247,8 +251,8 @@ class EnrichedElement(FiniteElementBase):
 
         The summands do not share their points, so their evaluations stack
         along the basis index while retaining their own point indices.
-        Concatenating over a free basis index is what
-        :func:`~gem.unconcatenate.unconcatenate` splits downstream.
+        The free basis index carries the direct-sum blocks.  Downstream,
+        :func:`~gem.unconcatenate.unconcatenate` splits those blocks.
         """
         if not self.is_nodal_enriched:
             raise NotImplementedError(

@@ -218,7 +218,8 @@ def split_group(cache, concat_group):
 def _unconcatenate(cache, pairs):
     # Tail-call recursive core of unconcatenate.
     # Assumes that input has already been sanitised.
-    # Only an index carried by an assignment variable can be split against it.
+    # Split only indices carried by assignment variables.  If none are found,
+    # find_group returns None and this pass leaves the expressions unchanged.
     splittable = set().union(chain(*[v.free_indices for v, e in pairs]))
     concat_group = find_group([e for v, e in pairs], splittable)
     if concat_group is None:
@@ -227,8 +228,7 @@ def _unconcatenate(cache, pairs):
     index, multiindices, mappings = split_group(cache, concat_group)
 
     def cut(node):
-        """No need to rebuild expression of independent of the
-        relevant concatenation index."""
+        """Do not rebuild nodes independent of the concatenation index."""
         return index not in node.free_indices
 
     # Finally, split assignment pairs
@@ -254,8 +254,7 @@ def _split_contraction(cache, expression, indices):
     index, multiindices, mappings = split_group(cache, concat_group)
 
     def cut(node):
-        """No need to rebuild expression of independent of the
-        relevant concatenation index."""
+        """Do not rebuild nodes independent of the concatenation index."""
         return index not in node.free_indices
 
     # Split the contraction, one block at a time
@@ -270,16 +269,16 @@ def _split_contraction(cache, expression, indices):
 def split_contraction(expression, indices, cache=None):
     """Splits a contraction along the :py:class:`Concatenate` nodes it sums over.
 
-    No assignment variable need carry the concatenation index here.  The sum
-    is what the Concatenate splits against.  A sum over a whole direct sum is
-    the sum of the sums over its blocks:
+    The assignment variable need not carry the concatenation index.  The
+    contraction sums over that index, so it provides the split point.  A sum
+    over a direct sum is the sum of the sums over its blocks:
 
         sum_j Indexed(Concatenate(A, B), (j,)) * Indexed(Concatenate(C, D), (j,))
             = sum_{ja} A_ja * C_ja + sum_{jb} B_jb * D_jb.
 
-    Every Concatenate that one index indexes must concatenate the same blocks.
-    A FInAT element gives that guarantee: it blocks its tabulation and its dual
-    basis along the same summands.
+    All Concatenate nodes indexed by one index must contain the same blocks.
+    FInAT guarantees this: an element blocks its tabulation and dual basis
+    along the same summands.
 
     Parameters
     ----------

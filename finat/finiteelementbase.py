@@ -293,19 +293,17 @@ class FiniteElementBase(metaclass=ABCMeta):
 
     @cached_property
     def summands(self):
-        """The direct summands whose bases stack into this element's basis.
+        """Return the leaves of the direct-sum decomposition.
 
-        A direct sum blocks its tabulation and its dual basis along these
-        summands alike.  A contraction of the one against the other therefore
-        splits into a sum over them.
+        For ``E = E_1 ⊕ ... ⊕ E_n``, return ``(E_1, ..., E_n)``.  For an
+        element that is not a direct sum, return ``(E,)``.  The summands are
+        in basis order.  Their tabulations and dual bases form the
+        corresponding blocks of ``E``.
 
         Returns
         -------
         tuple
-            The elements, on this element's own cell and in basis order, whose
-            tabulations concatenate into this element's tabulation and whose
-            dual bases stack into its dual basis.  An element that is not a
-            direct sum is its own only summand.
+            The direct-sum leaves on this element's cell.
         """
         from finat.enriched import as_enriched  # Avoid circular import
         summands = as_enriched(self)
