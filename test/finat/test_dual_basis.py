@@ -116,6 +116,17 @@ def test_enriched_element_dual_basis():
     check_dual_basis(enriched)
 
 
+def test_mixed_enriched_element_dual_evaluation() -> None:
+    """A mixed element must dual-evaluate an enriched component correctly."""
+    cell = ufc_simplex(2)
+    mixed = finat.MixedElement([
+        restricted_lagrange_sum(cell),
+        finat.Lagrange(cell, 1),
+    ])
+
+    check_nodal(mixed)
+
+
 def test_quadrature_element_on_union_of_points():
     # Firedrake interpolates through a quadrature space on the points of the
     # target's dual basis, which for a direct sum is a union.  That element
