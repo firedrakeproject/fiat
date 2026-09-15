@@ -121,10 +121,7 @@ def test_mixed_enriched_element_dual_evaluation() -> None:
     cell = ufl.TensorProductCell(ufl.quadrilateral, ufl.interval)
     nce = create_element(finat.ufl.FiniteElement("NCE", cell, 1))
     q = create_element(finat.ufl.FiniteElement("Q", cell, 1))
-    mixed = finat.MixedElement([
-        nce,
-        q,
-    ])
+    mixed = finat.MixedElement([nce, q])
 
     check_nodal(mixed)
 
