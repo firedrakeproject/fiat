@@ -171,8 +171,7 @@ class EnrichedElement(FiniteElementBase):
 
         For ``E = E_1 ⊕ ... ⊕ E_n``, return ``(E_1, ..., E_n)``.  For an
         element that is not a direct sum, return ``(E,)``.  The summands are
-        in basis order.  Their tabulations and dual bases form the
-        corresponding blocks of ``E``.
+        in basis order.
 
         Returns
         -------
