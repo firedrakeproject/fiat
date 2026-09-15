@@ -2,10 +2,16 @@
 #
 # SPDX-License-Identifier:    LGPL-3.0-or-later
 
-# This is the lowest-order H(grad curl) element of Hu, Zhang and Zhang in the
-# same extended form as Guzman-Neilan: it has 26 dofs, of which the last 8 are
-# tangential face moments of the curl.  The first 18 basis functions are the
-# reference element bfs, and the extra 8 are used in the transformation theory.
+# This is not quite the lowest-order H(grad curl) element of Hu, Zhang and
+# Zhang: it has the same degrees of freedom, the same curl space (Guzman-Neilan)
+# and the same conformity, but the curl-free part of its shape functions is
+# fixed by an affine-invariant gauge instead of their correction, so the two
+# spaces differ by gradients (see HuZhangZhangSpace).
+#
+# It is in the same extended form as Guzman-Neilan: it has 26 dofs, of which the
+# last 8 are tangential face moments of the curl.  The first 18 basis functions
+# are the reference element bfs, and the extra 8 are used in the transformation
+# theory.
 
 from FIAT import finite_element, dual_set, polynomial_set
 from FIAT.functional import Functional
@@ -199,6 +205,14 @@ class HuZhangZhang(finite_element.CiarletElement):
     Degrees of freedom: the curl at the vertices, and tangential moments on edges.
 
     This element belongs to the Stokes complex CG1 -> HZZ -> GN -> DG0.
+
+    The shape functions are a variant of those of Hu, Zhang and Zhang (SINUM,
+    2022), differing from them by curl-free fields. Their construction fixes
+    the gradient part with a correction based at the origin, which is not
+    invariant under affine maps, and so cannot be carried by a basis
+    transformation from the reference cell. The degrees of freedom, the curl
+    of the space, H(grad curl)-conformity and the exactness of the complex are
+    those of the original element.
     """
     def __init__(self, ref_el, degree=1, quad_scheme=None):
         if degree != 1:

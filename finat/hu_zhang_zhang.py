@@ -31,6 +31,11 @@ def apply_derivative_functionals(fiat_element, nodes):
 class HuZhangZhang(PhysicallyMappedElement, FiatElement):
     """The lowest-order Hu-Zhang-Zhang H(grad curl)-conforming macroelement.
 
+    This is a gauge variant of the element of Hu, Zhang and Zhang: its shape
+    functions differ from theirs by curl-free fields, while the degrees of
+    freedom and the curl of the space are the same. See
+    :class:`FIAT.hu_zhang_zhang.HuZhangZhang`.
+
     The curl of this element is the Guzman-Neilan element, and its degrees of
     freedom are Guzman-Neilan functionals composed with the curl, so the basis
     transformation is assembled from that of Guzman-Neilan.  The only new
