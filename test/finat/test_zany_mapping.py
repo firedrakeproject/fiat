@@ -186,6 +186,10 @@ def test_high_order_stokes_elements(ref_to_phys, element, dimension, degree):
     check_zany_mapping(element, ref_to_phys[dimension], degree)
 
 
+def test_hu_zhang_zhang(ref_to_phys):
+    check_zany_mapping(finat.HuZhangZhang, ref_to_phys[3])
+
+
 @pytest.mark.parametrize("element, degree, variant", [
     *((finat.HuZhang, k, v) for v in ("integral", "point") for k in range(3, 6)),
 ])

@@ -223,6 +223,17 @@ if petsctools is not None:
     year = {2018},
     doi = {10.1137/17M1153467}
 }""")
+    petsctools.add_citation("HuZhangZhang2022", """
+@article{hu2022stokes,
+    author = {Hu, Kaibo and Zhang, Qian and Zhang, Zhimin},
+    title = {{A Family of Finite Element Stokes Complexes in Three Dimensions}},
+    journal = {SIAM Journal on Numerical Analysis},
+    volume = {60},
+    number = {1},
+    pages = {222-243},
+    year = {2022},
+    doi = {10.1137/20M1358700}
+}""")
     petsctools.add_citation("BernardiRaugel1985", """
 @article{bernardi-raugel-0,
     AUTHOR = {Bernardi, Christine and Raugel, Genevi\\`eve},
