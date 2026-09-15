@@ -46,8 +46,9 @@ def scale_rows(A):
 def HuZhangZhangSpace(ref_el, degree=4):
     r"""Return a basis for the extended Hu-Zhang-Zhang H(grad curl) space.
 
-    This is the space of C0 piecewise polynomial fields u on the Alfeld split
-    such that
+    This is the space of piecewise polynomial fields u on the Alfeld split,
+    continuous within the cell (across the internal faces of the split), such
+    that
 
     * curl u lies in the extended Guzman-Neilan space,
     * u . t is constant on each edge,
@@ -64,7 +65,8 @@ def HuZhangZhangSpace(ref_el, degree=4):
     construction of Hu, Zhang and Zhang only by curl-free fields.
 
     :arg ref_el: a tetrahedron.
-    :kwarg degree: the polynomial degree of the ambient C0 space.
+    :kwarg degree: the polynomial degree of the ambient space, which is
+        continuous within the cell.
 
     :returns: a PolynomialSet basis for the extended Hu-Zhang-Zhang space.
     """
@@ -200,8 +202,10 @@ class HuZhangZhang(finite_element.CiarletElement):
     """The Hu-Zhang-Zhang H(grad curl)-conforming (extended) macroelement.
 
     Reference element: a tetrahedron.
-    Function space: C0 piecewise quartics on the Alfeld split whose curl is in
-                    Guzman-Neilan, with the curl-free part fixed by a Koszul gauge.
+    Function space: piecewise quartics on the Alfeld split, continuous within
+                    the cell, whose curl is in Guzman-Neilan, with the curl-free
+                    part fixed by a Koszul gauge. Between cells the space is
+                    H(grad curl)-conforming, not C0.
     Degrees of freedom: the curl at the vertices, and tangential moments on edges.
 
     This element belongs to the Stokes complex CG1 -> HZZ -> GN -> DG0.
