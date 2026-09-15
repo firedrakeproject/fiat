@@ -254,19 +254,31 @@ class EnrichedElement(FiniteElementBase):
             raise NotImplementedError(
                 f"Dual evaluation not defined for non-nodal {type(self).__name__}"
             )
-        # Each summand uses its own dual_basis, so a non-nodal sum has to be
-        # refused here as well as in dual_basis: this path never asks self
-        # for one.
         evals = []
         point_indices = []
         for element in self.summands:
+            # Enrichments of non-nodal elements raise NotImplementedError
             expr, element_points, indices = element.dual_evaluation(
                 fn, coordinate_mapping=coordinate_mapping)
             evals.append(broadcast_tensor(expr, indices))
             point_indices.extend(element_points)
 
         beta = self.get_indices()
-        return gem.Indexed(gem.Concatenate(*evals), beta), tuple(dict.fromkeys(point_indices)), beta
+        evaluation = gem.Indexed(gem.Concatenate(*evals), beta)
+        unique_point_indices = tuple(dict.fromkeys(point_indices))
+        return evaluation, unique_point_indices, beta
+
+
+def distribute_over_sum(reconstruct, summands):
+    """Rebuild each summand of a direct sum, keeping its nodality.
+
+    :arg reconstruct: called on each of ``summands.elements`` to rebuild it
+        inside whatever wraps the sum.
+    :arg summands: an :class:`EnrichedElement`.
+    :returns: an :class:`EnrichedElement` of the rebuilt summands.
+    """
+    return EnrichedElement(list(map(reconstruct, summands.elements)),
+                           is_nodal_enriched=summands.is_nodal_enriched)
 
 
 @singledispatch
@@ -289,11 +301,6 @@ def as_enriched_enriched(element):
 
 @as_enriched.register(FlattenedDimensions)
 def as_enriched_flattened(element):
-    """Distribute the flattening over the sum the product is.
-
-    Each summand keeps the cell of the element that it came out of.  The
-    summands therefore tabulate against the same entities as that element.
-    """
     summands = as_enriched(element.product)
     if summands is None:
         return None
@@ -305,21 +312,8 @@ def as_enriched_discontinuous(element):
     return as_enriched(element.element)
 
 
-def distribute_over_sum(reconstruct, summands):
-    """Rebuild each summand of a direct sum, keeping its nodality.
-
-    :arg reconstruct: called on each of ``summands.elements`` to rebuild it
-        inside whatever wraps the sum.
-    :arg summands: an :class:`EnrichedElement`.
-    :returns: an :class:`EnrichedElement` of the rebuilt summands.
-    """
-    return EnrichedElement(list(map(reconstruct, summands.elements)),
-                           is_nodal_enriched=summands.is_nodal_enriched)
-
-
 @as_enriched.register(WrapperElementBase)
 def as_enriched_wrapper(element):
-    """Distribute the pullback over the sum the wrapped element is."""
     summands = as_enriched(element.wrappee)
     if summands is None:
         return None
@@ -328,7 +322,6 @@ def as_enriched_wrapper(element):
 
 @as_enriched.register(QuadratureElement)
 def as_enriched_quadrature_element(element):
-    """Rewrite a rule on a union of point sets as a sum of one rule each."""
     rules = element._summand_rules
     if not rules:
         return None
@@ -339,7 +332,7 @@ def as_enriched_quadrature_element(element):
 
 @as_enriched.register(TensorProductElement)
 def as_enriched_tensor_product(element):
-    """Distribute the product over the sum its first factor is.
+    """Expand a product of sums into a sum of products.
 
     The summands of a sum in the first factor own a contiguous range of the
     flat basis index, so they stack in the order the product already numbers
