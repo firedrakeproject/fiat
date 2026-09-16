@@ -12,7 +12,7 @@ import numpy
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import DualSet
 from FIAT.expansions import ExpansionSet
-from FIAT.polynomial_set import mis
+from FIAT.polynomial_set import PolynomialSet, mis
 from FIAT.pointwise_dual import compute_pointwise_dual
 from FIAT.reference_element import make_lattice, multiindex_equal
 
@@ -59,6 +59,30 @@ class BernsteinExpansionSet(ExpansionSet):
         for (alpha, i), vec in raw_result.items():
             result[alpha][i] = vec
         return result
+
+
+class BernsteinPolynomialSet(PolynomialSet):
+    """The Bernstein polynomials of a given degree on a simplex.
+
+    :arg ref_el: The simplex.
+    :arg degree: The polynomial degree.
+    :kwarg ordering: The ordering of the Bernstein polynomials, either
+        None for the ordering of the expansion set, or "topological"
+        for decreasing order of vanishing on the lower dimensional
+        entities, which orders the polynomials by their barycentric
+        exponents sorted in decreasing order.
+    """
+    def __init__(self, ref_el, degree, ordering=None):
+        sd = ref_el.get_spatial_dimension()
+        alphas = list(multiindex_equal(sd + 1, degree))
+        if ordering is None:
+            order = list(range(len(alphas)))
+        elif ordering == "topological":
+            order = sorted(range(len(alphas)), key=lambda i: sorted(alphas[i], reverse=True))
+        else:
+            raise ValueError(f"Invalid ordering {ordering}")
+        coeffs = numpy.eye(len(alphas))[order]
+        super().__init__(ref_el, degree, degree, BernsteinExpansionSet(ref_el), coeffs)
 
 
 class BernsteinDualSet(DualSet):
