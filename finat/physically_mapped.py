@@ -89,7 +89,7 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
 
     #: Relative tolerance below which entries of the numeric reference
     #: tabulations are dropped from the symbolic rows.
-    tol = 1e-10
+    tol = 1e-8
 
     #: If False, physical scalar facet moments are plain integrals rather
     #: than the measure-intrinsic integral averages of the reference nodes.

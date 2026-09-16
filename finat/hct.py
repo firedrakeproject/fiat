@@ -1,11 +1,8 @@
 import FIAT
-from math import comb
-from gem import ListTensor
 
 from finat.citations import cite
 from finat.fiat_elements import ScalarFiatElement
-from finat.physically_mapped import identity, PhysicallyMappedElement
-from finat.argyris import _vertex_transform, _edge_transform
+from finat.physically_mapped import PhysicallyMappedElement
 from copy import deepcopy
 
 
@@ -16,28 +13,6 @@ class HsiehCloughTocher(PhysicallyMappedElement, ScalarFiatElement):
             cite("Groselj2022")
         self.avg = avg
         super().__init__(FIAT.HsiehCloughTocher(cell, degree))
-
-    def basis_transformation(self, coordinate_mapping):
-        if self.degree == 3:
-            return super().basis_transformation(coordinate_mapping)
-
-        V = identity(self.space_dimension())
-
-        sd = self.cell.get_dimension()
-        top = self.cell.get_topology()
-
-        vorder = 1
-        eorder = self.degree - 3
-        voffset = comb(sd + vorder, vorder)
-        _vertex_transform(V, vorder, self.cell, coordinate_mapping)
-        _edge_transform(V, vorder, eorder, self.cell, coordinate_mapping, avg=self.avg)
-
-        # Patch up conditioning
-        h = coordinate_mapping.cell_size()
-        for v in sorted(top[0]):
-            s = voffset*v + 1
-            V[:, s:s+sd] *= 1/h[v]
-        return ListTensor(V.T)
 
     def dof_scale(self, node, dim, havg):
         return super().dof_scale(node, dim, havg) if dim == 0 else None

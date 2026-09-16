@@ -28,7 +28,7 @@ def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):
     else:
         ref_element = element(ref_cell, degree)
 
-    Q = finat.quadrature.make_quadrature(ref_cell, 2*degree)
+    Q = finat.quadrature.make_quadrature(ref_element.complex, 2*degree)
     qpts = Q.point_set
     qwts = Q.weights
 
