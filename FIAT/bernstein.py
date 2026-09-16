@@ -11,9 +11,54 @@ import numpy
 
 from FIAT.finite_element import FiniteElement
 from FIAT.dual_set import DualSet
+from FIAT.expansions import ExpansionSet
 from FIAT.polynomial_set import mis
 from FIAT.pointwise_dual import compute_pointwise_dual
-from FIAT.reference_element import make_lattice
+from FIAT.reference_element import make_lattice, multiindex_equal
+
+
+class BernsteinExpansionSet(ExpansionSet):
+    """Bernstein polynomial expansion set on a simplex."""
+
+    def __init__(self, ref_el):
+        if not ref_el.is_simplex():
+            raise ValueError("Bernstein expansion sets require a simplex")
+        super().__init__(ref_el, scale=1.0)
+
+    def _tabulate_on_cell(self, n, pts, order=0, cell=0, direction=None):
+        """Tabulate the expansion set and its derivatives on one cell."""
+        if direction is not None:
+            raise NotImplementedError("directional Bernstein tabulation is not implemented")
+
+        ref_el = self.ref_el
+        dim = ref_el.get_spatial_dimension()
+        topology = ref_el.get_topology()
+        vertices = ref_el.get_vertices_of_subcomplex(topology[dim][cell])
+
+        B2R = numpy.vstack([numpy.asarray(vertices).T, numpy.ones(len(vertices))])
+        R2B = numpy.linalg.inv(B2R)
+        points = numpy.asarray(pts)
+        B = numpy.concatenate([points, numpy.ones((*points.shape[:-1], 1))],
+                              axis=-1).dot(R2B.T)
+
+        raw_result = {
+            (derivative, i): vec
+            for i, alpha in enumerate(multiindex_equal(dim+1, n))
+            for o in range(order + 1)
+            for derivative, vec in bernstein_Dx(
+                B, alpha, o, R2B
+            ).items()
+        }
+        num_members = math.comb(n + dim, dim)
+        dtype = numpy.array(list(raw_result.values())).dtype
+        result = {
+            alpha: numpy.zeros((num_members, *points.shape[:-1]), dtype=dtype)
+            for o in range(order + 1)
+            for alpha in mis(dim, o)
+        }
+        for (alpha, i), vec in raw_result.items():
+            result[alpha][i] = vec
+        return result
 
 
 class BernsteinDualSet(DualSet):
