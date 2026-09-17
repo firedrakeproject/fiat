@@ -6,6 +6,10 @@ from gem.interpreter import evaluate
 
 @pytest.mark.parametrize("sd,element,degree,variant", [
     (2, finat.Hermite, 3, None),
+    (2, finat.ArnoldWintherNC, 2, None),
+    (2, finat.ArnoldWinther, 3, None),
+    (2, finat.HuZhang, 3, "integral"),
+    (2, finat.HuZhang, 3, "point"),
     (2, finat.QuadraticPowellSabin6, 2, None),
     (2, finat.QuadraticPowellSabin12, 2, None),
     (2, finat.ReducedHsiehCloughTocher, 3, None),
@@ -39,9 +43,11 @@ def test_mass_scaling(scaled_ref_to_phys, sd, element, degree, variant):
 
         z = (0,) * ref_element.cell.get_spatial_dimension()
         finat_vals_gem = ref_element.basis_evaluation(0, qpts, coordinate_mapping=mapping)[z]
-        phis = evaluate([finat_vals_gem])[0].arr.T
+        value_size = np.prod(ref_element.value_shape, dtype=int)
+        phis = evaluate([finat_vals_gem])[0].arr.reshape(len(qwts), -1, value_size)
 
-        M = np.dot(np.multiply(phis, qwts * abs(np.linalg.det(J))), phis.T)
+        weighted_phis = phis * (qwts * abs(np.linalg.det(J)))[:, None, None]
+        M = np.tensordot(weighted_phis, phis, axes=((0, 2), (0, 2)))
         kappa.append(np.linalg.cond(M))
 
     kappa = np.array(kappa)

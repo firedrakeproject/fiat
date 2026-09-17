@@ -111,7 +111,7 @@ class FunctionalData:
         if order == 1 and rank > 0 and mappings[rank - 1] == "contravariant piola":
             trace = numpy.trace(coefficients, axis1=-2, axis2=-1) / sd
             if numpy.allclose(coefficients, trace[..., None, None] * numpy.eye(sd),
-                              atol=tol * numpy.abs(coefficients).max()):
+                              rtol=0, atol=tol * numpy.abs(coefficients).max()):
                 coefficients = trace[..., None]
                 mappings = mappings[:rank - 1] + (DIVERGENCE,)
         return cls(points, coefficients, mappings)

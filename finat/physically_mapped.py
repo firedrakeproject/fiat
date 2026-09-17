@@ -258,6 +258,7 @@ class DirectlyDefinedElement(NeedsCoordinateMappingElement):
 
 
 class PhysicalGeometry(metaclass=ABCMeta):
+    """Geometry callbacks for physical cells."""
 
     @abstractmethod
     def cell_size(self):
@@ -272,7 +273,7 @@ class PhysicalGeometry(metaclass=ABCMeta):
 
         :arg point: The point in reference space (on the cell) to
              evaluate the Jacobian.
-        :returns: A GEM expression for the Jacobian, shape (gdim, tdim).
+        :returns: A GEM expression for the Jacobian, shape ``(gdim, tdim)``.
         """
 
     @abstractmethod
@@ -442,6 +443,20 @@ def solve(A, B, cache=None):
     return X
 
 
+def pseudoinverse(A):
+    """Returns the Moore-Penrose pseudoinverse of a full-rank matrix.
+
+    :arg A: An object array of GEM scalars with at least as many rows as
+        columns.
+    :returns: The Moore-Penrose pseudoinverse, formed as
+        ``solve(A.T @ A, A.T)``.
+    """
+    m, n = A.shape
+    if m < n:
+        raise ValueError("A must have at least as many rows as columns.")
+    return solve(A.T @ A, A.T)
+
+
 def as_gem(v):
     """Converts a number to a GEM constant, preserving structural zeros."""
     if v == 0:
@@ -467,15 +482,28 @@ class Jacobian:
     reference to physical coordinates; the papers' Jacobian is its
     inverse.
 
-    :arg J: A GEM expression for the Jacobian, shape ``(sd, sd)``.
+    For a rectangular Jacobian, :attr:`detJ` is the positive metric volume
+    factor :math:`\sqrt{\det(J^T J)}`.  The adjugate and cofactor matrix are
+    only defined here for square Jacobians; :func:`pseudoinverse` handles
+    full-rank rectangular Jacobians.
+
+    :arg J: A GEM expression for the Jacobian, shape ``(gdim, tdim)``.
     """
     def __init__(self, J):
-        sd = J.shape[0]
-        self.J = numpy.array([[J[i, k] for k in range(sd)] for i in range(sd)], dtype=object)
-        self.detJ = determinant(self.J)
-        self.adjJ = adjugate(self.J)
-        #: the cofactor matrix, which maps normals to normals
-        self.K = self.adjJ.T
+        if len(J.shape) != 2:
+            raise ValueError(f"The Jacobian must be a matrix, got shape {J.shape}.")
+        gdim, tdim = J.shape
+        self.J = numpy.array([[J[i, k] for k in range(tdim)] for i in range(gdim)], dtype=object)
+        if gdim == tdim:
+            self.detJ = determinant(self.J)
+            self.adjJ = adjugate(self.J)
+            #: the cofactor matrix, which maps normals to normals
+            self.K = self.adjJ.T
+        else:
+            JTJ = self.J.T @ self.J
+            self.detJ = determinant(JTJ)**0.5
+            self.adjJ = None
+            self.K = self.detJ * pseudoinverse(self.J).T
 
 
 def arrange_tabulation(tabulation, columns, functional):

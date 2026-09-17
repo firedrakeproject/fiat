@@ -6,7 +6,16 @@ import pytest
 import pprint
 
 from gem.interpreter import evaluate
-from finat.physically_mapped import PhysicallyMappedElement
+from finat.physically_mapped import Jacobian, PhysicallyMappedElement
+
+
+def test_jacobian_accepts_rectangular_matrix():
+    jacobian = Jacobian(gem.Literal(np.array([[3., 0.], [0., 4.], [0., 0.]])))
+    assert jacobian.J.shape == (3, 2)
+    assert evaluate([jacobian.detJ])[0].arr == pytest.approx(12.)
+    assert jacobian.adjJ is None
+    K = evaluate([gem.ListTensor(jacobian.K)])[0].arr
+    assert np.allclose(K, [[4, 0], [0, 3], [0, 0]])
 
 
 @pytest.fixture(params=["positive", "negative"])
@@ -206,23 +215,6 @@ zany_piola_elements = {
 ])
 def test_piola(ref_to_phys, element, dimension):
     check_zany_mapping(element, ref_to_phys[dimension])
-
-
-@pytest.mark.parametrize("element", [finat.ArnoldWinther, finat.HuZhang])
-def test_vertex_value_conditioning_scaling(ref_to_phys, scaled_ref_to_phys, element):
-    """Vertex values of stress elements use the conditioning scale ``h**-2``."""
-    scaled = scaled_ref_to_phys[2][-1]
-    unit = type(ref_to_phys[2])(scaled.ref_cell, scaled.phys_cell)
-    finat_element = element(scaled.ref_cell)
-
-    Ms = evaluate([finat_element.basis_transformation(scaled)])[0].arr
-    Mu = evaluate([finat_element.basis_transformation(unit)])[0].arr
-
-    h = scaled.cell_size()[0]
-    assert not np.isclose(h, 1)
-    expected = Mu.copy()
-    expected[:9] *= h**-2
-    assert np.allclose(Ms, expected)
 
 
 @pytest.mark.parametrize("dimension, element, degree", [
