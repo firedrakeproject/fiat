@@ -23,7 +23,11 @@ class MyMapping(PhysicalGeometry):
         return gem.Literal(np.linalg.det(self.A))
 
     def jacobian_at(self, point):
-        return gem.Literal(self.A)
+        A = self.A
+        if self.ref_cell.get_spatial_dimension() == 1:
+            # The manifold tangent is unsigned; detJ_at carries orientation.
+            A = np.abs(A)
+        return gem.Literal(A)
 
     def normalized_reference_edge_tangents(self):
         top = self.ref_cell.get_topology()
@@ -102,13 +106,14 @@ def scaled_simplex(dim, scale):
 
 @pytest.fixture
 def ref_el():
-    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (1, 2, 3)}
     return K
 
 
 @pytest.fixture
 def phys_el():
-    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (1, 2, 3)}
+    K[1].vertices = ((0.1,), (1.27,))
     K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
     K[3].vertices = ((0, 0, 0),
                      (1., 0.1, -0.37),

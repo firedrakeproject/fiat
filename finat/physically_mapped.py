@@ -153,7 +153,13 @@ class PhysicallyMappedElement(NeedsCoordinateMappingElement):
         ref_el = self._element.get_reference_element()
         sd = ref_el.get_spatial_dimension()
         bary, = ref_el.make_points(sd, 0, sd + 1)
-        jacobian = Jacobian(coordinate_mapping.jacobian_at(bary))
+        if sd == 1:
+            # The tangent derivative on a one-dimensional manifold carries
+            # the orientation in the signed Jacobian determinant.
+            J = gem.ListTensor([[coordinate_mapping.detJ_at(bary)]])
+        else:
+            J = coordinate_mapping.jacobian_at(bary)
+        jacobian = Jacobian(J)
         return PhysicalVandermondeMatrix(self._element, self.physical_nodes(jacobian), self.tol)
 
     def physical_nodes(self, jacobian):

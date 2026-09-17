@@ -11,7 +11,8 @@ from finat.physically_mapped import PhysicallyMappedElement
 
 @pytest.fixture(params=["positive", "negative"])
 def phys_el(request):
-    K = {dim: FIAT.ufc_simplex(dim) for dim in (2, 3)}
+    K = {dim: FIAT.ufc_simplex(dim) for dim in (1, 2, 3)}
+    K[1].vertices = ((0.1,), (1.27,))
     K[2].vertices = ((0.0, 0.1), (1.17, -0.09), (0.15, 1.84))
     K[3].vertices = ((0, 0, 0),
                      (1., 0.1, -0.37),
@@ -21,7 +22,10 @@ def phys_el(request):
         # swap two vertices to reverse the orientation
         for dim in K:
             v = list(K[dim].vertices)
-            v[1], v[2] = v[2], v[1]
+            if dim == 1:
+                v[0], v[1] = v[1], v[0]
+            else:
+                v[1], v[2] = v[2], v[1]
             K[dim].vertices = tuple(v)
     return K
 
@@ -119,6 +123,13 @@ def check_zany_mapping(element, ref_to_phys, *args, **kwargs):
     pp = pprint.PrettyPrinter(width=140, compact=True)
     assert np.allclose(residual, 0), pp.pformat((np.round(error, 8).tolist(), *inds))
     assert np.allclose(ref_vals_zany, phys_vals[:num_dofs]), pp.pformat((np.round(error, 8).tolist(), *inds))
+
+
+@pytest.mark.parametrize("element, degree", [
+    *((finat.Hermite, k) for k in range(3, 6)),
+])
+def test_C1_interval(ref_to_phys, element, degree):
+    check_zany_mapping(element, ref_to_phys[1], degree)
 
 
 @pytest.mark.parametrize("element", [
