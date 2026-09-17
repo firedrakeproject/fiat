@@ -44,9 +44,19 @@ def test_independent_contractions(nfactors, ndims):
     assert numpy.allclose(result.arr, expected)
 
 
-def test_too_many_indices_in_one_contraction():
-    # A single connected contraction is still bounded.
-    indices = tuple(gem.Index(extent=2) for _ in range(7))
-    table = gem.Indexed(gem.Literal(numpy.ones((2,) * 7)), indices)
-    with pytest.raises(NotImplementedError):
-        sum_factorise(indices, [table])
+def test_greedy_contraction():
+    # A single connected contraction too large to search exhaustively is
+    # ordered greedily, cheapest contraction first.
+    numpy.random.seed(0)
+    extent = 2
+    indices = tuple(gem.Index(extent=extent) for _ in range(7))
+    table = numpy.random.rand(*(extent,) * len(indices))
+    coefficient = numpy.random.rand(*(extent,) * len(indices))
+    factors = [gem.Indexed(gem.Literal(table), indices),
+               gem.Indexed(gem.Literal(coefficient), indices)]
+
+    expression = sum_factorise(indices, factors)
+    assert expression.free_indices == ()
+
+    result, = evaluate([expression])
+    assert numpy.allclose(result.arr, numpy.sum(table * coefficient))

@@ -633,7 +633,7 @@ class Index(IndexBase):
 
     def __lt__(self, other):
         # Allow sorting of free indices in Python 3
-        return id(self) < id(other)
+        return self.count < other.count
 
     def __getstate__(self):
         return self.name, self.extent, self.count
@@ -1151,7 +1151,7 @@ def unique(indices):
     :arg indices: iterable of indices
     :returns: sorted tuple of unique free indices
     """
-    return tuple(sorted(set(indices), key=id))
+    return tuple(sorted(set(indices), key=lambda index: index.count))
 
 
 def index_sum(expression, indices):
