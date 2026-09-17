@@ -229,9 +229,9 @@ class EnrichedElement(FiniteElementBase):
             weights = gem.Indexed(gem.Concatenate(*pieces), (p,))
             blocks.append(gem.ComponentTensor(weights, alpha))
 
-        beta, = self.get_indices()
-        Q = gem.Indexed(gem.Concatenate(*blocks), (beta,))
-        return gem.ComponentTensor(Q, (beta,) + zeta), x
+        beta = self.get_indices()
+        Q = gem.Indexed(gem.Concatenate(*blocks), beta)
+        return gem.ComponentTensor(Q, beta + zeta), x
 
     def _dual_evaluation(self, fn, coordinate_mapping=None):
         """Dual evaluate each summand on its own points.
