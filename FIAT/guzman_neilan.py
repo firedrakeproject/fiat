@@ -22,7 +22,7 @@ import numpy
 import math
 
 
-def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
+def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False, harmonic=False):
     r"""Return a basis for the (extended) Guzman-Neilan H1 space.
 
     Project the extended Bernardi-Raugel space (Pk + FacetBubble)^d
@@ -33,6 +33,7 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     :kwarg kind: kind = 1 gives Pk^d + GN bubbles,
                  kind = 2 gives C0 Pk(Alfeld)^d + GN bubbles.
     :kwarg reduced: Include tangential bubbles if reduced = False.
+    :kwarg harmonic: Use Stokes-harmonic extension for the face bubbles.
 
     :returns: a PolynomialSet basis for the Guzman-Neilan H1 space.
     """
@@ -40,7 +41,7 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
     ref_complex = AlfeldSplit(ref_el)
     C0 = polynomial_set.ONPolynomialSet(ref_complex, sd, shape=(sd,), scale=1, variant="bubble")
     B = take_interior_bubbles(C0)
-    if sd > 2:
+    if sd > 2 and not harmonic:
         B = modified_bubble_subspace(B)
 
     K = ref_complex if kind == 2 else ref_el
@@ -59,12 +60,18 @@ def GuzmanNeilanSpace(ref_el, order, kind=1, reduced=False):
 
 class GuzmanNeilanH1(finite_element.CiarletElement):
     """The Guzman-Neilan H1-conforming (extended) macroelement."""
-    def __init__(self, ref_el, order=1, kind=1, quad_scheme=None):
+    def __init__(self, ref_el, order=1, kind=1, variant=None, quad_scheme=None):
         sd = ref_el.get_spatial_dimension()
         if order >= sd:
             raise ValueError(f"{type(self).__name__} is only defined for order < dim")
+        harmonic = False
+        if variant is not None:
+            if variant == "harmonic":
+                harmonic = True
+            else:
+                raise ValueError(f"{type(self).__name__} does not support variant {variant}")
         degree = sd
-        poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind)
+        poly_set = GuzmanNeilanSpace(ref_el, order, kind=kind, harmonic=harmonic)
         ref_complex = poly_set.get_reference_element() if kind == 2 else ref_el
         dual = BernardiRaugelDualSet(ref_complex, order, degree=degree, quad_scheme=quad_scheme)
         formdegree = sd - 1  # (n-1)-form
@@ -80,8 +87,8 @@ class GuzmanNeilanFirstKindH1(GuzmanNeilanH1):
 
     This element belongs to a Stokes complex, and is paired with unsplit DG_{k-1}.
     """
-    def __init__(self, ref_el, order=1, quad_scheme=None):
-        super().__init__(ref_el, order=order, kind=1, quad_scheme=quad_scheme)
+    def __init__(self, ref_el, order=1, variant=None, quad_scheme=None):
+        super().__init__(ref_el, order=order, kind=1, variant=variant, quad_scheme=quad_scheme)
 
 
 class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
@@ -93,11 +100,11 @@ class GuzmanNeilanSecondKindH1(GuzmanNeilanH1):
 
     This element belongs to a Stokes complex, and is paired with DG_{k-1}(Alfeld).
     """
-    def __init__(self, ref_el, order=1, quad_scheme=None):
-        super().__init__(ref_el, order=order, kind=2, quad_scheme=quad_scheme)
+    def __init__(self, ref_el, order=1, variant=None, quad_scheme=None):
+        super().__init__(ref_el, order=order, kind=2, variant=variant, quad_scheme=quad_scheme)
 
 
-def GuzmanNeilanH1div(ref_el, degree=2, reduced=False, quad_scheme=None):
+def GuzmanNeilanH1div(ref_el, degree=2, variant=None, reduced=False, quad_scheme=None):
     """The Guzman-Neilan H1(div)-conforming (extended) macroelement.
 
     Reference element: a simplex of any dimension.
@@ -115,7 +122,7 @@ def GuzmanNeilanH1div(ref_el, degree=2, reduced=False, quad_scheme=None):
         div_nodes = [i for i, node in enumerate(AS.dual_basis())
                      if len(node.deriv_dict) > 0]
         AS = RestrictedElement(AS, indices=div_nodes)
-    GN = GuzmanNeilanH1(ref_el, order=order, quad_scheme=quad_scheme)
+    GN = GuzmanNeilanH1(ref_el, order=order, variant=variant, quad_scheme=quad_scheme)
     return NodalEnrichedElement(AS, GN)
 
 
@@ -128,6 +135,11 @@ def inner(v, u, qwts):
 def div(U):
     """Compute the divergence from tabulation dict."""
     return sum(U[k][:, k.index(1), :] for k in U if sum(k) == 1)
+
+
+def grad(U):
+    """Compute the gradient from tabulation dict."""
+    return numpy.concatenate([U[k] for k in U if sum(k) == 1], axis=-2)
 
 
 def take_interior_bubbles(P, degree=None):
@@ -202,10 +214,22 @@ def constant_div_projection(BR, C0, M, num_bubbles):
 
     U = M.tabulate(qpts, 1)
     X = BR.tabulate(qpts, 1)
-    # Invert the divergence
     B = inner(P, div(U), qwts)
     g = inner(P, div(X)[-num_bubbles:], qwts)
-    w = numpy.linalg.solve(B, g)
+    if B.shape[0] == B.shape[1]:
+        # Invert the divergence
+        w = numpy.linalg.solve(B, g)
+    else:
+        # Solve Stokes
+        n, m = B.shape
+        A = inner(grad(U), grad(U), qwts)
+        S = numpy.zeros((n + m, n + m))
+        S[:m, :m] = A
+        S[m:, :m] = B
+        S[:m, m:] = B.T
+        f = inner(grad(U), grad(X)[-num_bubbles:], qwts)
+        rhs = numpy.concatenate([f, g], axis=0)
+        w = numpy.linalg.solve(S, rhs)[:m]
 
     # Add correction to BR bubbles
     v = C0.tabulate(qpts)[(0,)*sd]
