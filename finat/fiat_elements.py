@@ -7,6 +7,42 @@ from finat.finiteelementbase import FiniteElementBase
 from finat.point_set import PointSet, PointSingleton
 
 
+def _cast_literals(expression: gem.Node, dtype: np.dtype) -> gem.Node:
+    """Cast floating-point literals in a GEM expression.
+
+    Parameters
+    ----------
+    expression
+        The expression whose literals should be cast.
+    dtype
+        The requested tabulation dtype.
+
+    Returns
+    -------
+    gem.Node
+        The expression with floating-point literals cast to ``dtype``.
+    """
+    # Equal-valued GEM literals compare equal even when their dtypes differ.
+    cache = {}
+
+    def cast(node: gem.Node) -> gem.Node:
+        try:
+            return cache[id(node)]
+        except KeyError:
+            pass
+
+        if isinstance(node, gem.Literal) and node.dtype.kind in "fc":
+            result = gem.Literal(node.array, dtype=dtype)
+        else:
+            children = tuple(cast(child) for child in node.children)
+            untouched = all(a is b for a, b in zip(children, node.children))
+            result = node if untouched else node.reconstruct(*children)
+        cache[id(node)] = result
+        return result
+
+    return cast(expression)
+
+
 class FiatElement(FiniteElementBase):
     """Base class for finite elements for which the tabulation is provided
     by FIAT."""
@@ -119,7 +155,7 @@ class FiatElement(FiniteElementBase):
             expr = gem.ComponentTensor(expr, basis_indices)
             if replace_indices:
                 expr, = gem.optimise.remove_componenttensors((expr,), subst=replace_indices)
-            result[alpha] = expr
+            result[alpha] = _cast_literals(expr, self.cell.dtype)
         return result
 
     def point_evaluation(self, order, refcoords, entity=None, coordinate_mapping=None):
@@ -156,6 +192,7 @@ class FiatElement(FiniteElementBase):
         vals = gem.optimise.constant_fold_zero(vals)
         vals = map(gem.optimise.aggressive_unroll, vals)
         vals = gem.optimise.remove_componenttensors(vals)
+        vals = (_cast_literals(expr, self.cell.dtype) for expr in vals)
         result = dict(zip(result.keys(), vals))
         return result
 

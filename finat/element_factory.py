@@ -114,9 +114,18 @@ have a direct FInAT equivalent."""
 def as_fiat_cell(cell, dtype=None):
     """Convert a ufl cell to a FIAT cell.
 
-    :arg cell: the :class:`ufl.Cell` to convert.
-    :arg dtype: the dtype to build the reference cell's coordinates with.
-        Defaults to FIAT's own default (float64) if not given."""
+    Parameters
+    ----------
+    cell
+        The UFL cell to convert.
+    dtype
+        Optional output dtype for tabulation.
+
+    Returns
+    -------
+    FIAT.reference_element.Cell
+        The corresponding FIAT reference cell.
+    """
     if not isinstance(cell, ufl.AbstractCell):
         raise ValueError("Expecting a UFL Cell")
     return ufc_cell(cell, dtype=dtype)
@@ -335,12 +344,23 @@ _cache = weakref.WeakKeyDictionary()
 def create_element(ufl_element, shape_innermost=True, shift_axes=0, restriction=None, dtype=None):
     """Create a FInAT element (suitable for tabulating with) given a UFL element.
 
-    :arg ufl_element: The UFL element to create a FInAT element from.
-    :arg shape_innermost: Vector/tensor indices come after basis function indices
-    :arg restriction: cell restriction in interior facet integrals
-                      (only for runtime tabulated elements)
-    :arg dtype: the dtype to build the element's reference cell with.
-               Defaults to FIAT's own default (float64) if not given.
+    Parameters
+    ----------
+    ufl_element
+        The UFL element to convert.
+    shape_innermost
+        Whether vector or tensor indices follow basis-function indices.
+    shift_axes
+        The number of axes by which to shift tensor-product elements.
+    restriction
+        Optional cell restriction for runtime-tabulated elements.
+    dtype
+        Optional output dtype for tabulation.
+
+    Returns
+    -------
+    finat.FiniteElementBase
+        The corresponding FInAT element.
     """
     finat_element, deps = _create_element(ufl_element,
                                           shape_innermost=shape_innermost,

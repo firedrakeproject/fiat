@@ -1,10 +1,13 @@
+import gem
 import numpy
 import pytest
+from gem.node import traversal
 
 import ufl
 import finat.ufl
 import finat
 from finat.element_factory import create_element, supported_elements
+from finat.point_set import PointSet
 
 
 @pytest.fixture(params=["BDM",
@@ -168,7 +171,7 @@ def test_cache_hit_vector(ufl_vector_element):
 
 
 def test_dtype_reaches_reference_cell(ufl_element):
-    """Check that target dtype is independent of construction dtype."""
+    """Check that requested dtype is independent of construction dtype."""
     default = create_element(ufl_element)
     single = create_element(ufl_element, dtype=numpy.float32)
     double = create_element(ufl_element, dtype=numpy.float64)
@@ -176,9 +179,41 @@ def test_dtype_reaches_reference_cell(ufl_element):
     assert numpy.array(default.cell.vertices).dtype == numpy.float64
     assert numpy.array(single.cell.vertices).dtype == numpy.float64
     assert numpy.array(double.cell.vertices).dtype == numpy.float64
-    assert default.cell.target_dtype == numpy.float64
-    assert single.cell.target_dtype == numpy.float32
-    assert double.cell.target_dtype == numpy.float64
+    assert default.cell.dtype == numpy.float64
+    assert single.cell.dtype == numpy.float32
+    assert double.cell.dtype == numpy.float64
+
+
+def test_dtype_applies_to_numerical_tabulation():
+    """Check that numerical tabulation literals use the requested dtype."""
+    ufl_element = finat.ufl.FiniteElement("Lagrange", ufl.triangle, 1)
+    element = create_element(ufl_element, dtype=numpy.float32)
+    points = PointSet(numpy.asarray(((0.2, 0.3),)))
+
+    tables = element.basis_evaluation(0, points)
+    literals = {
+        node.dtype
+        for node in traversal(tables.values())
+        if isinstance(node, gem.Literal) and node.dtype.kind in "fc"
+    }
+
+    assert literals == {numpy.dtype(numpy.float32)}
+
+
+def test_dtype_applies_to_symbolic_tabulation():
+    """Check that symbolic tabulation literals use the requested dtype."""
+    ufl_element = finat.ufl.FiniteElement("Lagrange", ufl.triangle, 1)
+    element = create_element(ufl_element, dtype=numpy.float32)
+    refcoords = gem.Variable("X", (2,), dtype=numpy.float32)
+
+    tables = element.point_evaluation(0, refcoords)
+    literals = {
+        node.dtype
+        for node in traversal(tables.values())
+        if isinstance(node, gem.Literal) and node.dtype.kind in "fc"
+    }
+
+    assert literals == {numpy.dtype(numpy.float32)}
 
 
 def test_dtype_cache_distinguishes(ufl_element):

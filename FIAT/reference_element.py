@@ -143,7 +143,7 @@ class Cell:
         comprising the facet."""
         self.shape = shape
         self.vertices = vertices
-        self.target_dtype = numpy.asarray(vertices).dtype
+        self.dtype = numpy.asarray(vertices).dtype
         self.topology = topology
 
         # Given the topology, work out for each entity in the cell,
@@ -1660,7 +1660,17 @@ def ufc_hypercube(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
     the UFC reference hypercube of that dimension.
 
-    :arg dtype: optional working dtype for tabulation.
+    Parameters
+    ----------
+    spatial_dim
+        The spatial dimension.
+    dtype
+        Optional output dtype for tabulation.
+
+    Returns
+    -------
+    Cell
+        The corresponding UFC reference hypercube.
     """
     if spatial_dim == 0:
         cell = Point()
@@ -1673,7 +1683,7 @@ def ufc_hypercube(spatial_dim, dtype=None):
     else:
         raise RuntimeError(f"Can't create UFC hypercube of dimension {spatial_dim}.")
     if dtype is not None:
-        cell.target_dtype = numpy.dtype(dtype)
+        cell.dtype = numpy.dtype(dtype)
     return cell
 
 
@@ -1696,7 +1706,17 @@ def ufc_simplex(spatial_dim, dtype=None):
     """Factory function that maps spatial dimension to an instance of
     the UFC reference simplex of that dimension.
 
-    :arg dtype: optional working dtype for tabulation.
+    Parameters
+    ----------
+    spatial_dim
+        The spatial dimension.
+    dtype
+        Optional output dtype for tabulation.
+
+    Returns
+    -------
+    Cell
+        The corresponding UFC reference simplex.
     """
     if spatial_dim == 0:
         cell = Point()
@@ -1709,7 +1729,7 @@ def ufc_simplex(spatial_dim, dtype=None):
     else:
         raise RuntimeError(f"Can't create UFC simplex of dimension {spatial_dim}.")
     if dtype is not None:
-        cell.target_dtype = numpy.dtype(dtype)
+        cell.dtype = numpy.dtype(dtype)
     return cell
 
 
@@ -1723,7 +1743,7 @@ def symmetric_simplex(spatial_dim, dtype=None):
     v = numpy.dot(Ref1.get_vertices(), A.T) + b[None, :]
     vertices = tuple(map(tuple, v))
     cell = SymmetricSimplex(Ref1.get_shape(), vertices, Ref1.get_topology())
-    cell.target_dtype = numpy.dtype(float if dtype is None else dtype)
+    cell.dtype = numpy.dtype(float if dtype is None else dtype)
     return cell
 
 
@@ -1739,7 +1759,7 @@ def ufc_cell(cell, dtype=None):
     if " * " in celltype:
         # Tensor product cell
         ref_el = TensorProductCell(*(ufc_cell(c, dtype=dtype) for c in celltype.split(" * ")))
-        ref_el.target_dtype = numpy.dtype(float if dtype is None else dtype)
+        ref_el.dtype = numpy.dtype(float if dtype is None else dtype)
         return ref_el
     elif celltype == "quadrilateral":
         return ufc_hypercube(2, dtype=dtype)
