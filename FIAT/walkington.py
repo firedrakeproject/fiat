@@ -99,10 +99,12 @@ class WalkingtonDualSet(DualSet):
 
 class Walkington(finite_element.CiarletElement):
     """The Walkington C1 macroelement."""
+    DEFAULT_DEGREE = 5
 
     def __init__(self, ref_el, degree=5):
         if ref_el.get_shape() != TETRAHEDRON:
             raise ValueError(f"{type(self).__name__} only defined on tetrahedron")
+        degree = self._parse_degree(degree)
         if degree != 5:
             raise ValueError(f"{type(self).__name__} only defined for degree=5.")
 

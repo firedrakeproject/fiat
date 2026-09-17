@@ -50,8 +50,10 @@ class BernsteinDualSet(DualSet):
 
 class Bernstein(FiniteElement):
     """A finite element with Bernstein polynomials as basis functions."""
+    DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree):
+        degree = self._parse_degree(degree)
         dual = BernsteinDualSet(ref_el, degree)
         k = 0  # 0-form
         super().__init__(ref_el, dual, degree, k)

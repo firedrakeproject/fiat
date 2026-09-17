@@ -58,7 +58,10 @@ def ArnoldQinSpace(ref_el, degree, reduced=False):
 class ArnoldQin(finite_element.CiarletElement):
     """The Arnold-Qin C0(Alfeld) quadratic macroelement with divergence in P0.
     This element belongs to a Stokes complex, and is paired with unsplit DG0."""
+    DEFAULT_DEGREE = 2
+
     def __init__(self, ref_el, degree=2, reduced=False):
+        degree = self._parse_degree(degree)
         poly_set = ArnoldQinSpace(ref_el, degree)
         if reduced:
             order = 1

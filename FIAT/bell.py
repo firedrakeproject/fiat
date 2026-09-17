@@ -48,10 +48,12 @@ class BellDualSet(dual_set.DualSet):
 
 class Bell(finite_element.CiarletElement):
     """The Bell finite element."""
+    DEFAULT_DEGREE = 5
 
     def __init__(self, ref_el, degree=5):
         if ref_el.get_shape() != TRIANGLE:
             raise ValueError(f"{type(self).__name__} only defined on triangles")
+        degree = self._parse_degree(degree)
         if degree != 5:
             raise ValueError(f"{type(self).__name__} only defined for degree = 5.")
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)

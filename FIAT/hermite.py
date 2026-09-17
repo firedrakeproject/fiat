@@ -69,10 +69,12 @@ class CubicHermiteDualSet(dual_set.DualSet):
 
 class CubicHermite(finite_element.CiarletElement):
     """The cubic Hermite finite element.  It is what it is."""
+    DEFAULT_DEGREE = 3
 
-    def __init__(self, ref_el, deg=3):
-        assert deg == 3
-        poly_set = polynomial_set.ONPolynomialSet(ref_el, 3)
+    def __init__(self, ref_el, degree=3):
+        degree = self._parse_degree(degree)
+        assert degree == 3
+        poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = CubicHermiteDualSet(ref_el)
 
-        super().__init__(poly_set, dual, 3)
+        super().__init__(poly_set, dual, degree)

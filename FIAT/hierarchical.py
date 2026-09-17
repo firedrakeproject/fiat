@@ -59,8 +59,10 @@ class LegendreDual(dual_set.DualSet):
 
 class Legendre(finite_element.CiarletElement):
     """Simplicial discontinuous element with Legendre polynomials."""
+    DEFAULT_DEGREE = 0
+
     def __new__(cls, ref_el, degree, variant=None):
-        if degree == 0:
+        if degree is None or degree == 0:
             splitting, variant, interpolant_deg = check_format_variant(variant, degree)
             if splitting is None and interpolant_deg == 0:
                 # FIXME P0 on the split requires implementing SplitSimplicialComplex.symmetry_group_size()
@@ -68,6 +70,7 @@ class Legendre(finite_element.CiarletElement):
         return super().__new__(cls)
 
     def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        degree = self._parse_degree(degree)
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
@@ -102,12 +105,13 @@ class IntegratedLegendreDual(dual_set.DualSet):
 
 class IntegratedLegendre(finite_element.CiarletElement):
     """Simplicial continuous element with integrated Legendre polynomials."""
+    DEFAULT_DEGREE = 1
+
     def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        degree = self._parse_degree(degree)
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
-        if degree < 1:
-            raise ValueError(f"{type(self).__name__} elements only valid for k >= 1")
         poly_set = ONPolynomialSet(ref_el, degree, variant="bubble")
         dual = IntegratedLegendreDual(ref_el, degree, interpolant_deg=interpolant_deg, quad_scheme=quad_scheme)
         formdegree = 0  # 0-form

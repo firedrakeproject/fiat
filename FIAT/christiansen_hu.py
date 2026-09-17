@@ -66,7 +66,10 @@ def ChristiansenHuSpace(ref_el, degree, reduced=False):
 class ChristiansenHu(finite_element.CiarletElement):
     """The Christiansen-Hu C^0(Worsey-Farin) linear macroelement with divergence in P0.
     This element belongs to a Stokes complex, and is paired with unsplit DG0."""
+    DEFAULT_DEGREE = 1
+
     def __init__(self, ref_el, degree=1):
+        degree = self._parse_degree(degree)
         if degree != 1:
             raise ValueError("Christiansen-Hu only defined for degree = 1")
         poly_set = ChristiansenHuSpace(ref_el, degree)

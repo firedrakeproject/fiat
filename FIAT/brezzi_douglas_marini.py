@@ -90,15 +90,14 @@ class BrezziDouglasMarini(finite_element.CiarletElement):
     exactly. This is important when you want to have (nearly) div-preserving
     interpolation.
     """
+    DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree, variant=None, quad_scheme=None):
+        degree = self._parse_degree(degree)
 
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             ref_el = splitting(ref_el)
-
-        if degree < 1:
-            raise Exception("BDM_k elements only valid for k >= 1")
 
         sd = ref_el.get_spatial_dimension()
         if ref_el.is_macrocell():

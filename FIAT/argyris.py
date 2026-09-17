@@ -102,9 +102,10 @@ class Argyris(finite_element.CiarletElement):
     "integral(q)" -> dofs are evaluated by quadrature rules with the minimum
     degree required for unisolvence plus q.
     """
+    DEFAULT_DEGREE = 5
 
     def __init__(self, ref_el, degree=5, variant=None, quad_scheme=None):
-
+        degree = self._parse_degree(degree)
         splitting, variant, interpolant_deg = check_format_variant(variant, degree)
         if splitting is not None:
             raise NotImplementedError(f"{type(self).__name__} is not implemented as a macroelement.")

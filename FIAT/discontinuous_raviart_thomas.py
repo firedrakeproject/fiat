@@ -54,9 +54,10 @@ class DRTDualSet(dual_set.DualSet):
 
 class DiscontinuousRaviartThomas(finite_element.CiarletElement):
     """The discontinuous Raviart-Thomas finite element"""
+    DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree):
-
+        degree = self._parse_degree(degree)
         poly_set = RTSpace(ref_el, degree)
         dual = DRTDualSet(ref_el, degree)
         super().__init__(poly_set, dual, degree, mapping="contravariant piola")

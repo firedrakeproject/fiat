@@ -86,8 +86,10 @@ class KongMulderVeldhuizen(finite_element.CiarletElement):
     W. A. MULDER
 
     """
+    DEFAULT_DEGREE = 1
 
     def __init__(self, ref_el, degree, variant=None):
+        degree = self._parse_degree(degree)
         splitting, variant = parse_lagrange_variant(variant)
         if splitting:
             ref_el = splitting(ref_el)

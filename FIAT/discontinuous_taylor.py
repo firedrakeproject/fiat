@@ -39,18 +39,18 @@ class DiscontinuousTaylorDualSet(dual_set.DualSet):
         super().__init__(nodes, ref_el, entity_ids)
 
 
-class HigherOrderDiscontinuousTaylor(finite_element.CiarletElement):
+class DiscontinuousTaylor(finite_element.CiarletElement):
     """The discontinuous Taylor finite element. Use a Taylor basis for DG."""
+    DEFAULT_DEGREE = 0
+
+    def __new__(cls, ref_el, degree):
+        if degree is None or degree == 0:
+            return P0.P0(ref_el)
+        return super().__new__(cls)
 
     def __init__(self, ref_el, degree):
+        degree = self._parse_degree(degree)
         poly_set = polynomial_set.ONPolynomialSet(ref_el, degree)
         dual = DiscontinuousTaylorDualSet(ref_el, degree)
         formdegree = ref_el.get_spatial_dimension()  # n-form
         super().__init__(poly_set, dual, degree, formdegree)
-
-
-def DiscontinuousTaylor(ref_el, degree):
-    if degree == 0:
-        return P0.P0(ref_el)
-    else:
-        return HigherOrderDiscontinuousTaylor(ref_el, degree)
