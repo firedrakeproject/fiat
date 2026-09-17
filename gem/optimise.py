@@ -449,6 +449,59 @@ def _independent_contractions(sum_indices, groups):
     return list(subproblems.values()), rest
 
 
+def _contract(terms, sum_index):
+    """Sum one index out of a list of product terms.
+
+    :arg terms: list of product terms
+    :arg sum_index: the index to contract
+    :returns: (terms after the contraction, its flop count)
+    """
+    # Select terms that need to be part of the contraction
+    contract = [t for t in terms if sum_index in t.free_indices]
+    deferred = [t for t in terms if sum_index not in t.free_indices]
+
+    # Optimise associativity
+    product, flops = associate(Product, contract)
+    term = IndexSum(product, (sum_index,))
+    flops += numpy.prod([i.extent for i in product.free_indices], dtype=int)
+
+    # Replace the contracted terms with the result of the contraction.
+    return deferred + [term], flops
+
+
+def _contract_in_order(sum_indices, groups):
+    """Contract indices in the given order.
+
+    :returns: (GEM expression, its flop count)
+    """
+    terms = groups[:]
+    flops = 0
+    for sum_index in sum_indices:
+        terms, flops_ = _contract(terms, sum_index)
+        flops += flops_
+
+    # If some contraction indices were independent, then we may still
+    # have several terms at this point.
+    expression, flops_ = associate(Product, terms)
+    return expression, flops + flops_
+
+
+def _contract_greedily(sum_indices, groups):
+    """Contract indices cheapest first.
+
+    :returns: (GEM expression, its flop count)
+    """
+    remaining = list(sum_indices)
+    ordering = []
+    terms = groups[:]
+    while remaining:
+        sum_index = min(remaining, key=lambda index: _contract(terms, index)[1])
+        remaining.remove(sum_index)
+        ordering.append(sum_index)
+        terms, _ = _contract(terms, sum_index)
+    return _contract_in_order(ordering, groups)
+
+
 # Planning a tree visits 3**factors subset pairs, while searching the
 # orderings of the contraction indices costs indices!.  Above this many
 # factors the exhaustive search over orderings is the cheaper plan.
@@ -563,35 +616,16 @@ def _sum_factorise_connected(sum_indices, groups):
         return _plan_contraction(sum_indices, groups)
 
     if len(sum_indices) > 6:
-        raise NotImplementedError("Too many indices for sum factorisation!")
+        # Exhaustive search costs a factorial in the number of indices.
+        expression, _ = _contract_greedily(sum_indices, groups)
+        return expression
 
     expression = None
     best_flops = numpy.inf
 
     # Consider all orderings of contraction indices
     for ordering in permutations(sum_indices):
-        terms = groups[:]
-        flops = 0
-        # Apply contraction index by index
-        for sum_index in ordering:
-            # Select terms that need to be part of the contraction
-            contract = [t for t in terms if sum_index in t.free_indices]
-            deferred = [t for t in terms if sum_index not in t.free_indices]
-
-            # Optimise associativity
-            product, flops_ = associate(Product, contract)
-            term = IndexSum(product, (sum_index,))
-            flops += flops_ + numpy.prod([i.extent for i in product.free_indices], dtype=int)
-
-            # Replace the contracted terms with the result of the
-            # contraction.
-            terms = deferred + [term]
-
-        # If some contraction indices were independent, then we may
-        # still have several terms at this point.
-        expr, flops_ = associate(Product, terms)
-        flops += flops_
-
+        expr, flops = _contract_in_order(ordering, groups)
         if flops < best_flops:
             expression = expr
             best_flops = flops
@@ -1295,8 +1329,8 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     This function evaluates the contraction for each row, then reads those
     results through the map.  The rewrite is correct only if the map does not
     change with the contracted indices, and no other part of the contraction
-    uses the argument.  It is faster only if the map has more arguments than
-    the table has rows.
+    uses the argument.  It is faster only when the gathers that share a
+    tabulation have more arguments between them than the table has rows.
 
     :arg expression: the root of a scalar GEM expression
     :returns: the expression with each such contraction evaluated one time
@@ -1305,6 +1339,12 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
     gathers = _indirect_gathers(expression)
     if not gathers:
         return expression
+
+    # Gathers that select the same rows with the same arguments read one
+    # tabulation, so they pay for it once between them.
+    readers = Counter((frozenset(gather.expression.free_indices), nrows)
+                      for gather, nrows in gathers.items())
+    row_indices = {}
 
     def rename(node, self, substitution):
         target, replacement = substitution
@@ -1324,12 +1364,15 @@ def tabulate_indirect_contractions(expression: Node) -> Node:
         for gather, nrows in gathers.items():
             arguments = frozenset(gather.expression.free_indices)
             if arguments <= free and arguments.isdisjoint(contracted):
-                saving = iteration_count(arguments) - nrows
+                sharing = readers[(arguments, nrows)]
+                saving = sharing * iteration_count(arguments) - nrows
                 if saving > 0:
                     candidates.append((saving, gather, arguments, nrows))
 
         for _, gather, arguments, nrows in sorted(candidates, key=lambda c: -c[0]):
-            row = Index(extent=nrows)
+            # One index per table, so that gathers sharing a tabulation build
+            # the same node and evaluate it one time.
+            row = row_indices.setdefault((arguments, nrows), Index(extent=nrows))
             per_row = MemoizerArg(rename)(body, (gather, row))
             # The body must reach the arguments only through this gather.
             if arguments.isdisjoint(per_row.free_indices):
