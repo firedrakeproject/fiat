@@ -151,6 +151,7 @@ class SplitSimplicialComplex(SimplicialComplex):
         self._interior_facets = interior_facets
 
         super().__init__(parent.shape, vertices, topology)
+        self.dtype = parent.dtype
 
     def get_child_to_parent(self):
         """Maps split complex facet tuple to its parent entity tuple."""

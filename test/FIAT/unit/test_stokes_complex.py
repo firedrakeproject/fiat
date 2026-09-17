@@ -143,8 +143,10 @@ def check_stokes_complex(spaces, degree):
 
 @pytest.mark.parametrize("reduced", (False, True), ids=("full", "reduced"))
 @pytest.mark.parametrize("sobolev", ("H1", "H1div"))
-@pytest.mark.parametrize("cell", (T,))
-def test_hct_stokes_complex(cell, sobolev, reduced):
+@pytest.mark.parametrize("dtype", (numpy.float64, numpy.float32),
+                         ids=("float64", "float32"))
+def test_hct_stokes_complex(dtype, sobolev, reduced):
+    cell = ufc_simplex(2, dtype=dtype)
     if sobolev == "H1":
         if reduced:
             spaces = [rHCT(cell), rAQ(cell), DG(cell, 0)]
@@ -246,11 +248,18 @@ def test_gn_trace(sd):
 
 
 @pytest.mark.parametrize("cell", (T, S))
-@pytest.mark.parametrize("family", ("AQ", "CH", "GN", "GN2"))
-def test_minimal_stokes_space(cell, family):
+@pytest.mark.parametrize("family,dtype", (
+    ("AQ", numpy.float64),
+    ("CH", numpy.float64),
+    ("CH", numpy.float32),
+    ("GN", numpy.float64),
+    ("GN2", numpy.float64),
+))
+def test_minimal_stokes_space(cell, family, dtype):
     # Test that the C0 Stokes space is spanned by a C0 basis
     # Also test that its divergence is constant
     sd = cell.get_spatial_dimension()
+    cell = ufc_simplex(sd, dtype=dtype)
     if family == "GN":
         degree = 1
         space = GuzmanNeilanSpace
