@@ -300,6 +300,25 @@ class FiniteElementBase(metaclass=ABCMeta):
             f"Dual basis not defined for element {type(self).__name__}"
         )
 
+    @cached_property
+    def summands(self):
+        """Return the leaves of the direct-sum decomposition.
+
+        For ``E = E_1 ⊕ ... ⊕ E_n``, return ``(E_1, ..., E_n)``.  For an
+        element that is not a direct sum, return ``(E,)``.  The summands are
+        in basis order.
+
+        Returns
+        -------
+        tuple
+            The direct-sum leaves on this element's cell.
+        """
+        from finat.enriched import as_enriched  # Avoid circular import
+        summands = as_enriched(self)
+        if summands is None:
+            return (self,)
+        return summands.summands
+
     def dual_evaluation(self, fn, coordinate_mapping=None):
         '''Get a GEM expression for performing the dual basis evaluation at
         the nodes of the reference element. Currently only works for flat
