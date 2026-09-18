@@ -10,6 +10,7 @@
 # transformation theory.
 
 from FIAT import finite_element, dual_set, polynomial_set, expansions
+from FIAT.bubble import make_projected_bubble_moment
 from FIAT.check_format_variant import parse_quadrature_scheme
 from FIAT.functional import ComponentPointEvaluation, FrobeniusIntegralMoment
 from FIAT.hierarchical import make_dual_bubbles
@@ -77,14 +78,7 @@ class BernardiRaugelDualSet(dual_set.DualSet):
             # Quadrature and weight function for tangential constraints
             codim = sd-1 if degree == 1 and ref_facet.is_macrocell() else 0
             if codim == 0:
-                Qt_ref = parse_quadrature_scheme(ref_facet, 2*degree, quad_scheme=None)
-                Pk = polynomial_set.ONPolynomialSet(ref_facet, degree, scale="orthonormal")
-                coeffs = polynomial_set.project(ref_facet.compute_bubble, Pk, Qt_ref)
-                coeffs[..., :expansions.polynomial_dimension(ref_facet, degree-1)] = 0
-                Pt = polynomial_set.PolynomialSet(ref_facet, degree, degree,
-                                                  Pk.get_expansion_set(),
-                                                  coeffs)
-                ft_at_qpts = Pt.tabulate(Qt_ref.get_points())[(0,)*(sd-1)][-1]
+                Qt_ref, ft_at_qpts = make_projected_bubble_moment(ref_facet, degree)
                 bf_at_qpts = ref_facet.compute_bubble(Qt_ref.get_points())
                 bf_wts = numpy.multiply(bf_at_qpts, Qt_ref.get_weights())
                 scale = numpy.sum(bf_wts) / numpy.dot(ft_at_qpts, bf_wts)
